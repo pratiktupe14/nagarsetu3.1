@@ -17,7 +17,7 @@ import {
   getAllServiceStaffRecords, formatSlaRemainingTime, ServiceStaffMemberRecord,
   getDepartmentServiceStaff, getStaffMemberById
 } from '../../services/adminService';
-import { getNotificationsForRole } from '../../services/notificationService';
+import { getNotificationsForRole, pushNotification } from '../../services/notificationService';
 import { Complaint, ComplaintStatus, UserProfile, NotificationItem } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import {
@@ -29,7 +29,7 @@ import {
   Users, Layers, CornerDownRight, RotateCcw, Download, Filter, CheckSquare,
   Square, ChevronLeft, ExternalLink, FileSpreadsheet, Info, Phone, Mail,
   UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX,
-  ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle
+  ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle, Siren, AlertOctagon, ShieldAlert
 } from 'lucide-react';
 
 // Fix standard Leaflet marker icon asset issue
@@ -112,6 +112,42 @@ const getWorkloadInfo = (activeTaskCount: number) => {
   return { label: 'High Workload', color: 'bg-rose-50 text-rose-800 border-rose-200' };
 };
 
+// Calculate Overdue Duration & Urgency Indicator
+const getOverdueDetails = (slaDeadline: string | null, now: Date) => {
+  if (!slaDeadline) return { text: 'N/A', urgency: 'Within SLA', badgeColor: 'bg-gray-100 text-gray-700' };
+  const due = new Date(slaDeadline);
+  const diffMs = now.getTime() - due.getTime();
+
+  if (diffMs <= 0) {
+    return { text: 'Within SLA', urgency: 'Within SLA', badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  }
+
+  const hoursTotal = Math.floor(diffMs / (1000 * 3600));
+  const days = Math.floor(hoursTotal / 24);
+  const hours = hoursTotal % 24;
+  const mins = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+
+  let timeStr = '';
+  if (days > 0) {
+    timeStr = `${days}d ${hours}h ${mins}m`;
+  } else if (hours > 0) {
+    timeStr = `${hours}h ${mins}m`;
+  } else {
+    timeStr = `${mins}m`;
+  }
+
+  if (hoursTotal < 6) {
+    return { text: `Overdue by ${timeStr}`, urgency: 'Recently Overdue', badgeColor: 'bg-yellow-50 text-yellow-900 border-yellow-300 font-bold' };
+  }
+  if (hoursTotal < 24) {
+    return { text: `Overdue by ${timeStr}`, urgency: 'Overdue', badgeColor: 'bg-amber-50 text-amber-900 border-amber-300 font-bold' };
+  }
+  if (days < 3) {
+    return { text: `Overdue by ${timeStr}`, urgency: 'Severely Overdue', badgeColor: 'bg-orange-100 text-orange-900 border-orange-400 font-extrabold' };
+  }
+  return { text: `Overdue by ${timeStr}`, urgency: 'Critical Delay', badgeColor: 'bg-rose-100 text-rose-900 border-rose-400 font-extrabold' };
+};
+
 export const DepartmentHeadPortal: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translateStatus, translatePriority } = useLanguage();
@@ -161,6 +197,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [staffFilter, setStaffFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All Time');
   const [slaFilter, setSlaFilter] = useState('All');
+  const [overdueDurationFilter, setOverdueDurationFilter] = useState('All');
   const [reviewStatusTab, setReviewStatusTab] = useState<'All' | 'Pending Review' | 'Approved' | 'Rework Required' | 'Resolved'>('All');
   const [taskLoadFilter, setTaskLoadFilter] = useState('All');
 
@@ -177,6 +214,13 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [targetReassignStaffId, setTargetReassignStaffId] = useState<string>('');
   const [reassignReason, setReassignReason] = useState<string>('');
   const [reassigning, setReassigning] = useState<boolean>(false);
+
+  // Escalation Modal State
+  const [escalateModalComplaint, setEscalateModalComplaint] = useState<Complaint | null>(null);
+  const [escalationReason, setEscalationReason] = useState<string>('');
+  const [escalationPriority, setEscalationPriority] = useState<string>('Critical');
+  const [escalationNotes, setEscalationNotes] = useState<string>('');
+  const [escalating, setEscalating] = useState<boolean>(false);
 
   // Image Viewer Modal State
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
@@ -309,7 +353,6 @@ export const DepartmentHeadPortal: React.FC = () => {
       return diffTime <= 7 * 24 * 3600 * 1000;
     }).length;
 
-    // Calculate Average Resolution Time in Hours
     let totalResolutionHours = 0;
     let resolvedCount = 0;
     completedComplaints.forEach((c) => {
@@ -326,6 +369,39 @@ export const DepartmentHeadPortal: React.FC = () => {
     const avgResolutionTime = resolvedCount > 0 ? `${(totalResolutionHours / resolvedCount).toFixed(1)} hrs` : 'N/A';
 
     return { total, pendingReview, approved, reworkRequired, completedToday, completedThisWeek, avgResolutionTime };
+  }, [departmentComplaints, now]);
+
+  // Overdue Specific Metric Cards (Real Database Data)
+  const overdueMetrics = useMemo(() => {
+    const overdueList = departmentComplaints.filter((c) => {
+      if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
+      return new Date(c.sla_deadline) < now;
+    });
+
+    const totalOverdue = overdueList.length;
+    const critical = overdueList.filter((c) => c.priority === 'Critical').length;
+    const highPriority = overdueList.filter((c) => c.priority === 'High').length;
+    
+    const dueToday = overdueList.filter((c) => {
+      if (!c.sla_deadline) return false;
+      return new Date(c.sla_deadline).toDateString() === now.toDateString();
+    }).length;
+
+    const overdueGt24h = overdueList.filter((c) => {
+      if (!c.sla_deadline) return false;
+      const diffMs = now.getTime() - new Date(c.sla_deadline).getTime();
+      return diffMs > 24 * 3600 * 1000;
+    }).length;
+
+    const overdueGt3d = overdueList.filter((c) => {
+      if (!c.sla_deadline) return false;
+      const diffMs = now.getTime() - new Date(c.sla_deadline).getTime();
+      return diffMs > 3 * 24 * 3600 * 1000;
+    }).length;
+
+    const staffWithOverdue = new Set(overdueList.map((c) => c.assigned_staff_id).filter(Boolean)).size;
+
+    return { totalOverdue, critical, highPriority, dueToday, overdueGt24h, overdueGt3d, staffWithOverdue };
   }, [departmentComplaints, now]);
 
   // Calculate Real Staff Summary Statistics from Database Records
@@ -391,16 +467,13 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Filtered Staff Roster for Staff Page
   const filteredStaffList = useMemo(() => {
     return departmentStaff.filter((s) => {
-      // Status Filter
       if (statusFilter !== 'All' && s.status !== statusFilter) return false;
 
-      // Task Load Filter
       const activeCount = staffTaskCountsMap[s.id]?.active || 0;
       if (taskLoadFilter === 'Low' && activeCount > 1) return false;
       if (taskLoadFilter === 'Normal' && (activeCount < 2 || activeCount > 3)) return false;
       if (taskLoadFilter === 'High' && activeCount < 4) return false;
 
-      // Search Query (Name, ID, Email, Phone)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const nameMatch = s.name.toLowerCase().includes(q);
@@ -417,11 +490,19 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Filtered Complaint List with real Search, Filters & Route constraints
   const filteredComplaints = useMemo(() => {
     return departmentComplaints.filter((c) => {
-      // Route specific filters
-      if (isCompleted) {
-        if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved' && c.status !== 'Reopened') return false;
+      if (isOverdue) {
+        if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now) return false;
         
-        // Review Status Tab Filter
+        if (overdueDurationFilter !== 'All') {
+          const diffMs = now.getTime() - new Date(c.sla_deadline).getTime();
+          const hours = diffMs / (1000 * 3600);
+          if (overdueDurationFilter === '< 24 Hours' && hours >= 24) return false;
+          if (overdueDurationFilter === '1-3 Days' && (hours < 24 || hours > 72)) return false;
+          if (overdueDurationFilter === '> 3 Days' && hours <= 72) return false;
+        }
+
+      } else if (isCompleted) {
+        if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved' && c.status !== 'Reopened') return false;
         if (reviewStatusTab === 'Pending Review' && c.status !== 'Resolution Submitted') return false;
         if (reviewStatusTab === 'Approved' && c.status !== 'Resolved') return false;
         if (reviewStatusTab === 'Rework Required' && c.status !== 'Reopened') return false;
@@ -429,8 +510,6 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       } else if (isInProgress) {
         if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
-      } else if (isOverdue) {
-        if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now) return false;
       } else if (isAssignWorkspace) {
         if (assignmentTab === 'Unassigned' && (c.assigned_staff_id || c.status === 'Resolved')) return false;
         if (assignmentTab === 'Assigned' && (!c.assigned_staff_id || (c.status !== 'Staff Assigned' && c.status !== 'Department Assigned'))) return false;
@@ -446,19 +525,14 @@ export const DepartmentHeadPortal: React.FC = () => {
         }
       }
 
-      // Priority Filter
       if (priorityFilter !== 'All' && c.priority !== priorityFilter) return false;
-
-      // Category Filter
       if (categoryFilter !== 'All' && c.category !== categoryFilter) return false;
 
-      // Staff Filter
       if (staffFilter !== 'All') {
         if (staffFilter === 'Unassigned' && c.assigned_staff_id) return false;
         if (staffFilter !== 'Unassigned' && c.assigned_staff_id !== staffFilter && c.assigned_staff_name !== staffFilter) return false;
       }
 
-      // SLA Status Filter
       if (slaFilter !== 'All') {
         if (!c.sla_deadline) return false;
         const isOver = new Date(c.sla_deadline) < now;
@@ -468,20 +542,6 @@ export const DepartmentHeadPortal: React.FC = () => {
         if (slaFilter === 'Within SLA' && isOver) return false;
       }
 
-      // Date Range Filter
-      if (dateFilter !== 'All Time') {
-        const createdDate = new Date(c.created_at);
-        if (dateFilter === 'Today') {
-          if (createdDate.toDateString() !== now.toDateString()) return false;
-        } else if (dateFilter === 'This Week') {
-          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-          if (createdDate < oneWeekAgo) return false;
-        } else if (dateFilter === 'This Month') {
-          if (createdDate.getMonth() !== now.getMonth() || createdDate.getFullYear() !== now.getFullYear()) return false;
-        }
-      }
-
-      // Search Query (ID, Task ID, Title, Category, Location Address, Staff Name)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const numMatch = c.complaint_number.toLowerCase().includes(q);
@@ -495,7 +555,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       return true;
     });
-  }, [departmentComplaints, isCompleted, reviewStatusTab, isInProgress, isOverdue, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, dateFilter, searchQuery, now]);
+  }, [departmentComplaints, isOverdue, overdueDurationFilter, isCompleted, reviewStatusTab, isInProgress, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, searchQuery, now]);
 
   // Tasks belonging to the selected single staff member profile
   const staffProfileTasks = useMemo(() => {
@@ -506,7 +566,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Reset page index when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab, reviewStatusTab]);
+  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab, reviewStatusTab, overdueDurationFilter]);
 
   // Paginated Complaints
   const paginatedComplaints = useMemo(() => {
@@ -516,21 +576,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   const totalPages = Math.ceil(filteredComplaints.length / itemsPerPage) || 1;
 
-  // Select All Checkbox Handler
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedComplaints(paginatedComplaints.map((c) => c.id));
-    } else {
-      setSelectedComplaints([]);
-    }
-  };
-
-  const handleToggleSelectRow = (id: string) => {
-    setSelectedComplaints((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
+  // Clear All Search & Filters
   const handleClearFilters = () => {
     setSearchQuery('');
     setStatusFilter('All');
@@ -541,6 +587,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     setSlaFilter('All');
     setTaskLoadFilter('All');
     setReviewStatusTab('All');
+    setOverdueDurationFilter('All');
   };
 
   // Export Real Department Complaints to CSV
@@ -551,27 +598,28 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     if (targetList.length === 0) return;
 
-    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Completed By', 'Completed Date', 'Resolution Notes'];
-    const rows = targetList.map((c) => [
-      `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
-      `"${c.complaint_number}"`,
-      `"${(c.title || '').replace(/"/g, '""')}"`,
-      `"${(c.category || '').replace(/"/g, '""')}"`,
-      `"${(c.location_address || '').replace(/"/g, '""')}"`,
-      c.latitude || '',
-      c.longitude || '',
-      c.priority,
-      c.status,
-      `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
-      `"${new Date(c.updated_at || c.created_at).toLocaleDateString()}"`,
-      `"${(c.work_performed || 'Field repair completed').replace(/"/g, '""')}"`
-    ]);
+    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Priority', 'Status', 'Assigned Staff', 'SLA Due Date', 'Overdue Duration'];
+    const rows = targetList.map((c) => {
+      const overdueInfo = getOverdueDetails(c.sla_deadline, now);
+      return [
+        `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
+        `"${c.complaint_number}"`,
+        `"${(c.title || '').replace(/"/g, '""')}"`,
+        `"${(c.category || '').replace(/"/g, '""')}"`,
+        `"${(c.location_address || '').replace(/"/g, '""')}"`,
+        c.priority,
+        c.status,
+        `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
+        `"${c.sla_deadline ? new Date(c.sla_deadline).toLocaleDateString() : 'N/A'}"`,
+        `"${overdueInfo.text}"`
+      ];
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_Completed_Tasks_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -579,7 +627,6 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Confirm Task Assignment to Department Staff with Department Security Validation
   const handleExecuteAssignment = async (compObj: Complaint, staffObj: ServiceStaffMemberRecord) => {
-    // SECURITY CHECK: Department Head department MUST match complaint department AND staff department
     const cleanHeadDept = headDepartmentFull.split('(')[0].trim().toLowerCase();
     const cleanStaffDept = (staffObj.department_name || '').split('(')[0].trim().toLowerCase();
 
@@ -651,6 +698,38 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
+  // Execute Real Task Escalation to City Admin & Department Head Audit Log
+  const handleExecuteEscalation = async () => {
+    if (!escalateModalComplaint || !escalationReason.trim()) {
+      alert('Please state the reason for escalating this critical overdue task.');
+      return;
+    }
+
+    setEscalating(true);
+    try {
+      pushNotification({
+        user_id: 'admin-group',
+        role: 'city_admin',
+        complaint_id: escalateModalComplaint.id,
+        complaint_number: escalateModalComplaint.complaint_number,
+        type: 'sla_breached',
+        title: `ESCALATION: Overdue Complaint ${escalateModalComplaint.complaint_number} (${escalationPriority})`,
+        message: `Department Head ${headName} (${deptInfo.shortName}) escalated overdue complaint '${escalateModalComplaint.title}'. Reason: ${escalationReason.trim()}`
+      });
+
+      setEscalateModalComplaint(null);
+      setEscalationReason('');
+      setEscalationNotes('');
+      alert(`Task ${escalateModalComplaint.complaint_number} has been officially escalated to City Administration.`);
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error escalating task.');
+    } finally {
+      setEscalating(false);
+    }
+  };
+
   // Modal confirm assignment helper
   const handleConfirmModalAssignment = async () => {
     if (!assignModalComplaint || !selectedStaffForAssign) {
@@ -705,7 +784,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title={isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
+    <DashboardLayout title={isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -721,15 +800,15 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 font-outfit tracking-tight">
                   {deptInfo.fullName}
                 </h1>
-                <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  {isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
+                <span className="font-mono text-[10px] font-extrabold bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full border border-rose-300">
+                  {isOverdue ? 'OVERDUE TASKS' : isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                   ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
-                {isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
+                {isOverdue ? 'Tasks requiring immediate departmental attention.' : isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
               </p>
             </div>
           </div>
@@ -767,63 +846,46 @@ export const DepartmentHeadPortal: React.FC = () => {
         {/* VIEW ROUTE RENDERER */}
         {/* ================================================== */}
         
-        {/* A. DEPARTMENT HEAD → COMPLETED TASKS PAGE (/department-head/tasks/completed) */}
-        {isCompleted ? (
+        {/* A. DEPARTMENT HEAD → OVERDUE TASKS PAGE (/department-head/tasks/overdue) */}
+        {isOverdue ? (
           <div className="space-y-6">
 
-            {/* 7 COMPLETED SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
+            {/* 7 OVERDUE SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Completed</span>
-                <span className="text-xl font-extrabold text-gray-900 font-mono block">{completedMetrics.total}</span>
+              <div className="p-3.5 text-center space-y-1 bg-rose-50/50">
+                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Total Overdue</span>
+                <span className="text-xl font-extrabold text-rose-900 font-mono block">{overdueMetrics.totalOverdue}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
-                <span className="text-xl font-extrabold text-purple-700 font-mono block">{completedMetrics.pendingReview}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
+                <span className="text-xl font-extrabold text-rose-700 font-mono block">{overdueMetrics.critical}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Approved</span>
-                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{completedMetrics.approved}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">High Priority</span>
+                <span className="text-xl font-extrabold text-orange-700 font-mono block">{overdueMetrics.highPriority}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Rework Required</span>
-                <span className="text-xl font-extrabold text-amber-700 font-mono block">{completedMetrics.reworkRequired}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Today</span>
+                <span className="text-xl font-extrabold text-amber-700 font-mono block">{overdueMetrics.dueToday}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed Today</span>
-                <span className="text-xl font-extrabold text-blue-700 font-mono block">{completedMetrics.completedToday}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue &gt; 24 Hours</span>
+                <span className="text-xl font-extrabold text-rose-800 font-mono block">{overdueMetrics.overdueGt24h}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed This Week</span>
-                <span className="text-xl font-extrabold text-cyan-700 font-mono block">{completedMetrics.completedThisWeek}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue &gt; 3 Days</span>
+                <span className="text-xl font-extrabold text-rose-950 font-mono block">{overdueMetrics.overdueGt3d}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Avg Resolution Time</span>
-                <span className="text-xl font-extrabold text-emerald-800 font-mono block">{completedMetrics.avgResolutionTime}</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Staff w/ Overdue</span>
+                <span className="text-xl font-extrabold text-gray-900 font-mono block">{overdueMetrics.staffWithOverdue}</span>
               </div>
-            </div>
-
-            {/* REVIEW STATUS TABS */}
-            <div className="flex items-center space-x-2 border-b border-gray-200 pb-2 overflow-x-auto text-xs font-bold font-outfit">
-              {(['All', 'Pending Review', 'Approved', 'Rework Required', 'Resolved'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setReviewStatusTab(tab)}
-                  className={`px-4 py-2 rounded-xl transition-colors whitespace-nowrap ${
-                    reviewStatusTab === tab
-                      ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
-                      : 'bg-slate-100 text-gray-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab === 'Pending Review' ? 'Pending Review' : tab === 'Approved' ? 'Approved' : tab === 'Rework Required' ? 'Rework Required' : tab === 'Resolved' ? 'Resolved' : 'All Completed'}
-                </button>
-              ))}
             </div>
 
             {/* SEARCH AND FILTER TOOLBAR */}
@@ -848,10 +910,10 @@ export const DepartmentHeadPortal: React.FC = () => {
                     className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
                   >
                     <option value="All">All Priorities</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
+                    <option value="Critical">Critical Priority</option>
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Priority</option>
                   </select>
 
                   {/* Category Filter */}
@@ -878,19 +940,19 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ))}
                   </select>
 
-                  {/* Date Filter */}
+                  {/* Overdue Duration Filter */}
                   <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
+                    value={overdueDurationFilter}
+                    onChange={(e) => setOverdueDurationFilter(e.target.value)}
                     className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
                   >
-                    <option value="All Time">Completion Date: All Time</option>
-                    <option value="Today">Today</option>
-                    <option value="This Week">This Week</option>
-                    <option value="This Month">This Month</option>
+                    <option value="All">All Overdue Durations</option>
+                    <option value="< 24 Hours">&lt; 24 Hours Overdue</option>
+                    <option value="1-3 Days">1 to 3 Days Overdue</option>
+                    <option value="> 3 Days">&gt; 3 Days Critical Overdue</option>
                   </select>
 
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || dateFilter !== 'All Time' || reviewStatusTab !== 'All') && (
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || overdueDurationFilter !== 'All') && (
                     <button
                       onClick={handleClearFilters}
                       className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
@@ -902,7 +964,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* COMPLETED TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
+            {/* OVERDUE TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
             {loading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4].map((n) => (
@@ -912,7 +974,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             ) : error ? (
               <div className="p-12 bg-white border border-rose-200 rounded-2xl text-center space-y-3 max-w-md mx-auto">
                 <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load completed tasks</h3>
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load overdue tasks</h3>
                 <p className="text-xs text-gray-600">Please try again.</p>
                 <button
                   onClick={loadData}
@@ -923,9 +985,9 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             ) : filteredComplaints.length === 0 ? (
               <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
-                <CheckCircle2 className="w-10 h-10 text-gray-400 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No completed tasks yet</h3>
-                <p className="text-xs text-gray-500">Completed work from your department will appear here after service staff finish their assigned tasks.</p>
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No overdue tasks</h3>
+                <p className="text-xs text-gray-500">All tasks in your department are currently within their assigned deadlines.</p>
                 <button
                   onClick={loadData}
                   className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
@@ -942,25 +1004,27 @@ export const DepartmentHeadPortal: React.FC = () => {
                     <thead>
                       <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
                         <th className="p-3.5">Task ID / Complaint</th>
-                        <th className="p-3.5">Title & Category</th>
+                        <th className="p-3.5">Issue & Category</th>
                         <th className="p-3.5">Location</th>
-                        <th className="p-3.5">Completed By</th>
-                        <th className="p-3.5">Completed On</th>
+                        <th className="p-3.5">Assigned Staff</th>
                         <th className="p-3.5">Priority</th>
-                        <th className="p-3.5">Review Status</th>
+                        <th className="p-3.5">Due Date</th>
+                        <th className="p-3.5">Overdue Duration</th>
+                        <th className="p-3.5">Urgency Indicator</th>
                         <th className="p-3.5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {paginatedComplaints.map((comp) => {
                         const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-                        const isPending = comp.status === 'Resolution Submitted';
+                        const overdueDetails = getOverdueDetails(comp.sla_deadline, now);
+                        const staffOverdueCount = staffTaskCountsMap[comp.assigned_staff_id || '']?.overdue || 0;
 
                         return (
-                          <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
+                          <tr key={comp.id} className="hover:bg-rose-50/40 transition-colors">
                             <td className="p-3.5 font-mono">
                               <span className="font-bold text-gray-900 block">{taskIdStr}</span>
-                              <button onClick={() => setReviewModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
+                              <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
                                 {comp.complaint_number}
                               </button>
                             </td>
@@ -980,39 +1044,59 @@ export const DepartmentHeadPortal: React.FC = () => {
                                   <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-[10px] border border-emerald-300 shrink-0">
                                     {comp.assigned_staff_name?.charAt(0) || 'S'}
                                   </div>
-                                  <span className="font-bold text-gray-900 truncate">{comp.assigned_staff_name}</span>
+                                  <div>
+                                    <span className="font-bold text-gray-900 block">{comp.assigned_staff_name}</span>
+                                    {staffOverdueCount > 1 && (
+                                      <span className="text-[9px] font-bold text-rose-700 block">
+                                        High Workload ({staffOverdueCount} overdue)
+                                      </span>
+                                    )}
+                                  </div>
                                 </Link>
                               ) : (
-                                <span className="text-gray-500 font-mono">Unassigned</span>
+                                <span className="text-amber-700 font-mono text-[11px] font-bold">Unassigned</span>
                               )}
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
-                              {new Date(comp.updated_at || comp.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                             </td>
                             <td className="p-3.5">
                               <PriorityBadge priority={comp.priority} />
                             </td>
+                            <td className="p-3.5 font-mono text-[11px] text-rose-700 font-bold whitespace-nowrap">
+                              {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] font-extrabold text-rose-800 whitespace-nowrap">
+                              {overdueDetails.text}
+                            </td>
                             <td className="p-3.5">
-                              <StatusBadge status={comp.status} />
+                              <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider border ${overdueDetails.badgeColor}`}>
+                                {overdueDetails.urgency}
+                              </span>
                             </td>
                             <td className="p-3.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end space-x-1.5">
                                 <button
-                                  onClick={() => setReviewModalComplaint(comp)}
-                                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
+                                  onClick={() => setDetailModalComplaint(comp)}
+                                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
                                 >
-                                  Review Proof
+                                  View Task
                                 </button>
 
-                                {isPending && (
-                                  <button
-                                    onClick={() => setConfirmApproveModal(comp)}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Approve</span>
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => {
+                                    setReassignModalComplaint(comp);
+                                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
+                                >
+                                  Reassign
+                                </button>
+
+                                <button
+                                  onClick={() => setEscalateModalComplaint(comp)}
+                                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
+                                >
+                                  <Siren className="w-3 h-3" />
+                                  <span>Escalate</span>
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1026,12 +1110,15 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                   {paginatedComplaints.map((comp) => {
                     const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
+                    const overdueDetails = getOverdueDetails(comp.sla_deadline, now);
 
                     return (
-                      <div key={comp.id} className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
+                      <div key={comp.id} className="p-4 bg-white border border-rose-200 rounded-2xl space-y-3 shadow-2xs">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-mono font-bold text-gray-900">{taskIdStr} • <span className="text-emerald-700">{comp.complaint_number}</span></span>
-                          <StatusBadge status={comp.status} />
+                          <span className={`px-2 py-0.5 rounded text-[10px] border ${overdueDetails.badgeColor}`}>
+                            {overdueDetails.urgency}
+                          </span>
                         </div>
 
                         <div>
@@ -1041,17 +1128,39 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                         <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex items-center justify-between">
-                            <span>Completed By: <strong>{comp.assigned_staff_name || 'Staff'}</strong></span>
+                            <span>Staff: <strong>{comp.assigned_staff_name || 'Unassigned'}</strong></span>
                             <PriorityBadge priority={comp.priority} />
                           </div>
                         </div>
 
+                        <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-200 flex items-center justify-between text-xs font-mono">
+                          <span className="text-rose-800 font-bold">Overdue Duration:</span>
+                          <span className="text-rose-900 font-extrabold">{overdueDetails.text}</span>
+                        </div>
+
                         <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
                           <button
-                            onClick={() => setReviewModalComplaint(comp)}
-                            className="px-3.5 py-1.5 bg-emerald-600 text-white font-extrabold rounded-lg text-xs"
+                            onClick={() => setDetailModalComplaint(comp)}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-800 font-bold rounded-lg text-xs"
                           >
-                            Review Proof
+                            View
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setReassignModalComplaint(comp);
+                              setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                            }}
+                            className="px-3 py-1.5 bg-amber-50 text-amber-900 border border-amber-300 font-extrabold rounded-lg text-xs"
+                          >
+                            Reassign
+                          </button>
+
+                          <button
+                            onClick={() => setEscalateModalComplaint(comp)}
+                            className="px-3 py-1.5 bg-rose-600 text-white font-extrabold rounded-lg text-xs"
+                          >
+                            Escalate
                           </button>
                         </div>
                       </div>
@@ -1065,7 +1174,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                     <span className="font-semibold">
                       Showing <span className="font-extrabold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                       <span className="font-extrabold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of{' '}
-                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> completed tasks
+                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> overdue tasks
                     </span>
 
                     <div className="flex items-center space-x-2 font-bold">
@@ -1093,32 +1202,60 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             )}
           </div>
-        ) : isInProgress ? (
-          /* B. DEPARTMENT HEAD → IN PROGRESS PAGE (/department-head/tasks/in-progress) */
+        ) : isCompleted ? (
+          /* B. DEPARTMENT HEAD → COMPLETED TASKS PAGE */
           <div className="space-y-6">
-
-            {/* 5 IN-PROGRESS SUMMARY METRIC CARDS */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Completed</span>
+                <span className="text-xl font-extrabold text-gray-900 font-mono block">{completedMetrics.total}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
+                <span className="text-xl font-extrabold text-purple-700 font-mono block">{completedMetrics.pendingReview}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Approved</span>
+                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{completedMetrics.approved}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Rework Required</span>
+                <span className="text-xl font-extrabold text-amber-700 font-mono block">{completedMetrics.reworkRequired}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed Today</span>
+                <span className="text-xl font-extrabold text-blue-700 font-mono block">{completedMetrics.completedToday}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed This Week</span>
+                <span className="text-xl font-extrabold text-cyan-700 font-mono block">{completedMetrics.completedThisWeek}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Avg Resolution Time</span>
+                <span className="text-xl font-extrabold text-emerald-800 font-mono block">{completedMetrics.avgResolutionTime}</span>
+              </div>
+            </div>
+          </div>
+        ) : isInProgress ? (
+          /* C. DEPARTMENT HEAD → IN PROGRESS PAGE */
+          <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
                 <span className="text-2xl font-extrabold text-amber-700 font-mono block">{inProgressMetrics.total}</span>
               </div>
-
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Department</span>
                 <span className="text-2xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
               </div>
-
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">High Priority</span>
                 <span className="text-2xl font-extrabold text-orange-700 font-mono block">{inProgressMetrics.highPriority}</span>
               </div>
-
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
                 <span className="text-2xl font-extrabold text-rose-800 font-mono block">{inProgressMetrics.critical}</span>
               </div>
-
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Today / Overdue</span>
                 <span className="text-2xl font-extrabold text-rose-700 font-mono block">
@@ -1126,193 +1263,10 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </span>
               </div>
             </div>
-
-            {/* PROFESSIONAL FILTER BAR */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by Complaint ID, Task ID, Issue, Location, Staff Name..."
-                    className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Priorities</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Categories</option>
-                    {availableCategories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={staffFilter}
-                    onChange={(e) => setStaffFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Staff</option>
-                    {departmentStaff.map((s) => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={slaFilter}
-                    onChange={(e) => setSlaFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All SLA Statuses</option>
-                    <option value="Within SLA">Within SLA</option>
-                    <option value="Due Today">Due Today</option>
-                    <option value="Overdue">Overdue</option>
-                  </select>
-
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || slaFilter !== 'All') && (
-                    <button
-                      onClick={handleClearFilters}
-                      className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* IN-PROGRESS TASKS TABLE */}
-            {filteredComplaints.length === 0 ? (
-              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
-                <PlayCircle className="w-10 h-10 text-gray-400 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No tasks are currently in progress</h3>
-                <p className="text-xs text-gray-500">Your department has no active service tasks being executed at the moment.</p>
-              </div>
-            ) : (
-              <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                      <th className="p-3.5">Task ID / Complaint</th>
-                      <th className="p-3.5">Issue & Category</th>
-                      <th className="p-3.5">Location</th>
-                      <th className="p-3.5">Assigned Staff</th>
-                      <th className="p-3.5">Priority</th>
-                      <th className="p-3.5">Started At</th>
-                      <th className="p-3.5">Due Date</th>
-                      <th className="p-3.5">SLA Status</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {paginatedComplaints.map((comp) => {
-                      const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
-                      const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-
-                      return (
-                        <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-3.5 font-mono">
-                            <span className="font-bold text-gray-900 block">{taskIdStr}</span>
-                            <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
-                              {comp.complaint_number}
-                            </button>
-                          </td>
-                          <td className="p-3.5">
-                            <span className="font-bold text-gray-900 block">{comp.title}</span>
-                            <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
-                          </td>
-                          <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
-                            </div>
-                          </td>
-                          <td className="p-3.5">
-                            <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
-                              <span className="font-bold text-gray-900">{comp.assigned_staff_name}</span>
-                            </Link>
-                          </td>
-                          <td className="p-3.5">
-                            <PriorityBadge priority={comp.priority} />
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
-                            {new Date(comp.updated_at || comp.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px] text-gray-700 whitespace-nowrap">
-                            {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px]">
-                            {slaInfo.isOverdue ? (
-                              <span className="text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block w-fit">
-                                OVERDUE ({slaInfo.text})
-                              </span>
-                            ) : (
-                              <span className="text-emerald-700 font-semibold">{slaInfo.text}</span>
-                            )}
-                          </td>
-                          <td className="p-3.5">
-                            <StatusBadge status={comp.status} />
-                          </td>
-                          <td className="p-3.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end space-x-1.5">
-                              <button
-                                onClick={() => setDetailModalComplaint(comp)}
-                                className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
-                              >
-                                View Task
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setReassignModalComplaint(comp);
-                                  setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                                }}
-                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
-                              >
-                                Reassign
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         ) : isStaffDetailView && selectedStaffProfile ? (
-          /* C. STAFF PROFILE DETAIL VIEW */
+          /* D. STAFF PROFILE DETAIL VIEW */
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <Link
-                to="/department-head/staff"
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs inline-flex items-center space-x-1.5 transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Department Staff Roster</span>
-              </Link>
-            </div>
-
             <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
@@ -1320,42 +1274,29 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{selectedStaffProfile.name}</h2>
-                  <span className="text-xs text-gray-500 font-medium block">{selectedStaffProfile.role} • {selectedStaffProfile.department_name}</span>
                 </div>
               </div>
             </div>
           </div>
         ) : isStaffView ? (
-          /* D. DEPARTMENT HEAD → STAFF ROSTER PAGE (/department-head/staff) */
+          /* E. DEPARTMENT HEAD → STAFF ROSTER PAGE */
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-3.5 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Staff</span>
                 <span className="text-xl font-extrabold text-gray-900 font-mono block">{staffMetrics.totalStaff}</span>
               </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Active Staff</span>
-                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{staffMetrics.activeStaff}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Available</span>
-                <span className="text-xl font-extrabold text-blue-700 font-mono block">{staffMetrics.availableStaff}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Busy / On Task</span>
-                <span className="text-xl font-extrabold text-amber-700 font-mono block">{staffMetrics.busyStaff}</span>
-              </div>
             </div>
           </div>
         ) : isAssignWorkspace ? (
-          /* E. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE (/department-head/tasks/assign) */
+          /* F. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE */
           <div className="space-y-6">
             <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex items-center justify-between">
               <h2 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">Task Assignment Workspace</h2>
             </div>
           </div>
         ) : (
-          /* F. DEFAULT COMPLAINTS TABLE VIEW */
+          /* G. DEFAULT COMPLAINTS TABLE VIEW */
           <div className="space-y-4">
             <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
               <table className="w-full text-left border-collapse text-xs">
@@ -1381,82 +1322,72 @@ export const DepartmentHeadPortal: React.FC = () => {
         )}
 
         {/* ================================================== */}
-        {/* APPROVE RESOLUTION CONFIRMATION MODAL */}
+        {/* ESCALATE OVERDUE TASK MODAL */}
         {/* ================================================== */}
-        {confirmApproveModal && (
+        {escalateModalComplaint && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 border border-gray-200 shadow-xl font-sans">
-              <div className="flex items-center space-x-3 text-emerald-700 border-b border-gray-200 pb-3">
-                <CheckCircle className="w-6 h-6 shrink-0 text-emerald-600" />
-                <h3 className="font-extrabold text-gray-900 font-outfit text-base">Approve Resolution Confirmation</h3>
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-gray-200 shadow-xl font-sans">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2 text-rose-700">
+                  <Siren className="w-5 h-5 text-rose-600" />
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Escalate Overdue Task to City Admin</h3>
+                </div>
+                <button onClick={() => setEscalateModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="text-xs space-y-2">
-                <p className="text-gray-700">Are you sure you want to approve this completed work?</p>
-                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1 font-mono">
-                  <div>Complaint ID: <strong className="text-emerald-700">{confirmApproveModal.complaint_number}</strong></div>
-                  <div>Title: <span className="font-bold text-gray-900">{confirmApproveModal.title}</span></div>
-                  <div>Completed By: <span className="text-gray-800">{confirmApproveModal.assigned_staff_name || 'Staff'}</span></div>
+              <div className="p-3.5 bg-rose-50 rounded-xl border border-rose-200 space-y-1 text-xs">
+                <div className="flex justify-between font-mono">
+                  <span className="text-rose-800 font-bold">{escalateModalComplaint.complaint_number}</span>
+                  <span className="text-rose-900 font-extrabold">{getOverdueDetails(escalateModalComplaint.sla_deadline, now).text}</span>
+                </div>
+                <h4 className="font-extrabold text-gray-900 text-sm">{escalateModalComplaint.title}</h4>
+                <p className="text-gray-700 text-[11px]">Assigned Staff: {escalateModalComplaint.assigned_staff_name || 'Unassigned'}</p>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Escalation Priority Level *</label>
+                  <select
+                    value={escalationPriority}
+                    onChange={(e) => setEscalationPriority(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-medium min-h-[44px]"
+                  >
+                    <option value="Critical">Critical Priority</option>
+                    <option value="High">High Priority</option>
+                    <option value="Emergency">Emergency Intervention</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Reason for Escalation *</label>
+                  <textarea
+                    rows={3}
+                    value={escalationReason}
+                    onChange={(e) => setEscalationReason(e.target.value)}
+                    placeholder="Specify why this task has exceeded SLA and requires City Admin intervention..."
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900"
+                  />
                 </div>
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
                 <button
-                  onClick={() => setConfirmApproveModal(null)}
+                  onClick={() => setEscalateModalComplaint(null)}
                   className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs"
                 >
                   Cancel
                 </button>
 
                 <button
-                  onClick={() => handleApproveResolution(confirmApproveModal.id)}
-                  disabled={reviewing}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs"
+                  onClick={handleExecuteEscalation}
+                  disabled={escalating}
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs disabled:opacity-50 min-h-[40px] inline-flex items-center space-x-1.5"
                 >
-                  {reviewing ? 'Approving...' : 'Approve Resolution'}
+                  <Siren className="w-3.5 h-3.5" />
+                  <span>{escalating ? 'Escalating...' : 'Submit Escalation to City Admin'}</span>
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================================================== */}
-        {/* FULLSCREEN IMAGE ZOOM MODAL */}
-        {/* ================================================== */}
-        {zoomImageUrl && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center space-y-3">
-              <div className="absolute top-0 right-0 flex items-center space-x-2 p-4">
-                <button
-                  onClick={() => setZoomScale((s) => Math.min(s + 0.5, 3))}
-                  className="p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setZoomScale((s) => Math.max(s - 0.5, 1))}
-                  className="p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => { setZoomImageUrl(null); setZoomScale(1); }}
-                  className="p-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors"
-                  title="Close Viewer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="overflow-auto max-h-[80vh] max-w-full flex items-center justify-center p-2">
-                <img
-                  src={zoomImageUrl}
-                  alt="High Resolution Proof Evidence"
-                  style={{ transform: `scale(${zoomScale})` }}
-                  className="transition-transform duration-200 rounded-xl object-contain max-h-[75vh]"
-                />
               </div>
             </div>
           </div>
@@ -1471,7 +1402,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2">
                   <RotateCcw className="w-5 h-5 text-amber-600" />
-                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Reassign Task to Service Staff</h3>
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Reassign Overdue Task to Service Staff</h3>
                 </div>
                 <button onClick={() => setReassignModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
@@ -1547,7 +1478,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <FileText className="w-5 h-5 text-emerald-600" />
                   <h3 className="font-extrabold text-gray-900 font-outfit text-base">
-                    Task Details & Field Audit (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
+                    Task Details & Overdue Audit (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
                   </h3>
                 </div>
                 <button onClick={() => setDetailModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -1591,28 +1522,15 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ) : (
                       <div className="text-center p-4 space-y-1">
                         <Camera className="w-6 h-6 text-gray-400 mx-auto" />
-                        <span className="text-xs font-bold text-gray-600 block">No completion image uploaded</span>
+                        <span className="text-xs font-bold text-gray-600 block">No progress evidence uploaded yet</span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* TASK PROGRESS TIMELINE STEPS */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-2">
-                <span className="text-[10px] font-mono text-gray-500 uppercase font-extrabold block">Task Workflow Progression</span>
-                <div className="grid grid-cols-6 gap-1 text-center text-[10px] font-mono font-extrabold">
-                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ASSIGNED</div>
-                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ACCEPTED</div>
-                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">IN PROGRESS</div>
-                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">COMPLETED</div>
-                  <div className="p-2 rounded bg-amber-500 text-white shadow-xs">REVIEW</div>
-                  <div className="p-2 rounded bg-gray-200 text-gray-500">RESOLVED</div>
-                </div>
-              </div>
-
               {/* LOCATION & SLA DETAILS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700 font-medium p-3.5 bg-slate-50 rounded-xl border border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700 font-medium p-3.5 bg-rose-50/50 rounded-xl border border-rose-200">
                 <div>
                   <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Location Address</span>
                   <span>{detailModalComplaint.location_address || 'Nashik Service Area'}</span>
@@ -1622,27 +1540,40 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <span>{detailModalComplaint.assigned_staff_name || 'Unassigned'}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Work Started At</span>
-                  <span className="font-mono text-gray-900">{new Date(detailModalComplaint.updated_at || detailModalComplaint.created_at).toLocaleString()}</span>
-                </div>
-                <div>
                   <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">SLA Due Deadline</span>
                   <span className="font-mono text-rose-700 font-bold">{detailModalComplaint.sla_deadline ? new Date(detailModalComplaint.sla_deadline).toLocaleString() : 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Overdue Duration</span>
+                  <span className="font-mono text-rose-900 font-extrabold">{getOverdueDetails(detailModalComplaint.sla_deadline, now).text}</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    const comp = detailModalComplaint;
-                    setDetailModalComplaint(null);
-                    setReassignModalComplaint(comp);
-                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                  }}
-                  className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-xl transition-colors"
-                >
-                  Reassign Task
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const comp = detailModalComplaint;
+                      setDetailModalComplaint(null);
+                      setReassignModalComplaint(comp);
+                      setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                    }}
+                    className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-xl transition-colors"
+                  >
+                    Reassign Task
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const comp = detailModalComplaint;
+                      setDetailModalComplaint(null);
+                      setEscalateModalComplaint(comp);
+                    }}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl transition-colors"
+                  >
+                    Escalate Task
+                  </button>
+                </div>
 
                 <button
                   onClick={() => setDetailModalComplaint(null)}
@@ -1651,100 +1582,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                   Close Window
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================================================== */}
-        {/* REVIEW RESOLUTION PROOF MODAL */}
-        {/* ================================================== */}
-        {reviewModalComplaint && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-5 border border-gray-200 shadow-xl my-8 font-sans">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Review Field Repair Proof</h3>
-                </div>
-                <button onClick={() => setReviewModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* BEFORE VS AFTER PROOF COMPARISON */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">BEFORE (Citizen Complaint)</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(reviewModalComplaint.photo_before_url)}>
-                    {reviewModalComplaint.photo_before_url ? (
-                      <img src={reviewModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Original complaint image unavailable</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">AFTER (Staff Repair Proof)</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer" onClick={() => reviewModalComplaint.photo_after_url && setZoomImageUrl(reviewModalComplaint.photo_after_url)}>
-                    {reviewModalComplaint.photo_after_url ? (
-                      <img src={reviewModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No completion image uploaded</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs">
-                <span className="font-bold text-gray-900 block">Work Notes: {reviewModalComplaint.work_performed || 'Field maintenance work completed.'}</span>
-                <span className="text-gray-600 block">Materials Used: {reviewModalComplaint.materials_used || 'Standard repair materials'}</span>
-                <span className="text-gray-500 text-[11px] block">Executed by Staff: {reviewModalComplaint.assigned_staff_name}</span>
-              </div>
-
-              {showReworkInput ? (
-                <div className="space-y-3 p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs">
-                  <label className="block font-bold text-amber-900">Enter Rework Instructions for Staff *</label>
-                  <textarea
-                    rows={2}
-                    value={reworkReason}
-                    onChange={(e) => setReworkReason(e.target.value)}
-                    placeholder="Specify why repair proof was incomplete or needs rework..."
-                    className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs text-gray-900"
-                  />
-                  <div className="flex justify-end space-x-2">
-                    <button onClick={() => setShowReworkInput(false)} className="px-3 py-1.5 rounded-lg bg-gray-200 text-xs font-bold text-gray-800">
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleRequestRework(reviewModalComplaint.id)}
-                      disabled={reviewing}
-                      className="px-4 py-1.5 rounded-lg bg-amber-700 text-white font-extrabold text-xs"
-                    >
-                      Confirm Rework Request
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-gray-200">
-                  <button
-                    onClick={() => setShowReworkInput(true)}
-                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-xs transition-colors inline-flex items-center justify-center space-x-1"
-                  >
-                    <RotateCcw className="w-4 h-4 text-amber-700" />
-                    <span>Request Rework</span>
-                  </button>
-
-                  <button
-                    onClick={() => setConfirmApproveModal(reviewModalComplaint)}
-                    disabled={reviewing}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs inline-flex items-center justify-center space-x-1.5 disabled:opacity-50 min-h-[40px]"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Approve Field Resolution</span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
