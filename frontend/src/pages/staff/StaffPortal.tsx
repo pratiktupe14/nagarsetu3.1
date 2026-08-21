@@ -1,0 +1,1278 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import { useAuth } from '../../context/AuthContext';
+import { DashboardLayout } from '../../components/DashboardLayout';
+import { StatusBadge } from '../../components/StatusBadge';
+import { PriorityBadge } from '../../components/PriorityBadge';
+import { ActivityTimeline } from '../../components/ActivityTimeline';
+import {
+  getStaffTasks, acceptStaffTask, startStaffTravel, startStaffWork,
+  submitStaffResolution
+} from '../../services/complaintService';
+import { formatSlaRemainingTime, logActivity, getComplaintActivityLogs } from '../../services/adminService';
+import { getNotificationsForRole, markNotificationAsRead } from '../../services/notificationService';
+import { Complaint, ComplaintStatus, NotificationItem } from '../../types/database.types';
+import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import {
+  Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
+  Camera, Check, Play, Navigation, Eye, UserCheck, ShieldCheck, Zap, X,
+  Search, Lock, Building2, User, RefreshCw, FileText, ChevronRight,
+  MessageSquarePlus, Star, ArrowRight, Map, Bell, Sliders, Calendar,
+  TrendingUp, Award, Activity, Droplets, Trash2, Waves
+} from 'lucide-react';
+
+const getDepartmentInfo = (departmentName: string) => {
+  const nameLower = (departmentName || '').toLowerCase();
+  if (nameLower.includes('sanitation') || nameLower.includes('waste')) {
+    return {
+      fullName: 'Sanitation & Waste Management',
+      shortName: 'Sanitation & Waste',
+      icon: Trash2,
+      badgeColor: 'bg-amber-50 text-amber-800 border-amber-300',
+      description: 'Garbage Collection, Overflowing Dustbins & Waste Cleanup',
+      taskTypes: ['Garbage Collection', 'Dustbin Cleanup', 'Waste Removal']
+    };
+  }
+  if (nameLower.includes('water')) {
+    return {
+      fullName: 'Water Supply & Sewerage',
+      shortName: 'Water & Sewerage',
+      icon: Droplets,
+      badgeColor: 'bg-blue-50 text-blue-800 border-blue-300',
+      description: 'Pipeline Maintenance, Water Leakage & Civic Water Supply',
+      taskTypes: ['Pipeline Repair', 'Water Leakage', 'Water Supply Issue']
+    };
+  }
+  if (nameLower.includes('drainage') || nameLower.includes('sewage')) {
+    return {
+      fullName: 'Drainage & Sewage Department',
+      shortName: 'Drainage & Sewage',
+      icon: Waves,
+      badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-300',
+      description: 'Drain Cleaning, Sewage Overflow & Underground Drainage',
+      taskTypes: ['Drain Blockage', 'Sewage Overflow', 'Drain Cleaning']
+    };
+  }
+  if (nameLower.includes('electric') || nameLower.includes('light')) {
+    return {
+      fullName: 'Electrical & Street Lighting',
+      shortName: 'Electrical & Lighting',
+      icon: Zap,
+      badgeColor: 'bg-yellow-50 text-yellow-800 border-yellow-300',
+      description: 'Streetlight Repair & Electrical Infrastructure Maintenance',
+      taskTypes: ['Streetlight Repair', 'Electrical Maintenance', 'Cable Repair']
+    };
+  }
+  if (nameLower.includes('traffic')) {
+    return {
+      fullName: 'Traffic Management Department',
+      shortName: 'Traffic Management',
+      icon: Activity,
+      badgeColor: 'bg-purple-50 text-purple-800 border-purple-300',
+      description: 'Traffic Signal Repair & Roadside Signage Infrastructure',
+      taskTypes: ['Traffic Signal Repair', 'Signage Maintenance', 'Traffic Infrastructure']
+    };
+  }
+  return {
+    fullName: 'Public Works Department (PWD)',
+    shortName: 'Public Works (PWD)',
+    icon: Wrench,
+    badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+    description: 'Pothole Patching, Road Damage & Public Infrastructure Repairs',
+    taskTypes: ['Pothole Repair', 'Road Maintenance', 'Infrastructure Repair']
+  };
+};
+
+// Fix standard Leaflet marker icon asset issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const createStatusMarkerIcon = (status: ComplaintStatus, isOverdue: boolean = false) => {
+  let color = '#0284c7';
+  if (status === 'Accepted' || status === 'On the Way' || status === 'In Progress') color = '#d97706';
+  else if (status === 'Resolution Submitted' || status === 'Resolved') color = '#059669';
+  if (isOverdue && status !== 'Resolved') color = '#e11d48';
+
+  return L.divIcon({
+    className: 'custom-staff-preview-marker',
+    html: `
+      <div style="background-color:${color}; width:18px; height:18px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
+    `,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
+};
+
+export const StaffPortal: React.FC = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Route View Mode
+  const currentPath = location.pathname;
+  const isDashboardView = currentPath === '/staff/portal';
+  const isNewPage = currentPath === '/staff/tasks/new';
+  const isInProgressPage = currentPath === '/staff/tasks/in-progress';
+  const isOverduePage = currentPath === '/staff/tasks/overdue';
+  const isCompletedPage = currentPath === '/staff/tasks/completed';
+  const isProfilePage = currentPath === '/staff/profile';
+
+  // Department-wise & Staff-specific identity
+  const staffName = user?.full_name || 'Field Officer';
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffDepartmentFull = user?.department_name || 'Public Works Department (PWD)';
+  const staffDepartment = staffDepartmentFull.split('(')[0].trim() || 'Department';
+  const staffRole = 'Field Service Officer';
+
+  const deptInfo = useMemo(() => getDepartmentInfo(staffDepartmentFull), [staffDepartmentFull]);
+
+  const [tasks, setTasks] = useState<Complaint[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters State for Task List View
+  const [activeTab, setActiveTab] = useState<'All' | 'New' | 'Accepted' | 'In Progress' | 'Due Soon' | 'Overdue' | 'Completed'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+
+  // Selected Task Modal State
+  const [selectedTask, setSelectedTask] = useState<Complaint | null>(null);
+
+  // Progress Update & Resolution State
+  const [progressNote, setProgressNote] = useState('');
+  const [submittingProgressNote, setSubmittingProgressNote] = useState(false);
+  const [photoAfterFile, setPhotoAfterFile] = useState<File | null>(null);
+  const [photoAfterPreview, setPhotoAfterPreview] = useState<string>('');
+  const [workNotes, setWorkNotes] = useState('');
+  const [materialsUsed, setMaterialsUsed] = useState('');
+  const [submittingResolution, setSubmittingResolution] = useState(false);
+
+  // Auto-set default activeTab based on sub-route
+  useEffect(() => {
+    if (isNewPage) setActiveTab('New');
+    else if (isInProgressPage) setActiveTab('In Progress');
+    else if (isOverduePage) setActiveTab('Overdue');
+    else if (isCompletedPage) setActiveTab('Completed');
+    else setActiveTab('All');
+  }, [isNewPage, isInProgressPage, isOverduePage, isCompletedPage]);
+
+  // Load Staff-Specific & Department-Specific Tasks and Notifications
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await getStaffTasks(user?.id, staffDepartmentFull);
+      setTasks(list);
+
+      const notifs = getNotificationsForRole(user?.id, 'service_staff');
+      setNotifications(notifs);
+    } catch (e) {
+      console.error(e);
+      setError('Unable to load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, staffDepartmentFull]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useRealtimeComplaints(useCallback(() => {
+    loadData();
+  }, [loadData]));
+
+  const now = new Date();
+
+  // Greeting Time of Day
+  const greetingTime = useMemo(() => {
+    const hrs = now.getHours();
+    if (hrs < 12) return 'Good Morning';
+    if (hrs < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }, [now]);
+
+  // Date String
+  const currentDateFormatted = useMemo(() => {
+    return now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, [now]);
+
+  // TASK SUMMARY METRICS
+  const metrics = useMemo(() => {
+    const total = tasks.length;
+    const newTasks = tasks.filter((t) => t.status === 'Department Assigned' || t.status === 'Staff Assigned').length;
+    const activeTasks = tasks.filter((t) => t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress').length;
+    
+    const criticalCount = tasks.filter((t) => t.priority === 'Critical').length;
+    const highCount = tasks.filter((t) => t.priority === 'High').length;
+
+    const dueSoon = tasks.filter((t) => {
+      if (t.status === 'Resolved') return false;
+      if (!t.sla_deadline) return false;
+      const diffMs = new Date(t.sla_deadline).getTime() - now.getTime();
+      return diffMs > 0 && diffMs <= 2 * 3600000;
+    }).length;
+
+    const overdueTasksList = tasks.filter((t) => {
+      if (t.status === 'Resolved') return false;
+      if (!t.sla_deadline) return false;
+      return new Date(t.sla_deadline) < now;
+    });
+
+    const overdueCount = overdueTasksList.length;
+    const completed = tasks.filter((t) => t.status === 'Resolution Submitted' || t.status === 'Resolved').length;
+
+    // SLA Compliance %
+    const completedWithinSla = tasks.filter((t) => {
+      if (t.status !== 'Resolved' && t.status !== 'Resolution Submitted') return false;
+      if (!t.sla_deadline || !t.updated_at) return true;
+      return new Date(t.updated_at) <= new Date(t.sla_deadline);
+    }).length;
+
+    const slaCompliancePercent = completed > 0 ? Math.round((completedWithinSla / completed) * 100) : 94;
+
+    return {
+      total,
+      newTasks,
+      activeTasks,
+      criticalCount,
+      highCount,
+      dueSoon,
+      overdueCount,
+      overdueTasksList,
+      completed,
+      slaCompliancePercent
+    };
+  }, [tasks, now]);
+
+  // PRIORITY TASKS (Sorted: Critical -> High -> Due Soon -> Overdue)
+  const priorityTasksList = useMemo(() => {
+    const activeOnly = tasks.filter((t) => t.status !== 'Resolved');
+    return activeOnly.sort((a, b) => {
+      const priorityOrder: Record<string, number> = { Critical: 1, High: 2, Medium: 3, Low: 4 };
+      const pA = priorityOrder[a.priority] || 5;
+      const pB = priorityOrder[b.priority] || 5;
+      if (pA !== pB) return pA - pB;
+      const timeA = a.sla_deadline ? new Date(a.sla_deadline).getTime() : 0;
+      const timeB = b.sla_deadline ? new Date(b.sla_deadline).getTime() : 0;
+      return timeA - timeB;
+    }).slice(0, 4);
+  }, [tasks]);
+
+  // ACTIVE TASKS FOR DASHBOARD
+  const activeTasksList = useMemo(() => {
+    return tasks.filter((t) => t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress').slice(0, 4);
+  }, [tasks]);
+
+  // NEW ASSIGNMENTS FOR DASHBOARD
+  const newAssignmentsList = useMemo(() => {
+    return tasks.filter((t) => t.status === 'Department Assigned' || t.status === 'Staff Assigned').slice(0, 4);
+  }, [tasks]);
+
+  // TASKS WITH VALID GPS FOR MAP PREVIEW
+  const mapPreviewTasks = useMemo(() => {
+    return tasks.filter(
+      (t) => typeof t.latitude === 'number' && typeof t.longitude === 'number' && t.latitude !== 0 && t.longitude !== 0
+    );
+  }, [tasks]);
+
+  // RECENT ACTIVITY LOGS
+  const recentActivities = useMemo(() => {
+    if (tasks.length === 0) return [];
+    const firstCompId = tasks[0].id;
+    return getComplaintActivityLogs(firstCompId).slice(0, 4);
+  }, [tasks]);
+
+  // FILTERED TASKS FOR LIST VIEW
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      // Route Specific Pre-filtering
+      if (isNewPage && !(t.status === 'Department Assigned' || t.status === 'Staff Assigned')) return false;
+      if (isInProgressPage && !(t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress')) return false;
+      if (isOverduePage && (t.status === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now)) return false;
+      if (isCompletedPage && !(t.status === 'Resolution Submitted' || t.status === 'Resolved')) return false;
+
+      // Tab Filter
+      if (!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && !isDashboardView) {
+        if (activeTab === 'New' && !(t.status === 'Department Assigned' || t.status === 'Staff Assigned')) return false;
+        if (activeTab === 'Accepted' && t.status !== 'Accepted') return false;
+        if (activeTab === 'In Progress' && !(t.status === 'In Progress' || t.status === 'On the Way')) return false;
+        if (activeTab === 'Completed' && !(t.status === 'Resolution Submitted' || t.status === 'Resolved')) return false;
+        
+        if (activeTab === 'Due Soon') {
+          if (t.status === 'Resolved' || !t.sla_deadline) return false;
+          const diffMs = new Date(t.sla_deadline).getTime() - now.getTime();
+          if (diffMs <= 0 || diffMs > 2 * 3600000) return false;
+        }
+
+        if (activeTab === 'Overdue') {
+          if (t.status === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now) return false;
+        }
+      }
+
+      // Priority Filter
+      if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesNum = t.complaint_number.toLowerCase().includes(q);
+        const matchesTitle = t.title.toLowerCase().includes(q);
+        const matchesLoc = (t.location_address || '').toLowerCase().includes(q);
+        if (!matchesNum && !matchesTitle && !matchesLoc) return false;
+      }
+
+      return true;
+    });
+  }, [tasks, isNewPage, isInProgressPage, isOverduePage, isCompletedPage, isDashboardView, activeTab, priorityFilter, searchQuery, now]);
+
+  // WORKFLOW TRANSITION HANDLERS
+  const handleStatusTransition = async (taskId: string, newStatus: ComplaintStatus) => {
+    try {
+      if (newStatus === 'Accepted') await acceptStaffTask(taskId);
+      else if (newStatus === 'On the Way') await startStaffTravel(taskId);
+      else if (newStatus === 'In Progress') await startStaffWork(taskId);
+
+      await loadData();
+      const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
+      setSelectedTask(updatedList.find((t) => t.id === taskId) || null);
+    } catch (err) {
+      console.error(err);
+      alert('Error updating task status.');
+    }
+  };
+
+  // ADD FIELD PROGRESS NOTE
+  const handleAddProgressNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTask || !progressNote.trim()) return;
+
+    setSubmittingProgressNote(true);
+    try {
+      logActivity(
+        selectedTask.id,
+        staffName,
+        'Field Work Progress Update',
+        selectedTask.status,
+        selectedTask.status,
+        progressNote.trim()
+      );
+      setProgressNote('');
+      await loadData();
+      const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
+      setSelectedTask(updatedList.find((t) => t.id === selectedTask.id) || null);
+    } catch (err) {
+      console.error(err);
+      alert('Error adding progress note.');
+    } finally {
+      setSubmittingProgressNote(false);
+    }
+  };
+
+  const handleSubmitResolutionProof = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTask || !photoAfterPreview) {
+      alert('Please upload or select an "AFTER" repair proof photo.');
+      return;
+    }
+
+    setSubmittingResolution(true);
+    try {
+      await submitStaffResolution(
+        selectedTask.id,
+        photoAfterPreview,
+        workNotes || 'Field maintenance work completed.',
+        materialsUsed || 'Standard repair materials & asphalt'
+      );
+      
+      setSelectedTask(null);
+      setPhotoAfterFile(null);
+      setPhotoAfterPreview('');
+      setWorkNotes('');
+      setMaterialsUsed('');
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error submitting resolution proof.');
+    } finally {
+      setSubmittingResolution(false);
+    }
+  };
+
+  return (
+    <DashboardLayout title={isDashboardView ? 'Dashboard' : 'My Tasks'}>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
+        
+        {/* ================================================== */}
+        {/* DEPARTMENT HEADER CARD (DYNAMIC BY SUPABASE) */}
+        {/* ================================================== */}
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className={`p-3 rounded-xl border ${deptInfo.badgeColor} shrink-0`}>
+              <deptInfo.icon className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{deptInfo.fullName}</h2>
+                <span className="font-mono text-[10px] font-bold bg-white text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                  Service Staff Portal
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 font-medium mt-0.5">{deptInfo.description}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0 text-xs">
+            <span className="font-bold text-gray-500 uppercase tracking-wider font-outfit text-[10px]">Primary Work:</span>
+            <div className="flex flex-wrap gap-1">
+              {deptInfo.taskTypes.map((t) => (
+                <span key={t} className="px-2 py-0.5 bg-white text-gray-700 font-mono text-[10px] font-bold rounded border border-gray-200">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ================================================== */}
+        {/* 2, 3. STAFF GREETING & PAGE HEADER */}
+        {/* ================================================== */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-5">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight font-outfit">
+                {isProfilePage
+                  ? 'Staff Profile'
+                  : isDashboardView
+                  ? `${greetingTime}, ${staffName.split(' ')[0]}`
+                  : 'My Tasks'}
+              </h1>
+              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-50 text-emerald-800 border border-emerald-300">
+                <deptInfo.icon className="w-3.5 h-3.5 text-emerald-700" />
+                <span>{deptInfo.shortName} Command</span>
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 font-medium">
+              {isProfilePage
+                ? 'Your authenticated municipal staff identity and department credentials.'
+                : isDashboardView
+                ? 'Here is your field work overview and priority assignments for today.'
+                : 'Manage complaints assigned to you and complete field service work.'}
+            </p>
+          </div>
+
+          {/* LOCKED IDENTITY & DATE BADGE */}
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="bg-slate-50 border border-gray-200 rounded-xl p-2.5 px-4 flex items-center space-x-4 shadow-xs">
+              <div className="flex items-center space-x-2 text-xs">
+                <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <div className="flex items-center space-x-1">
+                    <span className="font-extrabold text-gray-900 font-outfit">{staffDepartment}</span>
+                    <Lock className="w-3 h-3 text-gray-400" />
+                  </div>
+                  <span className="font-mono text-[10px] text-gray-500 font-bold block">{staffEmployeeId}</span>
+                </div>
+              </div>
+
+              <div className="h-6 w-px bg-gray-200" />
+
+              <div className="flex items-center space-x-2 text-xs">
+                <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="font-mono font-extrabold text-gray-900 block">{currentDateFormatted}</span>
+                  <span className="text-[10px] text-gray-500 font-medium block">Today</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="p-2.5 rounded-xl bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors min-h-[44px]"
+              title="Refresh Dashboard"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {isProfilePage ? (
+          <div className="max-w-3xl mx-auto space-y-6">
+            <div className="bg-white p-6 rounded-xl border border-gray-200 space-y-6">
+              <div className="flex items-center space-x-4 pb-4 border-b border-gray-200">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
+                  {staffName.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{staffName}</h2>
+                  <span className="text-xs font-bold text-emerald-700 block">{staffRole}</span>
+                  <span className="font-mono text-xs text-gray-500 block">ID: {staffEmployeeId}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Official Email</span>
+                  <span className="font-extrabold text-gray-900 block">{user?.email || 'N/A'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Assigned Department</span>
+                  <div className="flex items-center space-x-1">
+                    <span className="font-extrabold text-emerald-800">{staffDepartmentFull}</span>
+                    <Lock className="w-3 h-3 text-gray-400" />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Operational Scope</span>
+                  <span className="font-extrabold text-gray-900 block">Service Staff (Field Operations)</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Account Verification</span>
+                  <span className="font-extrabold text-emerald-700 block">Active & Verified Municipal Employee</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 text-xs space-y-2">
+                <div className="flex items-center space-x-2 text-gray-700">
+                  <Lock className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span className="font-bold">Security Notice:</span>
+                </div>
+                <p className="text-gray-600">
+                  Department assignment and role permissions are set by City Administration. Contact your Department Manager or City Admin to request role or department transfers.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+        {/* ================================================== */}
+        {/* 4. TODAY'S WORK SUMMARY METRIC TILES */}
+        {/* ================================================== */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+          
+          <Link to="/staff/tasks/new" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">New Assignments</span>
+            <span className="text-xl font-extrabold text-blue-700 font-mono block">{metrics.newTasks}</span>
+          </Link>
+
+          <Link to="/staff/tasks/in-progress" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
+            <span className="text-xl font-extrabold text-amber-700 font-mono block">{metrics.activeTasks}</span>
+          </Link>
+
+          <Link to="/staff/tasks" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Soon</span>
+            <span className="text-xl font-extrabold text-orange-700 font-mono block">{metrics.dueSoon}</span>
+          </Link>
+
+          <Link to="/staff/tasks/overdue" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue SLA</span>
+            <span className="text-xl font-extrabold text-rose-700 font-mono block">{metrics.overdueCount}</span>
+          </Link>
+
+          <Link to="/staff/tasks/completed" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed</span>
+            <span className="text-xl font-extrabold text-emerald-700 font-mono block">{metrics.completed}</span>
+          </Link>
+
+        </div>
+
+        {/* ================================================== */}
+        {/* 8. OVERDUE ALERT BANNER */}
+        {/* ================================================== */}
+        {metrics.overdueCount > 0 ? (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-3 text-rose-900">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              <div>
+                <span className="font-extrabold font-outfit text-sm block">OVERDUE SLA ALERT</span>
+                <span className="text-rose-800">
+                  You have <span className="font-mono font-extrabold">{metrics.overdueCount}</span> tasks that have exceeded their SLA completion deadline.
+                </span>
+              </div>
+            </div>
+
+            <Link
+              to="/staff/tasks/overdue"
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition-colors shrink-0 inline-flex items-center space-x-1"
+            >
+              <span>View Overdue Tasks</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        ) : (
+          <div className="p-3 px-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center space-x-2 text-xs font-bold text-emerald-900">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>All assigned tasks are within SLA. Great work!</span>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* 13. QUICK ACTIONS TOOLBAR */}
+        {/* ================================================== */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider font-outfit mr-1">Quick Actions:</span>
+          
+          <Link
+            to="/staff/tasks"
+            className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>My Tasks</span>
+          </Link>
+
+          <Link
+            to="/staff/map"
+            className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
+          >
+            <Map className="w-4 h-4 text-emerald-600" />
+            <span>Task Map</span>
+          </Link>
+
+          <Link
+            to="/staff/notifications"
+            className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
+          >
+            <Bell className="w-4 h-4 text-emerald-600" />
+            <span>Notifications</span>
+          </Link>
+
+          <Link
+            to="/staff/settings"
+            className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
+          >
+            <Sliders className="w-4 h-4 text-emerald-600" />
+            <span>Settings</span>
+          </Link>
+        </div>
+
+        {/* ================================================== */}
+        {/* 5. PRIORITY WORK SECTION */}
+        {/* ================================================== */}
+        {isDashboardView && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Zap className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                  Priority Tasks
+                </h3>
+              </div>
+              <Link to="/staff/tasks" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 inline-flex items-center space-x-1">
+                <span>View All Tasks</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {priorityTasksList.length === 0 ? (
+              <div className="p-6 bg-slate-50 border border-gray-200 rounded-xl text-center space-y-1">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                <span className="font-bold text-gray-900 text-xs font-outfit block">You're all caught up!</span>
+                <span className="text-[11px] text-gray-500 block">No pending priority tasks assigned.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {priorityTasksList.map((t) => {
+                  const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+                  const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+
+                  return (
+                    <div
+                      key={t.id}
+                      className={`p-4 rounded-xl border space-y-3 bg-white hover:shadow-xs transition-shadow flex flex-col justify-between ${
+                        isOverdue ? 'border-rose-300 bg-rose-50/20' : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-extrabold text-emerald-700">{t.complaint_number}</span>
+                          <PriorityBadge priority={t.priority} />
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-xs line-clamp-1">{t.title}</h4>
+                          <p className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{t.location_address}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                          <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-600'}>
+                            {slaInfo.text}
+                          </span>
+                          <StatusBadge status={t.status} />
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedTask(t)}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Task</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* DASHBOARD TWO-COLUMN GRID (ONLY ON DASHBOARD ROUTE) */}
+        {/* ================================================== */}
+        {isDashboardView ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* LEFT COLUMN: ACTIVE TASKS + NEW ASSIGNMENTS + PERFORMANCE */}
+            <div className="lg:col-span-7 space-y-6">
+              
+              {/* 6. MY ACTIVE TASKS */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-4 h-4 text-amber-600" />
+                    <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                      My Active Tasks
+                    </h3>
+                  </div>
+                  <Link to="/staff/tasks/in-progress" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                    View All Active →
+                  </Link>
+                </div>
+
+                {activeTasksList.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-gray-500 font-medium">
+                    No active field tasks currently in progress.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {activeTasksList.map((t) => {
+                      const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+
+                      return (
+                        <div key={t.id} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-extrabold text-emerald-700">{t.complaint_number}</span>
+                              <PriorityBadge priority={t.priority} />
+                            </div>
+                            <span className="font-bold text-gray-900 block truncate max-w-[240px]">{t.title}</span>
+                            <span className="text-[11px] text-gray-500 block truncate">{t.location_address}</span>
+                          </div>
+
+                          <div className="flex items-center space-x-3 shrink-0">
+                            <div className="text-right">
+                              <StatusBadge status={t.status} />
+                              <span className="font-mono text-[10px] text-gray-500 block mt-0.5">{slaInfo.text}</span>
+                            </div>
+                            <button
+                              onClick={() => setSelectedTask(t)}
+                              className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 7. NEW ASSIGNMENTS */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                      New Assignments
+                    </h3>
+                  </div>
+                  <Link to="/staff/tasks/new" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                    View All New →
+                  </Link>
+                </div>
+
+                {newAssignmentsList.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-gray-500 font-medium">
+                    No new tasks assigned.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {newAssignmentsList.map((t) => (
+                      <div key={t.id} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono font-extrabold text-emerald-700">{t.complaint_number}</span>
+                            <PriorityBadge priority={t.priority} />
+                          </div>
+                          <span className="font-bold text-gray-900 block truncate max-w-[240px]">{t.title}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            onClick={() => handleStatusTransition(t.id, 'Accepted')}
+                            className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-lg hover:bg-indigo-700 transition-colors"
+                          >
+                            Accept Task
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 9, 14. TODAY'S PROGRESS & PERFORMANCE */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-xs">
+                <div className="border-b border-gray-100 pb-3">
+                  <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                    Today's Progress & Performance
+                  </h3>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between font-bold">
+                    <span>Field Work Completion</span>
+                    <span className="font-mono text-emerald-700">
+                      {metrics.completed} / {metrics.total} Tasks Completed ({metrics.slaCompliancePercent}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      style={{ width: `${metrics.slaCompliancePercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Performance Metrics Tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-center text-xs">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Total Completed</span>
+                    <span className="text-base font-extrabold text-gray-900 font-mono block">{metrics.completed}</span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">SLA Compliance</span>
+                    <span className="text-base font-extrabold text-emerald-700 font-mono block">{metrics.slaCompliancePercent}%</span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Avg Resolution</span>
+                    <span className="text-base font-extrabold text-blue-700 font-mono block">16h 40m</span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Citizen Rating</span>
+                    <span className="text-base font-extrabold text-amber-700 font-mono block">★ 4.8 / 5</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN: TASK MAP PREVIEW + NOTIFICATIONS + RECENT ACTIVITY */}
+            <div className="lg:col-span-5 space-y-6">
+              
+              {/* 10. TASK MAP PREVIEW WIDGET */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Map className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                      My Task Locations
+                    </h3>
+                  </div>
+                  <Link to="/staff/map" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                    Open Task Map →
+                  </Link>
+                </div>
+
+                {/* MINI LEAFLET MAP PREVIEW */}
+                <div className="h-56 rounded-xl overflow-hidden border border-gray-200 shadow-xs relative bg-slate-100">
+                  <MapContainer
+                    center={[20.0059, 73.7898]}
+                    zoom={12}
+                    scrollWheelZoom={false}
+                    className="w-full h-full"
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {mapPreviewTasks.map((t) => (
+                      <Marker
+                        key={t.id}
+                        position={[Number(t.latitude), Number(t.longitude)]}
+                        icon={createStatusMarkerIcon(t.status)}
+                      >
+                        <Popup>
+                          <div className="text-xs font-bold font-sans">
+                            <span className="font-mono text-emerald-700">{t.complaint_number}</span><br />
+                            {t.title}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </MapContainer>
+                </div>
+              </div>
+
+              {/* 12. NOTIFICATIONS PREVIEW */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Bell className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                      Notifications
+                    </h3>
+                  </div>
+                  <Link to="/staff/notifications" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                    View All →
+                  </Link>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  {notifications.slice(0, 3).map((n) => (
+                    <div key={n.id} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900 block truncate">{n.title}</span>
+                        <span className="font-mono text-[10px] text-gray-400">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <p className="text-[11px] text-gray-600 line-clamp-1">{n.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 11. RECENT ACTIVITY HISTORY */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-3 shadow-xs">
+                <div className="border-b border-gray-100 pb-3">
+                  <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
+                    Recent Activity
+                  </h3>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  {recentActivities.map((act) => (
+                    <div key={act.id} className="flex items-start space-x-2.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-600 mt-1.5 shrink-0" />
+                      <div className="space-y-0.5">
+                        <span className="font-bold text-gray-900 block">{act.action}</span>
+                        <p className="text-[11px] text-gray-600">{act.notes}</p>
+                        <span className="font-mono text-[10px] text-gray-400 block">{new Date(act.created_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        ) : (
+          /* DEDICATED TASK LIST VIEW FOR SUB-ROUTES (/staff/tasks, /staff/tasks/new, etc.) */
+          <div>
+            {/* SEARCH & FILTERS BAR */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Search complaint ID, issue or location..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(['All', 'New', 'Accepted', 'In Progress', 'Due Soon', 'Overdue', 'Completed'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold font-mono transition-colors ${
+                          activeTab === tab
+                            ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CLASSIC TABLE FOR TASK LIST VIEW */}
+            <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-extrabold text-gray-600 uppercase font-outfit">
+                    <th className="py-3 px-3">Complaint ID</th>
+                    <th className="py-3 px-3">Issue Title</th>
+                    <th className="py-3 px-3">Location / Address</th>
+                    <th className="py-3 px-3">Priority</th>
+                    <th className="py-3 px-3 font-mono">Assigned Date</th>
+                    <th className="py-3 px-3 font-mono">SLA Target</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 font-medium">
+                  {filteredTasks.map((t) => {
+                    const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+                    const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+
+                    return (
+                      <tr key={t.id} className={`hover:bg-slate-50 ${isOverdue ? 'bg-rose-50/40' : ''}`}>
+                        <td className="py-3 px-3 font-mono font-extrabold text-emerald-700">{t.complaint_number}</td>
+                        <td className="py-3 px-3 font-bold text-gray-900">{t.title}</td>
+                        <td className="py-3 px-3 text-gray-700">{t.location_address}</td>
+                        <td className="py-3 px-3"><PriorityBadge priority={t.priority} /></td>
+                        <td className="py-3 px-3 font-mono text-gray-600">{new Date(t.created_at).toLocaleDateString()}</td>
+                        <td className="py-3 px-3 font-mono">
+                          <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>{slaInfo.text}</span>
+                        </td>
+                        <td className="py-3 px-3"><StatusBadge status={t.status} /></td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            onClick={() => setSelectedTask(t)}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Task</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* TASK EXECUTION & DETAIL MODAL (REUSED) */}
+        {/* ================================================== */}
+        {selectedTask && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs overflow-y-auto font-sans">
+            <div className="max-w-3xl w-full bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-md my-8 space-y-6 max-h-[90vh] overflow-y-auto">
+              
+              {/* MODAL HEADER */}
+              <div className="flex items-start justify-between border-b border-gray-200 pb-3">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">
+                      {selectedTask.complaint_number}
+                    </span>
+                    <StatusBadge status={selectedTask.status} />
+                    <PriorityBadge priority={selectedTask.priority} />
+                  </div>
+                  <h3 className="text-lg font-extrabold text-gray-900 font-outfit">{selectedTask.title}</h3>
+                </div>
+
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* ADMIN INSTRUCTIONS CALLOUT */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
+                <span className="font-extrabold text-amber-900 font-outfit uppercase tracking-wider block">
+                  Admin Instructions
+                </span>
+                <p className="text-amber-800">
+                  {selectedTask.additional_notes || 'Inspect site, repair damaged civic infrastructure, and upload clear after-work photograph proof for approval.'}
+                </p>
+              </div>
+
+              {/* FIELD WORKFLOW TRANSITION BUTTONS */}
+              {selectedTask.status !== 'Resolved' && (
+                <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
+                  <span className="font-extrabold text-gray-900 font-outfit block">Field Execution Lifecycle Actions</span>
+                  <div className="flex flex-wrap gap-2">
+                    
+                    {/* Step 1: Accept Task */}
+                    {(selectedTask.status === 'Department Assigned' || selectedTask.status === 'Staff Assigned') && (
+                      <button
+                        onClick={() => handleStatusTransition(selectedTask.id, 'Accepted')}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Accept Task Assignment</span>
+                      </button>
+                    )}
+
+                    {/* Step 2: Navigate to Location */}
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${selectedTask.latitude},${selectedTask.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      <span>Navigate to Location</span>
+                    </a>
+
+                    {/* Step 3: Mark On the Way */}
+                    {selectedTask.status === 'Accepted' && (
+                      <button
+                        onClick={() => handleStatusTransition(selectedTask.id, 'On the Way')}
+                        className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold flex items-center space-x-1.5 min-h-[44px]"
+                      >
+                        <Navigation className="w-4 h-4" />
+                        <span>Mark "On the Way to Site"</span>
+                      </button>
+                    )}
+
+                    {/* Step 4: Start Work */}
+                    {(selectedTask.status === 'Accepted' || selectedTask.status === 'On the Way') && (
+                      <button
+                        onClick={() => handleStatusTransition(selectedTask.id, 'In Progress')}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
+                      >
+                        <Play className="w-4 h-4" />
+                        <span>Start Work (In Progress)</span>
+                      </button>
+                    )}
+
+                  </div>
+                </div>
+              )}
+
+              {/* BEFORE / AFTER PHOTO GALLERY */}
+              <div className="space-y-2 text-xs border-t border-gray-200 pt-4">
+                <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Complaint Photo Evidence</h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report - Locked)</span>
+                    <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
+                      <img src={selectedTask.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
+                    {selectedTask.photo_after_url || photoAfterPreview ? (
+                      <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
+                        <img src={selectedTask.photo_after_url || photoAfterPreview} alt="Proof" className="w-full h-full object-cover" />
+                        {selectedTask.status !== 'Resolved' && (
+                          <button
+                            type="button"
+                            onClick={() => setPhotoAfterPreview('')}
+                            className="absolute top-2 right-2 bg-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold"
+                          >
+                            Change Photo
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center space-y-2 bg-gray-50/50 h-44 flex flex-col items-center justify-center">
+                        <Camera className="w-6 h-6 text-gray-400" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          id="staff-dash-proof-input"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setPhotoAfterFile(e.target.files[0]);
+                              setPhotoAfterPreview(URL.createObjectURL(e.target.files[0]));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor="staff-dash-proof-input"
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer min-h-[44px] inline-flex items-center space-x-1"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Repair Photo</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* COMPLETE TASK FORM */}
+              {selectedTask.status !== 'Resolved' && (
+                <form onSubmit={handleSubmitResolutionProof} className="space-y-4 pt-2 border-t border-gray-200 text-xs">
+                  <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Resolution Details & Proof Submission</h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
+                      <input
+                        type="text"
+                        required
+                        value={workNotes}
+                        onChange={(e) => setWorkNotes(e.target.value)}
+                        placeholder="e.g. Completed asphalt patching and road compaction."
+                        className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-xs text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
+                      <input
+                        type="text"
+                        value={materialsUsed}
+                        onChange={(e) => setMaterialsUsed(e.target.value)}
+                        placeholder="e.g. 50kg asphalt emulsion, roller compactor."
+                        className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-xs text-gray-900"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingResolution || (!photoAfterPreview && !selectedTask.photo_after_url)}
+                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-1.5 min-h-[44px] disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>{submittingResolution ? 'Submitting Proof...' : 'Mark Work Completed (Send for Admin Verification)'}</span>
+                  </button>
+                </form>
+              )}
+
+              {/* TASK ACTIVITY TIMELINE */}
+              <div className="pt-3 border-t border-gray-200">
+                <ActivityTimeline complaintId={selectedTask.id} />
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        </div>
+        )}
+
+      </div>
+    </DashboardLayout>
+  );
+};
