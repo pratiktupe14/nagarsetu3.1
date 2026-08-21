@@ -28,7 +28,7 @@ import {
   TrendingUp, Award, Activity, Droplets, Trash2, Waves, Shield, PlusCircle,
   Users, Layers, CornerDownRight, RotateCcw, Download, Filter, CheckSquare,
   Square, ChevronLeft, ExternalLink, FileSpreadsheet, Info, Phone, Mail,
-  UserPlus, ArrowLeft, CheckSquare2, AlertCircle
+  UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX
 } from 'lucide-react';
 
 // Fix standard Leaflet marker icon asset issue
@@ -159,6 +159,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [staffFilter, setStaffFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All Time');
+  const [slaFilter, setSlaFilter] = useState('All');
   const [taskLoadFilter, setTaskLoadFilter] = useState('All');
 
   // Task Assignment Workspace States
@@ -168,6 +169,12 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [assignmentDueDate, setAssignmentDueDate] = useState<string>('');
   const [assignmentNotes, setAssignmentNotes] = useState<string>('');
   const [assignmentTab, setAssignmentTab] = useState<'Unassigned' | 'Assigned' | 'In Progress' | 'Pending Review' | 'Completed' | 'Overdue'>('Unassigned');
+
+  // Reassignment Modal State
+  const [reassignModalComplaint, setReassignModalComplaint] = useState<Complaint | null>(null);
+  const [targetReassignStaffId, setTargetReassignStaffId] = useState<string>('');
+  const [reassignReason, setReassignReason] = useState<string>('');
+  const [reassigning, setReassigning] = useState<boolean>(false);
 
   // Bulk Operations State
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>([]);
@@ -253,6 +260,26 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     return { total, unassigned, assigned, inProgress, completedReviews, resolved, overdue, critical, staffCount };
   }, [departmentComplaints, departmentStaff, now]);
+
+  // In-Progress Specific Metric Cards (Real Supabase Data)
+  const inProgressMetrics = useMemo(() => {
+    const inProgressComplaints = departmentComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way');
+    const total = inProgressComplaints.length;
+    const highPriority = inProgressComplaints.filter((c) => c.priority === 'High').length;
+    const critical = inProgressComplaints.filter((c) => c.priority === 'Critical').length;
+    
+    const dueToday = inProgressComplaints.filter((c) => {
+      if (!c.sla_deadline) return false;
+      return new Date(c.sla_deadline).toDateString() === now.toDateString();
+    }).length;
+
+    const overdue = inProgressComplaints.filter((c) => {
+      if (!c.sla_deadline) return false;
+      return new Date(c.sla_deadline) < now;
+    }).length;
+
+    return { total, highPriority, critical, dueToday, overdue };
+  }, [departmentComplaints, now]);
 
   // Calculate Real Staff Summary Statistics from Database Records
   const staffMetrics = useMemo(() => {
@@ -344,7 +371,13 @@ export const DepartmentHeadPortal: React.FC = () => {
   const filteredComplaints = useMemo(() => {
     return departmentComplaints.filter((c) => {
       // Route specific filters
-      if (isAssignWorkspace) {
+      if (isInProgress) {
+        if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
+      } else if (isCompleted) {
+        if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved') return false;
+      } else if (isOverdue) {
+        if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now) return false;
+      } else if (isAssignWorkspace) {
         if (assignmentTab === 'Unassigned' && (c.assigned_staff_id || c.status === 'Resolved')) return false;
         if (assignmentTab === 'Assigned' && (!c.assigned_staff_id || (c.status !== 'Staff Assigned' && c.status !== 'Department Assigned'))) return false;
         if (assignmentTab === 'In Progress' && c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
@@ -359,11 +392,6 @@ export const DepartmentHeadPortal: React.FC = () => {
         }
       }
 
-      if (isAssign && c.assigned_staff_id) return false;
-      if (isInProgress && (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way')) return false;
-      if (isCompleted && (c.status !== 'Resolution Submitted' && c.status !== 'Resolved')) return false;
-      if (isOverdue && (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now)) return false;
-
       // Priority Filter
       if (priorityFilter !== 'All' && c.priority !== priorityFilter) return false;
 
@@ -374,6 +402,16 @@ export const DepartmentHeadPortal: React.FC = () => {
       if (staffFilter !== 'All') {
         if (staffFilter === 'Unassigned' && c.assigned_staff_id) return false;
         if (staffFilter !== 'Unassigned' && c.assigned_staff_id !== staffFilter && c.assigned_staff_name !== staffFilter) return false;
+      }
+
+      // SLA Status Filter
+      if (slaFilter !== 'All') {
+        if (!c.sla_deadline) return false;
+        const isOver = new Date(c.sla_deadline) < now;
+        const isToday = new Date(c.sla_deadline).toDateString() === now.toDateString();
+        if (slaFilter === 'Overdue' && !isOver) return false;
+        if (slaFilter === 'Due Today' && !isToday) return false;
+        if (slaFilter === 'Within SLA' && isOver) return false;
       }
 
       // Date Range Filter
@@ -389,19 +427,21 @@ export const DepartmentHeadPortal: React.FC = () => {
         }
       }
 
-      // Search Query (ID, Title, Category, Location Address)
+      // Search Query (ID, Task ID, Title, Category, Location Address, Staff Name)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const numMatch = c.complaint_number.toLowerCase().includes(q);
+        const taskIdMatch = `task-${c.id.slice(0, 6)}`.includes(q);
         const titleMatch = c.title.toLowerCase().includes(q);
         const catMatch = c.category.toLowerCase().includes(q);
         const locMatch = (c.location_address || '').toLowerCase().includes(q);
-        if (!numMatch && !titleMatch && !catMatch && !locMatch) return false;
+        const staffMatch = (c.assigned_staff_name || '').toLowerCase().includes(q);
+        if (!numMatch && !taskIdMatch && !titleMatch && !catMatch && !locMatch && !staffMatch) return false;
       }
 
       return true;
     });
-  }, [departmentComplaints, isAssignWorkspace, assignmentTab, isComplaints, isAssign, isInProgress, isCompleted, isOverdue, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, searchQuery, now]);
+  }, [departmentComplaints, isInProgress, isCompleted, isOverdue, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, dateFilter, searchQuery, now]);
 
   // Tasks belonging to the selected single staff member profile
   const staffProfileTasks = useMemo(() => {
@@ -412,7 +452,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Reset page index when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, taskLoadFilter, assignmentTab]);
+  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab]);
 
   // Paginated Complaints
   const paginatedComplaints = useMemo(() => {
@@ -444,6 +484,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     setCategoryFilter('All');
     setStaffFilter('All');
     setDateFilter('All Time');
+    setSlaFilter('All');
     setTaskLoadFilter('All');
   };
 
@@ -455,8 +496,9 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     if (targetList.length === 0) return;
 
-    const headers = ['Complaint ID', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'Reported Date'];
+    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'Started Date', 'SLA Due Date'];
     const rows = targetList.map((c) => [
+      `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
       `"${c.complaint_number}"`,
       `"${(c.title || '').replace(/"/g, '""')}"`,
       `"${(c.category || '').replace(/"/g, '""')}"`,
@@ -466,14 +508,15 @@ export const DepartmentHeadPortal: React.FC = () => {
       c.priority,
       c.status,
       `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
-      `"${new Date(c.created_at).toLocaleDateString()}"`
+      `"${new Date(c.updated_at || c.created_at).toLocaleDateString()}"`,
+      `"${c.sla_deadline ? new Date(c.sla_deadline).toLocaleDateString() : 'N/A'}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_Complaints_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_In_Progress_Report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -484,7 +527,6 @@ export const DepartmentHeadPortal: React.FC = () => {
     // SECURITY CHECK: Department Head department MUST match complaint department AND staff department
     const cleanHeadDept = headDepartmentFull.split('(')[0].trim().toLowerCase();
     const cleanStaffDept = (staffObj.department_name || '').split('(')[0].trim().toLowerCase();
-    const cleanCompDept = (compObj.department_name || '').split('(')[0].trim().toLowerCase();
 
     if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
       alert(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);
@@ -516,6 +558,41 @@ export const DepartmentHeadPortal: React.FC = () => {
       alert(err.message || 'Error executing task assignment.');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  // Execute Reassignment to a New Service Staff Member in Same Department
+  const handleExecuteReassignment = async () => {
+    if (!reassignModalComplaint || !targetReassignStaffId) {
+      alert('Please select a service staff member to reassign this task to.');
+      return;
+    }
+    const newStaff = departmentStaff.find((s) => s.id === targetReassignStaffId);
+    if (!newStaff) {
+      alert('Selected staff member record not found.');
+      return;
+    }
+
+    setReassigning(true);
+    try {
+      await assignTaskByDepartmentHead(
+        reassignModalComplaint.id,
+        newStaff.id,
+        newStaff.name,
+        newStaff.department_name || headDepartmentFull,
+        headId,
+        headName,
+        headDepartmentFull
+      );
+      setReassignModalComplaint(null);
+      setTargetReassignStaffId('');
+      setReassignReason('');
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error reassigning task.');
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -572,7 +649,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title={isStaffView ? "Department Staff" : isAssignWorkspace ? "Task Assignment" : "Department Operations"}>
+    <DashboardLayout title={isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -589,14 +666,14 @@ export const DepartmentHeadPortal: React.FC = () => {
                   {deptInfo.fullName}
                 </h1>
                 <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  DEPARTMENT HEAD PORTAL
+                  {isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                   ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
-                Managed by <span className="font-bold text-gray-900">{headName}</span> • Scope: <span className="text-gray-800 font-semibold">{deptInfo.description}</span>
+                {isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
               </p>
             </div>
           </div>
@@ -605,7 +682,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             <div className="bg-white px-3.5 py-2 rounded-xl border border-gray-200 text-xs flex items-center space-x-2">
               <Users className="w-4 h-4 text-emerald-600" />
               <div>
-                <span className="text-[10px] font-mono text-gray-500 font-bold block">Department Staff</span>
+                <span className="text-[10px] font-mono text-gray-500 font-bold block">{t('staff')}</span>
                 <span className="font-extrabold text-gray-900 font-mono">{complaintMetrics.staffCount} Active Members</span>
               </div>
             </div>
@@ -634,8 +711,351 @@ export const DepartmentHeadPortal: React.FC = () => {
         {/* VIEW ROUTE RENDERER */}
         {/* ================================================== */}
         
-        {/* A. STAFF PROFILE DETAIL VIEW (/department-head/staff/:staffId) */}
-        {isStaffDetailView && selectedStaffProfile ? (
+        {/* A. DEPARTMENT HEAD → IN PROGRESS PAGE (/department-head/tasks/in-progress) */}
+        {isInProgress ? (
+          <div className="space-y-6">
+
+            {/* 5 IN-PROGRESS SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-4 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
+                <span className="text-2xl font-extrabold text-amber-700 font-mono block">{inProgressMetrics.total}</span>
+              </div>
+
+              <div className="p-4 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Department</span>
+                <span className="text-2xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
+              </div>
+
+              <div className="p-4 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">High Priority</span>
+                <span className="text-2xl font-extrabold text-orange-700 font-mono block">{inProgressMetrics.highPriority}</span>
+              </div>
+
+              <div className="p-4 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
+                <span className="text-2xl font-extrabold text-rose-800 font-mono block">{inProgressMetrics.critical}</span>
+              </div>
+
+              <div className="p-4 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Today / Overdue</span>
+                <span className="text-2xl font-extrabold text-rose-700 font-mono block">
+                  {inProgressMetrics.dueToday + inProgressMetrics.overdue}
+                </span>
+              </div>
+            </div>
+
+            {/* PROFESSIONAL FILTER BAR */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by Complaint ID, Task ID, Issue, Location, Staff Name..."
+                    className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Priority Filter */}
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Priorities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+
+                  {/* Category Filter */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Categories</option>
+                    {availableCategories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+
+                  {/* Staff Filter */}
+                  <select
+                    value={staffFilter}
+                    onChange={(e) => setStaffFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Staff</option>
+                    {departmentStaff.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+
+                  {/* SLA Status Filter */}
+                  <select
+                    value={slaFilter}
+                    onChange={(e) => setSlaFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All SLA Statuses</option>
+                    <option value="Within SLA">Within SLA</option>
+                    <option value="Due Today">Due Today</option>
+                    <option value="Overdue">Overdue</option>
+                  </select>
+
+                  {/* Clear Filters Button */}
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || slaFilter !== 'All') && (
+                    <button
+                      onClick={handleClearFilters}
+                      className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* IN-PROGRESS TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="p-12 bg-white border border-rose-200 rounded-2xl text-center space-y-3 max-w-md mx-auto">
+                <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load in-progress tasks</h3>
+                <p className="text-xs text-gray-600">Please check your connection and try again.</p>
+                <button
+                  onClick={loadData}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : filteredComplaints.length === 0 ? (
+              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
+                <PlayCircle className="w-10 h-10 text-gray-400 mx-auto" />
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No tasks are currently in progress</h3>
+                <p className="text-xs text-gray-500">Your department has no active service tasks being executed at the moment.</p>
+                <button
+                  onClick={loadData}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
+                >
+                  Refresh Tasks
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                
+                {/* DESKTOP TABLE */}
+                <div className="hidden md:block border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                        <th className="p-3.5">Task ID / Complaint</th>
+                        <th className="p-3.5">Issue & Category</th>
+                        <th className="p-3.5">Location</th>
+                        <th className="p-3.5">Assigned Staff</th>
+                        <th className="p-3.5">Priority</th>
+                        <th className="p-3.5">Started At</th>
+                        <th className="p-3.5">Due Date</th>
+                        <th className="p-3.5">SLA Status</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paginatedComplaints.map((comp) => {
+                        const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
+                        const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
+
+                        return (
+                          <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3.5 font-mono">
+                              <span className="font-bold text-gray-900 block">{taskIdStr}</span>
+                              <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
+                                {comp.complaint_number}
+                              </button>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="font-bold text-gray-900 block">{comp.title}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
+                            </td>
+                            <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
+                              <div className="flex items-center space-x-1">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+                              </div>
+                            </td>
+                            <td className="p-3.5">
+                              {comp.assigned_staff_id ? (
+                                <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
+                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-[10px] border border-emerald-300 shrink-0">
+                                    {comp.assigned_staff_name?.charAt(0) || 'S'}
+                                  </div>
+                                  <div>
+                                    <span className="font-bold text-gray-900 block">{comp.assigned_staff_name}</span>
+                                    <span className="text-[9px] text-gray-500 font-mono block">
+                                      Active Tasks: {staffTaskCountsMap[comp.assigned_staff_id]?.active || 1}
+                                    </span>
+                                  </div>
+                                </Link>
+                              ) : (
+                                <span className="text-amber-700 font-mono text-[11px] font-bold">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="p-3.5">
+                              <PriorityBadge priority={comp.priority} />
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                              {new Date(comp.updated_at || comp.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] text-gray-700 whitespace-nowrap">
+                              {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px]">
+                              {slaInfo.isOverdue ? (
+                                <span className="text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block w-fit">
+                                  OVERDUE ({slaInfo.text})
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 font-semibold">{slaInfo.text}</span>
+                              )}
+                            </td>
+                            <td className="p-3.5">
+                              <StatusBadge status={comp.status} />
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                <button
+                                  onClick={() => setDetailModalComplaint(comp)}
+                                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
+                                >
+                                  View Task
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setReassignModalComplaint(comp);
+                                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
+                                >
+                                  Reassign
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* MOBILE CARDS VIEW */}
+                <div className="grid grid-cols-1 gap-4 md:hidden">
+                  {paginatedComplaints.map((comp) => {
+                    const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
+                    const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
+
+                    return (
+                      <div key={comp.id} className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-bold text-gray-900">{taskIdStr} • <span className="text-emerald-700">{comp.complaint_number}</span></span>
+                          <StatusBadge status={comp.status} />
+                        </div>
+
+                        <div>
+                          <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
+                          <span className="text-[11px] text-gray-500 font-mono block">{comp.category}</span>
+                        </div>
+
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <div className="flex items-center space-x-1">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1">
+                            <span>Staff: <strong>{comp.assigned_staff_name || 'Unassigned'}</strong></span>
+                            <PriorityBadge priority={comp.priority} />
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between text-xs font-mono">
+                          <span className="text-gray-600">SLA Remaining:</span>
+                          <span className={slaInfo.isOverdue ? "text-rose-700 font-extrabold" : "text-emerald-700 font-bold"}>
+                            {slaInfo.text}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                          <button
+                            onClick={() => setDetailModalComplaint(comp)}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-800 font-bold rounded-lg text-xs"
+                          >
+                            View Task
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setReassignModalComplaint(comp);
+                              setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                            }}
+                            className="px-3.5 py-1.5 bg-amber-50 text-amber-900 border border-amber-300 font-extrabold rounded-lg text-xs"
+                          >
+                            Reassign
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* PAGINATION BAR */}
+                {totalPages > 1 && (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex items-center justify-between text-xs text-gray-700">
+                    <span className="font-semibold">
+                      Showing <span className="font-extrabold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                      <span className="font-extrabold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of{' '}
+                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> tasks
+                    </span>
+
+                    <div className="flex items-center space-x-2 font-bold">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg font-mono">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+          </div>
+        ) : isStaffDetailView && selectedStaffProfile ? (
+          /* B. STAFF PROFILE DETAIL VIEW (/department-head/staff/:staffId) */
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <Link
@@ -824,7 +1244,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             </div>
           </div>
         ) : isStaffView ? (
-          /* B. DEPARTMENT HEAD → STAFF ROSTER PAGE (/department-head/staff) */
+          /* C. DEPARTMENT HEAD → STAFF ROSTER PAGE (/department-head/staff) */
           <div className="space-y-6">
 
             {/* 8 STAFF SUMMARY CARDS (CALCULATED FROM REAL SUPABASE DATA) */}
@@ -1112,7 +1532,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             )}
           </div>
         ) : isAssignWorkspace ? (
-          /* C. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE (/department-head/tasks/assign) */
+          /* D. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE (/department-head/tasks/assign) */
           <div className="space-y-6">
 
             {/* TASK ASSIGNMENT HEADER BANNER */}
@@ -1403,7 +1823,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
           </div>
         ) : (
-          /* D. DEFAULT COMPLAINTS / GENERAL OPERATIONS TABLE VIEW */
+          /* E. DEFAULT COMPLAINTS / GENERAL OPERATIONS TABLE VIEW */
           <div className="space-y-4">
             
             {/* SEARCH & FILTERS TOOLBAR */}
@@ -1564,6 +1984,81 @@ export const DepartmentHeadPortal: React.FC = () => {
         )}
 
         {/* ================================================== */}
+        {/* REASSIGN TASK MODAL */}
+        {/* ================================================== */}
+        {reassignModalComplaint && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-gray-200 shadow-xl font-sans">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2">
+                  <RotateCcw className="w-5 h-5 text-amber-600" />
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Reassign Task to Service Staff</h3>
+                </div>
+                <button onClick={() => setReassignModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="font-mono text-emerald-700 font-bold block">{reassignModalComplaint.complaint_number}</span>
+                  <span className="text-gray-500 font-mono">Current Staff: <strong className="text-amber-800">{reassignModalComplaint.assigned_staff_name || 'Unassigned'}</strong></span>
+                </div>
+                <h4 className="font-extrabold text-gray-900 text-sm">{reassignModalComplaint.title}</h4>
+                <p className="text-gray-600 text-[11px]">{reassignModalComplaint.location_address}</p>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Select New {deptInfo.shortName} Service Staff Member *
+                  </label>
+                  <select
+                    value={targetReassignStaffId}
+                    onChange={(e) => setTargetReassignStaffId(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-medium min-h-[44px]"
+                  >
+                    {departmentStaff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.employee_id || 'STF-001'}) — Status: {s.status || 'Available'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Reassignment Reason *</label>
+                  <textarea
+                    rows={2}
+                    value={reassignReason}
+                    onChange={(e) => setReassignReason(e.target.value)}
+                    placeholder="Provide reason for reassigning task..."
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
+                <button
+                  onClick={() => setReassignModalComplaint(null)}
+                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleExecuteReassignment}
+                  disabled={reassigning}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-xs disabled:opacity-50 min-h-[40px]"
+                >
+                  {reassigning ? 'Reassigning...' : 'Confirm Reassignment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
         {/* ASSIGN STAFF MODAL (STRICT DEPARTMENT VALIDATION) */}
         {/* ================================================== */}
         {assignModalComplaint && (
@@ -1634,7 +2129,7 @@ export const DepartmentHeadPortal: React.FC = () => {
         )}
 
         {/* ================================================== */}
-        {/* COMPLAINT DETAIL MODAL */}
+        {/* COMPLAINT / TASK DETAIL MODAL */}
         {/* ================================================== */}
         {detailModalComplaint && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -1642,7 +2137,9 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2">
                   <FileText className="w-5 h-5 text-emerald-600" />
-                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Complaint Details & Audit</h3>
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">
+                    Task Details & Field Audit (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
+                  </h3>
                 </div>
                 <button onClick={() => setDetailModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
@@ -1664,7 +2161,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </p>
               </div>
 
-              {/* CITIZEN PHOTO VS REPAIR PROOF */}
+              {/* CITIZEN PHOTO VS REPAIR PROOF / EVIDENCE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo</span>
@@ -1674,17 +2171,35 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Repair Proof</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Repair Proof Evidence</span>
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 flex items-center justify-center">
                     {detailModalComplaint.photo_after_url ? (
                       <img src={detailModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Proof Pending</div>
+                      <div className="text-center p-4 space-y-1">
+                        <Camera className="w-6 h-6 text-gray-400 mx-auto" />
+                        <span className="text-xs font-bold text-gray-600 block">Not submitted yet</span>
+                        <span className="text-[10px] text-gray-400 block font-mono">Field staff is currently executing work</span>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
 
+              {/* TASK PROGRESS TIMELINE STEPS */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-2">
+                <span className="text-[10px] font-mono text-gray-500 uppercase font-extrabold block">Task Workflow Progression</span>
+                <div className="grid grid-cols-6 gap-1 text-center text-[10px] font-mono font-extrabold">
+                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ASSIGNED</div>
+                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ACCEPTED</div>
+                  <div className="p-2 rounded bg-amber-500 text-white shadow-xs">IN PROGRESS</div>
+                  <div className="p-2 rounded bg-gray-200 text-gray-500">COMPLETED</div>
+                  <div className="p-2 rounded bg-gray-200 text-gray-500">REVIEW</div>
+                  <div className="p-2 rounded bg-gray-200 text-gray-500">RESOLVED</div>
+                </div>
+              </div>
+
+              {/* LOCATION & SLA DETAILS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700 font-medium p-3.5 bg-slate-50 rounded-xl border border-gray-200">
                 <div>
                   <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Location Address</span>
@@ -1694,9 +2209,29 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Assigned Field Staff</span>
                   <span>{detailModalComplaint.assigned_staff_name || 'Unassigned'}</span>
                 </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Work Started At</span>
+                  <span className="font-mono text-gray-900">{new Date(detailModalComplaint.updated_at || detailModalComplaint.created_at).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">SLA Due Deadline</span>
+                  <span className="font-mono text-rose-700 font-bold">{detailModalComplaint.sla_deadline ? new Date(detailModalComplaint.sla_deadline).toLocaleString() : 'N/A'}</span>
+                </div>
               </div>
 
-              <div className="flex justify-end pt-3 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    const comp = detailModalComplaint;
+                    setDetailModalComplaint(null);
+                    setReassignModalComplaint(comp);
+                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                  }}
+                  className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-xl transition-colors"
+                >
+                  Reassign Task
+                </button>
+
                 <button
                   onClick={() => setDetailModalComplaint(null)}
                   className="px-5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs"
@@ -1704,6 +2239,96 @@ export const DepartmentHeadPortal: React.FC = () => {
                   Close Window
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* REVIEW RESOLUTION PROOF MODAL */}
+        {/* ================================================== */}
+        {reviewModalComplaint && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-5 border border-gray-200 shadow-xl my-8 font-sans">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Review Field Repair Proof</h3>
+                </div>
+                <button onClick={() => setReviewModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* BEFORE VS AFTER PROOF COMPARISON */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">BEFORE (Citizen Complaint)</span>
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                    <img src={reviewModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">AFTER (Staff Repair Proof)</span>
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50">
+                    {reviewModalComplaint.photo_after_url ? (
+                      <img src={reviewModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Proof Unavailable</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs">
+                <span className="font-bold text-gray-900 block">Work Notes: {reviewModalComplaint.work_performed || 'Field maintenance work completed.'}</span>
+                <span className="text-gray-600 block">Materials Used: {reviewModalComplaint.materials_used || 'Standard repair materials'}</span>
+                <span className="text-gray-500 text-[11px] block">Executed by Staff: {reviewModalComplaint.assigned_staff_name}</span>
+              </div>
+
+              {showReworkInput ? (
+                <div className="space-y-3 p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs">
+                  <label className="block font-bold text-amber-900">Enter Rework Instructions for Staff *</label>
+                  <textarea
+                    rows={2}
+                    value={reworkReason}
+                    onChange={(e) => setReworkReason(e.target.value)}
+                    placeholder="Specify why repair proof was incomplete or needs rework..."
+                    className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs text-gray-900"
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <button onClick={() => setShowReworkInput(false)} className="px-3 py-1.5 rounded-lg bg-gray-200 text-xs font-bold text-gray-800">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleRequestRework(reviewModalComplaint.id)}
+                      disabled={reviewing}
+                      className="px-4 py-1.5 rounded-lg bg-amber-700 text-white font-extrabold text-xs"
+                    >
+                      Confirm Rework Request
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowReworkInput(true)}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-xs transition-colors inline-flex items-center justify-center space-x-1"
+                  >
+                    <RotateCcw className="w-4 h-4 text-amber-700" />
+                    <span>Request Rework</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleApproveResolution(reviewModalComplaint.id)}
+                    disabled={reviewing}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs inline-flex items-center justify-center space-x-1.5 disabled:opacity-50 min-h-[40px]"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{reviewing ? 'Approving...' : 'Approve Field Resolution'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
