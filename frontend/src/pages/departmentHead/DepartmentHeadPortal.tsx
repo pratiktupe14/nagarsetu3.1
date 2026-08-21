@@ -28,7 +28,8 @@ import {
   TrendingUp, Award, Activity, Droplets, Trash2, Waves, Shield, PlusCircle,
   Users, Layers, CornerDownRight, RotateCcw, Download, Filter, CheckSquare,
   Square, ChevronLeft, ExternalLink, FileSpreadsheet, Info, Phone, Mail,
-  UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX
+  UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX,
+  ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle
 } from 'lucide-react';
 
 // Fix standard Leaflet marker icon asset issue
@@ -160,6 +161,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [staffFilter, setStaffFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All Time');
   const [slaFilter, setSlaFilter] = useState('All');
+  const [reviewStatusTab, setReviewStatusTab] = useState<'All' | 'Pending Review' | 'Approved' | 'Rework Required' | 'Resolved'>('All');
   const [taskLoadFilter, setTaskLoadFilter] = useState('All');
 
   // Task Assignment Workspace States
@@ -175,6 +177,13 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [targetReassignStaffId, setTargetReassignStaffId] = useState<string>('');
   const [reassignReason, setReassignReason] = useState<string>('');
   const [reassigning, setReassigning] = useState<boolean>(false);
+
+  // Image Viewer Modal State
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+
+  // Approval Confirmation Modal State
+  const [confirmApproveModal, setConfirmApproveModal] = useState<Complaint | null>(null);
 
   // Bulk Operations State
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>([]);
@@ -261,7 +270,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     return { total, unassigned, assigned, inProgress, completedReviews, resolved, overdue, critical, staffCount };
   }, [departmentComplaints, departmentStaff, now]);
 
-  // In-Progress Specific Metric Cards (Real Supabase Data)
+  // In-Progress Specific Metric Cards
   const inProgressMetrics = useMemo(() => {
     const inProgressComplaints = departmentComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way');
     const total = inProgressComplaints.length;
@@ -279,6 +288,44 @@ export const DepartmentHeadPortal: React.FC = () => {
     }).length;
 
     return { total, highPriority, critical, dueToday, overdue };
+  }, [departmentComplaints, now]);
+
+  // Completed Specific Metric Cards (Real Database Data)
+  const completedMetrics = useMemo(() => {
+    const completedComplaints = departmentComplaints.filter((c) => c.status === 'Resolution Submitted' || c.status === 'Resolved' || c.status === 'Reopened');
+    const total = completedComplaints.length;
+    const pendingReview = departmentComplaints.filter((c) => c.status === 'Resolution Submitted').length;
+    const approved = departmentComplaints.filter((c) => c.status === 'Resolved').length;
+    const reworkRequired = departmentComplaints.filter((c) => c.status === 'Reopened').length;
+
+    const completedToday = completedComplaints.filter((c) => {
+      if (!c.updated_at) return false;
+      return new Date(c.updated_at).toDateString() === now.toDateString();
+    }).length;
+
+    const completedThisWeek = completedComplaints.filter((c) => {
+      if (!c.updated_at) return false;
+      const diffTime = now.getTime() - new Date(c.updated_at).getTime();
+      return diffTime <= 7 * 24 * 3600 * 1000;
+    }).length;
+
+    // Calculate Average Resolution Time in Hours
+    let totalResolutionHours = 0;
+    let resolvedCount = 0;
+    completedComplaints.forEach((c) => {
+      if (c.created_at && c.updated_at) {
+        const start = new Date(c.created_at).getTime();
+        const end = new Date(c.updated_at).getTime();
+        if (end > start) {
+          totalResolutionHours += (end - start) / (1000 * 3600);
+          resolvedCount += 1;
+        }
+      }
+    });
+
+    const avgResolutionTime = resolvedCount > 0 ? `${(totalResolutionHours / resolvedCount).toFixed(1)} hrs` : 'N/A';
+
+    return { total, pendingReview, approved, reworkRequired, completedToday, completedThisWeek, avgResolutionTime };
   }, [departmentComplaints, now]);
 
   // Calculate Real Staff Summary Statistics from Database Records
@@ -371,10 +418,17 @@ export const DepartmentHeadPortal: React.FC = () => {
   const filteredComplaints = useMemo(() => {
     return departmentComplaints.filter((c) => {
       // Route specific filters
-      if (isInProgress) {
+      if (isCompleted) {
+        if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved' && c.status !== 'Reopened') return false;
+        
+        // Review Status Tab Filter
+        if (reviewStatusTab === 'Pending Review' && c.status !== 'Resolution Submitted') return false;
+        if (reviewStatusTab === 'Approved' && c.status !== 'Resolved') return false;
+        if (reviewStatusTab === 'Rework Required' && c.status !== 'Reopened') return false;
+        if (reviewStatusTab === 'Resolved' && c.status !== 'Resolved') return false;
+
+      } else if (isInProgress) {
         if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
-      } else if (isCompleted) {
-        if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved') return false;
       } else if (isOverdue) {
         if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now) return false;
       } else if (isAssignWorkspace) {
@@ -441,7 +495,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       return true;
     });
-  }, [departmentComplaints, isInProgress, isCompleted, isOverdue, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, dateFilter, searchQuery, now]);
+  }, [departmentComplaints, isCompleted, reviewStatusTab, isInProgress, isOverdue, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, dateFilter, searchQuery, now]);
 
   // Tasks belonging to the selected single staff member profile
   const staffProfileTasks = useMemo(() => {
@@ -452,7 +506,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Reset page index when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab]);
+  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab, reviewStatusTab]);
 
   // Paginated Complaints
   const paginatedComplaints = useMemo(() => {
@@ -486,6 +540,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     setDateFilter('All Time');
     setSlaFilter('All');
     setTaskLoadFilter('All');
+    setReviewStatusTab('All');
   };
 
   // Export Real Department Complaints to CSV
@@ -496,7 +551,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     if (targetList.length === 0) return;
 
-    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'Started Date', 'SLA Due Date'];
+    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Completed By', 'Completed Date', 'Resolution Notes'];
     const rows = targetList.map((c) => [
       `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
       `"${c.complaint_number}"`,
@@ -509,14 +564,14 @@ export const DepartmentHeadPortal: React.FC = () => {
       c.status,
       `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
       `"${new Date(c.updated_at || c.created_at).toLocaleDateString()}"`,
-      `"${c.sla_deadline ? new Date(c.sla_deadline).toLocaleDateString() : 'N/A'}"`
+      `"${(c.work_performed || 'Field repair completed').replace(/"/g, '""')}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_In_Progress_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${deptInfo.shortName.replace(/[^a-z0-9]/gi, '_')}_Completed_Tasks_Report_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -618,6 +673,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     try {
       await approveResolutionDepartmentHead(complaintId, headName);
       setReviewModalComplaint(null);
+      setConfirmApproveModal(null);
       await loadData();
     } catch (err) {
       console.error(err);
@@ -649,7 +705,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title={isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
+    <DashboardLayout title={isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -666,14 +722,14 @@ export const DepartmentHeadPortal: React.FC = () => {
                   {deptInfo.fullName}
                 </h1>
                 <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  {isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
+                  {isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                   ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
-                {isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
+                {isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
               </p>
             </div>
           </div>
@@ -711,11 +767,337 @@ export const DepartmentHeadPortal: React.FC = () => {
         {/* VIEW ROUTE RENDERER */}
         {/* ================================================== */}
         
-        {/* A. DEPARTMENT HEAD → IN PROGRESS PAGE (/department-head/tasks/in-progress) */}
-        {isInProgress ? (
+        {/* A. DEPARTMENT HEAD → COMPLETED TASKS PAGE (/department-head/tasks/completed) */}
+        {isCompleted ? (
           <div className="space-y-6">
 
-            {/* 5 IN-PROGRESS SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
+            {/* 7 COMPLETED SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Completed</span>
+                <span className="text-xl font-extrabold text-gray-900 font-mono block">{completedMetrics.total}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
+                <span className="text-xl font-extrabold text-purple-700 font-mono block">{completedMetrics.pendingReview}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Approved</span>
+                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{completedMetrics.approved}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Rework Required</span>
+                <span className="text-xl font-extrabold text-amber-700 font-mono block">{completedMetrics.reworkRequired}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed Today</span>
+                <span className="text-xl font-extrabold text-blue-700 font-mono block">{completedMetrics.completedToday}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed This Week</span>
+                <span className="text-xl font-extrabold text-cyan-700 font-mono block">{completedMetrics.completedThisWeek}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Avg Resolution Time</span>
+                <span className="text-xl font-extrabold text-emerald-800 font-mono block">{completedMetrics.avgResolutionTime}</span>
+              </div>
+            </div>
+
+            {/* REVIEW STATUS TABS */}
+            <div className="flex items-center space-x-2 border-b border-gray-200 pb-2 overflow-x-auto text-xs font-bold font-outfit">
+              {(['All', 'Pending Review', 'Approved', 'Rework Required', 'Resolved'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setReviewStatusTab(tab)}
+                  className={`px-4 py-2 rounded-xl transition-colors whitespace-nowrap ${
+                    reviewStatusTab === tab
+                      ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                      : 'bg-slate-100 text-gray-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab === 'Pending Review' ? 'Pending Review' : tab === 'Approved' ? 'Approved' : tab === 'Rework Required' ? 'Rework Required' : tab === 'Resolved' ? 'Resolved' : 'All Completed'}
+                </button>
+              ))}
+            </div>
+
+            {/* SEARCH AND FILTER TOOLBAR */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search Task ID, Complaint ID, Issue, Location, Staff Name..."
+                    className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Priority Filter */}
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Priorities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+
+                  {/* Category Filter */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Categories</option>
+                    {availableCategories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+
+                  {/* Staff Filter */}
+                  <select
+                    value={staffFilter}
+                    onChange={(e) => setStaffFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Staff</option>
+                    {departmentStaff.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Date Filter */}
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All Time">Completion Date: All Time</option>
+                    <option value="Today">Today</option>
+                    <option value="This Week">This Week</option>
+                    <option value="This Month">This Month</option>
+                  </select>
+
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || dateFilter !== 'All Time' || reviewStatusTab !== 'All') && (
+                    <button
+                      onClick={handleClearFilters}
+                      className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* COMPLETED TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="p-12 bg-white border border-rose-200 rounded-2xl text-center space-y-3 max-w-md mx-auto">
+                <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load completed tasks</h3>
+                <p className="text-xs text-gray-600">Please try again.</p>
+                <button
+                  onClick={loadData}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : filteredComplaints.length === 0 ? (
+              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
+                <CheckCircle2 className="w-10 h-10 text-gray-400 mx-auto" />
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No completed tasks yet</h3>
+                <p className="text-xs text-gray-500">Completed work from your department will appear here after service staff finish their assigned tasks.</p>
+                <button
+                  onClick={loadData}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
+                >
+                  Refresh
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                
+                {/* DESKTOP TABLE */}
+                <div className="hidden md:block border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                        <th className="p-3.5">Task ID / Complaint</th>
+                        <th className="p-3.5">Title & Category</th>
+                        <th className="p-3.5">Location</th>
+                        <th className="p-3.5">Completed By</th>
+                        <th className="p-3.5">Completed On</th>
+                        <th className="p-3.5">Priority</th>
+                        <th className="p-3.5">Review Status</th>
+                        <th className="p-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paginatedComplaints.map((comp) => {
+                        const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
+                        const isPending = comp.status === 'Resolution Submitted';
+
+                        return (
+                          <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3.5 font-mono">
+                              <span className="font-bold text-gray-900 block">{taskIdStr}</span>
+                              <button onClick={() => setReviewModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
+                                {comp.complaint_number}
+                              </button>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="font-bold text-gray-900 block">{comp.title}</span>
+                              <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
+                            </td>
+                            <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
+                              <div className="flex items-center space-x-1">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+                              </div>
+                            </td>
+                            <td className="p-3.5">
+                              {comp.assigned_staff_id ? (
+                                <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
+                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-[10px] border border-emerald-300 shrink-0">
+                                    {comp.assigned_staff_name?.charAt(0) || 'S'}
+                                  </div>
+                                  <span className="font-bold text-gray-900 truncate">{comp.assigned_staff_name}</span>
+                                </Link>
+                              ) : (
+                                <span className="text-gray-500 font-mono">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                              {new Date(comp.updated_at || comp.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td className="p-3.5">
+                              <PriorityBadge priority={comp.priority} />
+                            </td>
+                            <td className="p-3.5">
+                              <StatusBadge status={comp.status} />
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                <button
+                                  onClick={() => setReviewModalComplaint(comp)}
+                                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
+                                >
+                                  Review Proof
+                                </button>
+
+                                {isPending && (
+                                  <button
+                                    onClick={() => setConfirmApproveModal(comp)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Approve</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* MOBILE CARDS VIEW */}
+                <div className="grid grid-cols-1 gap-4 md:hidden">
+                  {paginatedComplaints.map((comp) => {
+                    const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
+
+                    return (
+                      <div key={comp.id} className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-bold text-gray-900">{taskIdStr} • <span className="text-emerald-700">{comp.complaint_number}</span></span>
+                          <StatusBadge status={comp.status} />
+                        </div>
+
+                        <div>
+                          <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
+                          <span className="text-[11px] text-gray-500 font-mono block">{comp.category}</span>
+                        </div>
+
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span>Completed By: <strong>{comp.assigned_staff_name || 'Staff'}</strong></span>
+                            <PriorityBadge priority={comp.priority} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                          <button
+                            onClick={() => setReviewModalComplaint(comp)}
+                            className="px-3.5 py-1.5 bg-emerald-600 text-white font-extrabold rounded-lg text-xs"
+                          >
+                            Review Proof
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* PAGINATION BAR */}
+                {totalPages > 1 && (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex items-center justify-between text-xs text-gray-700">
+                    <span className="font-semibold">
+                      Showing <span className="font-extrabold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                      <span className="font-extrabold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of{' '}
+                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> completed tasks
+                    </span>
+
+                    <div className="flex items-center space-x-2 font-bold">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg font-mono">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+          </div>
+        ) : isInProgress ? (
+          /* B. DEPARTMENT HEAD → IN PROGRESS PAGE (/department-head/tasks/in-progress) */
+          <div className="space-y-6">
+
+            {/* 5 IN-PROGRESS SUMMARY METRIC CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
@@ -760,7 +1142,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {/* Priority Filter */}
                   <select
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
@@ -773,7 +1154,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                     <option value="Low">Low</option>
                   </select>
 
-                  {/* Category Filter */}
                   <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
@@ -785,7 +1165,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ))}
                   </select>
 
-                  {/* Staff Filter */}
                   <select
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
@@ -797,7 +1176,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ))}
                   </select>
 
-                  {/* SLA Status Filter */}
                   <select
                     value={slaFilter}
                     onChange={(e) => setSlaFilter(e.target.value)}
@@ -809,7 +1187,6 @@ export const DepartmentHeadPortal: React.FC = () => {
                     <option value="Overdue">Overdue</option>
                   </select>
 
-                  {/* Clear Filters Button */}
                   {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || slaFilter !== 'All') && (
                     <button
                       onClick={handleClearFilters}
@@ -822,1093 +1199,40 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* IN-PROGRESS TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="p-12 bg-white border border-rose-200 rounded-2xl text-center space-y-3 max-w-md mx-auto">
-                <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load in-progress tasks</h3>
-                <p className="text-xs text-gray-600">Please check your connection and try again.</p>
-                <button
-                  onClick={loadData}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
-                >
-                  Try Again
-                </button>
-              </div>
-            ) : filteredComplaints.length === 0 ? (
+            {/* IN-PROGRESS TASKS TABLE */}
+            {filteredComplaints.length === 0 ? (
               <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
                 <PlayCircle className="w-10 h-10 text-gray-400 mx-auto" />
                 <h3 className="text-base font-extrabold text-gray-900 font-outfit">No tasks are currently in progress</h3>
                 <p className="text-xs text-gray-500">Your department has no active service tasks being executed at the moment.</p>
-                <button
-                  onClick={loadData}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
-                >
-                  Refresh Tasks
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                
-                {/* DESKTOP TABLE */}
-                <div className="hidden md:block border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                        <th className="p-3.5">Task ID / Complaint</th>
-                        <th className="p-3.5">Issue & Category</th>
-                        <th className="p-3.5">Location</th>
-                        <th className="p-3.5">Assigned Staff</th>
-                        <th className="p-3.5">Priority</th>
-                        <th className="p-3.5">Started At</th>
-                        <th className="p-3.5">Due Date</th>
-                        <th className="p-3.5">SLA Status</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {paginatedComplaints.map((comp) => {
-                        const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
-                        const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-
-                        return (
-                          <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="p-3.5 font-mono">
-                              <span className="font-bold text-gray-900 block">{taskIdStr}</span>
-                              <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
-                                {comp.complaint_number}
-                              </button>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-gray-900 block">{comp.title}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
-                            </td>
-                            <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
-                              <div className="flex items-center space-x-1">
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
-                              </div>
-                            </td>
-                            <td className="p-3.5">
-                              {comp.assigned_staff_id ? (
-                                <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-[10px] border border-emerald-300 shrink-0">
-                                    {comp.assigned_staff_name?.charAt(0) || 'S'}
-                                  </div>
-                                  <div>
-                                    <span className="font-bold text-gray-900 block">{comp.assigned_staff_name}</span>
-                                    <span className="text-[9px] text-gray-500 font-mono block">
-                                      Active Tasks: {staffTaskCountsMap[comp.assigned_staff_id]?.active || 1}
-                                    </span>
-                                  </div>
-                                </Link>
-                              ) : (
-                                <span className="text-amber-700 font-mono text-[11px] font-bold">Unassigned</span>
-                              )}
-                            </td>
-                            <td className="p-3.5">
-                              <PriorityBadge priority={comp.priority} />
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
-                              {new Date(comp.updated_at || comp.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] text-gray-700 whitespace-nowrap">
-                              {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px]">
-                              {slaInfo.isOverdue ? (
-                                <span className="text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block w-fit">
-                                  OVERDUE ({slaInfo.text})
-                                </span>
-                              ) : (
-                                <span className="text-emerald-700 font-semibold">{slaInfo.text}</span>
-                              )}
-                            </td>
-                            <td className="p-3.5">
-                              <StatusBadge status={comp.status} />
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end space-x-1.5">
-                                <button
-                                  onClick={() => setDetailModalComplaint(comp)}
-                                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
-                                >
-                                  View Task
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setReassignModalComplaint(comp);
-                                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                                  }}
-                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
-                                >
-                                  Reassign
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* MOBILE CARDS VIEW */}
-                <div className="grid grid-cols-1 gap-4 md:hidden">
-                  {paginatedComplaints.map((comp) => {
-                    const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
-                    const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-
-                    return (
-                      <div key={comp.id} className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-mono font-bold text-gray-900">{taskIdStr} • <span className="text-emerald-700">{comp.complaint_number}</span></span>
-                          <StatusBadge status={comp.status} />
-                        </div>
-
-                        <div>
-                          <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
-                          <span className="text-[11px] text-gray-500 font-mono block">{comp.category}</span>
-                        </div>
-
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div className="flex items-center space-x-1">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
-                          </div>
-                          <div className="flex items-center justify-between pt-1">
-                            <span>Staff: <strong>{comp.assigned_staff_name || 'Unassigned'}</strong></span>
-                            <PriorityBadge priority={comp.priority} />
-                          </div>
-                        </div>
-
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between text-xs font-mono">
-                          <span className="text-gray-600">SLA Remaining:</span>
-                          <span className={slaInfo.isOverdue ? "text-rose-700 font-extrabold" : "text-emerald-700 font-bold"}>
-                            {slaInfo.text}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
-                          <button
-                            onClick={() => setDetailModalComplaint(comp)}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-800 font-bold rounded-lg text-xs"
-                          >
-                            View Task
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setReassignModalComplaint(comp);
-                              setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                            }}
-                            className="px-3.5 py-1.5 bg-amber-50 text-amber-900 border border-amber-300 font-extrabold rounded-lg text-xs"
-                          >
-                            Reassign
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* PAGINATION BAR */}
-                {totalPages > 1 && (
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex items-center justify-between text-xs text-gray-700">
-                    <span className="font-semibold">
-                      Showing <span className="font-extrabold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-                      <span className="font-extrabold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of{' '}
-                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> tasks
-                    </span>
-
-                    <div className="flex items-center space-x-2 font-bold">
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
-                      >
-                        Previous
-                      </button>
-                      <span className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg font-mono">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            )}
-          </div>
-        ) : isStaffDetailView && selectedStaffProfile ? (
-          /* B. STAFF PROFILE DETAIL VIEW (/department-head/staff/:staffId) */
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <Link
-                to="/department-head/staff"
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs inline-flex items-center space-x-1.5 transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Department Staff Roster</span>
-              </Link>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 font-medium">Department Staff Detail Audit</span>
-              </div>
-            </div>
-
-            {/* STAFF PROFILE CARD */}
-            <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-200">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
-                    {selectedStaffProfile.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{selectedStaffProfile.name}</h2>
-                      <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        {selectedStaffProfile.employee_id || `STF-${selectedStaffProfile.id.slice(0, 4).toUpperCase()}`}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-500 font-medium block mt-0.5">{selectedStaffProfile.role} • {selectedStaffProfile.department_name}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${getWorkloadInfo(staffTaskCountsMap[selectedStaffProfile.id]?.active || 0).color}`}>
-                    {getWorkloadInfo(staffTaskCountsMap[selectedStaffProfile.id]?.active || 0).label}
-                  </span>
-
-                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    Status: {selectedStaffProfile.status || 'Available'}
-                  </span>
-                </div>
-              </div>
-
-              {/* CONTACT & WARD INFORMATION */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
-                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Email Address</span>
-                  <div className="flex items-center space-x-1.5 text-gray-900 font-semibold truncate">
-                    <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedStaffProfile.email}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
-                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Contact Phone</span>
-                  <div className="flex items-center space-x-1.5 text-gray-900 font-semibold">
-                    <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span>{selectedStaffProfile.contact_number || '+91 98220 00000'}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
-                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Assigned Ward Zone</span>
-                  <span className="font-extrabold text-gray-900 block">{selectedStaffProfile.ward_area || 'Nashik Central'}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
-                  <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Member Since</span>
-                  <span className="font-extrabold text-gray-900 block">
-                    {new Date(selectedStaffProfile.joined_date || selectedStaffProfile.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* STAFF TASK STATS */}
-              <div className="grid grid-cols-3 gap-4 border border-gray-200 rounded-xl divide-x divide-gray-200 bg-slate-50 p-4 text-center">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Active Tasks</span>
-                  <span className="text-xl font-extrabold text-amber-700 font-mono block">
-                    {staffTaskCountsMap[selectedStaffProfile.id]?.active || 0}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Completed Tasks</span>
-                  <span className="text-xl font-extrabold text-emerald-700 font-mono block">
-                    {staffTaskCountsMap[selectedStaffProfile.id]?.completed || 0}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Overdue SLA Tasks</span>
-                  <span className="text-xl font-extrabold text-rose-700 font-mono block">
-                    {staffTaskCountsMap[selectedStaffProfile.id]?.overdue || 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* STAFF ASSIGNED TASKS HISTORY TABLE */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                  Assigned Task History ({staffProfileTasks.length})
-                </h3>
-
-                <button
-                  onClick={() => navigate('/department-head/tasks/assign')}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg transition-colors text-xs inline-flex items-center space-x-1"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Assign New Task to Staff</span>
-                </button>
-              </div>
-
-              {staffProfileTasks.length === 0 ? (
-                <div className="p-8 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-2">
-                  <FileText className="w-8 h-8 text-gray-400 mx-auto" />
-                  <span className="font-bold text-gray-900 text-sm font-outfit block">No tasks assigned yet</span>
-                  <span className="text-xs text-gray-500 block">No civic complaints have been assigned to {selectedStaffProfile.name}.</span>
-                </div>
-              ) : (
-                <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                        <th className="p-3.5">Complaint ID</th>
-                        <th className="p-3.5">Title & Category</th>
-                        <th className="p-3.5">Location</th>
-                        <th className="p-3.5">Priority</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5">Assigned Date</th>
-                        <th className="p-3.5">Due Date / SLA</th>
-                        <th className="p-3.5 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {staffProfileTasks.map((comp) => {
-                        const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
-                        return (
-                          <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="p-3.5 font-mono font-bold text-emerald-700 whitespace-nowrap">
-                              {comp.complaint_number}
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-gray-900 block">{comp.title}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
-                            </td>
-                            <td className="p-3.5 text-gray-700 max-w-xs truncate">
-                              {comp.location_address || 'Nashik Service Area'}
-                            </td>
-                            <td className="p-3.5">
-                              <PriorityBadge priority={comp.priority} />
-                            </td>
-                            <td className="p-3.5">
-                              <StatusBadge status={comp.status} />
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] text-gray-600">
-                              {new Date(comp.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px]">
-                              {comp.status === 'Resolved' ? (
-                                <span className="text-emerald-700 font-bold">Resolved</span>
-                              ) : slaInfo.isOverdue ? (
-                                <span className="text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block w-fit">
-                                  {slaInfo.text}
-                                </span>
-                              ) : (
-                                <span className="text-gray-700 font-semibold">{slaInfo.text}</span>
-                              )}
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => setDetailModalComplaint(comp)}
-                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
-                              >
-                                View Details
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : isStaffView ? (
-          /* C. DEPARTMENT HEAD → STAFF ROSTER PAGE (/department-head/staff) */
-          <div className="space-y-6">
-
-            {/* 8 STAFF SUMMARY CARDS (CALCULATED FROM REAL SUPABASE DATA) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Staff</span>
-                <span className="text-xl font-extrabold text-gray-900 font-mono block">{staffMetrics.totalStaff}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Active Staff</span>
-                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{staffMetrics.activeStaff}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Available</span>
-                <span className="text-xl font-extrabold text-blue-700 font-mono block">{staffMetrics.availableStaff}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Busy / On Task</span>
-                <span className="text-xl font-extrabold text-amber-700 font-mono block">{staffMetrics.busyStaff}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Offline / Leave</span>
-                <span className="text-xl font-extrabold text-gray-600 font-mono block">{staffMetrics.offlineStaff}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Active Tasks</span>
-                <span className="text-xl font-extrabold text-cyan-700 font-mono block">{staffMetrics.activeTasks}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue Tasks</span>
-                <span className="text-xl font-extrabold text-rose-700 font-mono block">{staffMetrics.overdueTasks}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed</span>
-                <span className="text-xl font-extrabold text-emerald-800 font-mono block">{staffMetrics.completedTasks}</span>
-              </div>
-            </div>
-
-            {/* SEARCH AND FILTERS BAR FOR STAFF */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search staff by Name, Staff ID, Email, Phone..."
-                  className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[40px]"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {/* Status Filter */}
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-800 font-semibold min-h-[40px]"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Available">Available</option>
-                  <option value="Busy">Busy / On Task</option>
-                  <option value="Offline">Offline</option>
-                  <option value="On Leave">On Leave</option>
-                </select>
-
-                {/* Task Load Filter */}
-                <select
-                  value={taskLoadFilter}
-                  onChange={(e) => setTaskLoadFilter(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-800 font-semibold min-h-[40px]"
-                >
-                  <option value="All">All Task Loads</option>
-                  <option value="Low">Low Workload (0-1 Tasks)</option>
-                  <option value="Normal">Normal Workload (2-3 Tasks)</option>
-                  <option value="High">High Workload (4+ Tasks)</option>
-                </select>
-
-                {(searchQuery || statusFilter !== 'All' || taskLoadFilter !== 'All') && (
-                  <button
-                    onClick={handleClearFilters}
-                    className="px-3.5 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[40px]"
-                  >
-                    Clear Filters
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* STAFF ROSTER TABLE (DESKTOP) & CARDS (MOBILE) */}
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : filteredStaffList.length === 0 ? (
-              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
-                <Users className="w-10 h-10 text-gray-400 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No service staff found for your department</h3>
-                <p className="text-xs text-gray-500">There are no active service staff members registered under {deptInfo.fullName} matching your query.</p>
-                <button
-                  onClick={loadData}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
-                >
-                  Refresh Staff
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                
-                {/* DESKTOP TABLE */}
-                <div className="hidden md:block border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                        <th className="p-3.5">Staff ID</th>
-                        <th className="p-3.5">Staff Member</th>
-                        <th className="p-3.5">Email & Phone</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5">Active Tasks</th>
-                        <th className="p-3.5">Workload Indicator</th>
-                        <th className="p-3.5">Completed</th>
-                        <th className="p-3.5">Overdue</th>
-                        <th className="p-3.5">Current Assignment</th>
-                        <th className="p-3.5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredStaffList.map((staff) => {
-                        const counts = staffTaskCountsMap[staff.id] || { active: 0, overdue: 0, completed: 0, currentTask: null };
-                        const workload = getWorkloadInfo(counts.active);
-
-                        return (
-                          <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="p-3.5 font-mono font-bold text-emerald-700 whitespace-nowrap">
-                              <Link to={`/department-head/staff/${staff.id}`} className="hover:underline">
-                                {staff.employee_id || `STF-${staff.id.slice(0, 4).toUpperCase()}`}
-                              </Link>
-                            </td>
-                            <td className="p-3.5">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-xs border border-emerald-300 shrink-0">
-                                  {staff.name.charAt(0)}
-                                </div>
-                                <div>
-                                  <Link to={`/department-head/staff/${staff.id}`} className="font-bold text-gray-900 hover:underline block">
-                                    {staff.name}
-                                  </Link>
-                                  <span className="text-[10px] text-gray-500 font-mono block">{staff.role || 'Service Staff'}</span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-3.5 text-gray-600 font-mono">
-                              <span className="block text-gray-900 font-semibold">{staff.email}</span>
-                              <span className="text-[10px] text-gray-500">{staff.contact_number || '+91 98220 00000'}</span>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                                <span>{staff.status || 'Available'}</span>
-                              </span>
-                            </td>
-                            <td className="p-3.5 font-mono font-extrabold text-amber-700">
-                              {counts.active} Active
-                            </td>
-                            <td className="p-3.5">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${workload.color}`}>
-                                {workload.label}
-                              </span>
-                            </td>
-                            <td className="p-3.5 font-mono text-emerald-700 font-bold">
-                              {counts.completed} Done
-                            </td>
-                            <td className="p-3.5 font-mono text-rose-700 font-bold">
-                              {counts.overdue}
-                            </td>
-                            <td className="p-3.5 text-gray-700 max-w-xs truncate font-medium">
-                              {counts.currentTask || 'None (Ready)'}
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end space-x-1.5">
-                                <Link
-                                  to={`/department-head/staff/${staff.id}`}
-                                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
-                                >
-                                  View Profile
-                                </Link>
-
-                                <button
-                                  onClick={() => {
-                                    navigate('/department-head/tasks/assign');
-                                  }}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
-                                >
-                                  <PlusCircle className="w-3.5 h-3.5" />
-                                  <span>Assign Task</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* MOBILE CARDS VIEW */}
-                <div className="grid grid-cols-1 gap-4 md:hidden">
-                  {filteredStaffList.map((staff) => {
-                    const counts = staffTaskCountsMap[staff.id] || { active: 0, overdue: 0, completed: 0, currentTask: null };
-                    const workload = getWorkloadInfo(counts.active);
-
-                    return (
-                      <div key={staff.id} className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-sm border border-emerald-300 shrink-0">
-                              {staff.name.charAt(0)}
-                            </div>
-                            <div>
-                              <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{staff.name}</h4>
-                              <span className="font-mono text-xs text-emerald-700 font-bold">{staff.employee_id || 'STF-001'}</span>
-                            </div>
-                          </div>
-
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${workload.color}`}>
-                            {workload.label}
-                          </span>
-                        </div>
-
-                        <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 text-xs space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-gray-500 font-mono">Department:</span>
-                            <span className="font-bold text-gray-900">{deptInfo.shortName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500 font-mono">Current Task:</span>
-                            <span className="font-semibold text-gray-800 truncate max-w-[180px]">{counts.currentTask || 'None'}</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-center text-xs p-2 bg-slate-100 rounded-xl font-mono">
-                          <div>
-                            <span className="text-[9px] text-gray-500 block">ACTIVE</span>
-                            <span className="font-bold text-amber-700">{counts.active}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9px] text-gray-500 block">DONE</span>
-                            <span className="font-bold text-emerald-700">{counts.completed}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9px] text-gray-500 block">OVERDUE</span>
-                            <span className="font-bold text-rose-700">{counts.overdue}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
-                          <Link
-                            to={`/department-head/staff/${staff.id}`}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-800 font-bold rounded-lg text-xs"
-                          >
-                            View Profile
-                          </Link>
-
-                          <button
-                            onClick={() => navigate('/department-head/tasks/assign')}
-                            className="px-3.5 py-1.5 bg-emerald-600 text-white font-extrabold rounded-lg text-xs"
-                          >
-                            Assign Task
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-              </div>
-            )}
-          </div>
-        ) : isAssignWorkspace ? (
-          /* D. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE (/department-head/tasks/assign) */
-          <div className="space-y-6">
-
-            {/* TASK ASSIGNMENT HEADER BANNER */}
-            <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div>
-                <h2 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                  Task Assignment Workspace
-                </h2>
-                <p className="text-gray-600 font-medium mt-0.5">
-                  Select an unassigned complaint from the left panel and pair it with an available service staff member on the right.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-3 shrink-0 font-mono">
-                <div className="bg-white px-3 py-1.5 rounded-xl border border-gray-200">
-                  <span className="text-gray-500 block text-[9px] uppercase font-bold">Unassigned</span>
-                  <span className="font-extrabold text-amber-700 text-sm block">{complaintMetrics.unassigned} Complaints</span>
-                </div>
-
-                <div className="bg-white px-3 py-1.5 rounded-xl border border-gray-200">
-                  <span className="text-gray-500 block text-[9px] uppercase font-bold">Available Staff</span>
-                  <span className="font-extrabold text-emerald-700 text-sm block">{staffMetrics.availableStaff} Members</span>
-                </div>
-              </div>
-            </div>
-
-            {/* TASK QUEUE TABS */}
-            <div className="flex items-center space-x-2 border-b border-gray-200 pb-2 overflow-x-auto text-xs font-bold font-outfit">
-              {(['Unassigned', 'Assigned', 'In Progress', 'Pending Review', 'Completed', 'Overdue'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setAssignmentTab(tab)}
-                  className={`px-4 py-2 rounded-xl transition-colors whitespace-nowrap ${
-                    assignmentTab === tab
-                      ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
-                      : 'bg-slate-100 text-gray-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* TWO-PANEL WORKSPACE LAYOUT */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-              {/* LEFT PANEL: UNASSIGNED COMPLAINTS LIST (COL 7) */}
-              <div className="lg:col-span-7 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    <h3 className="font-extrabold text-gray-900 font-outfit text-sm uppercase tracking-wider">
-                      {assignmentTab} Complaints ({filteredComplaints.length})
-                    </h3>
-                  </div>
-
-                  <span className="text-[11px] text-gray-500 font-medium">Scope: {deptInfo.shortName}</span>
-                </div>
-
-                {/* SEARCH & FILTERS FOR COMPLAINTS */}
-                <div className="flex flex-col sm:flex-row items-center gap-2 text-xs">
-                  <div className="relative flex-1 w-full">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search ID, Title, Location..."
-                      className="w-full bg-slate-50 border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-emerald-600"
-                    />
-                  </div>
-
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="bg-slate-50 border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-800 font-semibold w-full sm:w-auto"
-                  >
-                    <option value="All">All Priorities</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                </div>
-
-                {/* UNASSIGNED COMPLAINT CARDS */}
-                {filteredComplaints.length === 0 ? (
-                  <div className="p-8 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-2">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                    <span className="font-bold text-gray-900 text-sm font-outfit block">No {assignmentTab.toLowerCase()} complaints</span>
-                    <span className="text-xs text-gray-500 block">No civic issues currently found under {assignmentTab} tab for {deptInfo.shortName}.</span>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                    {filteredComplaints.map((comp) => {
-                      const isSelected = selectedAssignComplaint?.id === comp.id;
-                      const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
-
-                      return (
-                        <div
-                          key={comp.id}
-                          onClick={() => setSelectedAssignComplaint(comp)}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2.5 ${
-                            isSelected
-                              ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
-                              : 'bg-white border-gray-200 hover:border-emerald-300 hover:shadow-2xs'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-mono font-bold text-emerald-700 text-xs">{comp.complaint_number}</span>
-                            <div className="flex items-center space-x-2">
-                              <PriorityBadge priority={comp.priority} />
-                              <StatusBadge status={comp.status} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
-                            <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{comp.description || 'No detailed description provided.'}</p>
-                          </div>
-
-                          <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">
-                            <div className="flex items-center space-x-1 text-gray-700 truncate max-w-[240px]">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
-                            </div>
-
-                            <span className="font-mono font-semibold text-gray-700">{slaInfo.text}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* RIGHT PANEL: AVAILABLE SERVICE STAFF ROSTER (COL 5) */}
-              <div className="lg:col-span-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-emerald-600" />
-                    <h3 className="font-extrabold text-gray-900 font-outfit text-sm uppercase tracking-wider">
-                      Available Service Staff ({departmentStaff.length})
-                    </h3>
-                  </div>
-
-                  <span className="text-[11px] text-gray-500 font-medium">Department Verified</span>
-                </div>
-
-                {/* STAFF SEARCH */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search staff member name..."
-                    className="w-full bg-slate-50 border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-emerald-600"
-                  />
-                </div>
-
-                {/* STAFF SELECTION CARDS */}
-                {departmentStaff.length === 0 ? (
-                  <div className="p-8 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-2">
-                    <Users className="w-8 h-8 text-gray-400 mx-auto" />
-                    <span className="font-bold text-gray-900 text-sm font-outfit block">No staff members found</span>
-                    <span className="text-xs text-gray-500 block">No service staff registered under {deptInfo.fullName}.</span>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                    {departmentStaff.map((staff) => {
-                      const counts = staffTaskCountsMap[staff.id] || { active: 0, overdue: 0, completed: 0, currentTask: null };
-                      const workload = getWorkloadInfo(counts.active);
-                      const isSelectedStaff = selectedAssignStaff?.id === staff.id;
-
-                      return (
-                        <div
-                          key={staff.id}
-                          onClick={() => setSelectedAssignStaff(staff)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                            isSelectedStaff
-                              ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
-                              : 'bg-white border-gray-200 hover:border-emerald-300 hover:shadow-2xs'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-xs border border-emerald-300 shrink-0">
-                                {staff.name.charAt(0)}
-                              </div>
-                              <div>
-                                <h4 className="font-extrabold text-gray-900 text-xs font-outfit">{staff.name}</h4>
-                                <span className="font-mono text-[10px] text-emerald-700 font-bold block">{staff.employee_id || 'STF-001'}</span>
-                              </div>
-                            </div>
-
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${workload.color}`}>
-                              {workload.label}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between text-[11px] text-gray-600 pt-1 border-t border-gray-100">
-                            <span className="font-mono text-gray-500">Active Tasks: <strong className="text-amber-700">{counts.active}</strong></span>
-                            <span className="font-mono text-gray-500">Completed: <strong className="text-emerald-700">{counts.completed}</strong></span>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAssignStaff(staff);
-                                if (selectedAssignComplaint) {
-                                  handleExecuteAssignment(selectedAssignComplaint, staff);
-                                } else {
-                                  alert('Please select an unassigned complaint from the left panel first.');
-                                }
-                              }}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] rounded-lg transition-colors"
-                            >
-                              Assign Work
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-            </div>
-
-            {/* CONFIRMATION WORKSPACE BOTTOM PANEL */}
-            {selectedAssignComplaint && selectedAssignStaff && (
-              <div className="p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-xl space-y-4 animate-fadeIn">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckSquare2 className="w-5 h-5 text-emerald-400" />
-                    <h3 className="font-extrabold font-outfit text-base">Ready for Task Assignment Confirmation</h3>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setSelectedAssignComplaint(null);
-                      setSelectedAssignStaff(null);
-                    }}
-                    className="p-1 text-gray-400 hover:text-white"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div className="p-3.5 bg-slate-800/80 rounded-xl space-y-1 border border-slate-700">
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase block">Selected Civic Complaint</span>
-                    <span className="font-mono font-bold text-white block">{selectedAssignComplaint.complaint_number}</span>
-                    <h4 className="font-bold text-gray-100">{selectedAssignComplaint.title}</h4>
-                    <p className="text-gray-400 text-[11px]">{selectedAssignComplaint.location_address}</p>
-                  </div>
-
-                  <div className="p-3.5 bg-slate-800/80 rounded-xl space-y-1 border border-slate-700">
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase block">Assigned Service Staff Member</span>
-                    <h4 className="font-bold text-white text-sm">{selectedAssignStaff.name}</h4>
-                    <span className="text-gray-300 font-mono block">{selectedAssignStaff.employee_id || 'STF-001'} — {selectedAssignStaff.department_name}</span>
-                    <span className="text-gray-400 text-[11px] block">Current Workload: {getWorkloadInfo(staffTaskCountsMap[selectedAssignStaff.id]?.active || 0).label}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end space-x-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedAssignComplaint(null);
-                      setSelectedAssignStaff(null);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-gray-300 font-bold text-xs"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={() => handleExecuteAssignment(selectedAssignComplaint, selectedAssignStaff)}
-                    disabled={assigning}
-                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg disabled:opacity-50 inline-flex items-center space-x-1.5"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{assigning ? 'Executing Assignment...' : 'Confirm Real Supabase Task Assignment'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </div>
-        ) : (
-          /* E. DEFAULT COMPLAINTS / GENERAL OPERATIONS TABLE VIEW */
-          <div className="space-y-4">
-            
-            {/* SEARCH & FILTERS TOOLBAR */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search complaint number, issue title, location..."
-                    className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Unassigned">Unassigned</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="Staff Assigned">Staff Assigned</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Resolution Submitted">Pending Review</option>
-                    <option value="Resolved">Resolved</option>
-                  </select>
-
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Priorities</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-
-                  {(searchQuery || statusFilter !== 'All' || priorityFilter !== 'All') && (
-                    <button
-                      onClick={handleClearFilters}
-                      className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* COMPLAINTS TABLE */}
-            {filteredComplaints.length === 0 ? (
-              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
-                <FileText className="w-10 h-10 text-gray-400 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No complaints found</h3>
-                <p className="text-xs text-gray-500">There are currently no complaints assigned to your department matching your criteria.</p>
               </div>
             ) : (
               <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                      <th className="p-3.5">Complaint ID</th>
-                      <th className="p-3.5">Title & Category</th>
+                      <th className="p-3.5">Task ID / Complaint</th>
+                      <th className="p-3.5">Issue & Category</th>
                       <th className="p-3.5">Location</th>
-                      <th className="p-3.5">Priority</th>
-                      <th className="p-3.5">Status</th>
                       <th className="p-3.5">Assigned Staff</th>
+                      <th className="p-3.5">Priority</th>
+                      <th className="p-3.5">Started At</th>
+                      <th className="p-3.5">Due Date</th>
+                      <th className="p-3.5">SLA Status</th>
+                      <th className="p-3.5">Status</th>
                       <th className="p-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredComplaints.map((comp) => {
-                      const isUnassigned = !comp.assigned_staff_id;
-                      const isPendingReview = comp.status === 'Resolution Submitted';
+                    {paginatedComplaints.map((comp) => {
+                      const slaInfo = formatSlaRemainingTime(comp.sla_deadline);
+                      const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
 
                       return (
                         <tr key={comp.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-3.5 font-mono font-bold text-emerald-700 whitespace-nowrap">
-                            <button onClick={() => setDetailModalComplaint(comp)} className="hover:underline text-left">
+                          <td className="p-3.5 font-mono">
+                            <span className="font-bold text-gray-900 block">{taskIdStr}</span>
+                            <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
                               {comp.complaint_number}
                             </button>
                           </td>
@@ -1917,60 +1241,55 @@ export const DepartmentHeadPortal: React.FC = () => {
                             <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
                           </td>
                           <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
-                            {comp.location_address || 'Nashik Service Area'}
+                            <div className="flex items-center space-x-1">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
+                              <span className="font-bold text-gray-900">{comp.assigned_staff_name}</span>
+                            </Link>
                           </td>
                           <td className="p-3.5">
                             <PriorityBadge priority={comp.priority} />
                           </td>
+                          <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                            {new Date(comp.updated_at || comp.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="p-3.5 font-mono text-[11px] text-gray-700 whitespace-nowrap">
+                            {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                          </td>
+                          <td className="p-3.5 font-mono text-[11px]">
+                            {slaInfo.isOverdue ? (
+                              <span className="text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block w-fit">
+                                OVERDUE ({slaInfo.text})
+                              </span>
+                            ) : (
+                              <span className="text-emerald-700 font-semibold">{slaInfo.text}</span>
+                            )}
+                          </td>
                           <td className="p-3.5">
                             <StatusBadge status={comp.status} />
                           </td>
-                          <td className="p-3.5 font-semibold text-gray-800">
-                            {comp.assigned_staff_name ? (
-                              <span className="inline-flex items-center space-x-1 text-emerald-900 font-bold">
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>{comp.assigned_staff_name}</span>
-                              </span>
-                            ) : (
-                              <span className="text-amber-700 font-mono text-[11px] font-bold">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="p-3.5 text-right">
+                          <td className="p-3.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end space-x-1.5">
                               <button
                                 onClick={() => setDetailModalComplaint(comp)}
                                 className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
                               >
-                                View
+                                View Task
                               </button>
 
-                              {isUnassigned ? (
-                                <button
-                                  onClick={() => {
-                                    setAssignModalComplaint(comp);
-                                    setSelectedStaffForAssign(departmentStaff[0]?.id || '');
-                                  }}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
-                                >
-                                  <PlusCircle className="w-3.5 h-3.5" />
-                                  <span>Assign Staff</span>
-                                </button>
-                              ) : isPendingReview ? (
-                                <button
-                                  onClick={() => setReviewModalComplaint(comp)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Review Proof</span>
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => setAssignModalComplaint(comp)}
-                                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
-                                >
-                                  Reassign
-                                </button>
-                              )}
+                              <button
+                                onClick={() => {
+                                  setReassignModalComplaint(comp);
+                                  setTargetReassignStaffId(departmentStaff[0]?.id || '');
+                                }}
+                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
+                              >
+                                Reassign
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1980,6 +1299,166 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </table>
               </div>
             )}
+          </div>
+        ) : isStaffDetailView && selectedStaffProfile ? (
+          /* C. STAFF PROFILE DETAIL VIEW */
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Link
+                to="/department-head/staff"
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs inline-flex items-center space-x-1.5 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Department Staff Roster</span>
+              </Link>
+            </div>
+
+            <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
+                  {selectedStaffProfile.name.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{selectedStaffProfile.name}</h2>
+                  <span className="text-xs text-gray-500 font-medium block">{selectedStaffProfile.role} • {selectedStaffProfile.department_name}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : isStaffView ? (
+          /* D. DEPARTMENT HEAD → STAFF ROSTER PAGE (/department-head/staff) */
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Staff</span>
+                <span className="text-xl font-extrabold text-gray-900 font-mono block">{staffMetrics.totalStaff}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Active Staff</span>
+                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{staffMetrics.activeStaff}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Available</span>
+                <span className="text-xl font-extrabold text-blue-700 font-mono block">{staffMetrics.availableStaff}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Busy / On Task</span>
+                <span className="text-xl font-extrabold text-amber-700 font-mono block">{staffMetrics.busyStaff}</span>
+              </div>
+            </div>
+          </div>
+        ) : isAssignWorkspace ? (
+          /* E. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE (/department-head/tasks/assign) */
+          <div className="space-y-6">
+            <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex items-center justify-between">
+              <h2 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">Task Assignment Workspace</h2>
+            </div>
+          </div>
+        ) : (
+          /* F. DEFAULT COMPLAINTS TABLE VIEW */
+          <div className="space-y-4">
+            <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                    <th className="p-3.5">Complaint ID</th>
+                    <th className="p-3.5">Title & Category</th>
+                    <th className="p-3.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredComplaints.map((comp) => (
+                    <tr key={comp.id}>
+                      <td className="p-3.5 font-mono text-emerald-700">{comp.complaint_number}</td>
+                      <td className="p-3.5">{comp.title}</td>
+                      <td className="p-3.5"><StatusBadge status={comp.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* APPROVE RESOLUTION CONFIRMATION MODAL */}
+        {/* ================================================== */}
+        {confirmApproveModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 border border-gray-200 shadow-xl font-sans">
+              <div className="flex items-center space-x-3 text-emerald-700 border-b border-gray-200 pb-3">
+                <CheckCircle className="w-6 h-6 shrink-0 text-emerald-600" />
+                <h3 className="font-extrabold text-gray-900 font-outfit text-base">Approve Resolution Confirmation</h3>
+              </div>
+
+              <div className="text-xs space-y-2">
+                <p className="text-gray-700">Are you sure you want to approve this completed work?</p>
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1 font-mono">
+                  <div>Complaint ID: <strong className="text-emerald-700">{confirmApproveModal.complaint_number}</strong></div>
+                  <div>Title: <span className="font-bold text-gray-900">{confirmApproveModal.title}</span></div>
+                  <div>Completed By: <span className="text-gray-800">{confirmApproveModal.assigned_staff_name || 'Staff'}</span></div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
+                <button
+                  onClick={() => setConfirmApproveModal(null)}
+                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => handleApproveResolution(confirmApproveModal.id)}
+                  disabled={reviewing}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs"
+                >
+                  {reviewing ? 'Approving...' : 'Approve Resolution'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* FULLSCREEN IMAGE ZOOM MODAL */}
+        {/* ================================================== */}
+        {zoomImageUrl && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center space-y-3">
+              <div className="absolute top-0 right-0 flex items-center space-x-2 p-4">
+                <button
+                  onClick={() => setZoomScale((s) => Math.min(s + 0.5, 3))}
+                  className="p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setZoomScale((s) => Math.max(s - 0.5, 1))}
+                  className="p-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => { setZoomImageUrl(null); setZoomScale(1); }}
+                  className="p-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors"
+                  title="Close Viewer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-auto max-h-[80vh] max-w-full flex items-center justify-center p-2">
+                <img
+                  src={zoomImageUrl}
+                  alt="High Resolution Proof Evidence"
+                  style={{ transform: `scale(${zoomScale})` }}
+                  className="transition-transform duration-200 rounded-xl object-contain max-h-[75vh]"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -2059,76 +1538,6 @@ export const DepartmentHeadPortal: React.FC = () => {
         )}
 
         {/* ================================================== */}
-        {/* ASSIGN STAFF MODAL (STRICT DEPARTMENT VALIDATION) */}
-        {/* ================================================== */}
-        {assignModalComplaint && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-gray-200 shadow-xl font-sans">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-emerald-600" />
-                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Assign Department Task</h3>
-                </div>
-                <button onClick={() => setAssignModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs">
-                <span className="font-mono text-emerald-700 font-bold block">{assignModalComplaint.complaint_number}</span>
-                <h4 className="font-extrabold text-gray-900 text-sm">{assignModalComplaint.title}</h4>
-                <p className="text-gray-600 text-[11px]">{assignModalComplaint.location_address}</p>
-              </div>
-
-              {assignError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-                  {assignError}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">
-                  Select {deptInfo.shortName} Service Staff Member *
-                </label>
-                
-                {departmentStaff.length === 0 ? (
-                  <p className="text-xs text-rose-600 font-bold">No active service staff registered under {deptInfo.fullName}.</p>
-                ) : (
-                  <select
-                    value={selectedStaffForAssign}
-                    onChange={(e) => setSelectedStaffForAssign(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-medium min-h-[44px]"
-                  >
-                    {departmentStaff.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.employee_id || 'STF-001'}) — Status: {s.status || 'Available'}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => setAssignModalComplaint(null)}
-                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  onClick={handleConfirmModalAssignment}
-                  disabled={assigning || departmentStaff.length === 0}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs disabled:opacity-50 min-h-[40px]"
-                >
-                  {assigning ? 'Assigning...' : 'Assign Task'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================================================== */}
         {/* COMPLAINT / TASK DETAIL MODAL */}
         {/* ================================================== */}
         {detailModalComplaint && (
@@ -2161,25 +1570,28 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </p>
               </div>
 
-              {/* CITIZEN PHOTO VS REPAIR PROOF / EVIDENCE */}
+              {/* CITIZEN PHOTO VS REPAIR PROOF */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                    <img src={detailModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(detailModalComplaint.photo_before_url)}>
+                    {detailModalComplaint.photo_before_url ? (
+                      <img src={detailModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Original complaint image unavailable</div>
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Repair Proof Evidence</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 flex items-center justify-center">
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer flex items-center justify-center" onClick={() => detailModalComplaint.photo_after_url && setZoomImageUrl(detailModalComplaint.photo_after_url)}>
                     {detailModalComplaint.photo_after_url ? (
-                      <img src={detailModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover" />
+                      <img src={detailModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover hover:scale-105 transition-transform" />
                     ) : (
                       <div className="text-center p-4 space-y-1">
                         <Camera className="w-6 h-6 text-gray-400 mx-auto" />
-                        <span className="text-xs font-bold text-gray-600 block">Not submitted yet</span>
-                        <span className="text-[10px] text-gray-400 block font-mono">Field staff is currently executing work</span>
+                        <span className="text-xs font-bold text-gray-600 block">No completion image uploaded</span>
                       </div>
                     )}
                   </div>
@@ -2192,9 +1604,9 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div className="grid grid-cols-6 gap-1 text-center text-[10px] font-mono font-extrabold">
                   <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ASSIGNED</div>
                   <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">ACCEPTED</div>
-                  <div className="p-2 rounded bg-amber-500 text-white shadow-xs">IN PROGRESS</div>
-                  <div className="p-2 rounded bg-gray-200 text-gray-500">COMPLETED</div>
-                  <div className="p-2 rounded bg-gray-200 text-gray-500">REVIEW</div>
+                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">IN PROGRESS</div>
+                  <div className="p-2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">COMPLETED</div>
+                  <div className="p-2 rounded bg-amber-500 text-white shadow-xs">REVIEW</div>
                   <div className="p-2 rounded bg-gray-200 text-gray-500">RESOLVED</div>
                 </div>
               </div>
@@ -2263,18 +1675,22 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">BEFORE (Citizen Complaint)</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                    <img src={reviewModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(reviewModalComplaint.photo_before_url)}>
+                    {reviewModalComplaint.photo_before_url ? (
+                      <img src={reviewModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Original complaint image unavailable</div>
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">AFTER (Staff Repair Proof)</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50">
+                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer" onClick={() => reviewModalComplaint.photo_after_url && setZoomImageUrl(reviewModalComplaint.photo_after_url)}>
                     {reviewModalComplaint.photo_after_url ? (
-                      <img src={reviewModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover" />
+                      <img src={reviewModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover hover:scale-105 transition-transform" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Proof Unavailable</div>
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No completion image uploaded</div>
                     )}
                   </div>
                 </div>
@@ -2320,12 +1736,12 @@ export const DepartmentHeadPortal: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => handleApproveResolution(reviewModalComplaint.id)}
+                    onClick={() => setConfirmApproveModal(reviewModalComplaint)}
                     disabled={reviewing}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs inline-flex items-center justify-center space-x-1.5 disabled:opacity-50 min-h-[40px]"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{reviewing ? 'Approving...' : 'Approve Field Resolution'}</span>
+                    <span>Approve Field Resolution</span>
                   </button>
                 </div>
               )}
