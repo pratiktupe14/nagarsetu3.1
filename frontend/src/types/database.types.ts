@@ -82,6 +82,7 @@ export interface UserProfile {
   avatar_url?: string;
   address?: string;
   language_pref?: string;
+  status?: 'Active' | 'Inactive' | 'active' | 'inactive';
   created_at?: string;
 }
 

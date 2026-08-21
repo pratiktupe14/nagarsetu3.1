@@ -220,14 +220,21 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       return;
     }
 
+    const cleanEmail = formEmail.trim().toLowerCase();
+    const existingProfile = profiles.find((p) => p.email.toLowerCase() === cleanEmail);
+    if (existingProfile && existingProfile.role !== 'department_head') {
+      alert('An account with this email already exists.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const selectedDept = SIX_MUNICIPAL_DEPARTMENTS.find((d) => d.id === formDeptId) || SIX_MUNICIPAL_DEPARTMENTS[0];
       
       const newHeadProfile: UserProfile = {
-        id: `head-${Date.now()}`,
+        id: existingProfile?.id || `head-${Date.now()}`,
         full_name: formFullName.trim(),
-        email: formEmail.trim(),
+        email: cleanEmail,
         mobile: formPhone.trim() || '+91 98220 00000',
         role: 'department_head',
         department_id: selectedDept.id,

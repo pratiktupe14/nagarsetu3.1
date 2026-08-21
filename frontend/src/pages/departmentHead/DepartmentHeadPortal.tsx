@@ -1027,6 +1027,31 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
+  if (user?.status === 'Inactive' || user?.status === 'inactive') {
+    return (
+      <DashboardLayout title="Account Inactive">
+        <div className="p-8 max-w-md mx-auto my-16 bg-white border border-rose-200 rounded-2xl shadow-lg text-center space-y-4 font-sans">
+          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Account Inactive</h2>
+          <p className="text-xs text-gray-600 leading-relaxed font-medium">
+            Your Department Head account has been deactivated by City Administration. Please contact Municipal Command Center for account reactivation.
+          </p>
+          <button
+            onClick={async () => {
+              await logout();
+              navigate('/login');
+            }}
+            className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors"
+          >
+            Log Out of Session
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title={isNotifView ? "Notifications" : isProfileView ? "Department Head Profile" : isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
