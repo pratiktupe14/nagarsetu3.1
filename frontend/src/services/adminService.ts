@@ -212,6 +212,34 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
   });
 }
 
+export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', staffId).single();
+      if (!error && data) {
+        return {
+          id: data.id,
+          name: data.full_name || data.name || 'Staff Member',
+          employee_id: data.employee_id || `STF-${data.id.slice(0, 4).toUpperCase()}`,
+          department_name: data.department_name || 'Public Works Department (PWD)',
+          role: 'Service Staff',
+          status: data.status || 'Available',
+          contact_number: data.phone_number || '+91 98220 00000',
+          email: data.email || 'staff@nagarsetu.gov.in',
+          ward_area: data.ward_area || 'Nashik City',
+          joined_date: data.created_at || new Date().toISOString(),
+          created_at: data.created_at || new Date().toISOString()
+        };
+      }
+    } catch (e) {
+      console.warn('Supabase fetch staff by ID error:', e);
+    }
+  }
+
+  const all = getAllServiceStaffRecords();
+  return all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
+}
+
 export function saveServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
   localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(staff));
 }

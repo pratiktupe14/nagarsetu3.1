@@ -363,6 +363,7 @@ export default function App() {
               '/department-head/tasks/completed',
               '/department-head/tasks/overdue',
               '/department-head/staff',
+              '/department-head/staff/:staffId',
               '/department-head/map',
               '/department-head/notifications',
               '/department-head/profile',
