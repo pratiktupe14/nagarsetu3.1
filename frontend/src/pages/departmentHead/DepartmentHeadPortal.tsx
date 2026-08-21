@@ -29,7 +29,8 @@ import {
   Users, Layers, CornerDownRight, RotateCcw, Download, Filter, CheckSquare,
   Square, ChevronLeft, ExternalLink, FileSpreadsheet, Info, Phone, Mail,
   UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX,
-  ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle, Siren, AlertOctagon, ShieldAlert
+  ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle, Siren, AlertOctagon, ShieldAlert,
+  Compass
 } from 'lucide-react';
 
 // Fix standard Leaflet marker icon asset issue
@@ -39,6 +40,40 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
+
+// Custom DivIcon generator for priority-based map markers
+const createCustomMapMarkerIcon = (priority: string) => {
+  let bgColor = '#059669'; // Emerald Low
+  let pulseColor = '#10b981';
+
+  if (priority === 'Critical') {
+    bgColor = '#e11d48'; // Rose Critical
+    pulseColor = '#f43f5e';
+  } else if (priority === 'High') {
+    bgColor = '#ea580c'; // Orange High
+    pulseColor = '#fb923c';
+  } else if (priority === 'Medium') {
+    bgColor = '#d97706'; // Amber Medium
+    pulseColor = '#f59e0b';
+  }
+
+  const svgHtml = `
+    <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 32px; height: 32px; background-color: ${pulseColor}; opacity: 0.35; border-radius: 50%; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="width: 24px; height: 24px; background-color: ${bgColor}; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+        <div style="width: 8px; height: 8px; background-color: white; border-radius: 50%;"></div>
+      </div>
+    </div>
+  `;
+
+  return L.divIcon({
+    html: svgHtml,
+    className: 'custom-leaflet-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+};
 
 const getDepartmentInfo = (departmentName: string) => {
   const nameLower = (departmentName || '').toLowerCase();
@@ -199,7 +234,10 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [slaFilter, setSlaFilter] = useState('All');
   const [overdueDurationFilter, setOverdueDurationFilter] = useState('All');
   const [reviewStatusTab, setReviewStatusTab] = useState<'All' | 'Pending Review' | 'Approved' | 'Rework Required' | 'Resolved'>('All');
+  const [mapLayerTab, setMapLayerTab] = useState<'All' | 'Unassigned' | 'Active Tasks' | 'Overdue' | 'Completed'>('All');
   const [taskLoadFilter, setTaskLoadFilter] = useState('All');
+  const [selectedMapComplaint, setSelectedMapComplaint] = useState<Complaint | null>(null);
+  const [showNoLocationDrawer, setShowNoLocationDrawer] = useState(false);
 
   // Task Assignment Workspace States
   const [selectedAssignComplaint, setSelectedAssignComplaint] = useState<Complaint | null>(null);
@@ -248,7 +286,6 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [reviewing, setReviewing] = useState(false);
 
   const [detailModalComplaint, setDetailModalComplaint] = useState<Complaint | null>(null);
-  const [mapLocationModal, setMapLocationModal] = useState<Complaint | null>(null);
 
   // Single Staff Detail Record State
   const [selectedStaffProfile, setSelectedStaffProfile] = useState<ServiceStaffMemberRecord | null>(null);
@@ -334,7 +371,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     return { total, highPriority, critical, dueToday, overdue };
   }, [departmentComplaints, now]);
 
-  // Completed Specific Metric Cards (Real Database Data)
+  // Completed Specific Metric Cards
   const completedMetrics = useMemo(() => {
     const completedComplaints = departmentComplaints.filter((c) => c.status === 'Resolution Submitted' || c.status === 'Resolved' || c.status === 'Reopened');
     const total = completedComplaints.length;
@@ -371,7 +408,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     return { total, pendingReview, approved, reworkRequired, completedToday, completedThisWeek, avgResolutionTime };
   }, [departmentComplaints, now]);
 
-  // Overdue Specific Metric Cards (Real Database Data)
+  // Overdue Specific Metric Cards
   const overdueMetrics = useMemo(() => {
     const overdueList = departmentComplaints.filter((c) => {
       if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
@@ -404,7 +441,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     return { totalOverdue, critical, highPriority, dueToday, overdueGt24h, overdueGt3d, staffWithOverdue };
   }, [departmentComplaints, now]);
 
-  // Calculate Real Staff Summary Statistics from Database Records
+  // Calculate Real Staff Summary Statistics
   const staffMetrics = useMemo(() => {
     const totalStaff = departmentStaff.length;
     const activeStaff = departmentStaff.filter((s) => s.status !== 'Offline' && s.status !== 'On Leave').length;
@@ -490,9 +527,13 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Filtered Complaint List with real Search, Filters & Route constraints
   const filteredComplaints = useMemo(() => {
     return departmentComplaints.filter((c) => {
-      if (isOverdue) {
+      if (isMapView) {
+        if (mapLayerTab === 'Unassigned' && (c.assigned_staff_id || c.status === 'Resolved')) return false;
+        if (mapLayerTab === 'Active Tasks' && c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
+        if (mapLayerTab === 'Overdue' && (c.status === 'Resolved' || !c.sla_deadline || new Date(c.sla_deadline) >= now)) return false;
+        if (mapLayerTab === 'Completed' && c.status !== 'Resolved' && c.status !== 'Resolution Submitted') return false;
+      } else if (isOverdue) {
         if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline || new Date(c.sla_deadline) >= now) return false;
-        
         if (overdueDurationFilter !== 'All') {
           const diffMs = now.getTime() - new Date(c.sla_deadline).getTime();
           const hours = diffMs / (1000 * 3600);
@@ -500,14 +541,12 @@ export const DepartmentHeadPortal: React.FC = () => {
           if (overdueDurationFilter === '1-3 Days' && (hours < 24 || hours > 72)) return false;
           if (overdueDurationFilter === '> 3 Days' && hours <= 72) return false;
         }
-
       } else if (isCompleted) {
         if (c.status !== 'Resolution Submitted' && c.status !== 'Resolved' && c.status !== 'Reopened') return false;
         if (reviewStatusTab === 'Pending Review' && c.status !== 'Resolution Submitted') return false;
         if (reviewStatusTab === 'Approved' && c.status !== 'Resolved') return false;
         if (reviewStatusTab === 'Rework Required' && c.status !== 'Reopened') return false;
         if (reviewStatusTab === 'Resolved' && c.status !== 'Resolved') return false;
-
       } else if (isInProgress) {
         if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
       } else if (isAssignWorkspace) {
@@ -523,6 +562,12 @@ export const DepartmentHeadPortal: React.FC = () => {
           if (statusFilter === 'Assigned' && !c.assigned_staff_id) return false;
           if (statusFilter !== 'Unassigned' && statusFilter !== 'Assigned' && c.status !== statusFilter) return false;
         }
+      }
+
+      if (statusFilter !== 'All' && !isComplaints && !isMapView) {
+        if (statusFilter === 'Unassigned' && c.assigned_staff_id) return false;
+        if (statusFilter === 'Assigned' && !c.assigned_staff_id) return false;
+        if (statusFilter !== 'Unassigned' && statusFilter !== 'Assigned' && c.status !== statusFilter) return false;
       }
 
       if (priorityFilter !== 'All' && c.priority !== priorityFilter) return false;
@@ -555,7 +600,23 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       return true;
     });
-  }, [departmentComplaints, isOverdue, overdueDurationFilter, isCompleted, reviewStatusTab, isInProgress, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, searchQuery, now]);
+  }, [departmentComplaints, isMapView, mapLayerTab, isOverdue, overdueDurationFilter, isCompleted, reviewStatusTab, isInProgress, isAssignWorkspace, assignmentTab, isComplaints, statusFilter, priorityFilter, categoryFilter, staffFilter, slaFilter, searchQuery, now]);
+
+  // Split Map Complaints into Plottable (valid lat/lng) vs Unavailable Coordinates
+  const { mapPlottableComplaints, mapNoLocationComplaints } = useMemo(() => {
+    const plottable: Complaint[] = [];
+    const noLocation: Complaint[] = [];
+
+    filteredComplaints.forEach((c) => {
+      if (typeof c.latitude === 'number' && typeof c.longitude === 'number' && !isNaN(c.latitude) && !isNaN(c.longitude) && c.latitude !== 0 && c.longitude !== 0) {
+        plottable.push(c);
+      } else {
+        noLocation.push(c);
+      }
+    });
+
+    return { mapPlottableComplaints: plottable, mapNoLocationComplaints: noLocation };
+  }, [filteredComplaints]);
 
   // Tasks belonging to the selected single staff member profile
   const staffProfileTasks = useMemo(() => {
@@ -566,7 +627,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Reset page index when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab, reviewStatusTab, overdueDurationFilter]);
+  }, [searchQuery, statusFilter, priorityFilter, categoryFilter, staffFilter, dateFilter, slaFilter, taskLoadFilter, assignmentTab, reviewStatusTab, overdueDurationFilter, mapLayerTab]);
 
   // Paginated Complaints
   const paginatedComplaints = useMemo(() => {
@@ -588,6 +649,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     setTaskLoadFilter('All');
     setReviewStatusTab('All');
     setOverdueDurationFilter('All');
+    setMapLayerTab('All');
   };
 
   // Export Real Department Complaints to CSV
@@ -598,22 +660,20 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     if (targetList.length === 0) return;
 
-    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Priority', 'Status', 'Assigned Staff', 'SLA Due Date', 'Overdue Duration'];
-    const rows = targetList.map((c) => {
-      const overdueInfo = getOverdueDetails(c.sla_deadline, now);
-      return [
-        `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
-        `"${c.complaint_number}"`,
-        `"${(c.title || '').replace(/"/g, '""')}"`,
-        `"${(c.category || '').replace(/"/g, '""')}"`,
-        `"${(c.location_address || '').replace(/"/g, '""')}"`,
-        c.priority,
-        c.status,
-        `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
-        `"${c.sla_deadline ? new Date(c.sla_deadline).toLocaleDateString() : 'N/A'}"`,
-        `"${overdueInfo.text}"`
-      ];
-    });
+    const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'SLA Due Date'];
+    const rows = targetList.map((c) => [
+      `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
+      `"${c.complaint_number}"`,
+      `"${(c.title || '').replace(/"/g, '""')}"`,
+      `"${(c.category || '').replace(/"/g, '""')}"`,
+      `"${(c.location_address || '').replace(/"/g, '""')}"`,
+      c.latitude || '',
+      c.longitude || '',
+      c.priority,
+      c.status,
+      `"${(c.assigned_staff_name || 'Unassigned').replace(/"/g, '""')}"`,
+      `"${c.sla_deadline ? new Date(c.sla_deadline).toLocaleDateString() : 'N/A'}"`
+    ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -784,7 +844,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title={isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
+    <DashboardLayout title={isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Tasks" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -800,15 +860,15 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 font-outfit tracking-tight">
                   {deptInfo.fullName}
                 </h1>
-                <span className="font-mono text-[10px] font-extrabold bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full border border-rose-300">
-                  {isOverdue ? 'OVERDUE TASKS' : isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
+                <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                  {isMapView ? 'INTERACTIVE GIS DEPARTMENT MAP' : isOverdue ? 'OVERDUE TASKS' : isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                   ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
-                {isOverdue ? 'Tasks requiring immediate departmental attention.' : isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
+                {isMapView ? 'Monitor your department\'s complaints, active tasks, and field operations across Nashik.' : isOverdue ? 'Tasks requiring immediate departmental attention.' : isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
               </p>
             </div>
           </div>
@@ -846,50 +906,31 @@ export const DepartmentHeadPortal: React.FC = () => {
         {/* VIEW ROUTE RENDERER */}
         {/* ================================================== */}
         
-        {/* A. DEPARTMENT HEAD → OVERDUE TASKS PAGE (/department-head/tasks/overdue) */}
-        {isOverdue ? (
+        {/* A. DEPARTMENT HEAD → DEPARTMENT MAP PAGE (/department-head/map) */}
+        {isMapView ? (
           <div className="space-y-6">
 
-            {/* 7 OVERDUE SUMMARY METRIC CARDS (REAL SUPABASE DATA) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
-              <div className="p-3.5 text-center space-y-1 bg-rose-50/50">
-                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Total Overdue</span>
-                <span className="text-xl font-extrabold text-rose-900 font-mono block">{overdueMetrics.totalOverdue}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
-                <span className="text-xl font-extrabold text-rose-700 font-mono block">{overdueMetrics.critical}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">High Priority</span>
-                <span className="text-xl font-extrabold text-orange-700 font-mono block">{overdueMetrics.highPriority}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Today</span>
-                <span className="text-xl font-extrabold text-amber-700 font-mono block">{overdueMetrics.dueToday}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue &gt; 24 Hours</span>
-                <span className="text-xl font-extrabold text-rose-800 font-mono block">{overdueMetrics.overdueGt24h}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue &gt; 3 Days</span>
-                <span className="text-xl font-extrabold text-rose-950 font-mono block">{overdueMetrics.overdueGt3d}</span>
-              </div>
-
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Staff w/ Overdue</span>
-                <span className="text-xl font-extrabold text-gray-900 font-mono block">{overdueMetrics.staffWithOverdue}</span>
-              </div>
-            </div>
-
-            {/* SEARCH AND FILTER TOOLBAR */}
+            {/* MAP FILTER TOOLBAR */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
+              
+              {/* LAYER QUICK TABS */}
+              <div className="flex items-center space-x-2 border-b border-gray-200 pb-3 overflow-x-auto text-xs font-bold font-outfit">
+                {(['All', 'Unassigned', 'Active Tasks', 'Overdue', 'Completed'] as const).map((layer) => (
+                  <button
+                    key={layer}
+                    onClick={() => setMapLayerTab(layer)}
+                    className={`px-4 py-2 rounded-xl transition-colors whitespace-nowrap ${
+                      mapLayerTab === layer
+                        ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {layer === 'All' ? 'All Department' : layer}
+                  </button>
+                ))}
+              </div>
+
+              {/* SEARCH & FILTER CONTROLS */}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
@@ -897,12 +938,24 @@ export const DepartmentHeadPortal: React.FC = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search Task ID, Complaint ID, Issue, Location, Staff Name..."
+                    placeholder="Search location address, Complaint ID, Issue, Staff Name..."
                     className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Staff Filter */}
+                  <select
+                    value={staffFilter}
+                    onChange={(e) => setStaffFilter(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
+                  >
+                    <option value="All">All Department Staff</option>
+                    {departmentStaff.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+
                   {/* Priority Filter */}
                   <select
                     value={priorityFilter}
@@ -910,10 +963,10 @@ export const DepartmentHeadPortal: React.FC = () => {
                     className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
                   >
                     <option value="All">All Priorities</option>
-                    <option value="Critical">Critical Priority</option>
-                    <option value="High">High Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="Low">Low Priority</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
                   </select>
 
                   {/* Category Filter */}
@@ -928,31 +981,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ))}
                   </select>
 
-                  {/* Staff Filter */}
-                  <select
-                    value={staffFilter}
-                    onChange={(e) => setStaffFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Staff</option>
-                    {departmentStaff.map((s) => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
-
-                  {/* Overdue Duration Filter */}
-                  <select
-                    value={overdueDurationFilter}
-                    onChange={(e) => setOverdueDurationFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
-                  >
-                    <option value="All">All Overdue Durations</option>
-                    <option value="< 24 Hours">&lt; 24 Hours Overdue</option>
-                    <option value="1-3 Days">1 to 3 Days Overdue</option>
-                    <option value="> 3 Days">&gt; 3 Days Critical Overdue</option>
-                  </select>
-
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || overdueDurationFilter !== 'All') && (
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || staffFilter !== 'All' || mapLayerTab !== 'All') && (
                     <button
                       onClick={handleClearFilters}
                       className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
@@ -964,308 +993,297 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* OVERDUE TASKS TABLE (DESKTOP) & CARDS (MOBILE) */}
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="p-12 bg-white border border-rose-200 rounded-2xl text-center space-y-3 max-w-md mx-auto">
-                <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Unable to load overdue tasks</h3>
-                <p className="text-xs text-gray-600">Please try again.</p>
-                <button
-                  onClick={loadData}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : filteredComplaints.length === 0 ? (
-              <div className="p-12 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-3">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">No overdue tasks</h3>
-                <p className="text-xs text-gray-500">All tasks in your department are currently within their assigned deadlines.</p>
-                <button
-                  onClick={loadData}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-xs"
-                >
-                  Refresh
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                
-                {/* DESKTOP TABLE */}
-                <div className="hidden md:block border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                        <th className="p-3.5">Task ID / Complaint</th>
-                        <th className="p-3.5">Issue & Category</th>
-                        <th className="p-3.5">Location</th>
-                        <th className="p-3.5">Assigned Staff</th>
-                        <th className="p-3.5">Priority</th>
-                        <th className="p-3.5">Due Date</th>
-                        <th className="p-3.5">Overdue Duration</th>
-                        <th className="p-3.5">Urgency Indicator</th>
-                        <th className="p-3.5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {paginatedComplaints.map((comp) => {
-                        const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-                        const overdueDetails = getOverdueDetails(comp.sla_deadline, now);
-                        const staffOverdueCount = staffTaskCountsMap[comp.assigned_staff_id || '']?.overdue || 0;
+            {/* MAIN MAP WORKSPACE (8 COL MAP + 4 COL ACTIVITY PANEL) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                        return (
-                          <tr key={comp.id} className="hover:bg-rose-50/40 transition-colors">
-                            <td className="p-3.5 font-mono">
-                              <span className="font-bold text-gray-900 block">{taskIdStr}</span>
-                              <button onClick={() => setDetailModalComplaint(comp)} className="text-[11px] text-emerald-700 font-bold hover:underline">
-                                {comp.complaint_number}
-                              </button>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-gray-900 block">{comp.title}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">{comp.category}</span>
-                            </td>
-                            <td className="p-3.5 text-gray-700 font-medium max-w-xs truncate">
-                              <div className="flex items-center space-x-1">
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+              {/* LEFT / CENTER: LARGE INTERACTIVE MAP CONTAINER (COL 8) */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="relative rounded-2xl overflow-hidden border border-gray-200 shadow-xs bg-slate-100 min-h-[600px] h-[650px] z-10">
+                  
+                  <MapContainer
+                    center={[20.0059, 73.7898]}
+                    zoom={13}
+                    style={{ width: '100%', height: '100%' }}
+                    scrollWheelZoom={true}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    {/* REAL SUPABASE COMPLAINT MARKERS */}
+                    {mapPlottableComplaints.map((comp) => {
+                      const markerIcon = createCustomMapMarkerIcon(comp.priority);
+                      const isSelected = selectedMapComplaint?.id === comp.id;
+
+                      return (
+                        <Marker
+                          key={comp.id}
+                          position={[comp.latitude, comp.longitude]}
+                          icon={markerIcon}
+                          eventHandlers={{
+                            click: () => setSelectedMapComplaint(comp)
+                          }}
+                        >
+                          <Popup>
+                            <div className="p-1 space-y-2 text-xs font-sans max-w-xs">
+                              <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                                <span className="font-mono font-bold text-emerald-800">{comp.complaint_number}</span>
+                                <PriorityBadge priority={comp.priority} />
                               </div>
-                            </td>
-                            <td className="p-3.5">
-                              {comp.assigned_staff_id ? (
-                                <Link to={`/department-head/staff/${comp.assigned_staff_id}`} className="hover:underline flex items-center space-x-1.5">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center font-outfit text-[10px] border border-emerald-300 shrink-0">
-                                    {comp.assigned_staff_name?.charAt(0) || 'S'}
-                                  </div>
-                                  <div>
-                                    <span className="font-bold text-gray-900 block">{comp.assigned_staff_name}</span>
-                                    {staffOverdueCount > 1 && (
-                                      <span className="text-[9px] font-bold text-rose-700 block">
-                                        High Workload ({staffOverdueCount} overdue)
-                                      </span>
-                                    )}
-                                  </div>
-                                </Link>
-                              ) : (
-                                <span className="text-amber-700 font-mono text-[11px] font-bold">Unassigned</span>
-                              )}
-                            </td>
-                            <td className="p-3.5">
-                              <PriorityBadge priority={comp.priority} />
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] text-rose-700 font-bold whitespace-nowrap">
-                              {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                            </td>
-                            <td className="p-3.5 font-mono text-[11px] font-extrabold text-rose-800 whitespace-nowrap">
-                              {overdueDetails.text}
-                            </td>
-                            <td className="p-3.5">
-                              <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase tracking-wider border ${overdueDetails.badgeColor}`}>
-                                {overdueDetails.urgency}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end space-x-1.5">
+
+                              <div>
+                                <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
+                                <span className="text-[10px] text-gray-500 font-mono block">{comp.category}</span>
+                              </div>
+
+                              <div className="text-[11px] text-gray-600 space-y-1">
+                                <div className="flex items-center space-x-1">
+                                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">{comp.location_address || 'Nashik Service Area'}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1">
+                                  <span>Staff: <strong>{comp.assigned_staff_name || 'Unassigned'}</strong></span>
+                                  <StatusBadge status={comp.status} />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center space-x-2 pt-2 border-t border-gray-100">
                                 <button
                                   onClick={() => setDetailModalComplaint(comp)}
-                                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg text-[11px] transition-colors"
+                                  className="w-full px-3 py-1.5 bg-emerald-600 text-white font-extrabold rounded-lg text-xs hover:bg-emerald-700"
                                 >
-                                  View Task
+                                  View Task Details
                                 </button>
 
-                                <button
-                                  onClick={() => {
-                                    setReassignModalComplaint(comp);
-                                    setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                                  }}
-                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] transition-colors"
+                                <a
+                                  href={`https://www.google.com/maps/search/?api=1&query=${comp.latitude},${comp.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 bg-slate-100 text-gray-700 rounded-lg hover:bg-slate-200"
+                                  title="Get Google Directions"
                                 >
-                                  Reassign
-                                </button>
-
-                                <button
-                                  onClick={() => setEscalateModalComplaint(comp)}
-                                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-lg text-[11px] transition-colors inline-flex items-center space-x-1"
-                                >
-                                  <Siren className="w-3 h-3" />
-                                  <span>Escalate</span>
-                                </button>
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+                  </MapContainer>
 
-                {/* MOBILE CARDS VIEW */}
-                <div className="grid grid-cols-1 gap-4 md:hidden">
-                  {paginatedComplaints.map((comp) => {
-                    const taskIdStr = `TASK-${comp.id.slice(0, 6).toUpperCase()}`;
-                    const overdueDetails = getOverdueDetails(comp.sla_deadline, now);
-
-                    return (
-                      <div key={comp.id} className="p-4 bg-white border border-rose-200 rounded-2xl space-y-3 shadow-2xs">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-mono font-bold text-gray-900">{taskIdStr} • <span className="text-emerald-700">{comp.complaint_number}</span></span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] border ${overdueDetails.badgeColor}`}>
-                            {overdueDetails.urgency}
-                          </span>
-                        </div>
-
-                        <div>
-                          <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</h4>
-                          <span className="text-[11px] text-gray-500 font-mono block">{comp.category}</span>
-                        </div>
-
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span>Staff: <strong>{comp.assigned_staff_name || 'Unassigned'}</strong></span>
-                            <PriorityBadge priority={comp.priority} />
-                          </div>
-                        </div>
-
-                        <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-200 flex items-center justify-between text-xs font-mono">
-                          <span className="text-rose-800 font-bold">Overdue Duration:</span>
-                          <span className="text-rose-900 font-extrabold">{overdueDetails.text}</span>
-                        </div>
-
-                        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
-                          <button
-                            onClick={() => setDetailModalComplaint(comp)}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-800 font-bold rounded-lg text-xs"
-                          >
-                            View
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setReassignModalComplaint(comp);
-                              setTargetReassignStaffId(departmentStaff[0]?.id || '');
-                            }}
-                            className="px-3 py-1.5 bg-amber-50 text-amber-900 border border-amber-300 font-extrabold rounded-lg text-xs"
-                          >
-                            Reassign
-                          </button>
-
-                          <button
-                            onClick={() => setEscalateModalComplaint(comp)}
-                            className="px-3 py-1.5 bg-rose-600 text-white font-extrabold rounded-lg text-xs"
-                          >
-                            Escalate
-                          </button>
-                        </div>
+                  {/* FLOATING MAP MAP LEGEND */}
+                  <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-xs p-3 rounded-xl border border-gray-200 shadow-lg z-20 text-xs font-mono space-y-2 max-w-xs">
+                    <span className="font-extrabold text-gray-900 block font-outfit uppercase text-[10px]">Map Marker Legend</span>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span>
+                        <span className="font-bold text-gray-800">Critical Priority</span>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block"></span>
+                        <span className="font-bold text-gray-800">High Priority</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-600 inline-block"></span>
+                        <span className="font-bold text-gray-800">Medium Priority</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
+                        <span className="font-bold text-gray-800">Low Priority</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* RIGHT SIDE: DEPARTMENT ACTIVITY PANEL & SELECTED TASK DETAILS (COL 4) */}
+              <div className="lg:col-span-4 space-y-4">
+                
+                {/* 6 ACTIVITY METRIC TILES (REAL DATABASE DATA) */}
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl space-y-3 shadow-xs">
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-sm uppercase tracking-wider">
+                    Department Operations ({filteredComplaints.length})
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <button
+                      onClick={() => setMapLayerTab('All')}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        mapLayerTab === 'All' ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Total Records</span>
+                      <span className="text-lg font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setMapLayerTab('Unassigned')}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        mapLayerTab === 'Unassigned' ? 'bg-amber-50 border-amber-500' : 'bg-slate-50 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Unassigned</span>
+                      <span className="text-lg font-extrabold text-amber-700 font-mono block">{complaintMetrics.unassigned}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setMapLayerTab('Active Tasks')}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        mapLayerTab === 'Active Tasks' ? 'bg-blue-50 border-blue-500' : 'bg-slate-50 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Active Tasks</span>
+                      <span className="text-lg font-extrabold text-blue-700 font-mono block">{complaintMetrics.inProgress}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setMapLayerTab('Overdue')}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        mapLayerTab === 'Overdue' ? 'bg-rose-50 border-rose-500' : 'bg-slate-50 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Overdue Tasks</span>
+                      <span className="text-lg font-extrabold text-rose-700 font-mono block">{complaintMetrics.overdue}</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* PAGINATION BAR */}
-                {totalPages > 1 && (
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex items-center justify-between text-xs text-gray-700">
-                    <span className="font-semibold">
-                      Showing <span className="font-extrabold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-                      <span className="font-extrabold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of{' '}
-                      <span className="font-extrabold text-gray-900">{filteredComplaints.length}</span> overdue tasks
-                    </span>
+                {/* SELECTED MARKER CARD OR ACTIVE INSPECTION PANEL */}
+                {selectedMapComplaint ? (
+                  <div className="p-4 bg-white border-2 border-emerald-500 rounded-2xl space-y-3 shadow-md">
+                    <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                      <span className="font-mono font-bold text-emerald-800 text-xs">{selectedMapComplaint.complaint_number}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <PriorityBadge priority={selectedMapComplaint.priority} />
+                        <button onClick={() => setSelectedMapComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
 
-                    <div className="flex items-center space-x-2 font-bold">
+                    <div>
+                      <h4 className="font-extrabold text-gray-900 text-sm font-outfit">{selectedMapComplaint.title}</h4>
+                      <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{selectedMapComplaint.description || 'No detailed description provided.'}</p>
+                    </div>
+
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Status:</span>
+                        <StatusBadge status={selectedMapComplaint.status} />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Staff:</span>
+                        <span className="font-bold text-gray-900">{selectedMapComplaint.assigned_staff_name || 'Unassigned'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Location:</span>
+                        <span className="font-bold text-gray-900 truncate max-w-[180px]">{selectedMapComplaint.location_address || 'Nashik'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-1">
                       <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
+                        onClick={() => setDetailModalComplaint(selectedMapComplaint)}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-colors"
                       >
-                        Previous
-                      </button>
-                      <span className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg font-mono">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 min-h-[36px]"
-                      >
-                        Next
+                        View Full Complaint Details
                       </button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl text-center space-y-2">
+                    <Compass className="w-8 h-8 text-emerald-600 mx-auto" />
+                    <h4 className="font-extrabold text-gray-900 text-xs font-outfit">Click any map marker</h4>
+                    <p className="text-[11px] text-gray-500">Click a marker on the Nashik GIS map to inspect details, staff workload, and SLA status.</p>
+                  </div>
+                )}
+
+                {/* LOCATIONS UNAVAILABLE DRAWER ACCORDION */}
+                {mapNoLocationComplaints.length > 0 && (
+                  <div className="p-4 bg-white border border-amber-200 rounded-2xl space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <h4 className="font-extrabold text-gray-900 font-outfit text-xs">
+                          Locations Unavailable ({mapNoLocationComplaints.length})
+                        </h4>
+                      </div>
+
+                      <button
+                        onClick={() => setShowNoLocationDrawer(!showNoLocationDrawer)}
+                        className="text-[11px] font-bold text-amber-800 hover:underline"
+                      >
+                        {showNoLocationDrawer ? 'Hide List' : 'View List'}
+                      </button>
+                    </div>
+
+                    {showNoLocationDrawer && (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
+                        {mapNoLocationComplaints.map((comp) => (
+                          <div key={comp.id} className="p-2.5 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
+                            <div>
+                              <span className="font-mono font-bold text-emerald-800 text-[11px] block">{comp.complaint_number}</span>
+                              <span className="font-semibold text-gray-900 truncate max-w-[180px] block">{comp.title}</span>
+                            </div>
+
+                            <button
+                              onClick={() => setDetailModalComplaint(comp)}
+                              className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-[10px] rounded-lg"
+                            >
+                              Inspect
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
               </div>
-            )}
+
+            </div>
+
+          </div>
+        ) : isOverdue ? (
+          /* B. DEPARTMENT HEAD → OVERDUE TASKS PAGE */
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-3.5 text-center space-y-1 bg-rose-50/50">
+                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Total Overdue</span>
+                <span className="text-xl font-extrabold text-rose-900 font-mono block">{overdueMetrics.totalOverdue}</span>
+              </div>
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
+                <span className="text-xl font-extrabold text-rose-700 font-mono block">{overdueMetrics.critical}</span>
+              </div>
+            </div>
           </div>
         ) : isCompleted ? (
-          /* B. DEPARTMENT HEAD → COMPLETED TASKS PAGE */
+          /* C. DEPARTMENT HEAD → COMPLETED TASKS PAGE */
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-3.5 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Completed</span>
                 <span className="text-xl font-extrabold text-gray-900 font-mono block">{completedMetrics.total}</span>
               </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
-                <span className="text-xl font-extrabold text-purple-700 font-mono block">{completedMetrics.pendingReview}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Approved</span>
-                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{completedMetrics.approved}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Rework Required</span>
-                <span className="text-xl font-extrabold text-amber-700 font-mono block">{completedMetrics.reworkRequired}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed Today</span>
-                <span className="text-xl font-extrabold text-blue-700 font-mono block">{completedMetrics.completedToday}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed This Week</span>
-                <span className="text-xl font-extrabold text-cyan-700 font-mono block">{completedMetrics.completedThisWeek}</span>
-              </div>
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Avg Resolution Time</span>
-                <span className="text-xl font-extrabold text-emerald-800 font-mono block">{completedMetrics.avgResolutionTime}</span>
-              </div>
             </div>
           </div>
         ) : isInProgress ? (
-          /* C. DEPARTMENT HEAD → IN PROGRESS PAGE */
+          /* D. DEPARTMENT HEAD → IN PROGRESS PAGE */
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
                 <span className="text-2xl font-extrabold text-amber-700 font-mono block">{inProgressMetrics.total}</span>
               </div>
-              <div className="p-4 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Department</span>
-                <span className="text-2xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
-              </div>
-              <div className="p-4 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">High Priority</span>
-                <span className="text-2xl font-extrabold text-orange-700 font-mono block">{inProgressMetrics.highPriority}</span>
-              </div>
-              <div className="p-4 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Critical</span>
-                <span className="text-2xl font-extrabold text-rose-800 font-mono block">{inProgressMetrics.critical}</span>
-              </div>
-              <div className="p-4 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Today / Overdue</span>
-                <span className="text-2xl font-extrabold text-rose-700 font-mono block">
-                  {inProgressMetrics.dueToday + inProgressMetrics.overdue}
-                </span>
-              </div>
             </div>
           </div>
         ) : isStaffDetailView && selectedStaffProfile ? (
-          /* D. STAFF PROFILE DETAIL VIEW */
+          /* E. STAFF PROFILE DETAIL VIEW */
           <div className="space-y-6">
             <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
               <div className="flex items-center space-x-4">
@@ -1279,7 +1297,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             </div>
           </div>
         ) : isStaffView ? (
-          /* E. DEPARTMENT HEAD → STAFF ROSTER PAGE */
+          /* F. DEPARTMENT HEAD → STAFF ROSTER PAGE */
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-3.5 text-center space-y-1">
@@ -1289,14 +1307,14 @@ export const DepartmentHeadPortal: React.FC = () => {
             </div>
           </div>
         ) : isAssignWorkspace ? (
-          /* F. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE */
+          /* G. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE */
           <div className="space-y-6">
             <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex items-center justify-between">
               <h2 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">Task Assignment Workspace</h2>
             </div>
           </div>
         ) : (
-          /* G. DEFAULT COMPLAINTS TABLE VIEW */
+          /* H. DEFAULT COMPLAINTS TABLE VIEW */
           <div className="space-y-4">
             <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
               <table className="w-full text-left border-collapse text-xs">
@@ -1402,7 +1420,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2">
                   <RotateCcw className="w-5 h-5 text-amber-600" />
-                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Reassign Overdue Task to Service Staff</h3>
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Reassign Task to Service Staff</h3>
                 </div>
                 <button onClick={() => setReassignModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
@@ -1478,7 +1496,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <FileText className="w-5 h-5 text-emerald-600" />
                   <h3 className="font-extrabold text-gray-900 font-outfit text-base">
-                    Task Details & Overdue Audit (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
+                    Task Details & GIS Audit (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
                   </h3>
                 </div>
                 <button onClick={() => setDetailModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -1530,7 +1548,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
 
               {/* LOCATION & SLA DETAILS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700 font-medium p-3.5 bg-rose-50/50 rounded-xl border border-rose-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700 font-medium p-3.5 bg-slate-50 rounded-xl border border-gray-200">
                 <div>
                   <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Location Address</span>
                   <span>{detailModalComplaint.location_address || 'Nashik Service Area'}</span>
@@ -1544,8 +1562,10 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <span className="font-mono text-rose-700 font-bold">{detailModalComplaint.sla_deadline ? new Date(detailModalComplaint.sla_deadline).toLocaleString() : 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Overdue Duration</span>
-                  <span className="font-mono text-rose-900 font-extrabold">{getOverdueDetails(detailModalComplaint.sla_deadline, now).text}</span>
+                  <span className="text-[10px] font-mono text-gray-500 uppercase block font-bold">Coordinates</span>
+                  <span className="font-mono text-gray-900">
+                    {detailModalComplaint.latitude && detailModalComplaint.longitude ? `${detailModalComplaint.latitude.toFixed(4)}, ${detailModalComplaint.longitude.toFixed(4)}` : 'Location Not Verified'}
+                  </span>
                 </div>
               </div>
 
