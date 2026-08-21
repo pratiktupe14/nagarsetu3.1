@@ -142,6 +142,37 @@ export async function getStaffTasks(staffId?: string, departmentName?: string): 
   });
 }
 
+// Fetch complaints belonging to a specific department from Supabase
+export async function getDepartmentComplaints(departmentId?: string, departmentName?: string): Promise<Complaint[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      let query = supabase.from('complaints').select('*');
+      if (departmentId) {
+        query = query.eq('department_id', departmentId);
+      } else if (departmentName && departmentName !== 'All') {
+        const cleanDept = departmentName.split('(')[0].trim();
+        query = query.or(`department_name.ilike.%${cleanDept}%,category.ilike.%${cleanDept}%`);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        return data as Complaint[];
+      }
+    } catch (err) {
+      console.warn('Supabase getDepartmentComplaints fallback:', err);
+    }
+  }
+
+  const all = getStoredComplaints();
+  const cleanHeadDept = (departmentName || '').split('(')[0].trim().toLowerCase();
+  return all.filter((c) => {
+    if (departmentId && c.department_id === departmentId) return true;
+    const cDept = (c.department_name || '').toLowerCase();
+    const cCat = (c.category || '').toLowerCase();
+    return cDept.includes(cleanHeadDept) || cleanHeadDept.includes(cDept) || cCat.includes(cleanHeadDept);
+  });
+}
+
 export async function getComplaintById(idOrNumber: string): Promise<Complaint | null> {
   if (isSupabaseConfigured()) {
     try {

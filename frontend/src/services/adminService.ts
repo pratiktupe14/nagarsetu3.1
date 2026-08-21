@@ -2,6 +2,7 @@ import { Complaint, ComplaintActivityLog, DepartmentStaffMember, AdminKPIStats, 
 import { getStoredComplaints, saveStoredComplaints } from './complaintService';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const LOCAL_STORAGE_ACTIVITY_LOGS_KEY = 'nagarsetu_activity_logs_v5';
 
@@ -170,6 +171,45 @@ export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
     } catch (e) {}
   }
   return [];
+}
+
+export async function getDepartmentServiceStaff(departmentId?: string, departmentName?: string): Promise<ServiceStaffMemberRecord[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      let query = supabase.from('profiles').select('*').eq('role', 'service_staff');
+      if (departmentId) {
+        query = query.eq('department_id', departmentId);
+      } else if (departmentName) {
+        const cleanDept = departmentName.split('(')[0].trim();
+        query = query.ilike('department_name', `%${cleanDept}%`);
+      }
+      const { data, error } = await query;
+      if (!error && data && Array.isArray(data) && data.length > 0) {
+        return data.map((p: any) => ({
+          id: p.id,
+          name: p.full_name || p.name || 'Staff Member',
+          employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
+          department_name: p.department_name || departmentName || 'Public Works Department (PWD)',
+          role: 'Service Staff',
+          status: p.status || 'Available',
+          contact_number: p.phone_number || '+91 98220 00000',
+          email: p.email || 'staff@nagarsetu.gov.in',
+          ward_area: p.ward_area || 'Nashik City',
+          joined_date: p.created_at || new Date().toISOString(),
+          created_at: p.created_at || new Date().toISOString()
+        }));
+      }
+    } catch (e) {
+      console.warn('Supabase fetch staff error:', e);
+    }
+  }
+
+  const all = getAllServiceStaffRecords();
+  const cleanHeadDept = (departmentName || '').split('(')[0].trim().toLowerCase();
+  return all.filter((s) => {
+    const sDept = (s.department_name || '').toLowerCase();
+    return sDept.includes(cleanHeadDept) || cleanHeadDept.includes(sDept);
+  });
 }
 
 export function saveServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
