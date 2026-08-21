@@ -31,6 +31,8 @@ import { AdminInProgressComplaintsPage } from './pages/admin/AdminInProgressComp
 import { AdminResolvedComplaintsPage } from './pages/admin/AdminResolvedComplaintsPage';
 import { AdminOverdueComplaintsPage } from './pages/admin/AdminOverdueComplaintsPage';
 import { AdminDepartmentsPage } from './pages/admin/AdminDepartmentsPage';
+import { AdminDepartmentHeadsPage } from './pages/admin/AdminDepartmentHeadsPage';
+import { AdminDepartmentDashboardPage } from './pages/admin/AdminDepartmentDashboardPage';
 import { AdminStaffPage } from './pages/admin/AdminStaffPage';
 import { AdminCityMapPage } from './pages/admin/AdminCityMapPage';
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
@@ -234,6 +236,24 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['city_admin']}>
                   <AdminDepartmentsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/department-heads"
+              element={
+                <ProtectedRoute allowedRoles={['city_admin']}>
+                  <AdminDepartmentHeadsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/departments/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['city_admin']}>
+                  <AdminDepartmentDashboardPage />
                 </ProtectedRoute>
               }
             />

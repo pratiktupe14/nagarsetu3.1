@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import {
   Home, FileText, PlusCircle, MapPin, Bell, User, Settings, HelpCircle, Info,
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
-  CheckCircle2, AlertTriangle, LogOut
+  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -85,6 +85,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'OPERATIONS',
       items: [
         { label: t('departments'), path: '/admin/departments', icon: Building2 },
+        { label: t('departmentHeads') || 'Department Heads', path: '/admin/department-heads', icon: UserCheck },
+        { label: t('departmentDashboard') || 'Department Dashboard', path: '/admin/departments/dashboard', icon: LayoutDashboard },
         { label: t('serviceStaff'), path: '/admin/staff', icon: Users },
         { label: t('cityMap'), path: '/admin/map', icon: Map }
       ]

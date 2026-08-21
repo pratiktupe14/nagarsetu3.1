@@ -105,6 +105,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     resolved: "Resolved",
     overdue: "Overdue",
     departments: "Departments",
+    departmentHeads: "Department Heads",
+    departmentDashboard: "Department Dashboard",
     serviceStaff: "Service Staff",
     cityMap: "City Map",
     analytics: "Analytics",
