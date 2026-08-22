@@ -57,7 +57,7 @@ export const VALID_TAXONOMY_MAP: Record<CivicCategory, { department: string; def
   }
 };
 
-const AI_ANALYSIS_CACHE_KEY = 'nagarsetu_gemini_analysis_cache_v2';
+const AI_ANALYSIS_CACHE_KEY = 'nagarsetu_gemini_analysis_cache_v4';
 
 function getAnalysisCache(): Record<string, AIVisionResult> {
   try {
@@ -73,7 +73,7 @@ function setAnalysisCache(key: string, result: AIVisionResult) {
     const cache = getAnalysisCache();
     cache[key] = result;
     localStorage.setItem(AI_ANALYSIS_CACHE_KEY, JSON.stringify(cache));
-  } catch (e) { }
+  } catch (e) {}
 }
 
 export async function computeImageHash(file: File): Promise<string> {
@@ -158,9 +158,6 @@ export async function fileToBase64(file: File | string): Promise<string> {
   });
 }
 
-/**
- * Extracts visual features for similarity check
- */
 export async function extractVisualFeatures(imageInput: File | string): Promise<VisualFeatures> {
   try {
     const img = await loadImage(imageInput);
@@ -316,7 +313,43 @@ export function compareImageSimilarity(
 }
 
 /**
- * Calls Python AI Microservice (port 8000) directly with actual image File bytes
+ * 1. Calls Express Backend API (/api/ai/analyze) on port 5000
+ */
+async function callExpressBackendAiAnalyze(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('photo', file, file.name);
+
+  // Try relative endpoint first (Vite proxy)
+  try {
+    const res = await fetch('/api/ai/analyze', {
+      method: 'POST',
+      body: formData
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.ai) return json.ai;
+      if (json.ai) return json.ai;
+    }
+  } catch (err) {}
+
+  // Direct localhost:5000 fallback
+  const directRes = await fetch('http://localhost:5000/api/ai/analyze', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!directRes.ok) {
+    const errText = await directRes.text();
+    throw new Error(`Express Backend API returned status ${directRes.status}: ${errText}`);
+  }
+
+  const json = await directRes.json();
+  if (json.error && !json.ai) throw new Error(json.error);
+  return json.ai || json;
+}
+
+/**
+ * 2. Calls Python AI Microservice (http://localhost:8000/analyze)
  */
 async function callPythonAiServiceDirect(file: File): Promise<any> {
   const formData = new FormData();
@@ -328,14 +361,14 @@ async function callPythonAiServiceDirect(file: File): Promise<any> {
   });
 
   if (!res.ok) {
-    throw new Error(`Python AI service returned ${res.status}`);
+    throw new Error(`Python AI service returned status ${res.status}`);
   }
 
   return await res.json();
 }
 
 /**
- * Calls Supabase Edge Function directly with base64 image data
+ * 3. Calls Supabase Edge Function with base64 image data
  */
 async function callGeminiVisionEdgeFunction(file: File): Promise<any> {
   if (!isSupabaseConfigured()) return null;
@@ -357,7 +390,7 @@ async function callGeminiVisionEdgeFunction(file: File): Promise<any> {
 }
 
 /**
- * Main Civic Image Classifier executing real Gemini Vision API via microservice or edge function
+ * Main Civic Image Classifier executing real Gemini Vision API via Node Express backend
  */
 export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
   const startTime = performance.now();
@@ -372,27 +405,40 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
   const visualFeatures = await extractVisualFeatures(file);
 
   let rawRes: any = null;
+  let lastErrorMsg: string | null = null;
 
-  // 1. Try Python FastAPI microservice (port 8000)
+  // Layer 1: Call Express Backend API (/api/ai/analyze on port 5000)
   try {
-    rawRes = await callPythonAiServiceDirect(file);
-  } catch (err) {
-    console.log('[NAGARSETU AI] Python service unavailable, trying Supabase Edge Function...', err);
+    rawRes = await callExpressBackendAiAnalyze(file);
+  } catch (err: any) {
+    lastErrorMsg = err.message || 'Express Backend AI error';
+    console.log('[NAGARSETU AI] Express Backend API error, trying Python service...', lastErrorMsg);
   }
 
-  // 2. Try Supabase Edge Function
-  if (!rawRes) {
+  // Layer 2: Call Python FastAPI microservice (http://localhost:8000/analyze)
+  if (!rawRes || rawRes.error) {
+    try {
+      rawRes = await callPythonAiServiceDirect(file);
+    } catch (err: any) {
+      if (!lastErrorMsg) lastErrorMsg = err.message;
+      console.log('[NAGARSETU AI] Python service unavailable, trying Supabase Edge Function...', err.message);
+    }
+  }
+
+  // Layer 3: Call Supabase Edge Function
+  if (!rawRes || rawRes.error) {
     try {
       rawRes = await callGeminiVisionEdgeFunction(file);
-    } catch (err) {
-      console.log('[NAGARSETU AI] Supabase Edge Function unavailable...', err);
+    } catch (err: any) {
+      if (!lastErrorMsg) lastErrorMsg = err.message;
+      console.log('[NAGARSETU AI] Supabase Edge Function unavailable...', err.message);
     }
   }
 
   const endTime = performance.now();
 
   // If real Gemini response obtained:
-  if (rawRes && rawRes.category) {
+  if (rawRes && rawRes.category && !rawRes.error) {
     const rawCategory = rawRes.category as CivicCategory;
     const category: CivicCategory = (CIVIC_CATEGORIES as readonly string[]).includes(rawCategory)
       ? rawCategory
@@ -429,29 +475,31 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
     return result;
   }
 
-  // If AI is offline or unreachable: Return explicit manual entry request (no fake Pothole defaults!)
-  const fallbackResult: AIVisionResult = {
+  // If AI is offline or error occurred: Return explicit diagnostic error information
+  const errorReason = rawRes?.error || lastErrorMsg || 'Express Backend server on port 5000 is not running or unreachable.';
+  
+  const errorResult: AIVisionResult = {
     mode: 'production',
     analysis_id: crypto.randomUUID(),
     image_hash: imageHash,
     category: 'Other Civic Issue',
-    issue_type: 'AI Vision Analysis Unavailable',
+    issue_type: 'AI Vision Analysis Failed',
     confidence: 0.0,
     confidence_level: 'Low',
     priority: 'Medium',
     department: 'Public Works Department (PWD)',
-    title: 'AI Analysis Unavailable',
-    description: 'AI Vision is unreachable. Please review the photo and select category & details manually.',
+    title: 'AI Analysis Failed',
+    description: `Gemini AI Analysis: ${errorReason}`,
     visual_features: visualFeatures,
     detected_objects: [],
     quality_check: {
       isUsable: true,
-      warning: 'AI service offline. Please fill complaint details manually.',
+      warning: `AI Service Warning: ${errorReason}`,
       brightness: visualFeatures.brightness,
       contrast: visualFeatures.contrast
     },
     analysis_time_ms: Math.round(endTime - startTime)
   };
 
-  return fallbackResult;
+  return errorResult;
 }
