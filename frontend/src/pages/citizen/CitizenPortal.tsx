@@ -157,7 +157,7 @@ export const CitizenPortal: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              Good Morning, {user?.full_name || 'Demo Citizen'}
+              Good Morning, {user?.full_name || 'Citizen'}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
               Report civic issues and help make your city better. Status changes sync live in real time.
@@ -229,9 +229,9 @@ export const CitizenPortal: React.FC = () => {
               <div className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center mx-auto border border-gray-200">
                 <FileText className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-gray-900 font-outfit">No complaints yet</h3>
+              <h3 className="text-base font-bold text-gray-900 font-outfit">No complaints reported yet.</h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                Help improve your municipal ward by reporting potholes, uncollected garbage, water leaks, or broken streetlights.
+                You haven't submitted any complaints yet. Report a civic issue to get started.
               </p>
               <Link
                 to="/citizen/report"
@@ -250,11 +250,18 @@ export const CitizenPortal: React.FC = () => {
                 >
                   <div className="space-y-3">
                     <div className="relative rounded-xl overflow-hidden h-40 bg-gray-100 border border-gray-200">
-                      <img
-                        src={comp.photo_before_url}
-                        alt={comp.title}
-                        className="w-full h-full object-cover"
-                      />
+                      {comp.photo_before_url ? (
+                        <img
+                          src={comp.photo_before_url}
+                          alt={comp.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
+                          <FileText className="w-6 h-6 text-gray-300" />
+                          <span className="text-[11px] font-semibold text-gray-400">No image available</span>
+                        </div>
+                      )}
                       <div className="absolute top-2 left-2">
                         <StatusBadge status={comp.status} />
                       </div>

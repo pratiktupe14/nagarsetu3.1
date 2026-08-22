@@ -557,11 +557,17 @@ export const NearbyIssuesPage: React.FC = () => {
                         <div className="text-xs font-sans space-y-2 max-w-[220px]">
                           {/* POPUP PREVIEW IMAGE */}
                           <div className="relative rounded-lg overflow-hidden h-24 border border-gray-200">
-                            <img
-                              src={complaint.photo_before_url || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=60'}
-                              alt={complaint.title}
-                              className="w-full h-full object-cover"
-                            />
+                            {complaint.photo_before_url ? (
+                              <img
+                                src={complaint.photo_before_url}
+                                alt={complaint.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
+                                <span className="text-[10px] font-semibold text-gray-400">No image available</span>
+                              </div>
+                            )}
                             <div className="absolute top-1 left-1"><StatusBadge status={complaint.status} /></div>
                           </div>
 
@@ -690,12 +696,18 @@ export const NearbyIssuesPage: React.FC = () => {
                         )}
 
                         <div className="flex gap-3">
-                          <img
-                            src={complaint.photo_before_url || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=60'}
-                            alt={complaint.title}
-                            className="w-24 h-24 rounded-xl object-cover border border-gray-200 shrink-0"
-                            loading="lazy"
-                          />
+                          {complaint.photo_before_url ? (
+                            <img
+                              src={complaint.photo_before_url}
+                              alt={complaint.title}
+                              className="w-24 h-24 rounded-xl object-cover border border-gray-200 shrink-0"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-24 h-24 rounded-xl bg-gray-50 border border-gray-200 flex flex-col items-center justify-center text-gray-400 shrink-0 text-center p-1">
+                              <span className="text-[10px] font-semibold text-gray-400">No image available</span>
+                            </div>
+                          )}
 
                           <div className="space-y-1 flex-1 text-xs">
                             <div className="flex items-center justify-between">

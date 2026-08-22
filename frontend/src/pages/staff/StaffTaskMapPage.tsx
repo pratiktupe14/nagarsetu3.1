@@ -838,14 +838,26 @@ export const StaffTaskMapPage: React.FC = () => {
               {/* LOCATION INFORMATION */}
               <div className="space-y-2 text-xs">
                 <span className="font-bold text-gray-700 block">Site Address & Coordinates</span>
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5">
-                  <div className="flex items-center space-x-1.5">
-                    <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="font-bold text-gray-900">{detailModalTask.location_address || 'Municipal Zone'}</span>
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-1.5">
+                      <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-bold text-gray-900">{detailModalTask.location_address || 'Location unavailable'}</span>
+                    </div>
+                    <div className="font-mono text-[11px] text-gray-600">
+                      GPS Coordinates: {detailModalTask.latitude}, {detailModalTask.longitude}
+                    </div>
                   </div>
-                  <div className="font-mono text-[11px] text-gray-600">
-                    GPS Coordinates: {detailModalTask.latitude}, {detailModalTask.longitude}
-                  </div>
+
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${detailModalTask.latitude},${detailModalTask.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs flex items-center space-x-1.5 min-h-[44px]"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>Get Directions</span>
+                  </a>
                 </div>
               </div>
 

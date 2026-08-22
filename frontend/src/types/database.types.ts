@@ -51,6 +51,8 @@ export interface ImageSimilarityResult {
 
 export interface AIVisionResult {
   mode: AIMode;
+  analysis_id?: string;
+  image_hash?: string;
   category: string;
   issue_type?: string;
   confidence: number; // e.g. 0.94

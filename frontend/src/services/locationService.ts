@@ -77,10 +77,97 @@ function setGeocodeCache(key: string, data: { latitude: number; longitude: numbe
   } catch (e) {}
 }
 
+const BACKEND_MAPS_URL = 'http://localhost:5000/api/maps';
+const PYTHON_MAPS_URL = 'http://localhost:8000/google-maps';
+
+/**
+ * Reverse Geocoding using Google Maps API (Backend Python package integration)
+ */
+export async function reverseGeocodeGoogleMaps(
+  latitude: number,
+  longitude: number
+): Promise<{ formatted_address: string; is_within_service_area?: boolean } | null> {
+  if (latitude == null || longitude == null || isNaN(latitude) || isNaN(longitude)) return null;
+
+  // Try Express backend first, then Python microservice
+  try {
+    const res = await fetch(`${BACKEND_MAPS_URL}/reverse-geocode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK' && data.formatted_address) {
+        return { formatted_address: data.formatted_address, is_within_service_area: data.is_within_service_area };
+      }
+    }
+  } catch (e) {
+    try {
+      const pyRes = await fetch(`${PYTHON_MAPS_URL}/reverse-geocode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude, longitude })
+      });
+      if (pyRes.ok) {
+        const pyData = await pyRes.json();
+        if (pyData.status === 'OK' && pyData.formatted_address) {
+          return { formatted_address: pyData.formatted_address, is_within_service_area: pyData.is_within_service_area };
+        }
+      }
+    } catch (err) {}
+  }
+  return null;
+}
+
+/**
+ * Directions & Route Navigation using Google Maps API
+ */
+export async function getGoogleMapsDirections(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+  mode: string = 'driving'
+): Promise<{
+  distance_text?: string;
+  duration_text?: string;
+  navigation_url: string;
+  steps?: Array<{ instruction: string; distance: string; duration: string }>;
+}> {
+  const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=${mode}`;
+
+  try {
+    const res = await fetch(`${BACKEND_MAPS_URL}/directions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origin_latitude: originLat,
+        origin_longitude: originLng,
+        destination_latitude: destLat,
+        destination_longitude: destLng,
+        mode
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK') {
+        return {
+          distance_text: data.distance_text,
+          duration_text: data.duration_text,
+          navigation_url: data.navigation_url || fallbackUrl,
+          steps: data.steps || []
+        };
+      }
+    }
+  } catch (e) {}
+
+  return { navigation_url: fallbackUrl };
+}
+
 /**
  * Real Geocoding Service with Nashik Address Bias
- * Queries OpenStreetMap Nominatim API with normalized Nashik address.
- * Validates returned coordinates against Nashik service area bounds.
+ * Queries Google Maps API via backend Python client, with OpenStreetMap fallback.
  */
 export async function geocodeNashikAddress(
   rawAddress: string
@@ -93,7 +180,30 @@ export async function geocodeNashikAddress(
     return cache[normalizedKey];
   }
 
-  // Construct query biased to Nashik, Maharashtra, India
+  // 1. Try Google Maps Backend Geocoding API first
+  try {
+    const res = await fetch(`${BACKEND_MAPS_URL}/geocode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: rawAddress })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK' && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        const result = {
+          latitude: data.latitude,
+          longitude: data.longitude,
+          formatted_address: data.formatted_address || rawAddress
+        };
+        setGeocodeCache(normalizedKey, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn('Google Maps backend geocode note:', err);
+  }
+
+  // 2. OpenStreetMap Nominatim Fallback if Google Maps API key is unconfigured
   const queryAddress = rawAddress.toLowerCase().includes('nashik')
     ? `${rawAddress}, Maharashtra, India`
     : `${rawAddress}, Nashik, Maharashtra, India`;
@@ -433,20 +543,10 @@ export async function auditAndRepairComplaintLocations(
     const c = repairedComplaints[i];
     let address = (c.location_address || '').trim();
 
-    // 1. Detect and fix non-Nashik / placeholder addresses
-    if (!address || address.toLowerCase().includes('talsande') || address.toLowerCase().includes('kolhapur')) {
+    // Keep genuine location address without hardcoding fake defaults
+    if (address.toLowerCase().includes('talsande') || address.toLowerCase().includes('kolhapur')) {
       mismatchedCount++;
-      if (c.category === 'Water Leakage') {
-        address = 'Station Road, Nashik Road, Nashik';
-      } else if (c.category === 'Pothole') {
-        address = 'M.G. Road, Panchavati, Nashik City';
-      } else if (c.category === 'Overflowing Dustbin') {
-        address = 'Market Yard, Panchavati, Nashik City';
-      } else if (c.category === 'Streetlight') {
-        address = 'Gangapur Road, Nashik West';
-      } else {
-        address = 'Panchavati Main Road, Nashik City';
-      }
+      address = '';
     }
 
     const hasValidCoords =

@@ -13,20 +13,64 @@ export function generateComplaintNumber(): string {
   return `NS-${year}-${randomSeq}`;
 }
 
-const SEED_COMPLAINTS: Complaint[] = [];
+const LEGACY_STORAGE_KEYS = [
+  'nagarsetu_citizen_complaints_v3',
+  'nagarsetu_citizen_complaints',
+  'nagarsetu_complaints',
+  'nagarsetu_complaint_list',
+  'complaints'
+];
+
+/**
+ * Identifies if a complaint object is a demo/fake record
+ */
+export function isDemoComplaint(c: Partial<Complaint>): boolean {
+  if (!c) return true;
+  const num = (c.complaint_number || '').toLowerCase();
+  const title = (c.title || '').toLowerCase();
+  const addr = (c.location_address || '').toLowerCase();
+  const desc = (c.description || '').toLowerCase();
+
+  if (num.includes('000145') || num.includes('000128')) return true;
+  if (title.includes('garbage overflow near public market') || title.includes('severe asphalt pothole on m.g. road')) return true;
+  if (addr.includes('market yard road') || (addr.includes('m.g. road') && addr.includes('ward 12'))) return true;
+  if (desc.includes('solid waste accumulation requiring municipal sanitation clearance') || desc.includes('deep road crater causing traffic congestion')) return true;
+
+  return false;
+}
 
 export function getStoredComplaints(): Complaint[] {
+  // Purge legacy storage keys if present
+  LEGACY_STORAGE_KEYS.forEach((key) => {
+    if (key !== LOCAL_STORAGE_COMPLAINTS_KEY) {
+      try {
+        const legacyData = localStorage.getItem(key);
+        if (legacyData) {
+          localStorage.removeItem(key);
+        }
+      } catch (e) {}
+    }
+  });
+
   const data = localStorage.getItem(LOCAL_STORAGE_COMPLAINTS_KEY);
   if (data) {
     try {
-      return JSON.parse(data);
+      const parsed: Complaint[] = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        const clean = parsed.filter((c) => !isDemoComplaint(c));
+        if (clean.length !== parsed.length) {
+          saveStoredComplaints(clean);
+        }
+        return clean;
+      }
     } catch (e) {}
   }
   return [];
 }
 
 export function saveStoredComplaints(complaints: Complaint[]) {
-  localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(complaints));
+  const clean = complaints.filter((c) => !isDemoComplaint(c));
+  localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(clean));
 }
 
 // Upload image to Supabase storage bucket
@@ -66,8 +110,8 @@ export async function getAllComplaints(): Promise<Complaint[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        list = data as Complaint[];
+      if (!error && data) {
+        list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
       }
     } catch (err) {
       console.warn('Supabase getAllComplaints fallback:', err);
@@ -79,8 +123,9 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   }
 
   const { repairedComplaints } = await auditAndRepairComplaintLocations(list);
-  saveStoredComplaints(repairedComplaints);
-  return repairedComplaints;
+  const cleanList = repairedComplaints.filter((c) => !isDemoComplaint(c));
+  saveStoredComplaints(cleanList);
+  return cleanList;
 }
 
 // Fetch citizen complaints from Supabase
@@ -96,7 +141,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        return data as Complaint[];
+        return (data as Complaint[]).filter((c) => !isDemoComplaint(c));
       }
     } catch (err) {
       console.warn('Supabase getCitizenComplaints fallback:', err);
@@ -104,7 +149,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   }
 
   const all = getStoredComplaints();
-  return all.filter((c) => c.citizen_id === citizenId);
+  return all.filter((c) => c.citizen_id === citizenId && !isDemoComplaint(c));
 }
 
 // Fetch staff tasks from Supabase

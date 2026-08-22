@@ -162,11 +162,18 @@ export const ComplaintDetailPage: React.FC = () => {
               <div className="space-y-2">
                 <span className="text-xs font-bold text-gray-700 block">BEFORE (Reported Condition)</span>
                 <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 h-60">
-                  <img
-                    src={complaint.photo_before_url}
-                    alt="Before repair"
-                    className="w-full h-full object-cover"
-                  />
+                  {complaint.photo_before_url ? (
+                    <img
+                      src={complaint.photo_before_url}
+                      alt="Before repair"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-2">
+                      <ShieldCheck className="w-10 h-10 text-gray-300" />
+                      <span className="text-xs font-semibold text-gray-500">No image available</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

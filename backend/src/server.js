@@ -12,6 +12,7 @@ const staffRoutes = require('./routes/staff.routes');
 const adminRoutes = require('./routes/admin.routes');
 const departmentRoutes = require('./routes/department.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const mapsRoutes = require('./routes/maps.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/maps', mapsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'NAGARSETU Express Backend API', version: '1.0.0' });

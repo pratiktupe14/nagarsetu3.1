@@ -1,6 +1,5 @@
 // Supabase Edge Function: analyze-civic-image
-// Powered by Google Gemini 1.5/2.0 Vision API
-// Securely processes civic issue images without exposing Gemini API key to client
+// Powered by Google Gemini 3.6 Flash Vision API
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
@@ -9,20 +8,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CIVIC_CATEGORIES = [
-  'Road Damage / Pothole',
-  'Garbage / Waste',
-  'Overflowing Dustbin',
-  'Water Leakage',
-  'Drainage / Sewage Overflow',
-  'Broken Streetlight',
-  'Traffic Signal Damage',
-  'Damaged Public Infrastructure',
-  'Open Manhole',
-  'Fallen Tree / Obstruction',
-  'Roadside Encroachment',
-  'Other Civic Issue'
-];
+const VALID_TAXONOMY: Record<string, string> = {
+  'Road Damage / Pothole': 'Public Works Department (PWD)',
+  'Water Leakage / Pipeline': 'Water Supply & Sewerage',
+  'Garbage / Waste': 'Sanitation & Waste Management',
+  'Drainage / Sewage': 'Drainage & Sewage Department',
+  'Streetlight / Electrical': 'Electrical & Street Lighting',
+  'Traffic Infrastructure': 'Traffic Management Department',
+  'Public Infrastructure Damage': 'Public Works Department (PWD)',
+  'Other Civic Issue': 'Public Works Department (PWD)'
+};
+
+const SYSTEM_PROMPT = `You are the civic issue vision analyzer for NAGARSETU 3.0.
+Analyze ONLY the actual uploaded image.
+Do not infer the issue from the filename.
+Do not reuse previous analysis.
+Do not assume the issue is a pothole.
+Determine the physical civic problem visible in the image.
+
+If visible water is flowing from a broken pipe, damaged pipeline, leaking municipal water line, water ponding due to pipe break, or water infrastructure failure, classify it as:
+Water Leakage / Pipeline
+and recommend:
+Water Supply & Sewerage.
+
+If the image shows a pothole, crater, depression, pavement failure, or road surface damage without a water infrastructure failure, classify it as:
+Road Damage / Pothole
+and recommend:
+Public Works Department (PWD).
+
+If the image shows garbage, trash, solid waste, uncollected refuse, or overflowing litter bin, classify it as:
+Garbage / Waste
+and recommend:
+Sanitation & Waste Management.
+
+If the image shows overflowing drain, choked sewer, clogged gutter, open manhole shaft, or stagnant wastewater, classify it as:
+Drainage / Sewage
+and recommend:
+Drainage & Sewage Department.
+
+If the image shows non-functional, broken or damaged streetlight, lamp post, or electrical fixture, classify it as:
+Streetlight / Electrical
+and recommend:
+Electrical & Street Lighting.
+
+If the image shows damaged traffic light, broken signal pole, junction light malfunction, classify it as:
+Traffic Infrastructure
+and recommend:
+Traffic Management Department.
+
+If the image shows damaged public footpath pavers, broken curb, or public railing damage, classify it as:
+Public Infrastructure Damage
+and recommend:
+Public Works Department (PWD).
+
+If evidence is insufficient or unreadable, return:
+Other Civic Issue
+with low confidence score.
+
+Never invent visual details that are not visible.
+
+Respond ONLY with a valid JSON object matching this structure:
+{
+  "is_civic_issue": true,
+  "category": "One of: Road Damage / Pothole, Water Leakage / Pipeline, Garbage / Waste, Drainage / Sewage, Streetlight / Electrical, Traffic Infrastructure, Public Infrastructure Damage, Other Civic Issue",
+  "title": "Short practical complaint title (e.g. Municipal Water Pipeline Leakage)",
+  "description": "Factual description based strictly on visible evidence.",
+  "severity": "LOW or MEDIUM or HIGH or CRITICAL",
+  "priority": "Low or Medium or High or Critical",
+  "recommended_department": "Corresponding department from taxonomy",
+  "confidence": 0.0 to 1.0,
+  "detected_features": ["list", "of", "detected", "visual", "elements"],
+  "needs_manual_verification": false
+}`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -31,7 +88,7 @@ serve(async (req) => {
 
   try {
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    const GEMINI_VISION_MODEL = Deno.env.get('GEMINI_VISION_MODEL') || 'gemini-1.5-flash';
+    const GEMINI_VISION_MODEL = Deno.env.get('GEMINI_VISION_MODEL') || 'gemini-3.6-flash';
 
     if (!GEMINI_API_KEY) {
       return new Response(
@@ -48,7 +105,6 @@ serve(async (req) => {
     let base64Data = image_base64;
     let mimeType = mime_type;
 
-    // If image_url is provided, fetch image and convert to base64
     if (!base64Data && image_url) {
       const imgRes = await fetch(image_url);
       if (!imgRes.ok) {
@@ -71,30 +127,9 @@ serve(async (req) => {
       );
     }
 
-    // Clean up base64 prefix if present
     if (base64Data.includes('base64,')) {
       base64Data = base64Data.split('base64,')[1];
     }
-
-    // System prompt with strict JSON output formatting
-    const prompt = `You are NAGARSETU AI, an expert municipal computer vision classifier for civic defects.
-Analyze this civic issue photo and respond ONLY with a valid JSON object with the following structure:
-{
-  "is_civic_issue": true or false,
-  "category": "One of: ${CIVIC_CATEGORIES.join(', ')}",
-  "issue_type": "Specific concise title of the civic defect (e.g. Large Road Pothole)",
-  "confidence": 0.0 to 1.0 (realistic confidence based on clarity),
-  "severity": "Low" or "Medium" or "High" or "Critical",
-  "title": "Short practical complaint title (e.g. Severe Asphalt Pothole on Roadway)",
-  "description": "Factual description based strictly on visible evidence without making up unobservable facts.",
-  "recommended_department": "Corresponding municipal department name",
-  "visual_evidence": ["list", "of", "detected", "visual", "objects"],
-  "quality_check": {
-    "isUsable": true or false,
-    "warning": "Optional quality warning if blurry/dark/overexposed, otherwise null"
-  }
-}
-If the photo does not depict any municipal or civic issue, set "is_civic_issue": false and provide appropriate explanation.`;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -102,7 +137,7 @@ If the photo does not depict any municipal or civic issue, set "is_civic_issue":
       contents: [
         {
           parts: [
-            { text: prompt },
+            { text: SYSTEM_PROMPT },
             {
               inline_data: {
                 mime_type: mimeType,
@@ -137,6 +172,9 @@ If the photo does not depict any municipal or civic issue, set "is_civic_issue":
     }
 
     const parsedResult = JSON.parse(rawText);
+    const category = parsedResult.category in VALID_TAXONOMY ? parsedResult.category : 'Other Civic Issue';
+    parsedResult.category = category;
+    parsedResult.recommended_department = VALID_TAXONOMY[category];
 
     return new Response(
       JSON.stringify({
@@ -146,7 +184,7 @@ If the photo does not depict any municipal or civic issue, set "is_civic_issue":
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({
         error: error.message || 'Unknown Gemini Vision processing error',

@@ -221,8 +221,8 @@ export const MyComplaintsPage: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
               My Complaints
             </h1>
-            <p className="text-xs sm:text-sm text-gray-600">
-              Track and manage all your civic complaints in one place.
+            <p className="text-xs sm:text-sm text-gray-600 font-mono font-bold">
+              {totalCount} {totalCount === 1 ? 'complaint' : 'complaints'}
             </p>
           </div>
 
@@ -231,7 +231,7 @@ export const MyComplaintsPage: React.FC = () => {
             className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
           >
             <PlusCircle className="w-5 h-5" />
-            <span>+ Report Civic Issue</span>
+            <span>+ Report a Complaint</span>
           </Link>
         </div>
 
@@ -435,16 +435,34 @@ export const MyComplaintsPage: React.FC = () => {
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
               <FileText className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-extrabold text-gray-900 font-outfit">{t('noComplaintsFound')}</h3>
+            <h3 className="text-lg font-extrabold text-gray-900 font-outfit">
+              {activeTab === 'ALL'
+                ? 'No complaints reported yet.'
+                : activeTab === 'PENDING'
+                ? 'No pending complaints.'
+                : activeTab === 'IN PROGRESS'
+                ? 'No complaints currently in progress.'
+                : activeTab === 'RESOLVED'
+                ? 'No resolved complaints yet.'
+                : 'No reopened complaints.'}
+            </h3>
             <p className="text-xs text-gray-600 leading-relaxed">
-              Report a civic issue and help make your city cleaner and safer.
+              {activeTab === 'ALL'
+                ? "You haven't submitted any complaints yet."
+                : activeTab === 'PENDING'
+                ? "You don't have any complaints awaiting verification."
+                : activeTab === 'IN PROGRESS'
+                ? 'No staff assigned or ongoing repairs at this moment.'
+                : activeTab === 'RESOLVED'
+                ? 'No complaints have been marked resolved yet.'
+                : 'No complaints currently marked for re-inspection.'}
             </p>
             <Link
               to="/citizen/report"
               className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm transition-all min-h-[44px]"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>+ {t('reportComplaint')}</span>
+              <span>+ Report a Complaint</span>
             </Link>
           </div>
         ) : (
@@ -463,12 +481,19 @@ export const MyComplaintsPage: React.FC = () => {
                     
                     {/* ISSUE IMAGE (16/10 aspect ratio) */}
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
-                      <img
-                        src={c.photo_before_url || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=60'}
-                        alt={c.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      {c.photo_before_url ? (
+                        <img
+                          src={c.photo_before_url}
+                          alt={c.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
+                          <FileText className="w-8 h-8 text-gray-300" />
+                          <span className="text-xs font-semibold text-gray-400">No image available</span>
+                        </div>
+                      )}
                       <div className="absolute top-2 left-2">
                         <StatusBadge status={c.status} />
                       </div>
@@ -502,13 +527,17 @@ export const MyComplaintsPage: React.FC = () => {
                           <MapPin className="w-3.5 h-3.5 text-gray-400" />
                           <span>Location:</span>
                         </span>
-                        <span className="font-semibold text-gray-900 truncate max-w-[150px]">{c.location_address || 'City Area'}</span>
+                        <span className="font-semibold text-gray-900 truncate max-w-[150px]">{c.location_address || 'Location unavailable'}</span>
                       </div>
 
                       {/* GPS COORDINATES (MONOSPACE) */}
                       <div className="flex items-center justify-between text-gray-500 font-mono text-[10px]">
                         <span>Coordinates:</span>
-                        <span className="text-gray-700 font-bold">{Number(c.latitude).toFixed(4)}, {Number(c.longitude).toFixed(4)}</span>
+                        <span className="text-gray-700 font-bold">
+                          {c.latitude != null && c.longitude != null && !isNaN(Number(c.latitude)) && !isNaN(Number(c.longitude))
+                            ? `${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}`
+                            : 'Unavailable'}
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-between text-gray-700 pt-0.5">
@@ -516,7 +545,7 @@ export const MyComplaintsPage: React.FC = () => {
                           <Building2 className="w-3.5 h-3.5 text-gray-400" />
                           <span>Department:</span>
                         </span>
-                        <span className="font-semibold text-gray-900">{c.department_name || 'Public Works'}</span>
+                        <span className="font-semibold text-gray-900">{c.department_name || 'Unassigned'}</span>
                       </div>
 
                       <div className="flex items-center justify-between text-gray-700">
@@ -556,7 +585,7 @@ export const MyComplaintsPage: React.FC = () => {
                     </div>
 
                     {/* SLA RESOLUTION TIME OR OVERDUE WARNING */}
-                    {c.status !== 'Resolved' && (
+                    {c.status !== 'Resolved' && c.status !== 'Resolution Submitted' && c.sla_deadline && (
                       <div className="flex items-center justify-between text-xs pt-1 font-mono">
                         <span className="text-[11px] text-gray-500">Expected SLA:</span>
                         <span className={`text-[11px] font-bold ${slaInfo.isOverdue ? 'text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200' : 'text-gray-700'}`}>

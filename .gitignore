@@ -11,6 +11,14 @@ lerna-debug.log*
 node_modules
 **/node_modules
 
+# Python cache & temp files
+__pycache__/
+*.pyc
+ai_service/temp_extract/
+backend/uploads/
+backend/*.sqlite
+*.mjs
+
 # Build outputs
 dist
 dist-ssr

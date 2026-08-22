@@ -54,12 +54,18 @@ export const RelatedIssueCard: React.FC<RelatedIssueCardProps> = ({ item, onSupp
 
         {/* IMAGE & STATUS */}
         <div className="relative rounded-xl overflow-hidden h-32 bg-gray-100 border border-gray-200">
-          <img
-            src={complaint.photo_before_url || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=60'}
-            alt={complaint.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
+          {complaint.photo_before_url ? (
+            <img
+              src={complaint.photo_before_url}
+              alt={complaint.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
+              <span className="text-[10px] font-semibold text-gray-400">No image available</span>
+            </div>
+          )}
           <div className="absolute top-2 left-2">
             <StatusBadge status={complaint.status} />
           </div>

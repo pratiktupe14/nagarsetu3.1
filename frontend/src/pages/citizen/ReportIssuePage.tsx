@@ -9,6 +9,7 @@ import {
   detectCivicIssue,
   extractVisualFeatures,
   compareImageSimilarity,
+  checkAiHealth,
   CIVIC_CATEGORIES,
   CivicCategory
 } from '../../services/aiVisionService';
@@ -53,6 +54,13 @@ export const ReportIssuePage: React.FC = () => {
   const [analyzingAI, setAnalyzingAI] = useState(false);
   const [aiResult, setAiResult] = useState<AIVisionResult | null>(null);
   const [isManuallyEdited, setIsManuallyEdited] = useState(false);
+  const [aiHealth, setAiHealth] = useState<{ configured: boolean; model: string; reachable: boolean; error?: string | null } | null>(null);
+
+  React.useEffect(() => {
+    checkAiHealth().then((res) => {
+      setAiHealth(res);
+    });
+  }, []);
 
   // Citizen Editable Fields
   const [category, setCategory] = useState<CivicCategory>('Road Damage / Pothole');
@@ -71,31 +79,20 @@ export const ReportIssuePage: React.FC = () => {
 
   // Handle Primary Photo Upload / Capture
   const handlePhotoSelect = async (file: File) => {
+    // 1. Clear previous photo & AI state immediately
     setSelectedPhotoFile(file);
+    setAiResult(null);
+    setIsManuallyEdited(false);
+    setPrimaryFeatures(null);
+    setCategory('Road Damage / Pothole');
+    setTitle('');
+    setDescription('');
+    setPriority('High');
+    setDepartment('Public Works Department (PWD)');
+
     const url = URL.createObjectURL(file);
     setPhotoPreviewUrl(url);
     await runAIVisionAndLocation(file, url);
-  };
-
-  // Sample Photos
-  const handleSamplePhotoSelect = async (sampleUrl: string) => {
-    setPhotoPreviewUrl(sampleUrl);
-    setAnalyzingAI(true);
-    try {
-      const res = await detectCivicIssue(sampleUrl);
-      setAiResult(res);
-      setPrimaryFeatures(res.visual_features || null);
-      setCategory(res.category as CivicCategory);
-      setTitle(res.title);
-      setDescription(res.description);
-      setPriority(res.priority);
-      setDepartment(res.department);
-      runDuplicateCheck(lat, lng);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAnalyzingAI(false);
-    }
   };
 
   const runAIVisionAndLocation = async (file: File, url: string) => {
@@ -132,16 +129,17 @@ export const ReportIssuePage: React.FC = () => {
     }
 
     try {
-      const res = await detectCivicIssue(url);
+      // Pass actual uploaded File object to detectCivicIssue
+      const res = await detectCivicIssue(file);
       setAiResult(res);
       setPrimaryFeatures(res.visual_features || null);
-      setCategory(res.category as CivicCategory);
-      setTitle(res.title);
-      setDescription(res.description);
-      setPriority(res.priority);
-      setDepartment(res.department);
+      if (res.category) setCategory(res.category as CivicCategory);
+      if (res.title) setTitle(res.title);
+      if (res.description) setDescription(res.description);
+      if (res.priority) setPriority(res.priority);
+      if (res.department) setDepartment(res.department);
     } catch (err) {
-      console.error('AI error', err);
+      console.error('AI Vision Error:', err);
     } finally {
       setAnalyzingAI(false);
     }
@@ -289,9 +287,19 @@ export const ReportIssuePage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-3.5 py-2 rounded-full border border-emerald-200">
-            <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span>AI Computer Vision Active</span>
+          <div className={`flex items-center space-x-2 text-xs font-mono font-bold px-3.5 py-2 rounded-full border ${
+            aiHealth?.reachable
+              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+              : 'text-rose-700 bg-rose-50 border-rose-200'
+          }`}>
+            <Sparkles className={`w-4 h-4 ${aiHealth?.reachable ? 'text-emerald-600 animate-pulse' : 'text-rose-600'}`} />
+            <span>
+              {aiHealth?.reachable
+                ? `🟢 Gemini Vision Active (${aiHealth.model})`
+                : aiHealth?.configured
+                ? '🔴 AI Vision Offline (API Unreachable)'
+                : '🔴 AI Key Not Configured'}
+            </span>
           </div>
         </div>
 
@@ -404,6 +412,9 @@ export const ReportIssuePage: React.FC = () => {
                       setPrimaryFeatures(null);
                       setAiResult(null);
                       setAdditionalPhotos([]);
+                      setTitle('');
+                      setDescription('');
+                      setIsManuallyEdited(false);
                     }}
                     className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[44px]"
                   >
@@ -414,7 +425,36 @@ export const ReportIssuePage: React.FC = () => {
             )}
 
             {/* AI ANALYSIS RESULT CARD */}
-            {aiResult && (
+            {aiResult && aiResult.confidence === 0 ? (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-rose-900 font-outfit uppercase tracking-wider flex items-center space-x-1">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>AI Vision Analysis Failed</span>
+                  </span>
+                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded border text-rose-800 bg-white border-rose-200">
+                    Status: Analysis Unavailable
+                  </span>
+                </div>
+
+                <p className="text-rose-900 font-medium text-xs">
+                  {aiResult.description || 'AI service unavailable. Please review photo and fill complaint details manually.'}
+                </p>
+
+                {selectedPhotoFile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPhotoFile) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-white hover:bg-rose-100 text-rose-800 font-bold border border-rose-300 flex items-center justify-center space-x-1 min-h-[44px]"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Retry AI Analysis</span>
+                  </button>
+                )}
+              </div>
+            ) : aiResult && (
               <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-300 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold text-emerald-900 font-outfit uppercase tracking-wider flex items-center space-x-1">
