@@ -42,11 +42,11 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   },
   department_head: {
     id: 'demo-head-id-404',
-    full_name: 'Anil Kulkarni (PWD Head)',
-    email: 'pwd.head@nagarsetu.gov.in',
+    full_name: 'Department Head',
+    email: 'dept.head@nagarsetu.gov.in',
     role: 'department_head',
     department_name: 'Public Works Department (PWD)',
-    department_id: 'dept-pwd-001',
+    department_id: 'dept-pwd',
     language_pref: 'en'
   }
 };
@@ -82,30 +82,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const session = data?.session;
         if (session && session.user) {
           const authUser = session.user;
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authUser.id)
-            .single();
+          const userEmail = authUser.email || '';
 
-          const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', authUser.id)
-            .single();
+          const [profRes, roleRes, headRes] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle(),
+            supabase.from('user_roles').select('role').eq('user_id', authUser.id).maybeSingle(),
+            supabase.from('department_heads').select('*, departments(*)').or(`user_id.eq.${authUser.id},email.eq.${userEmail}`).eq('status', 'active').maybeSingle()
+          ]);
 
-          if (isMounted && profile) {
+          const profile = profRes.data;
+          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const deptHead = headRes.data;
+
+          if (isMounted) {
+            let role: UserRole = (userRole as UserRole) || 'citizen';
+            let deptId = profile?.department_id || deptHead?.department_id;
+            let deptName = profile?.department_name || deptHead?.departments?.name;
+
+            if (deptHead) {
+              role = 'department_head';
+              deptId = deptHead.department_id;
+              deptName = deptHead.departments?.name || deptName;
+            }
+
             const fetchedUser: UserProfile = {
-              id: profile.id,
-              full_name: profile.full_name || authUser.email?.split('@')[0] || 'User',
-              email: profile.email || authUser.email || '',
-              mobile: profile.mobile || '',
-              role: (userRole?.role as UserRole) || (authUser.user_metadata?.role as UserRole) || 'citizen',
-              department_id: profile.department_id,
-              department_name: profile.department_name || profile.department,
-              employee_id: profile.employee_id,
-              avatar_url: profile.avatar_url,
-              language_pref: profile.language_pref || 'en'
+              id: authUser.id,
+              full_name: deptHead?.name || profile?.full_name || authUser.email?.split('@')[0] || 'User',
+              email: userEmail,
+              mobile: deptHead?.phone || profile?.mobile || '',
+              role: role,
+              department_id: deptId,
+              department_name: deptName,
+              employee_id: deptHead?.employee_id || profile?.employee_id,
+              avatar_url: profile?.avatar_url,
+              language_pref: profile?.language_pref || 'en'
             };
             setUser(fetchedUser);
             localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
@@ -125,33 +135,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session && session.user) {
           const authUser = session.user;
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authUser.id)
-            .single();
+          const userEmail = authUser.email || '';
 
-          const { data: userRole } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', authUser.id)
-            .single();
+          const [profRes, roleRes, headRes] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle(),
+            supabase.from('user_roles').select('role').eq('user_id', authUser.id).maybeSingle(),
+            supabase.from('department_heads').select('*, departments(*)').or(`user_id.eq.${authUser.id},email.eq.${userEmail}`).eq('status', 'active').maybeSingle()
+          ]);
 
-          if (profile) {
-            const updatedUser: UserProfile = {
-              id: profile.id,
-              full_name: profile.full_name || 'User',
-              email: profile.email || authUser.email || '',
-              mobile: profile.mobile || '',
-              role: (userRole?.role as UserRole) || 'citizen',
-              department_id: profile.department_id,
-              department_name: profile.department_name || profile.department,
-              employee_id: profile.employee_id,
-              language_pref: profile.language_pref || 'en'
-            };
-            setUser(updatedUser);
-            localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+          const profile = profRes.data;
+          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const deptHead = headRes.data;
+
+          let role: UserRole = (userRole as UserRole) || 'citizen';
+          let deptId = profile?.department_id || deptHead?.department_id;
+          let deptName = profile?.department_name || deptHead?.departments?.name;
+
+          if (deptHead) {
+            role = 'department_head';
+            deptId = deptHead.department_id;
+            deptName = deptHead.departments?.name || deptName;
           }
+
+          const updatedUser: UserProfile = {
+            id: authUser.id,
+            full_name: deptHead?.name || profile?.full_name || 'User',
+            email: userEmail,
+            mobile: deptHead?.phone || profile?.mobile || '',
+            role: role,
+            department_id: deptId,
+            department_name: deptName,
+            employee_id: deptHead?.employee_id || profile?.employee_id,
+            language_pref: profile?.language_pref || 'en'
+          };
+          setUser(updatedUser);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
         }
       });
       authSubscription = res?.data?.subscription;
@@ -178,40 +196,99 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (identifier: string, password: string, targetRole: UserRole): Promise<boolean> => {
     setLoading(true);
     try {
+      const cleanEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : `${identifier.trim().toLowerCase()}@nagarsetu.gov.in`;
+
       if (isSupabaseConfigured()) {
+        // Check if user has an inactive department_head assignment with no active assignment
+        const { data: inactiveHead } = await supabase
+          .from('department_heads')
+          .select('*, departments(*)')
+          .eq('email', cleanEmail)
+          .eq('status', 'inactive')
+          .maybeSingle();
+
+        const { data: activeHead } = await supabase
+          .from('department_heads')
+          .select('*, departments(*)')
+          .eq('email', cleanEmail)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (inactiveHead && !activeHead) {
+          throw new Error("Your Department Head access has been deactivated. Please contact City Administration.");
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: identifier.includes('@') ? identifier : `${identifier}@nagarsetu.gov.in`,
+          email: cleanEmail,
           password: password || 'nagarsetu123'
         });
 
         if (!error && data?.user) {
           const authUser = data.user;
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authUser.id)
-            .single();
+          const [profRes, roleRes, headRes] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle(),
+            supabase.from('user_roles').select('role').eq('user_id', authUser.id).maybeSingle(),
+            supabase.from('department_heads').select('*, departments(*)').or(`user_id.eq.${authUser.id},email.eq.${cleanEmail}`).eq('status', 'active').maybeSingle()
+          ]);
+
+          const profile = profRes.data;
+          const deptHead = headRes.data;
+          const resolvedRole: UserRole = deptHead ? 'department_head' : (roleRes.data?.role as UserRole) || targetRole;
 
           const fetchedUser: UserProfile = {
             id: authUser.id,
-            full_name: profile?.full_name || authUser.email?.split('@')[0] || 'Authenticated User',
-            email: authUser.email || identifier,
-            mobile: profile?.mobile || '',
-            role: targetRole,
+            full_name: deptHead?.name || profile?.full_name || authUser.email?.split('@')[0] || 'Authenticated User',
+            email: authUser.email || cleanEmail,
+            mobile: deptHead?.phone || profile?.mobile || '',
+            role: resolvedRole,
+            department_id: deptHead?.department_id || profile?.department_id,
+            department_name: deptHead?.departments?.name || profile?.department_name,
+            employee_id: deptHead?.employee_id || profile?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };
           setUser(fetchedUser);
           localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
           return true;
         }
+
+        if (error) {
+          console.warn('Supabase signInWithPassword note:', error);
+          throw new Error(error.message || 'Authentication failed. Please check your credentials.');
+        }
+      }
+
+      // Query Supabase for active department head record matching cleanEmail
+      if (isSupabaseConfigured()) {
+        const { data: dhRow } = await supabase
+          .from('department_heads')
+          .select('*, departments(*)')
+          .eq('email', cleanEmail)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (dhRow) {
+          const dhUser: UserProfile = {
+            id: dhRow.user_id || `dh-${dhRow.id.slice(0, 8)}`,
+            full_name: dhRow.name,
+            email: cleanEmail,
+            mobile: dhRow.phone || '',
+            role: 'department_head',
+            department_id: dhRow.department_id,
+            department_name: dhRow.departments?.name || 'Municipal Department',
+            employee_id: dhRow.employee_id,
+            language_pref: 'en'
+          };
+          setUser(dhUser);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+          return true;
+        }
       }
 
       switchRole(targetRole);
       return true;
-    } catch (e) {
-      console.warn('Supabase Auth Login Fallback:', e);
-      switchRole(targetRole);
-      return true;
+    } catch (e: any) {
+      console.warn('Supabase Auth Login error:', e);
+      throw e;
     } finally {
       setLoading(false);
     }

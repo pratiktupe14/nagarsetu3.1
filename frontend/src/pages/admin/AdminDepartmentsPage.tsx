@@ -14,6 +14,8 @@ import {
   AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, X, Phone, Mail,
   Edit, Eye, Layers, Sparkles, Activity, Check, Clock, UserCheck, ShieldCheck
 } from 'lucide-react';
+import { getDepartmentHeads, getDepartments } from '../../services/departmentService';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 type SortField = 'name' | 'code' | 'staff_count' | 'pending' | 'in_progress' | 'resolved' | 'overdue' | 'performance';
 
@@ -62,10 +64,24 @@ export const AdminDepartmentsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const depts = getMunicipalDepartments();
-      setDepartments(depts);
+      const [headSummaries, compList] = await Promise.all([
+        getDepartmentHeads(),
+        getAllComplaints()
+      ]);
 
-      const compList = await getAllComplaints();
+      const mappedDepts: MunicipalDepartmentRecord[] = headSummaries.map((s) => ({
+        id: s.deptId,
+        name: s.deptName,
+        code: s.deptCode,
+        department_head: s.hasActiveHead ? s.headName : 'No Active Head',
+        contact_number: s.headPhone || '+91 98220 00000',
+        email: s.headEmail || 'head@nagarsetu.gov.in',
+        description: `${s.deptName} operations & infrastructure maintenance.`,
+        status: s.hasActiveHead ? 'Active' : 'Inactive',
+        created_at: new Date().toISOString()
+      }));
+
+      setDepartments(mappedDepts);
       setComplaints(compList);
     } catch (e) {
       console.error(e);
@@ -79,10 +95,27 @@ export const AdminDepartmentsPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // Subscribe to realtime updates
+  // Subscribe to realtime updates for complaints and department heads
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const channel = supabase
+      .channel('realtime_admin_departments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'department_heads' }, () => {
+        loadData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, () => {
+        loadData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   // Helper function to match complaint to department name
   const isComplaintInDept = useCallback((c: Complaint, deptName: string) => {

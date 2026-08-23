@@ -22,6 +22,9 @@ import {
   CheckSquare, BarChart2, PieChart, ShieldAlert
 } from 'lucide-react';
 
+import { getDepartmentHeads, DepartmentLeadershipSummary } from '../../services/departmentService';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+
 // Fix standard Leaflet marker icon asset issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -82,6 +85,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Map layer filter & search
@@ -92,8 +96,13 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const compList = await getAllComplaints();
+      const [compList, heads] = await Promise.all([
+        getAllComplaints(),
+        getDepartmentHeads()
+      ]);
+
       setComplaints(compList);
+      setHeadSummaries(heads);
 
       const staff = getAllServiceStaffRecords();
       setStaffMembers(staff);
@@ -114,6 +123,20 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const channel = supabase
+      .channel('realtime_admin_dept_dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'department_heads' }, () => {
+        loadData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   const now = new Date();
 
@@ -141,12 +164,15 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
     return SIX_MUNICIPAL_DEPARTMENTS.find((d) => d.id === selectedDeptId) || SIX_MUNICIPAL_DEPARTMENTS[0];
   }, [selectedDeptId]);
 
-  // Find Department Head Name
+  // Find Department Head Name dynamically from Supabase
   const currentDeptHeadName = useMemo(() => {
     if (selectedDeptId === 'all') return 'City Executive Leadership';
-    const headProf = profiles.find((p) => p.role === 'department_head' && (p.department_id === selectedDeptId || (p.department_name && p.department_name.toLowerCase().includes(currentDeptMeta.code.toLowerCase()))));
-    return headProf?.full_name || (currentDeptMeta.code === 'PWD' ? 'Anil Kulkarni' : currentDeptMeta.code === 'SAN' ? 'Dr. Anjali Patil' : currentDeptMeta.code === 'WTR' ? 'Er. Vikram Deshmukh' : 'Department Officer');
-  }, [profiles, selectedDeptId, currentDeptMeta]);
+    const match = headSummaries.find((s) => s.deptCode === currentDeptMeta.code || s.deptId === selectedDeptId);
+    if (match && match.hasActiveHead) {
+      return `${match.headName} (${match.headEmail})`;
+    }
+    return 'No Active Head';
+  }, [headSummaries, selectedDeptId, currentDeptMeta]);
 
   // Calculate Real Performance Metrics from Database Records
   const metrics = useMemo(() => {
@@ -198,8 +224,8 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
       const overdue = list.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < now).length;
       const resolved = list.filter((c) => c.status === 'Resolved').length;
       const resolutionRate = total > 0 ? `${((resolved / total) * 100).toFixed(0)}%` : '100%';
-      const headProf = profiles.find((p) => p.role === 'department_head' && (p.department_id === dept.id || (p.department_name && p.department_name.toLowerCase().includes(dept.code.toLowerCase()))));
-      const headName = headProf?.full_name || (dept.code === 'PWD' ? 'Anil Kulkarni' : dept.code === 'SAN' ? 'Dr. Anjali Patil' : dept.code === 'WTR' ? 'Er. Vikram Deshmukh' : 'Department Officer');
+      const match = headSummaries.find((s) => s.deptCode === dept.code || s.deptId === dept.id);
+      const headName = match && match.hasActiveHead ? match.headName : 'No Active Head';
 
       return {
         id: dept.id,
@@ -214,7 +240,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
         resolutionRate
       };
     });
-  }, [complaints, profiles, isComplaintMatch, now]);
+  }, [complaints, headSummaries, isComplaintMatch, now]);
 
   // Filter map plottable complaints
   const mapPlottableComplaints = useMemo(() => {

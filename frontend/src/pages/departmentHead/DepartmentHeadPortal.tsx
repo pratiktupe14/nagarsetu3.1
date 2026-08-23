@@ -142,13 +142,16 @@ const getDepartmentInfo = (departmentName: string) => {
 };
 
 const getWorkloadInfo = (activeTaskCount: number) => {
-  if (activeTaskCount <= 1) {
-    return { label: 'Low Workload', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  if (activeTaskCount === 0) {
+    return { label: 'LOW (Available)', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
   }
   if (activeTaskCount <= 3) {
-    return { label: 'Normal Workload', color: 'bg-blue-50 text-blue-800 border-blue-200' };
+    return { label: 'NORMAL', color: 'bg-blue-50 text-blue-800 border-blue-200' };
   }
-  return { label: 'High Workload', color: 'bg-rose-50 text-rose-800 border-rose-200' };
+  if (activeTaskCount <= 6) {
+    return { label: 'HIGH', color: 'bg-amber-50 text-amber-800 border-amber-200' };
+  }
+  return { label: 'OVERLOADED', color: 'bg-rose-50 text-rose-800 border-rose-200' };
 };
 
 // Calculate Overdue Duration & Urgency Indicator
@@ -213,7 +216,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Sub-routes & active view modes
   const currentPath = location.pathname;
-  const isDashboard = currentPath === '/department-head/portal';
+  const isDashboard = currentPath === '/department/portal' || currentPath === '/department-head/portal';
   const isComplaints = currentPath === '/department-head/complaints';
   const isAssign = currentPath.startsWith('/department-head/tasks/assign');
   const isAssignWorkspace = currentPath.startsWith('/department-head/tasks/assign');
@@ -229,14 +232,23 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Extract staff ID if viewing single staff member
   const staffIdFromPath = isStaffDetailView ? currentPath.split('/department-head/staff/')[1] : null;
 
+  const [activeHeadRecord, setActiveHeadRecord] = useState<any>(null);
+  const [isHeadActive, setIsHeadActive] = useState<boolean>(true);
+
   // Department Identity
-  const headName = user?.full_name || 'Anil Kulkarni';
-  const headDepartmentFull = user?.department_name || 'Public Works Department (PWD)';
+  const headName = activeHeadRecord?.name || user?.full_name || 'Department Head';
+  const headDepartmentFull = activeHeadRecord?.departments?.name || user?.department_name || 'Public Works Department (PWD)';
   const headDepartment = headDepartmentFull.split('(')[0].trim() || 'Department';
-  const headDeptId = user?.department_id || 'dept-pwd-001';
-  const headId = user?.id || 'head-001';
+  const headDeptId = activeHeadRecord?.department_id || user?.department_id || 'dept-pwd-001';
+  const headId = activeHeadRecord?.user_id || user?.id || 'head-001';
 
   const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull), [headDepartmentFull]);
+  const isSanitationDept = useMemo(() => {
+    return (deptInfo.shortName || '').toLowerCase().includes('sanitation') || (headDeptId || '').toLowerCase().includes('san') || (headDepartmentFull || '').toLowerCase().includes('waste');
+  }, [deptInfo, headDeptId, headDepartmentFull]);
+  const isElectricalDept = useMemo(() => {
+    return (deptInfo.shortName || '').toLowerCase().includes('electric') || (headDeptId || '').toLowerCase().includes('ele') || (headDepartmentFull || '').toLowerCase().includes('light');
+  }, [deptInfo, headDeptId, headDepartmentFull]);
 
   // Data States
   const [departmentComplaints, setDepartmentComplaints] = useState<Complaint[]>([]);
@@ -347,10 +359,41 @@ export const DepartmentHeadPortal: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const deptFilteredComplaints = await getDepartmentComplaints(headDeptId, headDepartmentFull);
+      let activeDeptId = headDeptId;
+      let activeDeptFull = headDepartmentFull;
+      let activeHeadId = headId;
+
+      if (isSupabaseConfigured() && user?.email) {
+        const { data: dhRow } = await supabase
+          .from('department_heads')
+          .select('*, departments(*)')
+          .or(`user_id.eq.${user.id},email.eq.${user.email.toLowerCase()}`)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (dhRow) {
+          setActiveHeadRecord(dhRow);
+          setIsHeadActive(true);
+          activeDeptId = dhRow.department_id;
+          activeDeptFull = dhRow.departments?.name || activeDeptFull;
+          activeHeadId = dhRow.user_id || activeHeadId;
+        } else {
+          const { data: anyDhRow } = await supabase
+            .from('department_heads')
+            .select('*')
+            .or(`user_id.eq.${user.id},email.eq.${user.email.toLowerCase()}`)
+            .maybeSingle();
+
+          if (anyDhRow && anyDhRow.status === 'inactive') {
+            setIsHeadActive(false);
+          }
+        }
+      }
+
+      const deptFilteredComplaints = await getDepartmentComplaints(activeDeptId, activeDeptFull);
       setDepartmentComplaints(deptFilteredComplaints);
 
-      const deptFilteredStaff = await getDepartmentServiceStaff(headDeptId, headDepartmentFull);
+      const deptFilteredStaff = await getDepartmentServiceStaff(activeDeptId, activeDeptFull);
       setDepartmentStaff(deptFilteredStaff);
 
       if (staffIdFromPath) {
@@ -358,7 +401,7 @@ export const DepartmentHeadPortal: React.FC = () => {
         setSelectedStaffProfile(staffObj);
       }
 
-      const notifs = getNotificationsForRole(headId, 'department_head');
+      const notifs = getNotificationsForRole(activeHeadId, 'department_head');
       setNotifications(notifs);
 
     } catch (err) {
@@ -367,7 +410,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [headDeptId, headDepartmentFull, headId, staffIdFromPath]);
+  }, [headDeptId, headDepartmentFull, headId, staffIdFromPath, user]);
 
   useEffect(() => {
     loadData();
@@ -376,6 +419,20 @@ export const DepartmentHeadPortal: React.FC = () => {
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const channel = supabase
+      .channel('realtime_dh_portal')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'department_heads' }, () => {
+        loadData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   const now = new Date();
 
@@ -538,6 +595,109 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     return { total, unassigned, assigned, inProgress, completedReviews, resolved, overdue, critical, staffCount };
   }, [departmentComplaints, departmentStaff, now]);
+
+  // Sanitation Department Operational Metrics (Derived from real DB complaint categories & statuses)
+  const sanitationMetrics = useMemo(() => {
+    const garbageComplaints = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('garbage')
+    ).length;
+
+    const overflowingDustbins = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('dustbin') || (c.title || '').toLowerCase().includes('dustbin')
+    ).length;
+
+    const wasteAccumulation = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('waste') || (c.title || '').toLowerCase().includes('accumulation')
+    ).length;
+
+    const publicDumping = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('dumping') || (c.title || '').toLowerCase().includes('dump')
+    ).length;
+
+    const collectionRequests = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('collection') || (c.title || '').toLowerCase().includes('collection')
+    ).length;
+
+    const pendingCleanup = departmentComplaints.filter((c) =>
+      c.status !== 'Resolved' && c.status !== 'Rejected'
+    ).length;
+
+    const completedCleanup = departmentComplaints.filter((c) =>
+      c.status === 'Resolved'
+    ).length;
+
+    const overdueCleanup = departmentComplaints.filter((c) => {
+      if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
+      return new Date(c.sla_deadline) < now;
+    }).length;
+
+    return {
+      garbageComplaints,
+      overflowingDustbins,
+      wasteAccumulation,
+      publicDumping,
+      collectionRequests,
+      pendingCleanup,
+      completedCleanup,
+      overdueCleanup
+    };
+  }, [departmentComplaints, now]);
+
+  // Electrical & Street Lighting Operational Metrics (Derived from real DB complaint records)
+  const electricalMetrics = useMemo(() => {
+    const brokenStreetlights = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('broken') || (c.title || '').toLowerCase().includes('broken streetlight')
+    ).length;
+
+    const streetlightOutages = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('outage') || (c.title || '').toLowerCase().includes('not working') || (c.title || '').toLowerCase().includes('flickering')
+    ).length;
+
+    const electricalPoleDamage = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('pole') || (c.title || '').toLowerCase().includes('pole')
+    ).length;
+
+    const exposedWiring = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('wiring') || (c.title || '').toLowerCase().includes('wire') || (c.description || '').toLowerCase().includes('exposed')
+    ).length;
+
+    const electricalHazards = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('hazard') || (c.title || '').toLowerCase().includes('spark') || c.priority === 'Critical'
+    ).length;
+
+    const lightingMaintenance = departmentComplaints.filter((c) =>
+      (c.category || '').toLowerCase().includes('maintenance') || (c.category || '').toLowerCase().includes('installation')
+    ).length;
+
+    const pendingRepairs = departmentComplaints.filter((c) =>
+      c.status !== 'Resolved' && c.status !== 'Rejected'
+    ).length;
+
+    const completedRepairs = departmentComplaints.filter((c) =>
+      c.status === 'Resolved'
+    ).length;
+
+    return {
+      brokenStreetlights,
+      streetlightOutages,
+      electricalPoleDamage,
+      exposedWiring,
+      electricalHazards,
+      lightingMaintenance,
+      pendingRepairs,
+      completedRepairs
+    };
+  }, [departmentComplaints]);
+
+  // Critical Electrical Safety Alerts (High-risk hazards: exposed live wire, fallen pole, sparks, critical priority)
+  const criticalElectricalSafetyAlerts = useMemo(() => {
+    return departmentComplaints.filter((c) => {
+      if (c.status === 'Resolved' || c.status === 'Rejected') return false;
+      const text = `${c.title} ${c.category} ${c.description}`.toLowerCase();
+      const isHighRiskHazard = text.includes('wire') || text.includes('pole') || text.includes('spark') || text.includes('hazard') || text.includes('exposed');
+      return c.priority === 'Critical' || (c.priority === 'High' && isHighRiskHazard);
+    });
+  }, [departmentComplaints]);
 
   // In-Progress Specific Metric Cards
   const inProgressMetrics = useMemo(() => {
@@ -1027,16 +1187,16 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
-  if (user?.status === 'Inactive' || user?.status === 'inactive') {
+  if (!isHeadActive || user?.status === 'Inactive' || user?.status === 'inactive') {
     return (
-      <DashboardLayout title="Account Inactive">
+      <DashboardLayout title="Leadership Account Inactive">
         <div className="p-8 max-w-md mx-auto my-16 bg-white border border-rose-200 rounded-2xl shadow-lg text-center space-y-4 font-sans">
           <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8" />
+            <ShieldAlert className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Account Inactive</h2>
+          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Department Leadership Inactive</h2>
           <p className="text-xs text-gray-600 leading-relaxed font-medium">
-            Your Department Head account has been deactivated by City Administration. Please contact Municipal Command Center for account reactivation.
+            Your Department Head account status is currently <strong>Inactive</strong> or unassigned to an active municipal department. Department Head portal access has been revoked.
           </p>
           <button
             onClick={async () => {
@@ -1595,28 +1755,391 @@ export const DepartmentHeadPortal: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* J. DEFAULT COMPLAINTS TABLE VIEW */
-          <div className="space-y-4">
-            <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                    <th className="p-3.5">Complaint ID</th>
-                    <th className="p-3.5">Title & Category</th>
-                    <th className="p-3.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredComplaints.map((comp) => (
-                    <tr key={comp.id}>
-                      <td className="p-3.5 font-mono text-emerald-700">{comp.complaint_number}</td>
-                      <td className="p-3.5">{comp.title}</td>
-                      <td className="p-3.5"><StatusBadge status={comp.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          /* J. MAIN DEPARTMENT DASHBOARD & COMPLAINTS DIRECTORY */
+          <div className="space-y-6">
+
+            {/* 1. PRIMARY STATISTICS CARDS (DERIVED FROM SUPABASE DB) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Complaints</span>
+                <span className="text-xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1 bg-amber-50/40">
+                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-outfit">Unassigned</span>
+                <span className="text-xl font-extrabold text-amber-900 font-mono block">{complaintMetrics.unassigned}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Assigned</span>
+                <span className="text-xl font-extrabold text-blue-700 font-mono block">{complaintMetrics.assigned}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
+                <span className="text-xl font-extrabold text-amber-600 font-mono block">{complaintMetrics.inProgress}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
+                <span className="text-xl font-extrabold text-purple-700 font-mono block">{complaintMetrics.completedReviews}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1 bg-rose-50/50">
+                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Overdue</span>
+                <span className="text-xl font-extrabold text-rose-900 font-mono block">{complaintMetrics.overdue}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1 bg-red-50/30">
+                <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block font-outfit">Critical Priority</span>
+                <span className="text-xl font-extrabold text-red-700 font-mono block">{complaintMetrics.critical}</span>
+              </div>
+
+              <div className="p-3.5 text-center space-y-1 bg-emerald-50/40">
+                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block font-outfit">Resolved</span>
+                <span className="text-xl font-extrabold text-emerald-700 font-mono block">{complaintMetrics.resolved}</span>
+              </div>
             </div>
+
+            {/* 2A. CRITICAL ELECTRICAL SAFETY ALERTS SECTION (WHEN ELECTRICAL DEPT & CRITICAL ALERTS EXIST) */}
+            {isElectricalDept && criticalElectricalSafetyAlerts.length > 0 && (
+              <div className="p-4 bg-red-50 border-2 border-red-400/80 rounded-2xl space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-red-900">
+                    <Zap className="w-5 h-5 text-red-600 animate-bounce" />
+                    <h3 className="text-xs font-extrabold font-outfit uppercase tracking-wider text-red-900">
+                      ⚠️ CRITICAL ELECTRICAL SAFETY ALERTS ({criticalElectricalSafetyAlerts.length})
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono font-extrabold bg-red-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    Immediate Action Required
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {criticalElectricalSafetyAlerts.slice(0, 6).map((alertComp) => (
+                    <div key={alertComp.id} className="p-3 bg-white border border-red-200 rounded-xl space-y-2 text-xs shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-red-700">{alertComp.complaint_number}</span>
+                        <PriorityBadge priority={alertComp.priority} />
+                      </div>
+                      <h4 className="font-extrabold text-gray-900 line-clamp-1">{alertComp.title}</h4>
+                      <p className="text-[11px] text-gray-600 line-clamp-2">{alertComp.description}</p>
+                      <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-[10px] text-gray-500">
+                        <span className="truncate max-w-[150px]">{alertComp.location_address || 'Nashik City'}</span>
+                        <button
+                          onClick={() => setDetailModalComplaint(alertComp)}
+                          className="px-2 py-0.5 bg-red-600 text-white font-extrabold rounded hover:bg-red-700 transition-colors"
+                        >
+                          View Hazard
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2B. ELECTRICAL-SPECIFIC OPERATIONAL METRICS ROW */}
+            {isElectricalDept && (
+              <div className="p-4 bg-amber-50/60 border border-amber-300/70 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-amber-900">
+                    <Zap className="w-4 h-4 text-yellow-600 fill-yellow-500" />
+                    <h3 className="text-xs font-extrabold font-outfit uppercase tracking-wider">
+                      Electrical & Street Lighting Operational Breakdown
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-amber-800 font-bold bg-white px-2 py-0.5 rounded border border-amber-200">
+                    Code: ELE
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Broken Streetlights</span>
+                    <span className="text-lg font-extrabold text-amber-900 font-mono block">{electricalMetrics.brokenStreetlights}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Lighting Outages</span>
+                    <span className="text-lg font-extrabold text-amber-900 font-mono block">{electricalMetrics.streetlightOutages}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Pole Damage</span>
+                    <span className="text-lg font-extrabold text-rose-800 font-mono block">{electricalMetrics.electricalPoleDamage}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Exposed Wiring</span>
+                    <span className="text-lg font-extrabold text-red-700 font-mono block">{electricalMetrics.exposedWiring}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Electrical Hazards</span>
+                    <span className="text-lg font-extrabold text-rose-900 font-mono block">{electricalMetrics.electricalHazards}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Lighting Maint.</span>
+                    <span className="text-lg font-extrabold text-blue-800 font-mono block">{electricalMetrics.lightingMaintenance}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Pending Repairs</span>
+                    <span className="text-lg font-extrabold text-amber-800 font-mono block">{electricalMetrics.pendingRepairs}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Completed Repairs</span>
+                    <span className="text-lg font-extrabold text-emerald-800 font-mono block">{electricalMetrics.completedRepairs}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2C. SANITATION-SPECIFIC OPERATIONAL METRICS ROW */}
+            {isSanitationDept && (
+              <div className="p-4 bg-amber-50/50 border border-amber-200/70 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-amber-900">
+                    <Trash2 className="w-4 h-4 text-amber-700" />
+                    <h3 className="text-xs font-extrabold font-outfit uppercase tracking-wider">
+                      Sanitation & Waste Operational Breakdown
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-amber-800 font-bold bg-white px-2 py-0.5 rounded border border-amber-200">
+                    Code: SAN
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Garbage</span>
+                    <span className="text-lg font-extrabold text-amber-900 font-mono block">{sanitationMetrics.garbageComplaints}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Overflow Dustbins</span>
+                    <span className="text-lg font-extrabold text-amber-900 font-mono block">{sanitationMetrics.overflowingDustbins}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Waste Accum.</span>
+                    <span className="text-lg font-extrabold text-amber-900 font-mono block">{sanitationMetrics.wasteAccumulation}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Public Dumping</span>
+                    <span className="text-lg font-extrabold text-rose-800 font-mono block">{sanitationMetrics.publicDumping}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Collection Req.</span>
+                    <span className="text-lg font-extrabold text-blue-800 font-mono block">{sanitationMetrics.collectionRequests}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Pending Cleanup</span>
+                    <span className="text-lg font-extrabold text-amber-800 font-mono block">{sanitationMetrics.pendingCleanup}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Completed Cleanup</span>
+                    <span className="text-lg font-extrabold text-emerald-800 font-mono block">{sanitationMetrics.completedCleanup}</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase block">Overdue Cleanup</span>
+                    <span className="text-lg font-extrabold text-rose-900 font-mono block">{sanitationMetrics.overdueCleanup}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. TOOLBAR FOR SEARCH & CATEGORY FILTERS */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isElectricalDept ? "Search electrical complaints by title, ID, location, or staff..." : "Search department complaints..."}
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                >
+                  <option value="All">{isElectricalDept ? 'All Electrical Categories' : isSanitationDept ? 'All Sanitation Categories' : 'All Categories'}</option>
+                  {isElectricalDept ? (
+                    <>
+                      <option value="Broken Streetlight">Broken Streetlight</option>
+                      <option value="Streetlight Not Working">Streetlight Not Working</option>
+                      <option value="Flickering Streetlight">Flickering Streetlight</option>
+                      <option value="Streetlight Damage">Streetlight Damage</option>
+                      <option value="Electrical Pole Damage">Electrical Pole Damage</option>
+                      <option value="Exposed Wiring">Exposed Wiring</option>
+                      <option value="Electrical Box Damage">Electrical Box Damage</option>
+                      <option value="Public Electrical Hazard">Public Electrical Hazard</option>
+                      <option value="Lighting Outage">Lighting Outage</option>
+                      <option value="Streetlight Installation">Streetlight Installation</option>
+                      <option value="Other Electrical Issue">Other Electrical Issue</option>
+                    </>
+                  ) : isSanitationDept ? (
+                    <>
+                      <option value="Garbage Overflow">Garbage Overflow</option>
+                      <option value="Overflowing Dustbin">Overflowing Dustbin</option>
+                      <option value="Waste Accumulation">Waste Accumulation</option>
+                      <option value="Illegal/Public Dumping">Illegal/Public Dumping</option>
+                      <option value="Garbage Collection">Garbage Collection</option>
+                      <option value="Waste Segregation">Waste Segregation</option>
+                      <option value="Public Sanitation">Public Sanitation</option>
+                      <option value="Other Waste Issue">Other Waste Issue</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Pothole Repair">Pothole Repair</option>
+                      <option value="Road Maintenance">Road Maintenance</option>
+                      <option value="Water Leakage">Water Leakage</option>
+                      <option value="Drain Cleaning">Drain Cleaning</option>
+                    </>
+                  )}
+                </select>
+
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                >
+                  <option value="All">All Priorities</option>
+                  <option value="Critical">Critical</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Unassigned">Unassigned</option>
+                  <option value="Assigned">Assigned</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolution Submitted">Pending Review</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+
+                {(searchQuery || categoryFilter !== 'All' || priorityFilter !== 'All' || statusFilter !== 'All') && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 4. COMPLAINTS TABLE OR EMPTY STATE */}
+            {filteredComplaints.length === 0 ? (
+              <div className="p-12 text-center bg-white border border-gray-200 rounded-2xl space-y-3">
+                {isElectricalDept ? (
+                  <Zap className="w-12 h-12 text-amber-500 mx-auto fill-amber-400" />
+                ) : isSanitationDept ? (
+                  <Trash2 className="w-12 h-12 text-amber-500 mx-auto" />
+                ) : (
+                  <Wrench className="w-12 h-12 text-emerald-600 mx-auto" />
+                )}
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">
+                  {isElectricalDept ? "No electrical complaints found." : isSanitationDept ? "No sanitation complaints found." : "No complaints found."}
+                </h3>
+                <p className="text-xs text-gray-500 font-medium max-w-sm mx-auto">
+                  {isElectricalDept ? "There are currently no active streetlight or electrical maintenance complaints matching your selected criteria." : isSanitationDept ? "There are currently no active waste or sanitation complaints matching your selected criteria." : "There are currently no complaints matching your selected criteria."}
+                </p>
+                <button
+                  onClick={loadData}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+                >
+                  Refresh Database State
+                </button>
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                      <th className="p-3.5">Complaint ID</th>
+                      <th className="p-3.5">Issue & Category</th>
+                      <th className="p-3.5">Location</th>
+                      <th className="p-3.5">Priority</th>
+                      <th className="p-3.5">Assigned SAN Staff</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredComplaints.map((comp) => (
+                      <tr key={comp.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-3.5 font-mono text-emerald-800 font-bold">
+                          {comp.complaint_number}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="font-extrabold text-gray-900 block">{comp.title}</span>
+                          <span className="text-[11px] text-gray-500 font-medium">{comp.category}</span>
+                        </td>
+                        <td className="p-3.5 text-gray-600 font-medium max-w-xs truncate">
+                          {comp.location_address || 'Nashik City'}
+                        </td>
+                        <td className="p-3.5">
+                          <PriorityBadge priority={comp.priority} />
+                        </td>
+                        <td className="p-3.5">
+                          {comp.assigned_staff_name ? (
+                            <span className="font-bold text-gray-800">{comp.assigned_staff_name}</span>
+                          ) : (
+                            <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3.5">
+                          <StatusBadge status={comp.status} />
+                        </td>
+                        <td className="p-3.5 text-right space-x-2">
+                          <button
+                            onClick={() => setDetailModalComplaint(comp)}
+                            className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px]"
+                          >
+                            View
+                          </button>
+                          {!comp.assigned_staff_id && comp.status !== 'Resolved' && (
+                            <button
+                              onClick={() => {
+                                setAssignModalComplaint(comp);
+                                setSelectedStaffForAssign('');
+                                setAssignError(null);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] shadow-2xs"
+                            >
+                              Assign Staff
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

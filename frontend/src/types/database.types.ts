@@ -99,6 +99,29 @@ export interface Department {
   created_at?: string;
 }
 
+export interface DepartmentHead {
+  id: string;
+  user_id: string;
+  department_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  employee_id: string;
+  designation?: string;
+  status: 'active' | 'inactive' | 'Active' | 'Inactive';
+  created_at?: string;
+  updated_at?: string;
+  // Optional joined metrics for UI
+  department_name?: string;
+  department_code?: string;
+  staff_count?: number;
+  active_tasks?: number;
+  open_complaints?: number;
+  overdue_tasks?: number;
+  completed_tasks?: number;
+  total_complaints?: number;
+}
+
 export interface Complaint {
   id: string;
   complaint_number: string; // e.g. NS-2026-100234

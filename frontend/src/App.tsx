@@ -376,6 +376,7 @@ export default function App() {
 
             {/* Department Head Protected Portal & Navigation Sub-routes */}
             {[
+              '/department/portal',
               '/department-head/portal',
               '/department-head/complaints',
               '/department-head/tasks/assign',

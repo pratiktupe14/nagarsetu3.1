@@ -532,3 +532,266 @@ export function logActivity(
   });
   localStorage.setItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY, JSON.stringify(all));
 }
+
+export interface DepartmentHeadSummary {
+  deptId: string;
+  deptName: string;
+  deptCode: string;
+  headId?: string;
+  userId?: string;
+  headName: string;
+  headEmail: string;
+  headPhone: string;
+  employeeId: string;
+  designation: string;
+  status: 'Active' | 'Inactive';
+  staffCount: number;
+  openComplaints: number;
+  activeTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  totalComplaints: number;
+  deptComplaints: Complaint[];
+  assignedStaff: ServiceStaffMemberRecord[];
+}
+
+export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHeadSummary[]> {
+  const now = new Date();
+
+  // Fetch departments, heads, staff profiles, complaints from Supabase
+  let departments: any[] = [];
+  let deptHeads: any[] = [];
+  let profiles: any[] = [];
+  let complaints: Complaint[] = [];
+
+  if (isSupabaseConfigured()) {
+    try {
+      const [deptRes, headRes, profRes, compRes] = await Promise.all([
+        supabase.from('departments').select('*'),
+        supabase.from('department_heads').select('*'),
+        supabase.from('profiles').select('*'),
+        supabase.from('complaints').select('*')
+      ]);
+
+      if (deptRes.data && deptRes.data.length > 0) departments = deptRes.data;
+      if (headRes.data) deptHeads = headRes.data;
+      if (profRes.data) profiles = profRes.data;
+      if (compRes.data) complaints = compRes.data as Complaint[];
+    } catch (e) {
+      console.warn('Supabase fetch department heads error:', e);
+    }
+  }
+
+  // Target 6 Municipal Departments
+  const SIX_MUNICIPAL_TARGETS = [
+    { code: 'PWD', name: 'Public Works Department (PWD)', defaultHead: 'Anil Kulkarni', email: 'pwd.head@nagarsetu.gov.in', phone: '+91 98220 11201', empId: 'EMP-PWD-001' },
+    { code: 'SAN', name: 'Sanitation & Waste Management', defaultHead: 'Dr. Anjali Patil', email: 'sanitation.head@nagarsetu.gov.in', phone: '+91 98220 11202', empId: 'EMP-SAN-001' },
+    { code: 'WTR', name: 'Water Supply & Sewerage', defaultHead: 'Er. Vikram Deshmukh', email: 'water.head@nagarsetu.gov.in', phone: '+91 98220 11203', empId: 'EMP-WTR-001' },
+    { code: 'DRN', name: 'Drainage & Sewage Department', defaultHead: 'Er. Manoj Kadam', email: 'drainage.head@nagarsetu.gov.in', phone: '+91 98220 11204', empId: 'EMP-DRN-001' },
+    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Er. Sunita Pawar', email: 'electrical.head@nagarsetu.gov.in', phone: '+91 98220 11205', empId: 'EMP-ELE-001' },
+    { code: 'TRF', name: 'Traffic Management Department', defaultHead: 'Insp. Ganesh More', email: 'traffic.head@nagarsetu.gov.in', phone: '+91 98220 11206', empId: 'EMP-TRF-001' }
+  ];
+
+  return SIX_MUNICIPAL_TARGETS.map((target) => {
+    // Match department record by code or name
+    const deptObj = departments.find(
+      (d) => d.code === target.code || (d.name && d.name.toLowerCase().includes(target.code.toLowerCase()))
+    );
+    const deptId = deptObj?.id || `dept-${target.code.toLowerCase()}`;
+
+    // Match active head record from department_heads or profiles
+    const activeHeadRow = deptHeads.find(
+      (h) => (h.department_id === deptId || h.email === target.email) && h.status === 'active'
+    );
+    const headProf = profiles.find(
+      (p) => p.role === 'department_head' && (p.department_id === deptId || p.email === target.email || p.id === activeHeadRow?.user_id)
+    );
+
+    const headName = activeHeadRow?.name || headProf?.full_name || target.defaultHead;
+    const headEmail = activeHeadRow?.email || headProf?.email || target.email;
+    const headPhone = activeHeadRow?.phone || headProf?.mobile || target.phone;
+    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || target.empId;
+    const designation = activeHeadRow?.designation || 'Department Head';
+    const status: 'Active' | 'Inactive' = (activeHeadRow?.status === 'inactive') ? 'Inactive' : 'Active';
+
+    // Calculate Real Staff Count for department
+    const deptStaff = profiles
+      .filter((p) => p.role === 'service_staff' && (p.department_id === deptId || (p.department_name && p.department_name.toLowerCase().includes(target.code.toLowerCase()))))
+      .map((p) => ({
+        id: p.id,
+        name: p.full_name || 'Staff Member',
+        employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
+        department_name: target.name,
+        role: 'Service Staff',
+        status: p.status || 'Available',
+        contact_number: p.mobile || '+91 98220 00000',
+        email: p.email || 'staff@nagarsetu.gov.in',
+        ward_area: p.address || 'Nashik',
+        joined_date: p.created_at || new Date().toISOString(),
+        created_at: p.created_at || new Date().toISOString()
+      }));
+
+    // Calculate Complaints Metrics for department using department_id & text match fallback
+    const deptComplaints = complaints.filter((c) => {
+      if (c.department_id === deptId) return true;
+      const dName = (c.department_name || '').toLowerCase();
+      const cCat = (c.category || '').toLowerCase();
+      const tCode = target.code.toLowerCase();
+      return dName.includes(tCode) || cCat.includes(tCode);
+    });
+
+    const openComplaints = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
+    const activeTasks = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned' || c.status === 'Department Assigned').length;
+    const completedTasks = deptComplaints.filter((c) => c.status === 'Resolved').length;
+    const overdueTasks = deptComplaints.filter((c) => {
+      if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
+      return new Date(c.sla_deadline) < now;
+    }).length;
+
+    return {
+      deptId,
+      deptName: target.name,
+      deptCode: target.code,
+      headId: activeHeadRow?.id,
+      userId: activeHeadRow?.user_id || headProf?.id,
+      headName,
+      headEmail,
+      headPhone,
+      employeeId,
+      designation,
+      status,
+      staffCount: deptStaff.length,
+      openComplaints,
+      activeTasks,
+      completedTasks,
+      overdueTasks,
+      totalComplaints: deptComplaints.length,
+      deptComplaints,
+      assignedStaff: deptStaff
+    };
+  });
+}
+
+export async function saveOrReplaceDepartmentHeadInSupabase(payload: {
+  fullName: string;
+  email: string;
+  phone?: string;
+  employeeId: string;
+  departmentId: string;
+  designation?: string;
+  password?: string;
+  performedByUserId?: string;
+}): Promise<boolean> {
+  const cleanEmail = payload.email.trim().toLowerCase();
+
+  if (isSupabaseConfigured()) {
+    try {
+      // 1. Check if Supabase Auth user exists for this email
+      let userId: string | null = null;
+      
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (existingUser?.id) {
+        userId = existingUser.id;
+      } else {
+        // Sign up new user via Supabase Auth
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: payload.password || 'Nagarsetu@2026',
+          options: {
+            data: {
+              full_name: payload.fullName,
+              role: 'department_head',
+              department_id: payload.departmentId
+            }
+          }
+        });
+
+        if (signUpErr && !signUpData?.user) {
+          console.warn('Supabase Auth signUp note:', signUpErr);
+        }
+        userId = signUpData?.user?.id || `user-dh-${Date.now()}`;
+      }
+
+      // 2. Call Supabase RPC create_or_change_department_head
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_change_department_head', {
+        p_user_id: userId,
+        p_department_id: payload.departmentId,
+        p_name: payload.fullName,
+        p_email: cleanEmail,
+        p_phone: payload.phone || '+91 98220 00000',
+        p_employee_id: payload.employeeId,
+        p_designation: payload.designation || 'Department Head',
+        p_performed_by: payload.performedByUserId || null
+      });
+
+      if (!rpcErr && rpcRes?.success) {
+        return true;
+      }
+
+      // Fallback: Direct database updates if RPC not executed yet
+      await supabase.from('department_heads').update({ status: 'inactive' }).eq('department_id', payload.departmentId);
+
+      await supabase.from('profiles').upsert({
+        id: userId,
+        full_name: payload.fullName,
+        email: cleanEmail,
+        mobile: payload.phone || '+91 98220 00000',
+        role: 'department_head',
+        department_id: payload.departmentId,
+        employee_id: payload.employeeId
+      });
+
+      await supabase.from('user_roles').upsert({
+        user_id: userId,
+        role: 'department_head'
+      });
+
+      await supabase.from('department_heads').upsert({
+        user_id: userId,
+        department_id: payload.departmentId,
+        name: payload.fullName,
+        email: cleanEmail,
+        phone: payload.phone || '+91 98220 00000',
+        employee_id: payload.employeeId,
+        designation: payload.designation || 'Department Head',
+        status: 'active'
+      });
+
+      return true;
+    } catch (err: any) {
+      console.error('Error saving department head in Supabase:', err);
+      throw new Error(err.message || 'Failed to save Department Head in Supabase');
+    }
+  }
+
+  return true;
+}
+
+export async function deactivateDepartmentHeadInSupabase(headId: string, performedByUserId?: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('deactivate_department_head', {
+        p_head_id: headId,
+        p_performed_by: performedByUserId || null
+      });
+
+      if (!rpcErr && rpcRes?.success) {
+        return true;
+      }
+
+      // Fallback direct update
+      await supabase.from('department_heads').update({ status: 'inactive', updated_at: new Date().toISOString() }).eq('id', headId);
+      return true;
+    } catch (e) {
+      console.error('Error deactivating department head:', e);
+      return false;
+    }
+  }
+  return true;
+}
+

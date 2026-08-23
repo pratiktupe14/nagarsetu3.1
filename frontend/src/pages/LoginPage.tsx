@@ -59,11 +59,14 @@ export const LoginPage: React.FC = () => {
 
       await login(identifier, password, selectedRole);
 
-      if (selectedRole === 'city_admin') {
+      const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
+      const activeRole = currentUser?.role || selectedRole;
+
+      if (activeRole === 'city_admin') {
         navigate('/admin/portal');
-      } else if (selectedRole === 'department_head') {
-        navigate('/department-head/portal');
-      } else if (selectedRole === 'service_staff') {
+      } else if (activeRole === 'department_head') {
+        navigate('/department/portal');
+      } else if (activeRole === 'service_staff') {
         navigate('/staff/portal');
       } else {
         navigate('/citizen/portal');

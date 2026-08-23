@@ -182,6 +182,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
 
     // Empty States
     noComplaintsFound: "No complaints found.",
+    noSanitationComplaintsFound: "No sanitation complaints found.",
+    noElectricalComplaintsFound: "No electrical complaints found.",
     noNotificationsAvailable: "No notifications available.",
     noTasksAssigned: "No tasks assigned.",
     noAnnouncementsAvailable: "No announcements available.",
@@ -190,7 +192,30 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // Error Messages
     somethingWentWrong: "Something went wrong.",
     unableToLoadData: "Unable to load data.",
+    unableToLoadSanitationData: "Unable to load sanitation department data.",
+    unableToLoadElectricalData: "Unable to load Electrical & Street Lighting data.",
     pleaseTryAgain: "Please try again.",
+
+    // Sanitation Department Operational Metrics
+    garbageComplaints: "Garbage Complaints",
+    overflowingDustbins: "Overflowing Dustbins",
+    wasteAccumulation: "Waste Accumulation",
+    publicDumping: "Public Dumping",
+    collectionRequests: "Collection Requests",
+    pendingCleanup: "Pending Cleanup",
+    completedCleanup: "Completed Cleanup",
+    overdueCleanup: "Overdue Cleanup",
+
+    // Electrical Department Operational Metrics
+    brokenStreetlights: "Broken Streetlights",
+    streetlightOutages: "Streetlight Outages",
+    electricalPoleDamage: "Pole Damage",
+    exposedWiring: "Exposed Wiring",
+    electricalHazards: "Electrical Hazards",
+    lightingMaintenance: "Lighting Maint.",
+    pendingRepairs: "Pending Repairs",
+    completedRepairs: "Completed Repairs",
+    criticalElectricalSafetyAlerts: "Critical Electrical Safety Alerts",
 
     // AI Analyzer
     aiLargePothole: "Large Road Pothole",
