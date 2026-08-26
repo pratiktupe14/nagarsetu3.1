@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { subscribeToRealtimeComplaints, RealtimeComplaintPayload } from '../services/realtimeService';
 
 /**
@@ -6,10 +6,20 @@ import { subscribeToRealtimeComplaints, RealtimeComplaintPayload } from '../serv
  * automatically triggering data refresh without full page reload.
  */
 export function useRealtimeComplaints(onUpdate: (payload: RealtimeComplaintPayload) => void) {
+  const onUpdateRef = useRef(onUpdate);
+
   useEffect(() => {
-    const unsubscribe = subscribeToRealtimeComplaints(onUpdate);
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToRealtimeComplaints((payload) => {
+      if (onUpdateRef.current) {
+        onUpdateRef.current(payload);
+      }
+    });
     return () => {
       unsubscribe();
     };
-  }, [onUpdate]);
+  }, []);
 }

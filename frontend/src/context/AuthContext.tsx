@@ -45,8 +45,8 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
     full_name: 'Department Head',
     email: 'dept.head@nagarsetu.gov.in',
     role: 'department_head',
-    department_name: 'Public Works Department (PWD)',
-    department_id: 'dept-pwd',
+    department_name: '',
+    department_id: '',
     language_pref: 'en'
   }
 };
@@ -130,7 +130,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               avatar_url: profile?.avatar_url,
               language_pref: profile?.language_pref || 'en'
             };
-            setUser(fetchedUser);
+            setUser((prevUser) => {
+              if (
+                prevUser &&
+                prevUser.id === fetchedUser.id &&
+                prevUser.role === fetchedUser.role &&
+                prevUser.email === fetchedUser.email &&
+                prevUser.full_name === fetchedUser.full_name &&
+                prevUser.department_id === fetchedUser.department_id
+              ) {
+                return prevUser;
+              }
+              return fetchedUser;
+            });
             localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
           }
         }
@@ -182,7 +194,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             employee_id: deptHead?.employee_id || profile?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };
-          setUser(updatedUser);
+          setUser((prevUser) => {
+            if (
+              prevUser &&
+              prevUser.id === updatedUser.id &&
+              prevUser.role === updatedUser.role &&
+              prevUser.email === updatedUser.email &&
+              prevUser.full_name === updatedUser.full_name &&
+              prevUser.department_id === updatedUser.department_id
+            ) {
+              return prevUser;
+            }
+            return updatedUser;
+          });
           localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
         }
       });
@@ -229,6 +253,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: data.user.email || cleanIdentifier,
               mobile: data.user.mobile || '',
               role: mappedRole,
+              department_id: data.user.department_id || undefined,
+              department_name: data.user.department_name || undefined,
+              employee_id: data.user.employee_id || undefined,
               language_pref: data.user.language_pref || 'en'
             };
             setUser(authenticatedUser);

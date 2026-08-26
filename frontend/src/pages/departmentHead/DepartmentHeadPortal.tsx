@@ -237,17 +237,23 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Department Identity
   const headName = activeHeadRecord?.name || user?.full_name || 'Department Head';
-  const headDepartmentFull = activeHeadRecord?.departments?.name || user?.department_name || 'Public Works Department (PWD)';
-  const headDepartment = headDepartmentFull.split('(')[0].trim() || 'Department';
-  const headDeptId = activeHeadRecord?.department_id || user?.department_id || 'dept-pwd-001';
-  const headId = activeHeadRecord?.user_id || user?.id || 'head-001';
+  const headDepartmentFull = activeHeadRecord?.departments?.name || user?.department_name || '';
+  const headDepartment = headDepartmentFull ? headDepartmentFull.split('(')[0].trim() : '';
+  const headDeptId = activeHeadRecord?.department_id || user?.department_id || '';
+  const headId = activeHeadRecord?.user_id || user?.id || '';
 
   const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull), [headDepartmentFull]);
   const isSanitationDept = useMemo(() => {
-    return (deptInfo.shortName || '').toLowerCase().includes('sanitation') || (headDeptId || '').toLowerCase().includes('san') || (headDepartmentFull || '').toLowerCase().includes('waste');
+    const normDeptId = String(headDeptId == null ? '' : headDeptId).trim().toLowerCase();
+    const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
+    const normShort = String(deptInfo.shortName == null ? '' : deptInfo.shortName).trim().toLowerCase();
+    return normShort.includes('sanitation') || normDeptId.includes('san') || normDeptFull.includes('waste');
   }, [deptInfo, headDeptId, headDepartmentFull]);
   const isElectricalDept = useMemo(() => {
-    return (deptInfo.shortName || '').toLowerCase().includes('electric') || (headDeptId || '').toLowerCase().includes('ele') || (headDepartmentFull || '').toLowerCase().includes('light');
+    const normDeptId = String(headDeptId == null ? '' : headDeptId).trim().toLowerCase();
+    const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
+    const normShort = String(deptInfo.shortName == null ? '' : deptInfo.shortName).trim().toLowerCase();
+    return normShort.includes('electric') || normDeptId.includes('ele') || normDeptFull.includes('light');
   }, [deptInfo, headDeptId, headDepartmentFull]);
 
   // Data States
@@ -355,21 +361,27 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [selectedStaffProfile, setSelectedStaffProfile] = useState<ServiceStaffMemberRecord | null>(null);
 
   // Load Department Data (Complaints, Staff, Notifications strictly by department from Supabase)
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (opts?: boolean | React.MouseEvent) => {
+    const isInitial = typeof opts === 'boolean' ? opts : true;
+    if (isInitial) setLoading(true);
     setError(null);
     try {
-      let activeDeptId = headDeptId;
-      let activeDeptFull = headDepartmentFull;
-      let activeHeadId = headId;
+      let activeDeptId = headDeptId || user?.department_id || '';
+      let activeDeptFull = headDepartmentFull || user?.department_name || '';
+      let activeHeadId = headId || user?.id || '';
 
       if (isSupabaseConfigured() && user?.email) {
-        const { data: dhRow } = await supabase
-          .from('department_heads')
-          .select('*, departments(*)')
-          .or(`user_id.eq.${user.id},email.eq.${user.email.toLowerCase()}`)
-          .eq('status', 'active')
-          .maybeSingle();
+        const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || '');
+        const cleanEmail = (user.email || '').toLowerCase();
+
+        let dhQuery = supabase.from('department_heads').select('*, departments(*)');
+        if (isUuid(user.id)) {
+          dhQuery = dhQuery.or(`user_id.eq.${user.id},email.eq.${cleanEmail}`);
+        } else {
+          dhQuery = dhQuery.eq('email', cleanEmail);
+        }
+
+        const { data: dhRow } = await dhQuery.eq('status', 'active').maybeSingle();
 
         if (dhRow) {
           setActiveHeadRecord(dhRow);
@@ -378,16 +390,27 @@ export const DepartmentHeadPortal: React.FC = () => {
           activeDeptFull = dhRow.departments?.name || activeDeptFull;
           activeHeadId = dhRow.user_id || activeHeadId;
         } else {
-          const { data: anyDhRow } = await supabase
-            .from('department_heads')
-            .select('*')
-            .or(`user_id.eq.${user.id},email.eq.${user.email.toLowerCase()}`)
-            .maybeSingle();
+          let anyQuery = supabase.from('department_heads').select('*');
+          if (isUuid(user.id)) {
+            anyQuery = anyQuery.or(`user_id.eq.${user.id},email.eq.${cleanEmail}`);
+          } else {
+            anyQuery = anyQuery.eq('email', cleanEmail);
+          }
+          const { data: anyDhRow } = await anyQuery.maybeSingle();
 
           if (anyDhRow && anyDhRow.status === 'inactive') {
             setIsHeadActive(false);
           }
         }
+      }
+
+      // Validate that department assignment exists
+      if (!activeDeptId && !activeDeptFull) {
+        setError('Department assignment could not be verified. Please contact City Administration.');
+        setDepartmentComplaints([]);
+        setDepartmentStaff([]);
+        setLoading(false);
+        return;
       }
 
       const deptFilteredComplaints = await getDepartmentComplaints(activeDeptId, activeDeptFull);
@@ -408,16 +431,16 @@ export const DepartmentHeadPortal: React.FC = () => {
       console.error('Error loading Department Head data:', err);
       setError('Unable to load department data. Please try again.');
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   }, [headDeptId, headDepartmentFull, headId, staffIdFromPath, user]);
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [loadData]);
 
   useRealtimeComplaints(useCallback(() => {
-    loadData();
+    loadData(false);
   }, [loadData]));
 
   useEffect(() => {
@@ -425,7 +448,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     const channel = supabase
       .channel('realtime_dh_portal')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'department_heads' }, () => {
-        loadData();
+        loadData(false);
       })
       .subscribe();
 
@@ -1031,8 +1054,8 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Confirm Task Assignment to Department Staff
   const handleExecuteAssignment = async (compObj: Complaint, staffObj: ServiceStaffMemberRecord) => {
-    const cleanHeadDept = headDepartmentFull.split('(')[0].trim().toLowerCase();
-    const cleanStaffDept = (staffObj.department_name || '').split('(')[0].trim().toLowerCase();
+    const cleanHeadDept = String(headDepartmentFull || '').split('(')[0].trim().toLowerCase();
+    const cleanStaffDept = String(staffObj.department_name || '').split('(')[0].trim().toLowerCase();
 
     if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
       alert(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);

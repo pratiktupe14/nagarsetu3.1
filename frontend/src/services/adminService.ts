@@ -174,6 +174,9 @@ export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
 }
 
 export async function getDepartmentServiceStaff(departmentId?: string, departmentName?: string): Promise<ServiceStaffMemberRecord[]> {
+  if (!departmentId && !departmentName) {
+    return [];
+  }
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('profiles').select('*').eq('role', 'service_staff');
@@ -189,7 +192,7 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
           id: p.id,
           name: p.full_name || p.name || 'Staff Member',
           employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
-          department_name: p.department_name || departmentName || 'Public Works Department (PWD)',
+          department_name: p.department_name || departmentName || 'Municipal Department',
           role: 'Service Staff',
           status: p.status || 'Available',
           contact_number: p.phone_number || '+91 98220 00000',
@@ -221,7 +224,7 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
           id: data.id,
           name: data.full_name || data.name || 'Staff Member',
           employee_id: data.employee_id || `STF-${data.id.slice(0, 4).toUpperCase()}`,
-          department_name: data.department_name || 'Public Works Department (PWD)',
+          department_name: data.department_name || 'Municipal Department',
           role: 'Service Staff',
           status: data.status || 'Available',
           contact_number: data.phone_number || '+91 98220 00000',

@@ -165,8 +165,16 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const selectedTarget = headSummaries.find((h) => h.deptCode === formDeptId || h.deptId === formDeptId) || headSummaries[0];
-      const deptIdToUse = selectedTarget?.deptId || formDeptId;
+      const selectedTarget = headSummaries.find((h) => 
+        h.deptCode === formDeptId || 
+        h.deptId === formDeptId ||
+        (h.deptCode && h.deptCode.toLowerCase() === formDeptId.toLowerCase()) ||
+        (h.deptId && h.deptId.toLowerCase() === formDeptId.toLowerCase()) ||
+        (h.deptName && h.deptName.toLowerCase().includes(formDeptId.toLowerCase()))
+      ) || SIX_DEPARTMENTS_META.find((d) => d.code === formDeptId || d.id === formDeptId);
+
+      const deptIdToUse = selectedTarget ? ('deptId' in selectedTarget ? selectedTarget.deptId : selectedTarget.id) : formDeptId;
+      const deptName = selectedTarget ? ('deptName' in selectedTarget ? selectedTarget.deptName : selectedTarget.name) : 'Department';
 
       await createDepartmentHead({
         fullName: formFullName.trim(),
@@ -183,7 +191,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         user_id: 'admin-group',
         role: 'city_admin',
         type: 'approved',
-        title: `DEPARTMENT HEAD APPOINTED: ${selectedTarget?.deptName || 'Department'}`,
+        title: `DEPARTMENT HEAD APPOINTED: ${deptName}`,
         message: `City Administration appointed ${formFullName.trim()} as active Department Head.`
       });
 
@@ -193,12 +201,13 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setFormEmail('');
       setFormPhone('');
       setFormEmployeeId('');
+      setFormDeptId('');
       setFormPassword('');
       setFormConfirmPassword('');
       setValidationError(null);
       setConflictWarning(null);
 
-      setToastMessage(`Department Head for ${selectedTarget?.deptName || 'Department'} updated successfully.`);
+      setToastMessage(`Department Head for ${deptName} updated successfully.`);
       setTimeout(() => setToastMessage(null), 4000);
       await loadData();
     } catch (err: any) {
@@ -632,6 +641,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                     disabled={Boolean(showChangeHeadModal)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-bold min-h-[44px]"
                   >
+                    <option value="">Select Municipal Department...</option>
                     {SIX_DEPARTMENTS_META.map((d) => (
                       <option key={d.code} value={d.code}>{d.name} ({d.code})</option>
                     ))}

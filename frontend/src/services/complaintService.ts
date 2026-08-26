@@ -91,13 +91,21 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'com
           return publicUrlData.publicUrl;
         }
       }
-    } catch (err) {
-      console.warn('Supabase storage upload fallback:', err);
+      if (error) {
+        console.error('Supabase storage upload notice:', error.message);
+      }
+    } catch (err: any) {
+      console.error('Supabase storage upload exception:', err);
     }
   }
 
-  // Fallback blob object URL
-  return URL.createObjectURL(file);
+  // Persistent Base64 Data URL fallback to prevent temporary blob expiration across reloads
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => resolve(URL.createObjectURL(file));
+    reader.readAsDataURL(file);
+  });
 }
 
 // Fetch all complaints from Supabase with real geocoding fallback
@@ -189,6 +197,9 @@ export async function getStaffTasks(staffId?: string, departmentName?: string): 
 
 // Fetch complaints belonging to a specific department from Supabase
 export async function getDepartmentComplaints(departmentId?: string, departmentName?: string): Promise<Complaint[]> {
+  if (!departmentId && !departmentName) {
+    return [];
+  }
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('complaints').select('*');

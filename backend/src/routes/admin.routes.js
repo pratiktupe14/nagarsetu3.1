@@ -163,6 +163,51 @@ router.get('/department-heads', async (req, res) => {
   }
 });
 
+// Helper function to resolve string code/name/ID to actual database department ID
+async function resolveDepartmentId(deptInput) {
+  if (!deptInput) return null;
+  if (typeof deptInput === 'number' && !isNaN(deptInput)) return deptInput;
+  const parsedNum = Number(deptInput);
+  if (!isNaN(parsedNum) && parsedNum > 0) return parsedNum;
+
+  const str = String(deptInput).trim();
+  const deptRes = await query(
+    `SELECT id FROM departments WHERE id = ? OR name LIKE ? OR description LIKE ? LIMIT 1`,
+    [str, `%${str}%`, `%${str}%`]
+  );
+  if (deptRes.rows && deptRes.rows.length > 0) {
+    return deptRes.rows[0].id;
+  }
+
+  const strUpper = str.toUpperCase();
+  if (strUpper.includes('SAN')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Sanitation%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (strUpper.includes('WTR') || strUpper.includes('WATER')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Water%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (strUpper.includes('DRN') || strUpper.includes('DRAIN') || strUpper.includes('SEWER')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Drain%' OR name LIKE '%Sewer%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (strUpper.includes('ELE') || strUpper.includes('LIGHT')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Electric%' OR name LIKE '%Light%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (strUpper.includes('TRF') || strUpper.includes('TRAF')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Traffic%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (strUpper.includes('PWD') || strUpper.includes('ROAD') || strUpper.includes('WORK')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Public Works%' OR name LIKE '%PWD%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+
+  return null;
+}
+
 // POST Create or Appoint Department Head
 router.post('/department-heads', async (req, res) => {
   try {
@@ -171,10 +216,10 @@ router.post('/department-heads', async (req, res) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPhone = (mobile || phone || '').trim() || '+91 98220 00000';
     const cleanEmpId = (employeeId || '').trim();
-    const cleanDeptId = Number(departmentId);
+    const cleanDeptId = await resolveDepartmentId(departmentId);
 
     if (!cleanName || !cleanEmail || !cleanDeptId) {
-      return res.status(400).json({ error: 'Name, email, and department ID are required.' });
+      return res.status(400).json({ error: 'Name, email, and a valid department selection are required.' });
     }
 
     // Email Uniqueness Check
@@ -263,7 +308,7 @@ router.put('/department-heads/:id', async (req, res) => {
     const newEmail = (email || targetEmail).trim().toLowerCase();
     const newPhone = (mobile || phone || currentHead.phone || currentUser.mobile || '+91 98220 00000').trim();
     const newEmpId = (employeeId !== undefined ? employeeId : (currentHead.employee_id || currentUser.employee_id || '')).trim();
-    const newDeptId = departmentId ? Number(departmentId) : (currentHead.department_id || currentUser.department_id);
+    const newDeptId = departmentId ? (await resolveDepartmentId(departmentId)) : (currentHead.department_id || currentUser.department_id);
     const newStatus = status || currentHead.status || currentUser.status || 'active';
 
     // Email Uniqueness check if email changed

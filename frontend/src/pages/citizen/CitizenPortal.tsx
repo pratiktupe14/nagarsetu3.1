@@ -34,8 +34,9 @@ export const CitizenPortal: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'In Progress' | 'Resolved' | 'Reopened'>('All');
   const [offlineDraftsCount, setOfflineDraftsCount] = useState(0);
 
-  const loadComplaints = useCallback(async () => {
-    setLoading(true);
+  const loadComplaints = useCallback(async (opts?: boolean | React.MouseEvent) => {
+    const isInitial = typeof opts === 'boolean' ? opts : true;
+    if (isInitial) setLoading(true);
     setErrorMsg(null);
     try {
       const [list, anns, works] = await Promise.all([
@@ -50,12 +51,12 @@ export const CitizenPortal: React.FC = () => {
       console.error('Error in CitizenPortal loadComplaints:', e);
       setErrorMsg('Unable to load your dashboard.');
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    loadComplaints();
+    loadComplaints(true);
     try {
       const drafts = getOfflineDrafts();
       setOfflineDraftsCount(Array.isArray(drafts) ? drafts.length : 0);
@@ -66,7 +67,7 @@ export const CitizenPortal: React.FC = () => {
 
   // Subscribe to real-time complaint updates across portals
   useRealtimeComplaints(useCallback(() => {
-    loadComplaints();
+    loadComplaints(false);
   }, [loadComplaints]));
 
   // Defensive array checks
