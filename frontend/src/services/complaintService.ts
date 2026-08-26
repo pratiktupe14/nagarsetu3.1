@@ -2,6 +2,7 @@ import { Complaint, ComplaintStatus, PriorityLevel, StaffPerformanceMetrics } fr
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
+import { getApiUrl } from '../config/apiConfig';
 import { geocodeComplaintsWithoutCoordinates, auditAndRepairComplaintLocations } from './locationService';
 
 const LOCAL_STORAGE_COMPLAINTS_KEY = 'nagarsetu_citizen_complaints_v3';
@@ -237,7 +238,7 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
   // 1. Try local Express Backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    const res = await fetch(`http://localhost:5000/api/complaints/${encodeURIComponent(idOrNumber)}`, {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(idOrNumber)}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (res.ok) {
@@ -332,7 +333,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
   try {
     const token = localStorage.getItem('nagarsetu_token');
     if (token) {
-      const res = await fetch('http://localhost:5000/api/complaints/submit', {
+      const res = await fetch('${getApiUrl()}/api/complaints/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

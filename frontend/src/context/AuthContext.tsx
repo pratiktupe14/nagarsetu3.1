@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getApiUrl } from '../config/apiConfig';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 interface AuthContextType {
@@ -238,7 +239,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 1. Try Local Express Backend API authentication first
       try {
-        const response = await fetch('http://localhost:5000/api/auth/login', {
+        const response = await fetch(`${getApiUrl()}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })

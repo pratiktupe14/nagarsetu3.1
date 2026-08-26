@@ -1,5 +1,6 @@
 import { AIVisionResult, PriorityLevel, VisualFeatures, ImageSimilarityResult } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getApiUrl, getAiServiceUrl } from '../config/apiConfig';
 
 export const CIVIC_CATEGORIES = [
   'Road Damage / Pothole',
@@ -143,7 +144,7 @@ export async function checkAiHealth(): Promise<{ configured: boolean; model: str
     }
   } catch (err: any) {
     try {
-      const directRes = await fetch('http://localhost:5000/api/ai/health');
+      const directRes = await fetch('${getApiUrl()}/api/ai/health');
       if (directRes.ok) return await directRes.json();
     } catch (e) {}
     return {
@@ -399,7 +400,7 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
 
     // Direct localhost:5000 fallback
     try {
-      const directRes = await fetch('http://localhost:5000/api/ai/analyze', {
+      const directRes = await fetch('${getApiUrl()}/api/ai/analyze', {
         method: 'POST',
         body: formData
       });
@@ -431,7 +432,7 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
       if (directErr.message && !directErr.message.includes('Failed to fetch')) {
         throw directErr;
       }
-      throw new Error('Backend server on http://localhost:5000 is offline or unreachable.');
+      throw new Error('Backend server on ${getApiUrl()} is offline or unreachable.');
     }
   }
 }
@@ -443,7 +444,7 @@ async function callPythonAiServiceDirect(file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file, file.name);
 
-  const res = await fetch('http://localhost:8000/analyze', {
+  const res = await fetch(`${getAiServiceUrl()}/analyze`, {
     method: 'POST',
     body: formData
   });
@@ -566,9 +567,9 @@ export async function detectCivicIssue(file: File, bypassCache: boolean = false)
   }
 
   // Format error reason cleanly without generic 'Failed to fetch'
-  let errorReason = rawRes?.error || lastErrorMsg || 'Backend server on http://localhost:5000 is offline or unreachable.';
+  let errorReason = rawRes?.error || lastErrorMsg || 'Backend server on ${getApiUrl()} is offline or unreachable.';
   if (errorReason.includes('Failed to fetch') || errorReason.includes('NetworkError')) {
-    errorReason = 'Backend server on http://localhost:5000 is offline or unreachable.';
+    errorReason = 'Backend server on ${getApiUrl()} is offline or unreachable.';
   }
 
   const errorResult: AIVisionResult = {

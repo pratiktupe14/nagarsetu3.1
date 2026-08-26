@@ -1,5 +1,6 @@
 import exifr from 'exifr';
 import { Complaint } from '../types/database.types';
+import { getApiUrl } from '../config/apiConfig';
 
 export interface LocationResult {
   latitude: number | null;
@@ -181,8 +182,8 @@ function setGeocodeCache(key: string, data: { latitude: number; longitude: numbe
   } catch (e) {}
 }
 
-const BACKEND_MAPS_URL = 'http://localhost:5000/api/maps';
-const PYTHON_MAPS_URL = 'http://localhost:8000/google-maps';
+const getBackendMapsUrl = () => `${getApiUrl()}/api/maps`;
+const getPythonMapsUrl = () => `${getApiUrl()}/api/maps/google-maps`;
 
 /**
  * Reverse Geocoding using Google Maps API (Backend Python package integration)
@@ -195,7 +196,7 @@ export async function reverseGeocodeGoogleMaps(
 
   // Try Express backend first, then Python microservice
   try {
-    const res = await fetch(`${BACKEND_MAPS_URL}/reverse-geocode`, {
+    const res = await fetch(`${getBackendMapsUrl()}/reverse-geocode`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ latitude, longitude })
@@ -208,7 +209,7 @@ export async function reverseGeocodeGoogleMaps(
     }
   } catch (e) {
     try {
-      const pyRes = await fetch(`${PYTHON_MAPS_URL}/reverse-geocode`, {
+      const pyRes = await fetch(`${getPythonMapsUrl()}/reverse-geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude, longitude })
@@ -242,7 +243,7 @@ export async function getGoogleMapsDirections(
   const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=${mode}`;
 
   try {
-    const res = await fetch(`${BACKEND_MAPS_URL}/directions`, {
+    const res = await fetch(`${getBackendMapsUrl()}/directions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -285,7 +286,7 @@ export async function geocodeNashikAddress(
 
   // 1. Try Google Maps Backend Geocoding API first
   try {
-    const res = await fetch(`${BACKEND_MAPS_URL}/geocode`, {
+    const res = await fetch(`${getBackendMapsUrl()}/geocode`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address: rawAddress })

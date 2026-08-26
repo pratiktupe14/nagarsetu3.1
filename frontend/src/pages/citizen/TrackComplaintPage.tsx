@@ -7,6 +7,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getCitizenComplaints, getComplaintById } from '../../services/complaintService';
 import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
+import { getApiUrl } from '../../config/apiConfig';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { LiveGoogleMap } from '../../components/LiveGoogleMap';
 import {
@@ -121,7 +122,7 @@ export const TrackComplaintPage: React.FC = () => {
   const fetchStatusHistory = async (complaintId: string) => {
     try {
       const token = localStorage.getItem('nagarsetu_token');
-      const response = await fetch(`http://localhost:5000/api/complaints/${complaintId}/history`, {
+      const response = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/history`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (response.ok) {

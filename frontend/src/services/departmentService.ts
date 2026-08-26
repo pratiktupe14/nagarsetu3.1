@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Complaint } from '../types/database.types';
 import { pushNotification } from './notificationService';
+import { getApiUrl } from '../config/apiConfig';
 
 export interface MunicipalDepartment {
   id: string;
@@ -85,7 +86,7 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
 
   // Backend API fallback
   try {
-    const res = await fetch('http://localhost:5000/api/admin/departments');
+    const res = await fetch('${getApiUrl()}/api/admin/departments');
     if (res.ok) {
       const bData = await res.json();
       if (bData && bData.departments && bData.departments.length > 0) {
@@ -146,9 +147,9 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
     const [dhRes, deptRes, compRes] = await Promise.all([
-      fetch('http://localhost:5000/api/admin/department-heads', { headers }),
-      fetch('http://localhost:5000/api/admin/departments', { headers }),
-      fetch('http://localhost:5000/api/complaints', { headers })
+      fetch('${getApiUrl()}/api/admin/department-heads', { headers }),
+      fetch('${getApiUrl()}/api/admin/departments', { headers }),
+      fetch('${getApiUrl()}/api/complaints', { headers })
     ]);
 
     if (dhRes.ok) {
@@ -301,7 +302,7 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
   // 1. Call Local Express Backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    const response = await fetch('http://localhost:5000/api/admin/department-heads', {
+    const response = await fetch('${getApiUrl()}/api/admin/department-heads', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -502,7 +503,7 @@ export async function updateDepartmentHead(headId: string, payload: Partial<Crea
   // 1. Call Local Express Backend API
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    const response = await fetch(`http://localhost:5000/api/admin/department-heads/${headId}`, {
+    const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -548,7 +549,7 @@ export async function updateDepartmentHead(headId: string, payload: Partial<Crea
 export async function deactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    await fetch(`http://localhost:5000/api/admin/department-heads/${headId}/deactivate`, {
+    await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/deactivate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -586,7 +587,7 @@ export async function deactivateDepartmentHead(headId: string, performedByUserId
 export async function reactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    await fetch(`http://localhost:5000/api/admin/department-heads/${headId}/reactivate`, {
+    await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/reactivate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
