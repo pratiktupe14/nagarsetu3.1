@@ -317,6 +317,40 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
     }
   }
 
+  // Sync with Express backend API if authenticated
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    if (token) {
+      const res = await fetch('http://localhost:5000/api/complaints/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          photo_url: newComplaint.photo_before_url,
+          category: newComplaint.category,
+          title: newComplaint.title,
+          description: newComplaint.description,
+          priority: newComplaint.priority,
+          latitude: newComplaint.latitude,
+          longitude: newComplaint.longitude,
+          location_source: newComplaint.location_source,
+          location_address: newComplaint.location_address,
+          department_id: newComplaint.department_id
+        })
+      });
+      if (res.ok) {
+        const bData = await res.json();
+        if (bData && bData.complaint_id) {
+          newComplaint.id = String(bData.complaint_id);
+        }
+      }
+    }
+  } catch (bErr) {
+    console.warn('Backend API createComplaint sync note:', bErr);
+  }
+
   const all = getStoredComplaints();
   all.unshift(newComplaint);
   saveStoredComplaints(all);

@@ -82,7 +82,24 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
       console.warn('Supabase fetch departments error:', e);
     }
   }
-  return TARGET_MUNICIPAL_DEPARTMENTS.map((d, idx) => ({
+
+  // Backend API fallback
+  try {
+    const res = await fetch('http://localhost:5000/api/admin/departments');
+    if (res.ok) {
+      const bData = await res.json();
+      if (bData && bData.departments && bData.departments.length > 0) {
+        return bData.departments.map((d: any) => ({
+          id: String(d.id),
+          name: d.name,
+          code: d.code || d.name.substring(0, 3).toUpperCase(),
+          description: d.description || ''
+        }));
+      }
+    }
+  } catch (bErr) {}
+
+  return TARGET_MUNICIPAL_DEPARTMENTS.map((d) => ({
     id: `dept-${d.code.toLowerCase()}`,
     name: d.name,
     code: d.code,
