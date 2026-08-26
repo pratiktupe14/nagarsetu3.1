@@ -222,42 +222,38 @@ router.post('/department-heads', async (req, res) => {
       return res.status(400).json({ error: 'Name, email, and a valid department selection are required.' });
     }
 
-    // Email Uniqueness Check
-    const emailCheck = await query(`SELECT id, email, role FROM users WHERE email = ?`, [cleanEmail]);
+    // Email Uniqueness Check & User Upsert
+    const emailCheck = await query(`SELECT id, email, role FROM users WHERE LOWER(email) = ?`, [cleanEmail]);
     let existingUser = emailCheck.rows && emailCheck.rows.length > 0 ? emailCheck.rows[0] : null;
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email address is already in use.' });
-    }
-
-    // Employee ID Uniqueness Check
-    if (cleanEmpId) {
-      const empCheck = await query(`SELECT id FROM users WHERE employee_id = ? AND email != ?`, [cleanEmpId, cleanEmail]);
-      if (empCheck.rows && empCheck.rows.length > 0) {
-        return res.status(400).json({ error: 'Employee ID is already in use.' });
-      }
-    }
 
     // Password Hashing
     let passwordHash = null;
-    if (password && password.length >= 6) {
+    if (password && password.trim().length >= 6) {
       const salt = await bcrypt.genSalt(10);
-      passwordHash = await bcrypt.hash(password, salt);
+      passwordHash = await bcrypt.hash(password.trim(), salt);
     } else {
       const salt = await bcrypt.genSalt(10);
       passwordHash = await bcrypt.hash('Nagarsetu@2026', salt);
     }
 
-    // Create new User auth account
-    const insertUserRes = await query(
-      `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,
-      [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status]
-    );
-    const userId = insertUserRes.rows[0].id;
+    let userId;
+    if (existingUser) {
+      userId = existingUser.id;
+      await query(
+        `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = 'department_head', department_id = ?, employee_id = ?, status = ? WHERE id = ? OR LOWER(email) = ?`,
+        [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status, userId, cleanEmail]
+      );
+    } else {
+      const insertUserRes = await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,
+        [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status]
+      );
+      userId = insertUserRes.rows[0].id;
+    }
 
     // If status is active, deactivate previous active heads for this department
     if (status === 'active') {
-      await query(`UPDATE department_heads SET status = 'inactive' WHERE department_id = ?`, [cleanDeptId]);
+      await query(`UPDATE department_heads SET status = 'inactive' WHERE department_id = ? AND (user_id != ? AND LOWER(email) != ?)`, [cleanDeptId, userId, cleanEmail]);
     }
 
     // Insert or Update department_heads record

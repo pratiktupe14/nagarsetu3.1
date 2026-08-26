@@ -343,7 +343,7 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
         }
       }
 
-      // 2. Check for Existing Profile or Department Head Record
+      // 2. Resolve User ID and Synchronize Supabase Auth Account
       let userId: string | null = null;
 
       const { data: existingUser } = await supabase
@@ -358,12 +358,10 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
         .eq('email', cleanEmail)
         .maybeSingle();
 
-      if (existingUser?.id) {
-        userId = existingUser.id;
-      } else if (existingDh?.user_id) {
-        userId = existingDh.user_id;
-      } else {
-        // Create brand new Auth user using isolated non-persisted client
+      userId = existingUser?.id || existingDh?.user_id || null;
+
+      // Attempt Auth registration for credential synchronization
+      try {
         const { data: signUpData, error: signUpErr } = await tempAuthClient.auth.signUp({
           email: cleanEmail,
           password: payload.password || 'Nagarsetu@2026',
@@ -376,14 +374,17 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
           }
         });
 
-        if (signUpErr && !signUpData?.user) {
-          console.warn('Supabase Auth signUp note:', signUpErr);
-          if (signUpErr.message && signUpErr.message.toLowerCase().includes('already registered')) {
-            const { data: reUser } = await supabase.from('profiles').select('id').eq('email', cleanEmail).maybeSingle();
-            if (reUser?.id) userId = reUser.id;
-          }
+        if (signUpData?.user?.id) {
+          userId = signUpData.user.id;
+        } else if (signUpErr) {
+          console.warn('Supabase Auth signUp note:', signUpErr.message);
         }
-        userId = signUpData?.user?.id || userId || `user-dh-${Date.now()}`;
+      } catch (authEx) {
+        console.warn('Auth sync exception note:', authEx);
+      }
+
+      if (!userId) {
+        userId = `user-dh-${Date.now()}`;
       }
 
       if (!userId) {
