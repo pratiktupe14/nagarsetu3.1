@@ -714,7 +714,6 @@ export const StaffNotificationsPage: React.FC = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          capture="environment"
                           id="staff-notif-proof-input"
                           className="hidden"
                           onChange={(e) => {

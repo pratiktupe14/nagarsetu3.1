@@ -372,10 +372,24 @@ export const ReportIssuePage: React.FC = () => {
                     <p className="text-xs text-gray-500">Take a photo or upload an image of the civic issue.</p>
                   </div>
 
+                  {/* Camera Direct Input */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    id="citizen-photo-camera"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handlePhotoSelect(e.target.files[0]);
+                      }
+                    }}
+                  />
+
+                  {/* Gallery / Files Standard Input (No Forced Capture) */}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/jpg"
-                    capture="environment"
                     id="citizen-photo-upload"
                     className="hidden"
                     onChange={(e) => {
@@ -387,11 +401,11 @@ export const ReportIssuePage: React.FC = () => {
 
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                     <label
-                      htmlFor="citizen-photo-upload"
+                      htmlFor="citizen-photo-camera"
                       className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-sm min-h-[44px] flex items-center justify-center space-x-2"
                     >
                       <Camera className="w-4 h-4" />
-                      <span>Open Camera</span>
+                      <span>Take Photo (Camera)</span>
                     </label>
 
                     <label
@@ -399,7 +413,7 @@ export const ReportIssuePage: React.FC = () => {
                       className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 font-extrabold text-xs uppercase tracking-wider cursor-pointer border border-gray-300 shadow-xs min-h-[44px] flex items-center justify-center space-x-2"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>Upload Image</span>
+                      <span>Gallery / Files</span>
                     </label>
                   </div>
                 </div>
@@ -538,10 +552,25 @@ export const ReportIssuePage: React.FC = () => {
                     <span className="font-extrabold text-gray-900 font-outfit">Additional Angles & Evidence ({additionalPhotos.length}/4)</span>
                   </div>
 
+                  {/* Additional Angle Camera Input */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    id="additional-angle-camera"
+                    className="hidden"
+                    disabled={additionalPhotos.length >= 4 || analyzingAngle}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleAdditionalPhotoSelect(e.target.files[0]);
+                      }
+                    }}
+                  />
+
+                  {/* Additional Angle Gallery/Files Standard Input */}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/jpg"
-                    capture="environment"
                     id="additional-angle-upload"
                     className="hidden"
                     disabled={additionalPhotos.length >= 4 || analyzingAngle}
@@ -553,13 +582,25 @@ export const ReportIssuePage: React.FC = () => {
                   />
 
                   {additionalPhotos.length < 4 && (
-                    <label
-                      htmlFor="additional-angle-upload"
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] cursor-pointer flex items-center space-x-1 min-h-[36px]"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Angle</span>
-                    </label>
+                    <div className="flex items-center space-x-2">
+                      <label
+                        htmlFor="additional-angle-camera"
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] cursor-pointer flex items-center space-x-1 min-h-[36px]"
+                        title="Take photo with camera"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Camera</span>
+                      </label>
+
+                      <label
+                        htmlFor="additional-angle-upload"
+                        className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg font-bold text-[11px] cursor-pointer flex items-center space-x-1 min-h-[36px]"
+                        title="Choose photo from gallery or files"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Gallery/Files</span>
+                      </label>
+                    </div>
                   )}
                 </div>
 

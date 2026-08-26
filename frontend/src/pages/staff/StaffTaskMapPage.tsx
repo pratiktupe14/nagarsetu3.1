@@ -917,7 +917,6 @@ export const StaffTaskMapPage: React.FC = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          capture="environment"
                           id="staff-map-proof-input"
                           className="hidden"
                           onChange={(e) => {

@@ -1196,7 +1196,6 @@ export const StaffPortal: React.FC = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          capture="environment"
                           id="staff-dash-proof-input"
                           className="hidden"
                           onChange={(e) => {
