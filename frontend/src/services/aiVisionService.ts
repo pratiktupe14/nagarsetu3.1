@@ -14,44 +14,85 @@ export const CIVIC_CATEGORIES = [
 
 export type CivicCategory = typeof CIVIC_CATEGORIES[number];
 
+export const OFFICIAL_DEPARTMENTS = [
+  'Roads & Public Works Department (PWD)',
+  'Sanitation & Solid Waste Management',
+  'Water Supply & Sewerage Board',
+  'Electrical & Public Lighting Department',
+  'Drainage & Sewerage Department',
+  'Traffic Engineering & Control Department'
+] as const;
+
+export type OfficialDepartment = typeof OFFICIAL_DEPARTMENTS[number];
+
+export function normalizeDepartment(dept?: string, category?: string): string {
+  if (dept && (OFFICIAL_DEPARTMENTS as readonly string[]).includes(dept)) {
+    return dept;
+  }
+
+  const str = (dept || '').toLowerCase();
+  const cat = (category || '').toLowerCase();
+
+  if (str.includes('electrical') || str.includes('light') || str.includes('street light') || str.includes('streetlight') || cat.includes('streetlight') || cat.includes('electrical')) {
+    return 'Electrical & Public Lighting Department';
+  }
+  if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
+    return 'Sanitation & Solid Waste Management';
+  }
+  if (str.includes('water supply') || str.includes('water leakage') || str.includes('pipeline') || (str.includes('water') && !str.includes('drain') && !str.includes('sew')) || (cat.includes('water') && !cat.includes('drain'))) {
+    return 'Water Supply & Sewerage Board';
+  }
+  if (str.includes('drain') || str.includes('sewag') || str.includes('sewer') || cat.includes('drainage') || cat.includes('sewage')) {
+    return 'Drainage & Sewerage Department';
+  }
+  if (str.includes('traffic') || str.includes('signal') || cat.includes('traffic')) {
+    return 'Traffic Engineering & Control Department';
+  }
+  if (str.includes('road') || str.includes('pothole') || str.includes('public works') || str.includes('pwd') || str.includes('footpath') || cat.includes('road') || cat.includes('infrastructure')) {
+    return 'Roads & Public Works Department (PWD)';
+  }
+
+  return 'Roads & Public Works Department (PWD)';
+}
+
 export const VALID_TAXONOMY_MAP: Record<CivicCategory, { department: string; defaultTitle: string; defaultPriority: PriorityLevel }> = {
   'Road Damage / Pothole': {
-    department: 'Public Works Department (PWD)',
+    department: 'Roads & Public Works Department (PWD)',
     defaultTitle: 'Asphalt Pothole / Road Surface Crater',
     defaultPriority: 'High'
   },
   'Water Leakage / Pipeline': {
-    department: 'Water Supply & Sewerage',
+    department: 'Water Supply & Sewerage Board',
     defaultTitle: 'Municipal Water Pipeline Leakage',
     defaultPriority: 'High'
   },
   'Garbage / Waste': {
-    department: 'Sanitation & Waste Management',
+    department: 'Sanitation & Solid Waste Management',
     defaultTitle: 'Uncollected Solid Waste Accumulation',
     defaultPriority: 'Medium'
   },
   'Drainage / Sewage': {
-    department: 'Drainage & Sewage Department',
+    department: 'Drainage & Sewerage Department',
     defaultTitle: 'Blocked Stormwater Drain & Sewage Overflow',
     defaultPriority: 'Critical'
   },
   'Streetlight / Electrical': {
-    department: 'Electrical & Street Lighting',
+    department: 'Electrical & Public Lighting Department',
     defaultTitle: 'Damaged / Inoperative Streetlight Fixture',
     defaultPriority: 'Medium'
   },
   'Traffic Infrastructure': {
-    department: 'Traffic Management Department',
+    department: 'Traffic Engineering & Control Department',
     defaultTitle: 'Malfunctioning / Damaged Traffic Signal',
     defaultPriority: 'High'
   },
   'Public Infrastructure Damage': {
-    department: 'Public Works Department (PWD)',
+    department: 'Roads & Public Works Department (PWD)',
     defaultTitle: 'Damaged Public Footpath / Railing',
     defaultPriority: 'High'
   },
   'Other Civic Issue': {
-    department: 'Public Works Department (PWD)',
+    department: 'Roads & Public Works Department (PWD)',
     defaultTitle: 'General Civic Defect / Public Grievance',
     defaultPriority: 'Medium'
   }
@@ -325,27 +366,74 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
       method: 'POST',
       body: formData
     });
+
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.ai) return json.ai;
       if (json.ai) return json.ai;
+      return json;
     }
-  } catch (err) {}
 
-  // Direct localhost:5000 fallback
-  const directRes = await fetch('http://localhost:5000/api/ai/analyze', {
-    method: 'POST',
-    body: formData
-  });
+    const errText = await res.text();
+    let errorMessage = '';
+    try {
+      const parsed = JSON.parse(errText);
+      errorMessage = parsed.error || parsed.message || errText;
+    } catch (e) {
+      errorMessage = errText;
+    }
 
-  if (!directRes.ok) {
-    const errText = await directRes.text();
-    throw new Error(`Express Backend API returned status ${directRes.status}: ${errText}`);
+    if (res.status === 429) {
+      throw new Error('Gemini API Rate Limit / Quota Exceeded (HTTP 429). Please retry in 60 seconds.');
+    } else if (res.status === 401) {
+      throw new Error('Gemini API Authentication Failed (HTTP 401). Please verify server GEMINI_API_KEY.');
+    } else if (res.status === 400) {
+      throw new Error(`Invalid request or image payload (HTTP 400): ${errorMessage}`);
+    } else {
+      throw new Error(`Express Backend API returned status ${res.status}: ${errorMessage}`);
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+      throw err;
+    }
+
+    // Direct localhost:5000 fallback
+    try {
+      const directRes = await fetch('http://localhost:5000/api/ai/analyze', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (directRes.ok) {
+        const json = await directRes.json();
+        if (json.success && json.ai) return json.ai;
+        if (json.ai) return json.ai;
+        return json;
+      }
+
+      const errText = await directRes.text();
+      let errorMessage = '';
+      try {
+        const parsed = JSON.parse(errText);
+        errorMessage = parsed.error || parsed.message || errText;
+      } catch (e) {
+        errorMessage = errText;
+      }
+
+      if (directRes.status === 429) {
+        throw new Error('Gemini API Rate Limit / Quota Exceeded (HTTP 429). Please retry in 60 seconds.');
+      } else if (directRes.status === 401) {
+        throw new Error('Gemini API Authentication Failed (HTTP 401). Please verify server GEMINI_API_KEY.');
+      } else {
+        throw new Error(`Express Backend API returned status ${directRes.status}: ${errorMessage}`);
+      }
+    } catch (directErr: any) {
+      if (directErr.message && !directErr.message.includes('Failed to fetch')) {
+        throw directErr;
+      }
+      throw new Error('Backend server on http://localhost:5000 is offline or unreachable.');
+    }
   }
-
-  const json = await directRes.json();
-  if (json.error && !json.ai) throw new Error(json.error);
-  return json.ai || json;
 }
 
 /**
@@ -392,14 +480,16 @@ async function callGeminiVisionEdgeFunction(file: File): Promise<any> {
 /**
  * Main Civic Image Classifier executing real Gemini Vision API via Node Express backend
  */
-export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
+export async function detectCivicIssue(file: File, bypassCache: boolean = false): Promise<AIVisionResult> {
   const startTime = performance.now();
   const imageHash = await computeImageHash(file);
 
-  // Check local cache by exact image hash
-  const cache = getAnalysisCache();
-  if (cache[imageHash]) {
-    return cache[imageHash];
+  // Check local cache by exact image hash unless bypassCache is requested
+  if (!bypassCache) {
+    const cache = getAnalysisCache();
+    if (cache[imageHash]) {
+      return cache[imageHash];
+    }
   }
 
   const visualFeatures = await extractVisualFeatures(file);
@@ -412,7 +502,7 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
     rawRes = await callExpressBackendAiAnalyze(file);
   } catch (err: any) {
     lastErrorMsg = err.message || 'Express Backend AI error';
-    console.log('[NAGARSETU AI] Express Backend API error, trying Python service...', lastErrorMsg);
+    console.log('[NAGARSETU AI] Express Backend API error:', lastErrorMsg);
   }
 
   // Layer 2: Call Python FastAPI microservice (http://localhost:8000/analyze)
@@ -421,7 +511,7 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
       rawRes = await callPythonAiServiceDirect(file);
     } catch (err: any) {
       if (!lastErrorMsg) lastErrorMsg = err.message;
-      console.log('[NAGARSETU AI] Python service unavailable, trying Supabase Edge Function...', err.message);
+      console.log('[NAGARSETU AI] Python service unavailable:', err.message);
     }
   }
 
@@ -431,7 +521,7 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
       rawRes = await callGeminiVisionEdgeFunction(file);
     } catch (err: any) {
       if (!lastErrorMsg) lastErrorMsg = err.message;
-      console.log('[NAGARSETU AI] Supabase Edge Function unavailable...', err.message);
+      console.log('[NAGARSETU AI] Supabase Edge Function unavailable:', err.message);
     }
   }
 
@@ -458,7 +548,7 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
       confidence: Math.round(confidence * 100) / 100,
       confidence_level: confidenceLevel,
       priority: (rawRes.priority as PriorityLevel) || meta.defaultPriority,
-      department: rawRes.recommended_department || meta.department,
+      department: normalizeDepartment(rawRes.recommended_department || meta.department, category),
       title: rawRes.title || meta.defaultTitle,
       description: rawRes.description || `Civic issue detected visually by Gemini Vision.`,
       visual_features: visualFeatures,
@@ -475,9 +565,12 @@ export async function detectCivicIssue(file: File): Promise<AIVisionResult> {
     return result;
   }
 
-  // If AI is offline or error occurred: Return explicit diagnostic error information
-  const errorReason = rawRes?.error || lastErrorMsg || 'Express Backend server on port 5000 is not running or unreachable.';
-  
+  // Format error reason cleanly without generic 'Failed to fetch'
+  let errorReason = rawRes?.error || lastErrorMsg || 'Backend server on http://localhost:5000 is offline or unreachable.';
+  if (errorReason.includes('Failed to fetch') || errorReason.includes('NetworkError')) {
+    errorReason = 'Backend server on http://localhost:5000 is offline or unreachable.';
+  }
+
   const errorResult: AIVisionResult = {
     mode: 'production',
     analysis_id: crypto.randomUUID(),

@@ -79,6 +79,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
       latitude,
       longitude,
       location_source,
+      location_address,
       department_id,
       duplicate_of_id
     } = req.body;
@@ -102,9 +103,9 @@ router.post('/submit', authenticateToken, async (req, res) => {
     const insertSql = `
       INSERT INTO complaints (
         citizen_id, photo_before_url, category, title, description, priority,
-        status, department_id, latitude, longitude, location_source, duplicate_of_id
+        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -118,10 +119,23 @@ router.post('/submit', authenticateToken, async (req, res) => {
       latitude,
       longitude,
       location_source,
+      location_address || '',
       duplicate_of_id || null
     ]);
 
     const complaintId = result.rows[0].id;
+
+    // Record initial status history
+    try {
+      const deptNameRes = await query(`SELECT name FROM departments WHERE id = ?`, [finalDeptId]);
+      const deptName = deptNameRes.rows?.[0]?.name || 'Municipal Triage Queue';
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [complaintId, 'Submitted', 'Complaint registered successfully by citizen.', deptName, 'Citizen']
+      );
+    } catch (hErr) {
+      console.warn('Failed to record initial status history:', hErr.message);
+    }
 
     // Send initial submission notification
     await notifyStatusChange(complaintId, 'Submitted', req.user.id);
@@ -133,6 +147,20 @@ router.post('/submit', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Submit complaint error:', err);
     return res.status(500).json({ error: 'Failed to submit complaint' });
+  }
+});
+
+// Get complaint status history timeline
+router.get('/:id/history', authenticateToken, async (req, res) => {
+  try {
+    const historyRes = await query(
+      `SELECT * FROM complaint_status_history WHERE complaint_id = ? ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+    return res.json({ history: historyRes.rows || [] });
+  } catch (err) {
+    console.error('Fetch complaint status history error:', err);
+    return res.status(500).json({ error: 'Failed to fetch status history' });
   }
 });
 
@@ -166,9 +194,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN users u ON c.citizen_id = u.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.id = ?
+      WHERE c.id = ? OR c.complaint_number = ?
     `;
-    const result = await query(sql, [req.params.id]);
+    const result = await query(sql, [req.params.id, req.params.id]);
     if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
@@ -184,7 +212,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       WHERE a.complaint_id = ?
       ORDER BY a.assigned_at DESC LIMIT 1
     `;
-    const assignRes = await query(assignSql, [req.params.id]);
+    const assignRes = await query(assignSql, [complaint.id]);
     complaint.assignment = assignRes.rows && assignRes.rows.length > 0 ? assignRes.rows[0] : null;
 
     return res.json({ complaint });

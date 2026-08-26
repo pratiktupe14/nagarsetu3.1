@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getPortalForRole } from '../context/AuthContext';
 import { UserRole } from '../types/database.types';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -25,18 +25,23 @@ export const LoginPage: React.FC = () => {
     setErrorMsg('');
     if (role === 'citizen') {
       setIdentifier('9876543210');
+      setPassword('password123');
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
+      setPassword('NagarSetu@Admin2026!');
     } else if (role === 'department_head') {
-      setIdentifier('pwd.head@nagarsetu.gov.in');
-    } else {
+      setIdentifier('rahul.patil@nagarsetu.gov.in');
+      setPassword('head123');
+    } else if (role === 'service_staff') {
       setIdentifier('staff@nagarsetu.gov.in');
+      setPassword('staff123');
     }
   };
 
-  const handleSendOtp = () => {
-    if (!identifier) {
-      setErrorMsg('Please enter your registered mobile number.');
+  const handleSendOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifier || identifier.length < 10) {
+      setErrorMsg('Please enter a valid 10-digit mobile number.');
       return;
     }
     setOtpSent(true);
@@ -61,16 +66,8 @@ export const LoginPage: React.FC = () => {
 
       const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
       const activeRole = currentUser?.role || selectedRole;
-
-      if (activeRole === 'city_admin') {
-        navigate('/admin/portal');
-      } else if (activeRole === 'department_head') {
-        navigate('/department/portal');
-      } else if (activeRole === 'service_staff') {
-        navigate('/staff/portal');
-      } else {
-        navigate('/citizen/portal');
-      }
+      const targetPortal = getPortalForRole(activeRole);
+      navigate(targetPortal);
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed. Please check credentials.');
     } finally {

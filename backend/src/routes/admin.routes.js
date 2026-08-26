@@ -6,7 +6,7 @@ const { query } = require('../config/db');
 
 // Admin Auth Guard
 router.use(authenticateToken);
-router.use(requireRole(['admin']));
+router.use(requireRole(['admin', 'city_admin']));
 
 // Admin Analytics summary
 router.get('/analytics', async (req, res) => {
@@ -137,6 +137,217 @@ router.post('/departments', async (req, res) => {
     return res.status(201).json({ message: 'Department created', id: result.rows[0].id });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to create department' });
+  }
+});
+
+// ==========================================
+// DEPARTMENT HEADS MANAGEMENT ENDPOINTS
+// ==========================================
+
+// GET all Department Heads
+router.get('/department-heads', async (req, res) => {
+  try {
+    const sql = `
+      SELECT dh.*, d.name as department_name, d.description as department_description,
+             u.id as linked_user_id, u.role as user_role, u.status as user_status
+      FROM department_heads dh
+      LEFT JOIN departments d ON d.id = dh.department_id
+      LEFT JOIN users u ON u.id = dh.user_id OR u.email = dh.email
+      ORDER BY dh.id DESC
+    `;
+    const result = await query(sql);
+    return res.json({ department_heads: result.rows });
+  } catch (err) {
+    console.error('Error fetching department heads:', err);
+    return res.status(500).json({ error: 'Failed to fetch department heads' });
+  }
+});
+
+// POST Create or Appoint Department Head
+router.post('/department-heads', async (req, res) => {
+  try {
+    const { name, fullName, email, phone, mobile, employeeId, departmentId, designation, password, status = 'active' } = req.body;
+    const cleanName = (fullName || name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPhone = (mobile || phone || '').trim() || '+91 98220 00000';
+    const cleanEmpId = (employeeId || '').trim();
+    const cleanDeptId = Number(departmentId);
+
+    if (!cleanName || !cleanEmail || !cleanDeptId) {
+      return res.status(400).json({ error: 'Name, email, and department ID are required.' });
+    }
+
+    // Email Uniqueness Check
+    const emailCheck = await query(`SELECT id, email, role FROM users WHERE email = ?`, [cleanEmail]);
+    let existingUser = emailCheck.rows && emailCheck.rows.length > 0 ? emailCheck.rows[0] : null;
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email address is already in use.' });
+    }
+
+    // Employee ID Uniqueness Check
+    if (cleanEmpId) {
+      const empCheck = await query(`SELECT id FROM users WHERE employee_id = ? AND email != ?`, [cleanEmpId, cleanEmail]);
+      if (empCheck.rows && empCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Employee ID is already in use.' });
+      }
+    }
+
+    // Password Hashing
+    let passwordHash = null;
+    if (password && password.length >= 6) {
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(password, salt);
+    } else {
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash('Nagarsetu@2026', salt);
+    }
+
+    // Create new User auth account
+    const insertUserRes = await query(
+      `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,
+      [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status]
+    );
+    const userId = insertUserRes.rows[0].id;
+
+    // If status is active, deactivate previous active heads for this department
+    if (status === 'active') {
+      await query(`UPDATE department_heads SET status = 'inactive' WHERE department_id = ?`, [cleanDeptId]);
+    }
+
+    // Insert or Update department_heads record
+    const dhCheck = await query(`SELECT id FROM department_heads WHERE user_id = ? OR email = ?`, [userId, cleanEmail]);
+    if (dhCheck.rows && dhCheck.rows.length > 0) {
+      await query(
+        `UPDATE department_heads SET user_id = ?, department_id = ?, name = ?, email = ?, phone = ?, employee_id = ?, designation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [userId, cleanDeptId, cleanName, cleanEmail, cleanPhone, cleanEmpId, designation || 'Department Head', status, dhCheck.rows[0].id]
+      );
+    } else {
+      await query(
+        `INSERT INTO department_heads (user_id, department_id, name, email, phone, employee_id, designation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, cleanDeptId, cleanName, cleanEmail, cleanPhone, cleanEmpId, designation || 'Department Head', status]
+      );
+    }
+
+    return res.status(201).json({
+      message: 'Department Head saved successfully',
+      user_id: userId,
+      department_id: cleanDeptId,
+      status
+    });
+  } catch (err) {
+    console.error('Error saving department head:', err);
+    return res.status(500).json({ error: 'Failed to save Department Head: ' + err.message });
+  }
+});
+
+// PUT Update Department Head by ID
+router.put('/department-heads/:id', async (req, res) => {
+  try {
+    const headId = req.params.id;
+    const { name, fullName, email, phone, mobile, employeeId, departmentId, designation, password, status } = req.body;
+
+    const dhRes = await query(`SELECT * FROM department_heads WHERE id = ? OR user_id = ?`, [headId, headId]);
+    const uRes = await query(`SELECT * FROM users WHERE id = ? OR email = ?`, [headId, email || '']);
+
+    if ((!dhRes.rows || dhRes.rows.length === 0) && (!uRes.rows || uRes.rows.length === 0)) {
+      return res.status(404).json({ error: 'Department Head not found.' });
+    }
+
+    const currentHead = dhRes.rows[0] || {};
+    const currentUser = uRes.rows[0] || {};
+    const targetUserId = currentHead.user_id || currentUser.id;
+    const targetEmail = currentHead.email || currentUser.email;
+
+    const newName = (fullName || name || currentHead.name || currentUser.name).trim();
+    const newEmail = (email || targetEmail).trim().toLowerCase();
+    const newPhone = (mobile || phone || currentHead.phone || currentUser.mobile || '+91 98220 00000').trim();
+    const newEmpId = (employeeId !== undefined ? employeeId : (currentHead.employee_id || currentUser.employee_id || '')).trim();
+    const newDeptId = departmentId ? Number(departmentId) : (currentHead.department_id || currentUser.department_id);
+    const newStatus = status || currentHead.status || currentUser.status || 'active';
+
+    // Email Uniqueness check if email changed
+    if (targetEmail && newEmail !== targetEmail.toLowerCase()) {
+      const emailCheck = await query(`SELECT id FROM users WHERE LOWER(email) = ? AND id != ? AND LOWER(email) != ?`, [newEmail, targetUserId, targetEmail.toLowerCase()]);
+      if (emailCheck.rows && emailCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Email address is already in use.' });
+      }
+    }
+
+    // Password Hash update if provided
+    let passwordHash = null;
+    if (password && password.trim().length > 0) {
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(password.trim(), salt);
+    }
+
+    // Update Users Auth Account
+    if (passwordHash) {
+      await query(
+        `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, department_id = ?, employee_id = ?, status = ? WHERE id = ? OR email = ?`,
+        [newName, newPhone, newEmail, passwordHash, newDeptId, newEmpId, newStatus, targetUserId, targetEmail]
+      );
+    } else {
+      await query(
+        `UPDATE users SET name = ?, mobile = ?, email = ?, department_id = ?, employee_id = ?, status = ? WHERE id = ? OR email = ?`,
+        [newName, newPhone, newEmail, newDeptId, newEmpId, newStatus, targetUserId, targetEmail]
+      );
+    }
+
+    // Update Department Heads record
+    if (currentHead.id) {
+      await query(
+        `UPDATE department_heads SET name = ?, email = ?, phone = ?, employee_id = ?, department_id = ?, designation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newName, newEmail, newPhone, newEmpId, newDeptId, designation || currentHead.designation || 'Department Head', newStatus, currentHead.id]
+      );
+    } else {
+      await query(
+        `INSERT INTO department_heads (user_id, department_id, name, email, phone, employee_id, designation, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [targetUserId, newDeptId, newName, newEmail, newPhone, newEmpId, designation || 'Department Head', newStatus]
+      );
+    }
+
+    return res.json({ message: 'Department Head updated successfully' });
+  } catch (err) {
+    console.error('Error updating department head:', err);
+    return res.status(500).json({ error: 'Failed to update Department Head: ' + err.message });
+  }
+});
+
+// Deactivate Department Head
+router.post('/department-heads/:id/deactivate', async (req, res) => {
+  try {
+    const headId = req.params.id;
+    const dhRes = await query(`SELECT * FROM department_heads WHERE id = ? OR user_id = ?`, [headId, headId]);
+    if (dhRes.rows && dhRes.rows.length > 0) {
+      const head = dhRes.rows[0];
+      await query(`UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ? OR user_id = ?`, [headId, headId]);
+      await query(`UPDATE users SET status = 'inactive' WHERE id = ? OR email = ?`, [head.user_id, head.email]);
+    } else {
+      await query(`UPDATE users SET status = 'inactive' WHERE id = ?`, [headId]);
+    }
+    return res.json({ message: 'Department Head deactivated successfully' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to deactivate Department Head' });
+  }
+});
+
+// Reactivate Department Head
+router.post('/department-heads/:id/reactivate', async (req, res) => {
+  try {
+    const headId = req.params.id;
+    const dhRes = await query(`SELECT * FROM department_heads WHERE id = ? OR user_id = ?`, [headId, headId]);
+    if (dhRes.rows && dhRes.rows.length > 0) {
+      const head = dhRes.rows[0];
+      await query(`UPDATE department_heads SET status = 'inactive' WHERE department_id = ?`, [head.department_id]);
+      await query(`UPDATE department_heads SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ? OR user_id = ?`, [headId, headId]);
+      await query(`UPDATE users SET status = 'active' WHERE id = ? OR email = ?`, [head.user_id, head.email]);
+    } else {
+      await query(`UPDATE users SET status = 'active' WHERE id = ?`, [headId]);
+    }
+    return res.json({ message: 'Department Head reactivated successfully' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to reactivate Department Head' });
   }
 });
 

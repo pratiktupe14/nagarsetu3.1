@@ -53,6 +53,13 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
 
 export const DEMO_USERS = DEFAULT_ROLE_USERS;
 
+export function getPortalForRole(role: UserRole): string {
+  if (role === 'city_admin') return '/admin/portal';
+  if (role === 'department_head') return '/department/portal';
+  if (role === 'service_staff') return '/staff/portal';
+  return '/citizen/portal';
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile>(() => {
     const cached = localStorage.getItem('nagarsetu_user');
@@ -71,9 +78,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let isMounted = true;
 
+    // Safety timeout guard: Force loading to false after 3.5s so app NEVER locks on loading screen
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 3500);
+
     async function checkCurrentSession() {
       if (!isSupabaseConfigured()) {
         if (isMounted) setLoading(false);
+        clearTimeout(safetyTimer);
         return;
       }
 
@@ -125,6 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn('Supabase Auth Session Check:', err);
       } finally {
         if (isMounted) setLoading(false);
+        clearTimeout(safetyTimer);
       }
     }
 
@@ -179,6 +193,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimer);
       if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
         try {
           authSubscription.unsubscribe();
@@ -194,9 +209,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const login = async (identifier: string, password: string, targetRole: UserRole): Promise<boolean> => {
-    setLoading(true);
     try {
-      const cleanEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : `${identifier.trim().toLowerCase()}@nagarsetu.gov.in`;
+      const cleanIdentifier = identifier.trim();
+
+      // 1. Try Local Express Backend API authentication first
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token && data.user) {
+            const mappedRole: UserRole = data.user.role === 'admin' ? 'city_admin' : (data.user.role as UserRole);
+            const authenticatedUser: UserProfile = {
+              id: String(data.user.id),
+              full_name: data.user.name || 'Municipal User',
+              email: data.user.email || cleanIdentifier,
+              mobile: data.user.mobile || '',
+              role: mappedRole,
+              language_pref: data.user.language_pref || 'en'
+            };
+            setUser(authenticatedUser);
+            localStorage.setItem('nagarsetu_token', data.token);
+            localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+            return true;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend API login note:', backendErr);
+      }
+
+      const cleanEmail = cleanIdentifier.includes('@') ? cleanIdentifier.toLowerCase() : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
 
       if (isSupabaseConfigured()) {
         // Check if user has an inactive department_head assignment with no active assignment
@@ -289,8 +334,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e: any) {
       console.warn('Supabase Auth Login error:', e);
       throw e;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -313,7 +356,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     email: string,
     password?: string
   ): Promise<boolean> => {
-    setLoading(true);
     try {
       if (isSupabaseConfigured() && email && password) {
         const { data, error } = await supabase.auth.signUp({
@@ -367,8 +409,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {
       console.error('Registration Error:', e);
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -393,6 +433,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
           <span>NAGARSETU 3.0 — Loading workspace...</span>
         </div>
+        <button
+          onClick={() => setLoading(false)}
+          className="mt-4 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-700 font-bold text-[11px] rounded-lg transition-colors border border-gray-300"
+        >
+          Proceed to Portal
+        </button>
       </div>
     );
   }

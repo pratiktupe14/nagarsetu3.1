@@ -3,6 +3,7 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import {
   getDepartmentHeads,
   createDepartmentHead,
+  updateDepartmentHead,
   deactivateDepartmentHead,
   reactivateDepartmentHead,
   DepartmentLeadershipSummary
@@ -47,6 +48,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
   const [showChangeHeadModal, setShowChangeHeadModal] = useState<DepartmentLeadershipSummary | null>(null);
   const [viewHeadProfileModal, setViewHeadProfileModal] = useState<DepartmentLeadershipSummary | null>(null);
   const [deactivateModalHead, setDeactivateModalHead] = useState<DepartmentLeadershipSummary | null>(null);
+  const [editHeadModal, setEditHeadModal] = useState<DepartmentLeadershipSummary | null>(null);
 
   // Form State for Add / Edit Department Head
   const [formFullName, setFormFullName] = useState('');
@@ -239,6 +241,59 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       await loadData();
     } catch (e: any) {
       alert(e.message || 'Failed to reactivate Department Head.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Open Edit Profile Modal
+  const openEditModal = (row: DepartmentLeadershipSummary) => {
+    setEditHeadModal(row);
+    setFormFullName(row.headName || '');
+    setFormEmail(row.headEmail || '');
+    setFormPhone(row.headPhone || '');
+    setFormEmployeeId(row.employeeId || '');
+    setFormDesignation(row.designation || 'Department Head');
+    setFormDeptId(row.deptId || row.deptCode);
+    setFormPassword('');
+    setFormConfirmPassword('');
+    setValidationError(null);
+  };
+
+  // Execute Update Department Head
+  const handleUpdateDepartmentHead = async () => {
+    if (!editHeadModal || !editHeadModal.headId) return;
+    setValidationError(null);
+
+    if (!formFullName.trim()) {
+      setValidationError('Please enter Full Name.');
+      return;
+    }
+    if (!formEmail.trim() || !formEmail.includes('@')) {
+      setValidationError('Please enter a valid Official Email address.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await updateDepartmentHead(editHeadModal.headId, {
+        fullName: formFullName.trim(),
+        email: formEmail.trim().toLowerCase(),
+        phone: formPhone.trim(),
+        employeeId: formEmployeeId.trim(),
+        departmentId: formDeptId,
+        designation: formDesignation.trim(),
+        password: formPassword.trim() || undefined,
+        performedByUserId: user?.id
+      });
+
+      setToastMessage(`Department Head profile updated successfully.`);
+      setTimeout(() => setToastMessage(null), 4000);
+      setEditHeadModal(null);
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setValidationError(err.message || 'Error updating Department Head.');
     } finally {
       setSubmitting(false);
     }
@@ -452,6 +507,16 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
                         </button>
+
+                        {row.headId && (
+                          <button
+                            onClick={() => openEditModal(row)}
+                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px] rounded-lg transition-colors inline-flex items-center space-x-1"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                            <span>Edit Profile</span>
+                          </button>
+                        )}
 
                         <button
                           onClick={() => {
@@ -798,6 +863,124 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   className="px-5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs"
                 >
                   Close Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT DEPARTMENT HEAD PROFILE MODAL */}
+        {editHeadModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
+            <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                    <Edit className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-gray-900 font-outfit">Edit Department Head Profile</h3>
+                    <p className="text-xs text-gray-500 font-mono">{editHeadModal.deptName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditHeadModal(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {validationError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{validationError}</span>
+                </div>
+              )}
+
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={formFullName}
+                    onChange={(e) => setFormFullName(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Official Email Address</label>
+                    <input
+                      type="email"
+                      value={formEmail}
+                      onChange={(e) => setFormEmail(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:bg-white focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      value={formEmployeeId}
+                      onChange={(e) => setFormEmployeeId(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:bg-white focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Contact Phone</label>
+                    <input
+                      type="text"
+                      value={formPhone}
+                      onChange={(e) => setFormPhone(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:bg-white focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Department</label>
+                    <select
+                      value={formDeptId}
+                      onChange={(e) => setFormDeptId(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500"
+                    >
+                      {SIX_DEPARTMENTS_META.map((d) => (
+                        <option key={d.code} value={d.code}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                  <label className="block text-amber-900 font-bold">New Password (Optional)</label>
+                  <p className="text-[11px] text-amber-700">Leave blank to keep current login password unchanged.</p>
+                  <input
+                    type="password"
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    placeholder="Enter new password to reset"
+                    className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditHeadModal(null)}
+                  className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateDepartmentHead}
+                  disabled={submitting}
+                  className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider"
+                >
+                  {submitting ? 'Saving Updates...' : 'Save Profile Changes'}
                 </button>
               </div>
             </div>

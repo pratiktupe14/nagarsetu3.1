@@ -40,6 +40,10 @@ router.post('/task/:id/status', async (req, res) => {
     }
 
     await query(`UPDATE complaints SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, req.params.id]);
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+      [req.params.id, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
+    ).catch(() => {});
     await notifyStatusChange(req.params.id, status, compRes.rows[0].citizen_id);
 
     return res.json({ message: `Task status updated to ${status}` });
@@ -69,6 +73,11 @@ router.post('/task/:id/resolve', upload.single('photo_after'), async (req, res) 
       `UPDATE complaints SET photo_after_url = ?, status = 'Resolved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [photoAfterUrl, req.params.id]
     );
+
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+      [req.params.id, 'Resolved', 'Field work completed with resolution photo proof.', 'Field Operations', req.user.name || 'Field Staff']
+    ).catch(() => {});
 
     // Update assignment record with resolved_at timestamp
     await query(

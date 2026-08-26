@@ -61,18 +61,46 @@ router.post('/login', async (req, res) => {
     }
 
     const user = resUser.rows[0];
+
+    if (user.status === 'inactive') {
+      return res.status(401).json({ error: 'Account is inactive. Please contact City Administration.' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    let departmentId = user.department_id || null;
+    let departmentName = null;
+
+    if (user.role === 'department_head' || user.role === 'staff' || user.role === 'officer') {
+      // Check department_heads table for active assignment
+      const dhRes = await query(`SELECT dh.*, d.name as dept_name FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE (dh.user_id = ? OR dh.email = ?) AND dh.status = 'active' ORDER BY dh.id DESC LIMIT 1`, [user.id, user.email || '']);
+      if (dhRes.rows && dhRes.rows.length > 0) {
+        departmentId = dhRes.rows[0].department_id;
+        departmentName = dhRes.rows[0].dept_name;
+      } else if (departmentId) {
+        const dRes = await query(`SELECT name FROM departments WHERE id = ?`, [departmentId]);
+        if (dRes.rows && dRes.rows.length > 0) {
+          departmentName = dRes.rows[0].name;
+        }
+      }
+    }
+
+    const userRole = user.role === 'admin' ? 'city_admin' : user.role;
+
     const userObj = {
       id: user.id,
       name: user.name,
       mobile: user.mobile,
       email: user.email,
-      role: user.role,
+      role: userRole,
+      department_id: departmentId,
+      department_name: departmentName,
+      employee_id: user.employee_id || null,
+      status: user.status || 'active',
       language_pref: user.language_pref
     };
 

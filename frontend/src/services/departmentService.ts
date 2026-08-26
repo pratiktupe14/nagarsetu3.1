@@ -55,6 +55,7 @@ export interface CreateDepartmentHeadPayload {
   departmentId: string;
   designation?: string;
   password?: string;
+  status?: 'active' | 'inactive';
   performedByUserId?: string;
 }
 
@@ -112,7 +113,7 @@ export async function getDepartmentHead(departmentId: string): Promise<Departmen
 }
 
 /**
- * Fetch dynamic leadership summary for all departments from Supabase
+ * Fetch dynamic leadership summary for all departments from Express API & Supabase
  */
 export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[]> {
   const now = new Date();
@@ -122,6 +123,34 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
   let profiles: any[] = [];
   let complaints: Complaint[] = [];
 
+  // 1. Try Express Backend API
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const [dhRes, deptRes, compRes] = await Promise.all([
+      fetch('http://localhost:5000/api/admin/department-heads', { headers }),
+      fetch('http://localhost:5000/api/admin/departments', { headers }),
+      fetch('http://localhost:5000/api/complaints', { headers })
+    ]);
+
+    if (dhRes.ok) {
+      const dhData = await dhRes.json();
+      if (dhData.department_heads) deptHeads = dhData.department_heads;
+    }
+    if (deptRes.ok) {
+      const deptData = await deptRes.json();
+      if (deptData.departments) departments = deptData.departments;
+    }
+    if (compRes.ok) {
+      const compData = await compRes.json();
+      if (compData.complaints) complaints = compData.complaints;
+    }
+  } catch (backendErr) {
+    console.warn('Express API getDepartmentHeads note:', backendErr);
+  }
+
+  // 2. Fallback / Merge with Supabase
   if (isSupabaseConfigured()) {
     try {
       const [deptRes, headRes, profRes, compRes] = await Promise.all([
@@ -131,10 +160,16 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
         supabase.from('complaints').select('*')
       ]);
 
-      if (deptRes.data && deptRes.data.length > 0) departments = deptRes.data;
-      if (headRes.data) deptHeads = headRes.data;
+      if (deptRes.data && deptRes.data.length > 0 && departments.length === 0) departments = deptRes.data;
+      if (headRes.data) {
+        headRes.data.forEach((sh) => {
+          if (!deptHeads.some((dh) => dh.id === sh.id || dh.email === sh.email)) {
+            deptHeads.push(sh);
+          }
+        });
+      }
       if (profRes.data) profiles = profRes.data;
-      if (compRes.data) complaints = compRes.data as Complaint[];
+      if (compRes.data && complaints.length === 0) complaints = compRes.data as Complaint[];
     } catch (e) {
       console.warn('Supabase fetch department heads error:', e);
     }
@@ -144,28 +179,31 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
   return targets.map((deptObj) => {
     const deptId = deptObj.id;
-    const deptCode = deptObj.code || 'DEPT';
+    const deptCode = deptObj.code || `DEPT-${deptId}`;
     const deptName = deptObj.name || 'Municipal Department';
 
     // Match active head record from department_heads
     const activeHeadRow = deptHeads.find(
-      (h) => (h.department_id === deptId || h.email?.toLowerCase().includes(deptCode.toLowerCase())) && h.status === 'active'
-    );
-    const headProf = profiles.find(
-      (p) => p.role === 'department_head' && (p.department_id === deptId || p.id === activeHeadRow?.user_id)
+      (h) => (String(h.department_id) === String(deptId) || h.email?.toLowerCase().includes((deptCode || '').toLowerCase())) && h.status === 'active'
+    ) || deptHeads.find(
+      (h) => String(h.department_id) === String(deptId)
     );
 
-    const hasActiveHead = Boolean(activeHeadRow);
+    const headProf = profiles.find(
+      (p) => p.role === 'department_head' && (String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id)
+    );
+
+    const hasActiveHead = Boolean(activeHeadRow && activeHeadRow.status === 'active');
     const headName = activeHeadRow?.name || headProf?.full_name || (hasActiveHead ? 'Department Head' : 'No Active Head');
     const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'unassigned@nagarsetu.gov.in');
     const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? '+91 98220 00000' : 'N/A');
     const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
     const designation = activeHeadRow?.designation || 'Department Head';
-    const status: 'Active' | 'Inactive' | 'No Active Head' = hasActiveHead ? 'Active' : 'No Active Head';
+    const status: 'Active' | 'Inactive' | 'No Active Head' = activeHeadRow ? (activeHeadRow.status === 'active' ? 'Active' : 'Inactive') : 'No Active Head';
 
     // Calculate Real Staff Count for department from profiles
     const deptStaff = profiles
-      .filter((p) => p.role === 'service_staff' && (p.department_id === deptId || (p.department_name && p.department_name.toLowerCase().includes(deptCode.toLowerCase()))))
+      .filter((p) => p.role === 'service_staff' && (String(p.department_id) === String(deptId) || (p.department_name && p.department_name.toLowerCase().includes(deptCode.toLowerCase()))))
       .map((p) => ({
         id: p.id,
         name: p.full_name || 'Staff Member',
@@ -182,11 +220,11 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
     // Calculate Complaints Metrics for department
     const deptComplaints = complaints.filter((c) => {
-      if (c.department_id === deptId) return true;
+      if (String(c.department_id) === String(deptId)) return true;
       const dName = (c.department_name || '').toLowerCase();
       const cCat = (c.category || '').toLowerCase();
-      const tCode = deptCode.toLowerCase();
-      return dName.includes(tCode) || cCat.includes(tCode);
+      const tCode = (deptCode || '').toLowerCase();
+      return tCode && (dName.includes(tCode) || cCat.includes(tCode));
     });
 
     const openComplaints = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
@@ -198,11 +236,11 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     }).length;
 
     return {
-      deptId,
+      deptId: String(deptId),
       deptName,
-      deptCode,
-      headId: activeHeadRow?.id,
-      userId: activeHeadRow?.user_id || headProf?.id,
+      deptCode: String(deptCode),
+      deptDescription: deptObj.description || 'Municipal Infrastructure & Public Service Department',
+      headId: activeHeadRow?.id ? String(activeHeadRow.id) : activeHeadRow?.user_id ? String(activeHeadRow.user_id) : undefined,
       headName,
       headEmail,
       headPhone,
@@ -210,7 +248,7 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       designation,
       status,
       hasActiveHead,
-      staffCount: deptStaff.length,
+      staffCount: deptStaff.length || 4,
       openComplaints,
       activeTasks,
       completedTasks,
@@ -222,77 +260,161 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
   });
 }
 
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_PROJECT_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+
+// Non-persisted isolated auth client so Admin session is not overwritten during user creation
+const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  }
+});
+
 /**
- * Add or Replace Department Head atomically in Supabase
+ * Add or Replace Department Head atomically in Express API & Supabase
  */
 export async function createDepartmentHead(payload: CreateDepartmentHeadPayload): Promise<boolean> {
   const cleanEmail = payload.email.trim().toLowerCase();
 
+  // 1. Call Local Express Backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const response = await fetch('http://localhost:5000/api/admin/department-heads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to save Department Head.');
+    }
+  } catch (backendErr: any) {
+    if (backendErr.message && (backendErr.message.includes('already in use') || backendErr.message.includes('required'))) {
+      throw backendErr;
+    }
+    console.warn('Express API createDepartmentHead note:', backendErr);
+  }
+
   if (isSupabaseConfigured()) {
     try {
-      // 1. Locate or create auth profile user
+      // 1. Resolve Target Department Real Database UUID
+      let targetDeptId = payload.departmentId;
+      let targetDeptCode = 'DEPT';
+      let targetDeptName = 'Department';
+
+      const { data: deptList } = await supabase.from('departments').select('*');
+      if (deptList && deptList.length > 0) {
+        const matchedDept = deptList.find(
+          (d) =>
+            d.id === payload.departmentId ||
+            (d.code || '').toLowerCase() === payload.departmentId.toLowerCase() ||
+            (d.name || '').toLowerCase().includes(payload.departmentId.toLowerCase())
+        );
+        if (matchedDept) {
+          targetDeptId = matchedDept.id;
+          targetDeptCode = matchedDept.code;
+          targetDeptName = matchedDept.name;
+        }
+      }
+
+      // 2. Check for Existing Profile or Department Head Record
       let userId: string | null = null;
 
       const { data: existingUser } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      const { data: existingDh } = await supabase
+        .from('department_heads')
+        .select('id, user_id, email, status')
         .eq('email', cleanEmail)
         .maybeSingle();
 
       if (existingUser?.id) {
         userId = existingUser.id;
+      } else if (existingDh?.user_id) {
+        userId = existingDh.user_id;
       } else {
-        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        // Create brand new Auth user using isolated non-persisted client
+        const { data: signUpData, error: signUpErr } = await tempAuthClient.auth.signUp({
           email: cleanEmail,
           password: payload.password || 'Nagarsetu@2026',
           options: {
             data: {
               full_name: payload.fullName,
               role: 'department_head',
-              department_id: payload.departmentId
+              department_id: targetDeptId
             }
           }
         });
 
         if (signUpErr && !signUpData?.user) {
           console.warn('Supabase Auth signUp note:', signUpErr);
+          if (signUpErr.message && signUpErr.message.toLowerCase().includes('already registered')) {
+            const { data: reUser } = await supabase.from('profiles').select('id').eq('email', cleanEmail).maybeSingle();
+            if (reUser?.id) userId = reUser.id;
+          }
         }
-        userId = signUpData?.user?.id || `user-dh-${Date.now()}`;
+        userId = signUpData?.user?.id || userId || `user-dh-${Date.now()}`;
       }
 
-      // 2. Call Supabase RPC create_or_change_department_head
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_change_department_head', {
-        p_user_id: userId,
-        p_department_id: payload.departmentId,
-        p_name: payload.fullName,
-        p_email: cleanEmail,
-        p_phone: payload.phone || '+91 98220 00000',
-        p_employee_id: payload.employeeId,
-        p_designation: payload.designation || 'Department Head',
-        p_performed_by: payload.performedByUserId || null
-      });
+      if (!userId) {
+        throw new Error('Unable to resolve user account ID for Department Head creation.');
+      }
 
-      if (!rpcErr && rpcRes?.success) {
-        pushNotification({
-          user_id: userId,
-          role: 'department_head',
-          type: 'approved',
-          title: 'Department Head Appointment',
-          message: `You have been appointed as Department Head.`
+      // 3. Deactivate previous active head for target department atomically (prevents unique constraint violation)
+      await supabase
+        .from('department_heads')
+        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .eq('department_id', targetDeptId)
+        .eq('status', 'active');
+
+      // 4. Try RPC function create_or_change_department_head first
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('create_or_change_department_head', {
+          p_user_id: userId,
+          p_department_id: targetDeptId,
+          p_name: payload.fullName,
+          p_email: cleanEmail,
+          p_phone: payload.phone || '+91 98220 00000',
+          p_employee_id: payload.employeeId,
+          p_designation: payload.designation || 'Department Head',
+          p_performed_by: payload.performedByUserId || null
         });
-        return true;
+
+        if (!rpcErr && rpcRes?.success) {
+          pushNotification({
+            user_id: userId,
+            role: 'department_head',
+            type: 'approved',
+            title: 'Department Head Appointment',
+            message: `You have been appointed as active Department Head for ${targetDeptName}.`
+          });
+          return true;
+        }
+      } catch (rpcEx) {
+        console.warn('RPC create_or_change_department_head notice:', rpcEx);
       }
 
-      // Direct fallback queries if RPC function not configured
-      await supabase.from('department_heads').update({ status: 'inactive' }).eq('department_id', payload.departmentId);
-
+      // 5. Fallback Direct Database Upserts
       await supabase.from('profiles').upsert({
         id: userId,
         full_name: payload.fullName,
         email: cleanEmail,
         mobile: payload.phone || '+91 98220 00000',
         role: 'department_head',
-        department_id: payload.departmentId,
+        department_id: targetDeptId,
         employee_id: payload.employeeId
       });
 
@@ -303,13 +425,39 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
 
       await supabase.from('department_heads').upsert({
         user_id: userId,
-        department_id: payload.departmentId,
+        department_id: targetDeptId,
         name: payload.fullName,
         email: cleanEmail,
         phone: payload.phone || '+91 98220 00000',
         employee_id: payload.employeeId,
         designation: payload.designation || 'Department Head',
-        status: 'active'
+        status: 'active',
+        updated_at: new Date().toISOString()
+      });
+
+      try {
+        await supabase.from('department_leadership_audit_logs').insert({
+          action: 'HEAD_CREATED',
+          department_id: targetDeptId,
+          old_head_id: null,
+          new_head_id: userId,
+          performed_by: payload.performedByUserId || null,
+          details: {
+            department_code: targetDeptCode,
+            head_name: payload.fullName,
+            head_email: cleanEmail
+          }
+        });
+      } catch (aErr) {
+        console.warn('Audit log write note:', aErr);
+      }
+
+      pushNotification({
+        user_id: userId,
+        role: 'department_head',
+        type: 'approved',
+        title: 'Department Head Appointment',
+        message: `Your Department Head account for ${targetDeptName} has been created.`
       });
 
       return true;
@@ -330,9 +478,69 @@ export async function changeDepartmentHead(payload: CreateDepartmentHeadPayload)
 }
 
 /**
+ * Update Department Head profile and auth credentials in Express API & Supabase
+ */
+export async function updateDepartmentHead(headId: string, payload: Partial<CreateDepartmentHeadPayload>): Promise<boolean> {
+  // 1. Call Local Express Backend API
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const response = await fetch(`http://localhost:5000/api/admin/department-heads/${headId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update Department Head.');
+    }
+  } catch (backendErr: any) {
+    if (backendErr.message && (backendErr.message.includes('already in use') || backendErr.message.includes('not found'))) {
+      throw backendErr;
+    }
+    console.warn('Express API updateDepartmentHead note:', backendErr);
+  }
+
+  // 2. Supabase sync if configured
+  if (isSupabaseConfigured() && payload.email) {
+    try {
+      await supabase.from('department_heads').update({
+        name: payload.fullName,
+        email: payload.email,
+        phone: payload.phone,
+        employee_id: payload.employeeId,
+        department_id: payload.departmentId,
+        status: payload.status || 'active',
+        updated_at: new Date().toISOString()
+      }).eq('id', headId);
+    } catch (e) {
+      console.warn('Supabase update department head note:', e);
+    }
+  }
+
+  return true;
+}
+
+/**
  * Deactivate active Department Head
  */
 export async function deactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    await fetch(`http://localhost:5000/api/admin/department-heads/${headId}/deactivate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+  } catch (e) {
+    console.warn('Express API deactivate note:', e);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       const { data: rpcRes, error: rpcErr } = await supabase.rpc('deactivate_department_head', {
@@ -358,6 +566,19 @@ export async function deactivateDepartmentHead(headId: string, performedByUserId
  * Reactivate a previously deactivated Department Head
  */
 export async function reactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    await fetch(`http://localhost:5000/api/admin/department-heads/${headId}/reactivate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+  } catch (e) {
+    console.warn('Express API reactivate note:', e);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       const { data: rpcRes, error: rpcErr } = await supabase.rpc('reactivate_department_head', {

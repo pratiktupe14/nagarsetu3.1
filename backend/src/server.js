@@ -48,19 +48,20 @@ async function seedDefaultUsers() {
     if (resCount.rows && resCount.rows[0].count === 0) {
       console.log('Seeding default demo users (Citizen, Officer, Staff, Admin)...');
       const salt = await bcrypt.genSalt(10);
-      const password_hash = await bcrypt.hash('password123', salt);
+      const defaultHash = await bcrypt.hash('password123', salt);
+      const adminHash = await bcrypt.hash('NagarSetu@Admin2026!', salt);
 
       const usersToSeed = [
-        { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en' },
-        { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en' },
-        { name: 'Ramesh Kumar (Field Staff)', mobile: '9876543212', email: 'staff@nagarsetu.gov.in', role: 'staff', lang: 'en' },
-        { name: 'Municipal Admin', mobile: '9876543213', email: 'admin@nagarsetu.gov.in', role: 'admin', lang: 'en' }
+        { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en', passHash: defaultHash },
+        { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en', passHash: defaultHash },
+        { name: 'Ramesh Kumar (Field Staff)', mobile: '9876543212', email: 'staff@nagarsetu.gov.in', role: 'staff', lang: 'en', passHash: defaultHash },
+        { name: 'Municipal Admin', mobile: '9876543213', email: 'admin@nagarsetu.gov.in', role: 'admin', lang: 'en', passHash: adminHash }
       ];
 
       for (const u of usersToSeed) {
         await query(
           `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
-          [u.name, u.mobile, u.email, password_hash, u.role, u.lang]
+          [u.name, u.mobile, u.email, u.passHash, u.role, u.lang]
         );
       }
       console.log('Default demo users seeded successfully.');

@@ -219,7 +219,28 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
 }
 
 export async function getComplaintById(idOrNumber: string): Promise<Complaint | null> {
-  if (isSupabaseConfigured()) {
+  if (!idOrNumber) return null;
+
+  let comp: Complaint | null = null;
+
+  // 1. Try local Express Backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const res = await fetch(`http://localhost:5000/api/complaints/${encodeURIComponent(idOrNumber)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.complaint) {
+        comp = data.complaint as Complaint;
+      }
+    }
+  } catch (backendErr) {
+    console.warn('Express backend getComplaintById fallback note:', backendErr);
+  }
+
+  // 2. Try Supabase if configured
+  if (!comp && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -228,22 +249,37 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
         .single();
 
       if (!error && data) {
-        return data as Complaint;
+        comp = data as Complaint;
       }
     } catch (err) {
       console.warn('Supabase getComplaintById fallback:', err);
     }
   }
 
-  const all = getStoredComplaints();
-  return all.find((c) => c.id === idOrNumber || c.complaint_number === idOrNumber) || null;
+  // 3. Try LocalStorage cached complaints fallback
+  if (!comp) {
+    const all = getStoredComplaints();
+    comp = all.find((c) => String(c.id) === String(idOrNumber) || (c.complaint_number && c.complaint_number.toLowerCase() === idOrNumber.toLowerCase())) || null;
+  }
+
+  if (comp) {
+    if (comp.latitude != null) comp.latitude = Number(comp.latitude);
+    if (comp.longitude != null) comp.longitude = Number(comp.longitude);
+  }
+
+  return comp;
 }
 
-// Insert new complaint into Supabase
+// Insert new complaint into Supabase & LocalStorage
 export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_at' | 'updated_at'>): Promise<Complaint> {
   const newComplaintNumber = payload.complaint_number || generateComplaintNumber();
+  const parsedLat = payload.latitude != null ? Number(payload.latitude) : 0;
+  const parsedLng = payload.longitude != null ? Number(payload.longitude) : 0;
+
   const newComplaint: Complaint = {
     ...payload,
+    latitude: parsedLat,
+    longitude: parsedLng,
     complaint_number: newComplaintNumber,
     id: 'comp-' + Date.now(),
     created_at: new Date().toISOString(),

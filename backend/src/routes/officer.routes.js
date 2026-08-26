@@ -77,10 +77,18 @@ router.post('/verify', async (req, res) => {
 
     if (action === 'approve') {
       await query(`UPDATE complaints SET status = 'Verified', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [complaint_id]);
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [complaint_id, 'Verified', 'Complaint verified and approved by municipal officer.', 'Municipal Review', req.user.name || 'Municipal Officer']
+      ).catch(() => {});
       await notifyStatusChange(complaint_id, 'Verified', citizenId);
       return res.json({ message: 'Complaint verified and approved' });
     } else if (action === 'reject') {
       await query(`UPDATE complaints SET status = 'Rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [complaint_id]);
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [complaint_id, 'Rejected', rejection_reason || 'Does not meet municipal criteria.', 'Municipal Review', req.user.name || 'Municipal Officer']
+      ).catch(() => {});
       await notifyStatusChange(complaint_id, 'Rejected', citizenId, rejection_reason);
       return res.json({ message: 'Complaint rejected' });
     }
@@ -123,6 +131,16 @@ router.post('/assign', async (req, res) => {
     updateSql += ` WHERE id = ?`;
     params.push(complaint_id);
     await query(updateSql, params);
+
+    // Record status history
+    try {
+      const staffRes = await query(`SELECT name FROM users WHERE id = ?`, [staff_id]);
+      const staffName = staffRes.rows?.[0]?.name || 'Field Officer';
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [complaint_id, 'Assigned', `Assigned to field staff ${staffName}.`, 'Department Operations', req.user.name || 'Municipal Officer']
+      );
+    } catch (hErr) {}
 
     // Trigger Notification
     await notifyStatusChange(complaint_id, 'Assigned', citizenId);

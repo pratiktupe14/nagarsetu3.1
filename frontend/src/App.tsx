@@ -21,6 +21,7 @@ import { CitizenAnnouncementsPage } from './pages/citizen/CitizenAnnouncementsPa
 import { AnnouncementDetailPage } from './pages/citizen/AnnouncementDetailPage';
 import { CitizenWorkPage } from './pages/citizen/CitizenWorkPage';
 import { MaintenanceDetailPage } from './pages/citizen/MaintenanceDetailPage';
+import { TrackComplaintPage } from './pages/citizen/TrackComplaintPage';
 
 import { AdminPortal } from './pages/admin/AdminPortal';
 import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
@@ -146,6 +147,23 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'service_staff']}>
                   <ComplaintDetailPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/citizen/track"
+              element={
+                <ProtectedRoute allowedRoles={['citizen']}>
+                  <TrackComplaintPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/citizen/track/:id"
+              element={
+                <ProtectedRoute allowedRoles={['citizen']}>
+                  <TrackComplaintPage />
                 </ProtectedRoute>
               }
             />
@@ -312,8 +330,26 @@ export default function App() {
               }
             />
 
+            {/* Citizen Protected Portal Aliases */}
             {[
-              '/admin/portal'
+              '/citizen/portal',
+              '/citizen/dashboard'
+            ].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <ProtectedRoute allowedRoles={['citizen']}>
+                    <CitizenPortal />
+                  </ProtectedRoute>
+                }
+              />
+            ))}
+
+            {/* City Admin Protected Portal Aliases */}
+            {[
+              '/admin/portal',
+              '/admin/dashboard'
             ].map((path) => (
               <Route
                 key={path}
@@ -326,36 +362,10 @@ export default function App() {
               />
             ))}
 
-            <Route
-              path="/staff/map"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffTaskMapPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/staff/notifications"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffNotificationsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/staff/settings"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffSettingsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Service Staff Protected Portal & Navigation Sub-routes */}
+            {/* Service Staff Protected Portal Aliases */}
             {[
               '/staff/portal',
+              '/staff/dashboard',
               '/staff/tasks',
               '/staff/tasks/new',
               '/staff/tasks/in-progress',
@@ -373,6 +383,31 @@ export default function App() {
                 }
               />
             ))}
+
+            <Route
+              path="/staff/map"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffTaskMapPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/notifications"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffNotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/settings"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffSettingsPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Department Head Protected Portal & Navigation Sub-routes */}
             {[

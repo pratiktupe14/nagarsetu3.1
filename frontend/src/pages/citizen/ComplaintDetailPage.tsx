@@ -26,16 +26,32 @@ export const ComplaintDetailPage: React.FC = () => {
   const [reopenReason, setReopenReason] = useState('');
   const [submittingReopen, setSubmittingReopen] = useState(false);
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      setErrorMsg('Complaint ID not specified.');
+      return;
+    }
+
     setLoading(true);
+    setErrorMsg(null);
     try {
       const data = await getComplaintById(id);
-      setComplaint(data);
-      const list = await getAllComplaints();
-      setAllComplaints(list);
-    } catch (e) {
-      console.error(e);
+      if (data) {
+        setComplaint(data);
+        setErrorMsg(null);
+      } else {
+        setComplaint(null);
+        setErrorMsg(`Complaint not found for ID "${id}".`);
+      }
+      // Non-blocking background fetch for list
+      getAllComplaints().then((list) => setAllComplaints(list)).catch(() => {});
+    } catch (e: any) {
+      console.error('Error loading complaint detail:', e);
+      setComplaint(null);
+      setErrorMsg('Unable to load complaint details. Please check your network connection.');
     } finally {
       setLoading(false);
     }
@@ -47,8 +63,11 @@ export const ComplaintDetailPage: React.FC = () => {
 
   // Subscribe to real-time complaint updates across portals
   useRealtimeComplaints(useCallback(() => {
-    loadData();
-  }, [loadData]));
+    if (!id) return;
+    getComplaintById(id).then((updated) => {
+      if (updated) setComplaint(updated);
+    });
+  }, [id]));
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,19 +95,43 @@ export const ComplaintDetailPage: React.FC = () => {
   if (loading) {
     return (
       <DashboardLayout title="Complaint Details">
-        <div className="p-12 text-center text-gray-500 font-medium text-xs">Loading complaint details...</div>
+        <div className="max-w-md mx-auto py-20 px-4 text-center space-y-4 font-sans">
+          <div className="w-10 h-10 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin mx-auto" />
+          <p className="text-xs font-bold text-gray-700 font-outfit">Loading complaint details...</p>
+        </div>
       </DashboardLayout>
     );
   }
 
-  if (!complaint) {
+  if (errorMsg || !complaint) {
     return (
       <DashboardLayout title="Complaint Details">
-        <div className="p-12 text-center space-y-4 max-w-md mx-auto font-sans">
-          <h2 className="text-xl font-bold text-gray-900 font-outfit">Complaint Not Found</h2>
-          <Link to="/citizen/complaints" className="inline-block px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs">
-            Back to My Complaints
-          </Link>
+        <div className="max-w-md mx-auto py-16 px-4 text-center space-y-4 font-sans">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto">
+            <Flame className="w-8 h-8 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">
+            {errorMsg || 'Complaint Not Found'}
+          </h2>
+          {id && (
+            <p className="text-xs text-gray-500 font-mono">
+              Complaint ID: {id}
+            </p>
+          )}
+          <div className="flex items-center justify-center space-x-3 pt-2">
+            <button
+              onClick={() => loadData()}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase shadow-sm"
+            >
+              Try Again
+            </button>
+            <Link
+              to="/citizen/complaints"
+              className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs"
+            >
+              Back to My Complaints
+            </Link>
+          </div>
         </div>
       </DashboardLayout>
     );

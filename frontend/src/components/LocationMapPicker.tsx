@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents } from 'react-leaflet';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
 // Fix standard Leaflet marker icon asset issue
@@ -19,6 +19,25 @@ const customIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+// MapController: Auto-center and invalidateSize when position updates
+function MapController({ center, zoom = 16 }: { center: [number, number]; zoom?: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center && typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
+      map.setView(center, zoom, { animate: true });
+      const timer = setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch (e) {}
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [center[0], center[1], zoom, map]);
+
+  return null;
+}
+
 function MapClickEvents({ onSelectLocation }: { onSelectLocation: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
@@ -31,22 +50,27 @@ function MapClickEvents({ onSelectLocation }: { onSelectLocation: (lat: number, 
 interface MapPickerProps {
   initialLat?: number;
   initialLng?: number;
+  accuracyMeters?: number | null;
   onLocationSelect?: (lat: number, lng: number) => void;
   interactive?: boolean;
   showDuplicateRadius?: boolean;
+  accuracyStatusText?: string | null;
 }
 
 export const LocationMapPicker: React.FC<MapPickerProps> = ({
   initialLat = 20.0059,
   initialLng = 73.7898,
+  accuracyMeters = null,
   onLocationSelect,
   interactive = true,
-  showDuplicateRadius = false
+  showDuplicateRadius = false,
+  accuracyStatusText = null
 }) => {
   const [position, setPosition] = useState<[number, number]>([initialLat, initialLng]);
+  const markerRef = useRef<L.Marker | null>(null);
 
   useEffect(() => {
-    if (initialLat && initialLng) {
+    if (initialLat != null && initialLng != null && !isNaN(initialLat) && !isNaN(initialLng)) {
       setPosition([initialLat, initialLng]);
     }
   }, [initialLat, initialLng]);
@@ -59,26 +83,62 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
     }
   };
 
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          const latLng = marker.getLatLng();
+          handleSelect(latLng.lat, latLng.lng);
+        }
+      },
+    }),
+    [interactive]
+  );
+
   return (
     <div className="w-full h-64 sm:h-72 rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
       <MapContainer
         center={position}
-        zoom={15}
+        zoom={16}
         scrollWheelZoom={false}
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
-        <Marker position={position} icon={customIcon}>
+        <MapController center={position} zoom={16} />
+
+        {/* GPS Accuracy Circle */}
+        {accuracyMeters && accuracyMeters > 0 && (
+          <Circle
+            center={position}
+            radius={accuracyMeters}
+            pathOptions={{ color: '#3b82f6', fillColor: '#60a5fa', fillOpacity: 0.15, weight: 1.5 }}
+          />
+        )}
+
+        {/* Selected Location Marker (Draggable) */}
+        <Marker
+          position={position}
+          icon={customIcon}
+          draggable={interactive}
+          eventHandlers={eventHandlers}
+          ref={markerRef}
+        >
           <Popup>
-            <div className="text-xs font-semibold text-gray-900">
-              Selected Complaint Location<br />
-              <span className="font-mono text-[10px] text-gray-500">
-                {position[0].toFixed(5)}, {position[1].toFixed(5)}
+            <div className="text-xs font-semibold text-gray-900 font-sans">
+              📍 Selected Complaint Location<br />
+              <span className="font-mono text-[10px] text-emerald-700 font-bold block pt-0.5">
+                {position[0].toFixed(6)}, {position[1].toFixed(6)}
               </span>
+              {interactive && (
+                <span className="text-[10px] text-gray-400 block pt-0.5 font-normal">
+                  (Drag pin or tap map to adjust)
+                </span>
+              )}
             </div>
           </Popup>
         </Marker>
@@ -95,8 +155,13 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
       </MapContainer>
 
       {interactive && (
-        <div className="absolute bottom-2 left-2 right-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] text-emerald-700 font-semibold z-[400] text-center shadow-sm">
-          📍 Tap anywhere on the map to mark or adjust the exact complaint pin location.
+        <div className="absolute bottom-2 left-2 right-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] text-emerald-800 font-semibold z-[400] text-center shadow-xs flex items-center justify-between">
+          <span className="truncate">📍 Tap anywhere on map or drag pin to adjust location</span>
+          {accuracyStatusText && (
+            <span className="ml-2 font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+              {accuracyStatusText}
+            </span>
+          )}
         </div>
       )}
     </div>

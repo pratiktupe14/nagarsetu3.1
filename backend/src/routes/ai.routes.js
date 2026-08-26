@@ -127,20 +127,25 @@ router.get('/health', async (req, res) => {
  * Accepts uploaded photo file and returns Gemini 3.6 Flash structured classification
  */
 router.post('/analyze', upload.single('photo'), async (req, res) => {
+  const reqTime = new Date().toISOString();
+  console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
+
   try {
     if (!req.file) {
-      console.error('[NAGARSETU AI Analyze] No photo file provided.');
+      console.error(`[${reqTime}] [NAGARSETU AI] Error: No photo file provided.`);
       return res.status(400).json({
         success: false,
         error: 'No photo file provided in request (expected multipart file field "photo").'
       });
     }
 
+    console.log(`[${reqTime}] [NAGARSETU AI] Image received: originalname="${req.file.originalname}", size=${req.file.size} bytes, mimetype="${req.file.mimetype}"`);
+
     const fullPath = req.file.path;
     const aiAnalysis = await analyzeComplaintPhoto(fullPath);
 
     if (aiAnalysis.error) {
-      console.error('[NAGARSETU AI Analyze] Vision analysis error:', aiAnalysis.error);
+      console.error(`[${reqTime}] [NAGARSETU AI] Vision analysis error:`, aiAnalysis.error);
       return res.status(500).json({
         success: false,
         error: aiAnalysis.error,
@@ -148,14 +153,14 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
       });
     }
 
-    console.log(`[NAGARSETU AI Analyze] Success. Category: ${aiAnalysis.category}, Dept: ${aiAnalysis.recommended_department}`);
+    console.log(`[${reqTime}] [NAGARSETU AI] Success: model="${aiAnalysis.model}", category="${aiAnalysis.category}", department="${aiAnalysis.recommended_department}"`);
     return res.json({
       success: true,
       photo_url: `/uploads/${req.file.filename}`,
       ai: aiAnalysis
     });
   } catch (err) {
-    console.error('[NAGARSETU AI Analyze] Express analyze route error:', err);
+    console.error(`[${reqTime}] [NAGARSETU AI] Express analyze route error:`, err.message);
     return res.status(500).json({
       success: false,
       error: `Failed to analyze photo: ${err.message}`

@@ -49,12 +49,116 @@ export const NASHIK_SERVICE_BOUNDS = {
 
 export function isWithinNashikServiceArea(lat: number | null | undefined, lng: number | null | undefined): boolean {
   if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return false;
-  return (
-    lat >= NASHIK_SERVICE_BOUNDS.minLat &&
-    lat <= NASHIK_SERVICE_BOUNDS.maxLat &&
-    lng >= NASHIK_SERVICE_BOUNDS.minLng &&
-    lng <= NASHIK_SERVICE_BOUNDS.maxLng
-  );
+  // Allow all valid real-world GPS coordinates across Maharashtra / India / worldwide
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+export interface GpsLocationResult {
+  latitude: number | null;
+  longitude: number | null;
+  accuracyMeters: number | null;
+  status: 'success' | 'permission_denied' | 'position_unavailable' | 'timeout' | 'unsupported' | 'error';
+  message: string;
+  isLowAccuracy?: boolean;
+}
+
+/**
+ * High-Accuracy Fresh GPS Location Request for Every Complaint Session
+ * Always sets maximumAge: 0 to prevent stale cached location reuse.
+ */
+export function requestFreshGpsLocation(timeoutMs: number = 10000): Promise<GpsLocationResult> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({
+        latitude: null,
+        longitude: null,
+        accuracyMeters: null,
+        status: 'unsupported',
+        message: 'Geolocation is not supported by your browser.'
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
+        const isLow = accuracy !== null && accuracy > 100;
+
+        resolve({
+          latitude: lat,
+          longitude: lng,
+          accuracyMeters: accuracy,
+          status: 'success',
+          isLowAccuracy: isLow,
+          message: isLow
+            ? `Location detected with low accuracy (±${accuracy}m). Please adjust the marker manually.`
+            : `Location detected successfully${accuracy ? ` (±${accuracy}m accuracy)` : ''}.`
+        });
+      },
+      (err) => {
+        let status: GpsLocationResult['status'] = 'error';
+        let message = 'Unable to detect location. Please select your location manually on the map.';
+
+        if (err.code === err.PERMISSION_DENIED) {
+          status = 'permission_denied';
+          message = 'Location access is disabled. Please enable location permission or select your complaint location manually on the map.';
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          status = 'position_unavailable';
+          message = 'Unable to determine your location. Please try again or select the location manually.';
+        } else if (err.code === err.TIMEOUT) {
+          status = 'timeout';
+          message = 'Location detection timed out. Try again or select the location manually.';
+        }
+
+        resolve({
+          latitude: null,
+          longitude: null,
+          accuracyMeters: null,
+          status,
+          message
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: timeoutMs,
+        maximumAge: 0 // Maximum age 0 prevents reusing stale location cache!
+      }
+    );
+  });
+}
+
+/**
+ * Reverse Geocode GPS Coordinates to Human Readable Address
+ */
+export async function reverseGeocodeCoordinates(
+  latitude: number,
+  longitude: number
+): Promise<string> {
+  if (latitude == null || longitude == null || isNaN(latitude) || isNaN(longitude)) return '';
+
+  const googleRes = await reverseGeocodeGoogleMaps(latitude, longitude);
+  if (googleRes && googleRes.formatted_address) {
+    return googleRes.formatted_address;
+  }
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'NagarSetu-CivicApp/3.0'
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.display_name) {
+        return data.display_name;
+      }
+    }
+  } catch (e) {}
+
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
 
 // In-memory & local cache for geocoded addresses to prevent redundant API calls
@@ -166,8 +270,7 @@ export async function getGoogleMapsDirections(
 }
 
 /**
- * Real Geocoding Service with Nashik Address Bias
- * Queries Google Maps API via backend Python client, with OpenStreetMap fallback.
+ * Real Geocoding Service with Nominatim / Google Maps
  */
 export async function geocodeNashikAddress(
   rawAddress: string
@@ -199,20 +302,18 @@ export async function geocodeNashikAddress(
         return result;
       }
     }
-  } catch (err) {
-    console.warn('Google Maps backend geocode note:', err);
-  }
+  } catch (err) {}
 
-  // 2. OpenStreetMap Nominatim Fallback if Google Maps API key is unconfigured
-  const queryAddress = rawAddress.toLowerCase().includes('nashik')
-    ? `${rawAddress}, Maharashtra, India`
-    : `${rawAddress}, Nashik, Maharashtra, India`;
+  // 2. OpenStreetMap Nominatim Fallback - Search address cleanly without hardcoding any location!
+  const queryAddress = (rawAddress.toLowerCase().includes('maharashtra') || rawAddress.toLowerCase().includes('india'))
+    ? rawAddress
+    : `${rawAddress}, Maharashtra, India`;
 
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryAddress)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'NagarSetu-CivicApp/3.0 (civictech-governance-nashik)'
+        'User-Agent': 'NagarSetu-CivicApp/3.0'
       }
     });
 
@@ -224,7 +325,7 @@ export async function geocodeNashikAddress(
       const lat = parseFloat(first.lat);
       const lng = parseFloat(first.lon);
 
-      if (!isNaN(lat) && !isNaN(lng) && isWithinNashikServiceArea(lat, lng)) {
+      if (Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
         const result = {
           latitude: lat,
           longitude: lng,
@@ -234,12 +335,12 @@ export async function geocodeNashikAddress(
         return result;
       }
     }
-  } catch (err) {
-    console.error('Geocoding error for address:', rawAddress, err);
-  }
+  } catch (err) {}
 
   return null;
 }
+
+export const geocodeAddress = geocodeNashikAddress;
 
 /**
  * Batch Geocoding Helper:
@@ -251,7 +352,7 @@ export async function geocodeComplaintsWithoutCoordinates(complaints: Complaint[
   for (let i = 0; i < updatedComplaints.length; i++) {
     const c = updatedComplaints[i];
     if ((c.latitude == null || c.longitude == null) && c.location_address) {
-      const geoResult = await geocodeNashikAddress(c.location_address);
+      const geoResult = await geocodeAddress(c.location_address);
       if (geoResult) {
         updatedComplaints[i] = {
           ...c,
@@ -524,10 +625,9 @@ export interface ComplaintLocationAuditReport {
 }
 
 /**
- * Data Audit & Repair Engine for Complaints:
- * Audits all existing complaints, detects address-coordinate mismatches or non-Nashik addresses,
- * normalizes addresses to Nashik civic areas, geocodes them using OpenStreetMap Nominatim API,
- * and updates complaint lat/lng and location_source.
+ * Data Audit Engine for Complaints:
+ * Preserves genuine GPS coordinates of all complaints with 100% fidelity.
+ * Only attempts fallback geocoding if coordinates are completely missing (null/NaN).
  */
 export async function auditAndRepairComplaintLocations(
   complaints: Complaint[]
@@ -541,31 +641,34 @@ export async function auditAndRepairComplaintLocations(
 
   for (let i = 0; i < repairedComplaints.length; i++) {
     const c = repairedComplaints[i];
-    let address = (c.location_address || '').trim();
-
-    // Keep genuine location address without hardcoding fake defaults
-    if (address.toLowerCase().includes('talsande') || address.toLowerCase().includes('kolhapur')) {
-      mismatchedCount++;
-      address = '';
-    }
+    const rawLat = c.latitude != null ? Number(c.latitude) : null;
+    const rawLng = c.longitude != null ? Number(c.longitude) : null;
+    const address = (c.location_address || '').trim();
 
     const hasValidCoords =
-      c.latitude != null &&
-      c.longitude != null &&
-      !isNaN(Number(c.latitude)) &&
-      !isNaN(Number(c.longitude)) &&
-      isWithinNashikServiceArea(Number(c.latitude), Number(c.longitude));
+      rawLat !== null &&
+      rawLng !== null &&
+      Number.isFinite(rawLat) &&
+      Number.isFinite(rawLng) &&
+      rawLat >= -90 && rawLat <= 90 &&
+      rawLng >= -180 && rawLng <= 180 &&
+      !(rawLat === 0 && rawLng === 0);
 
-    if (hasValidCoords && !address.toLowerCase().includes('talsande')) {
+    if (hasValidCoords) {
+      // PRESERVE GENUINE GPS / SAVED COORDINATES WITH 100% FIDELITY!
+      // Never overwrite or re-geocode valid coordinates!
       validMatchingCount++;
       repairedComplaints[i] = {
         ...c,
+        latitude: rawLat!,
+        longitude: rawLng!,
         location_address: address,
         location_source: c.location_source || 'live_gps'
       };
-    } else {
+    } else if (address.length > 3) {
+      // Only attempt fallback geocoding if coordinates are completely missing (null/NaN)
       mismatchedCount++;
-      const geoResult = await geocodeNashikAddress(address);
+      const geoResult = await geocodeAddress(address);
       if (geoResult) {
         correctedCount++;
         repairedComplaints[i] = {
@@ -592,7 +695,7 @@ export async function auditAndRepairComplaintLocations(
     mismatchedCount,
     correctedCount,
     locationUnavailableCount,
-    geocodingProvider: 'OpenStreetMap Nominatim API (Nashik Service Area Biased)'
+    geocodingProvider: 'OpenStreetMap Nominatim API'
   };
 
   return { repairedComplaints, report };

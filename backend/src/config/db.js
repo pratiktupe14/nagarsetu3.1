@@ -56,10 +56,40 @@ function createTablesSqlite() {
           email TEXT UNIQUE,
           password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'citizen',
+          department_id INTEGER,
+          employee_id TEXT,
+          status TEXT DEFAULT 'active',
           language_pref TEXT DEFAULT 'en',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS department_heads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          department_id INTEGER,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT,
+          employee_id TEXT,
+          designation TEXT DEFAULT 'Department Head',
+          status TEXT DEFAULT 'active',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (department_id) REFERENCES departments(id)
+        );
+      `);
+
+      // Safe column additions for existing databases
+      const safeAddColumn = (table, colDef) => {
+        sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef};`, () => {});
+      };
+      safeAddColumn('users', 'department_id INTEGER');
+      safeAddColumn('users', 'employee_id TEXT');
+      safeAddColumn('users', 'status TEXT DEFAULT "active"');
+      safeAddColumn('complaints', 'location_address TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (
@@ -127,6 +157,19 @@ function createTablesSqlite() {
           is_read INTEGER DEFAULT 0,
           sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (complaint_id) REFERENCES complaints(id)
+        );
+      `);
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS complaint_status_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          complaint_id INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          remark TEXT,
+          department TEXT,
+          updated_by TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (complaint_id) REFERENCES complaints(id)
         );
       `);

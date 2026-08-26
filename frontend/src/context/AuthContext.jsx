@@ -1,1 +1,1 @@
-export { AuthProvider, useAuth, DEMO_USERS } from './AuthContext.tsx';
+export { AuthProvider, useAuth, DEMO_USERS, getPortalForRole } from './AuthContext.tsx';

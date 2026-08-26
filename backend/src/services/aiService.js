@@ -4,14 +4,14 @@ const https = require('https');
 const crypto = require('crypto');
 
 const VALID_TAXONOMY = {
-  'Road Damage / Pothole': 'Public Works Department (PWD)',
-  'Water Leakage / Pipeline': 'Water Supply & Sewerage',
-  'Garbage / Waste': 'Sanitation & Waste Management',
-  'Drainage / Sewage': 'Drainage & Sewage Department',
-  'Streetlight / Electrical': 'Electrical & Street Lighting',
-  'Traffic Infrastructure': 'Traffic Management Department',
-  'Public Infrastructure Damage': 'Public Works Department (PWD)',
-  'Other Civic Issue': 'Public Works Department (PWD)'
+  'Road Damage / Pothole': 'Roads & Public Works Department (PWD)',
+  'Water Leakage / Pipeline': 'Water Supply & Sewerage Board',
+  'Garbage / Waste': 'Sanitation & Solid Waste Management',
+  'Drainage / Sewage': 'Drainage & Sewerage Department',
+  'Streetlight / Electrical': 'Electrical & Public Lighting Department',
+  'Traffic Infrastructure': 'Traffic Engineering & Control Department',
+  'Public Infrastructure Damage': 'Roads & Public Works Department (PWD)',
+  'Other Civic Issue': 'Roads & Public Works Department (PWD)'
 };
 
 const SYSTEM_PROMPT = `You are NAGARSETU 3.0's civic issue vision analyzer.
@@ -80,7 +80,7 @@ Respond ONLY with a valid JSON object matching this exact structure:
 }`;
 
 function mapDepartment(category) {
-  return VALID_TAXONOMY[category] || 'Public Works Department (PWD)';
+  return VALID_TAXONOMY[category] || 'Roads & Public Works Department (PWD)';
 }
 
 async function callDirectGeminiVision(filePath) {
@@ -152,8 +152,15 @@ async function callDirectGeminiVision(filePath) {
             const rawText = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!rawText) throw new Error('Empty response payload from Gemini model.');
 
-            const resultObj = JSON.parse(rawText);
-            const category = resultObj.category in VALID_TAXONOMY ? resultObj.category : 'Other Civic Issue';
+            let cleanText = rawText.trim();
+            if (cleanText.startsWith('```')) {
+              cleanText = cleanText.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '').trim();
+            }
+
+            const resultObj = JSON.parse(cleanText);
+            const category = (resultObj.category && Object.prototype.hasOwnProperty.call(VALID_TAXONOMY, resultObj.category))
+              ? resultObj.category
+              : 'Other Civic Issue';
             const department = mapDepartment(category);
             const confidence = typeof resultObj.confidence === 'number' ? resultObj.confidence : 0.92;
 

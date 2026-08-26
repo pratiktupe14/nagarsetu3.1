@@ -164,12 +164,46 @@ export const CitizenPortal: React.FC = () => {
             </p>
           </div>
 
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <Link
+              to="/citizen/track"
+              className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+            >
+              <Clock className="w-5 h-5 text-emerald-600" />
+              <span>Track Complaint Status</span>
+            </Link>
+            <Link
+              to="/citizen/report"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+            >
+              <PlusCircle className="w-5 h-5" />
+              <span>+ Report Civic Issue</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* COMPLAINT STATUS QUICK ACTION BANNER */}
+        <div className="bg-gradient-to-r from-emerald-900 to-teal-800 text-white p-6 rounded-2xl border border-emerald-700 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 flex items-center space-x-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-1" />
+                <span>Live Updates Enabled</span>
+              </span>
+              <span className="text-xs text-emerald-200 font-mono">Real-time status tracking</span>
+            </div>
+            <h2 className="text-xl font-extrabold text-white font-outfit">Complaint Status</h2>
+            <p className="text-xs text-emerald-100/90 max-w-xl">
+              Track your complaint and see real-time updates. View live progress timeline, officer assignment, and resolution proof without refreshing the page.
+            </p>
+          </div>
+
           <Link
-            to="/citizen/report"
-            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+            to="/citizen/track"
+            className="px-6 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-extrabold text-xs uppercase tracking-wider shadow-md flex items-center space-x-2 transition-all shrink-0 min-h-[44px]"
           >
-            <PlusCircle className="w-5 h-5" />
-            <span>+ Report Civic Issue</span>
+            <span>Track My Complaints</span>
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 

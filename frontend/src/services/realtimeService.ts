@@ -115,7 +115,20 @@ export function subscribeToRealtimeComplaints(onUpdate: (payload: RealtimeCompla
     }
   }
 
+  // Periodic poll fallback for backend SQLite updates (5 second heartbeat)
+  const pollIntervalId = setInterval(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      onUpdate({
+        complaintId: 'poll-refresh',
+        newStatus: 'Submitted',
+        actorName: 'Realtime Sync',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, 5000);
+
   return () => {
+    clearInterval(pollIntervalId);
     if (broadcastChannel) {
       broadcastChannel.removeEventListener('message', handleBroadcast);
     }

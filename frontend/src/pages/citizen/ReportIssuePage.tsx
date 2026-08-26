@@ -4,12 +4,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
-import { resolveIssueLocation, findDuplicateComplaints, isWithinNashikServiceArea } from '../../services/locationService';
+import {
+  resolveIssueLocation,
+  findDuplicateComplaints,
+  isWithinNashikServiceArea,
+  requestFreshGpsLocation,
+  reverseGeocodeCoordinates
+} from '../../services/locationService';
 import {
   detectCivicIssue,
   extractVisualFeatures,
   compareImageSimilarity,
   checkAiHealth,
+  normalizeDepartment,
   CIVIC_CATEGORIES,
   CivicCategory
 } from '../../services/aiVisionService';
@@ -43,11 +50,14 @@ export const ReportIssuePage: React.FC = () => {
   const [analyzingAngle, setAnalyzingAngle] = useState(false);
   const [angleErrorMsg, setAngleErrorMsg] = useState<string | null>(null);
 
-  // Location Priority State (Default: Nashik City Center)
+  // Location Priority State
   const [lat, setLat] = useState<number>(20.0059);
   const [lng, setLng] = useState<number>(73.7898);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [detectingLocation, setDetectingLocation] = useState<boolean>(false);
+  const [locationStatusText, setLocationStatusText] = useState<string>('Detecting your location...');
   const [locationSource, setLocationSource] = useState<'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps'>('manual_pin');
-  const [locationAddress, setLocationAddress] = useState<string>('Panchavati Main Road, Nashik City');
+  const [locationAddress, setLocationAddress] = useState<string>('Detecting location...');
   const [showLocationPickerModal, setShowLocationPickerModal] = useState(false);
 
   // AI Vision Analysis State
@@ -61,6 +71,35 @@ export const ReportIssuePage: React.FC = () => {
       setAiHealth(res);
     });
   }, []);
+
+  // Request fresh GPS location for every new complaint creation
+  const requestFreshLocation = React.useCallback(async () => {
+    setDetectingLocation(true);
+    setLocationStatusText('Detecting your current location...');
+
+    const result = await requestFreshGpsLocation(10000);
+    setDetectingLocation(false);
+
+    if (result.status === 'success' && result.latitude != null && result.longitude != null) {
+      setLat(result.latitude);
+      setLng(result.longitude);
+      setLocationAccuracy(result.accuracyMeters);
+      setLocationSource('live_gps');
+      setLocationStatusText(result.message);
+
+      const addr = await reverseGeocodeCoordinates(result.latitude, result.longitude);
+      if (addr) setLocationAddress(addr);
+
+      runDuplicateCheck(result.latitude, result.longitude);
+    } else {
+      setLocationStatusText(result.message);
+    }
+  }, []);
+
+  // Trigger GPS detection automatically on initial mount
+  React.useEffect(() => {
+    requestFreshLocation();
+  }, [requestFreshLocation]);
 
   // Citizen Editable Fields
   const [category, setCategory] = useState<CivicCategory>('Road Damage / Pothole');
@@ -88,56 +127,39 @@ export const ReportIssuePage: React.FC = () => {
     setTitle('');
     setDescription('');
     setPriority('High');
-    setDepartment('Public Works Department (PWD)');
+    setDepartment('Roads & Public Works Department (PWD)');
 
     const url = URL.createObjectURL(file);
     setPhotoPreviewUrl(url);
     await runAIVisionAndLocation(file, url);
   };
 
-  const runAIVisionAndLocation = async (file: File, url: string) => {
+  const runAIVisionAndLocation = async (file: File, url: string, isRetry: boolean = false) => {
     setAnalyzingAI(true);
 
-    let liveLat: number | null = null;
-    let liveLng: number | null = null;
+    const locResult = await resolveIssueLocation(file, lat, lng);
+    if (locResult.latitude && locResult.longitude && locationSource !== 'manual_pin') {
+      setLat(locResult.latitude);
+      setLng(locResult.longitude);
+      setLocationSource(locResult.source);
+      runDuplicateCheck(locResult.latitude, locResult.longitude);
 
-    if (navigator.geolocation) {
-      try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
-        });
-        liveLat = pos.coords.latitude;
-        liveLng = pos.coords.longitude;
-      } catch (e) {
-        console.log('Live GPS timeout/denied');
-      }
-    }
-
-    const locResult = await resolveIssueLocation(file, liveLat, liveLng);
-    if (locResult.latitude && locResult.longitude) {
-      if (isWithinNashikServiceArea(locResult.latitude, locResult.longitude)) {
-        setLat(locResult.latitude);
-        setLng(locResult.longitude);
-        setLocationSource(locResult.source);
-        runDuplicateCheck(locResult.latitude, locResult.longitude);
-      } else {
-        setLat(20.0059);
-        setLng(73.7898);
-        setLocationSource('manual_pin');
-        runDuplicateCheck(20.0059, 73.7898);
-      }
+      const addr = await reverseGeocodeCoordinates(locResult.latitude, locResult.longitude);
+      if (addr) setLocationAddress(addr);
     }
 
     try {
-      // Pass actual uploaded File object to detectCivicIssue
-      const res = await detectCivicIssue(file);
+      // Pass actual uploaded File object to detectCivicIssue (bypassing cache on retry)
+      const res = await detectCivicIssue(file, isRetry);
       setAiResult(res);
       setPrimaryFeatures(res.visual_features || null);
       if (res.category) setCategory(res.category as CivicCategory);
       if (res.title) setTitle(res.title);
       if (res.description) setDescription(res.description);
       if (res.priority) setPriority(res.priority);
-      if (res.department) setDepartment(res.department);
+      if (res.department) {
+        setDepartment(normalizeDepartment(res.department, res.category));
+      }
     } catch (err) {
       console.error('AI Vision Error:', err);
     } finally {
@@ -445,7 +467,7 @@ export const ReportIssuePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedPhotoFile) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl);
+                      if (selectedPhotoFile) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl, true);
                     }}
                     className="w-full py-2.5 rounded-xl bg-white hover:bg-rose-100 text-rose-800 font-bold border border-rose-300 flex items-center justify-center space-x-1 min-h-[44px]"
                   >
@@ -603,33 +625,86 @@ export const ReportIssuePage: React.FC = () => {
               </div>
             )}
 
-            {/* LOCATION CARD */}
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+            {/* AUTOMATIC & INTERACTIVE LOCATION CARD WITH EMBEDDED MAP */}
+            <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-3 font-sans">
               <div className="flex items-center justify-between">
-                <span className="font-extrabold text-gray-900 font-outfit flex items-center space-x-1">
-                  <MapPin className="w-4 h-4 text-emerald-600" />
-                  <span>📍 Complaint Location</span>
-                </span>
-                <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  {locationSource === 'live_gps' ? 'Live GPS' : locationSource === 'exif_gps' ? 'Photo EXIF' : 'Manual Pin'}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <MapPin className="w-5 h-5 text-rose-500" />
+                  <span className="font-extrabold text-gray-900 font-outfit text-sm">📍 Complaint Location</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={requestFreshLocation}
+                  disabled={detectingLocation}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs border border-emerald-200 flex items-center space-x-1 min-h-[36px] cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${detectingLocation ? 'animate-spin' : ''}`} />
+                  <span>{detectingLocation ? 'Detecting...' : 'Detect My Location'}</span>
+                </button>
               </div>
 
-              <div className="space-y-0.5">
-                <span className="font-bold text-gray-900 block">{locationAddress}</span>
-                <span className="font-mono text-[10px] text-gray-500 block">
-                  {lat.toFixed(4)}, {lng.toFixed(4)}
+              {/* LOCATION STATUS & ACCURACY BADGE */}
+              <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                locationSource === 'live_gps'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                  : 'bg-blue-50 text-blue-900 border-blue-200'
+              }`}>
+                <span className="flex items-center space-x-1.5">
+                  {detectingLocation ? (
+                    <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+                  ) : locationSource === 'live_gps' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  )}
+                  <span>{locationStatusText}</span>
                 </span>
+
+                {locationAccuracy && (
+                  <span className="font-mono text-[10px] font-extrabold bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+                    ±{locationAccuracy}m
+                  </span>
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowLocationPickerModal(true)}
-                className="w-full mt-2 py-2 rounded-xl bg-white hover:bg-gray-100 text-gray-800 font-bold border border-gray-300 min-h-[44px] flex items-center justify-center space-x-1"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Edit Location Pin</span>
-              </button>
+              {/* EMBEDDED MAP PICKER */}
+              <div className="rounded-xl overflow-hidden border border-gray-200">
+                <LocationMapPicker
+                  initialLat={lat}
+                  initialLng={lng}
+                  accuracyMeters={locationAccuracy}
+                  accuracyStatusText={locationSource === 'live_gps' ? '✓ Live GPS' : '📍 Manual Pin'}
+                  onLocationSelect={async (newLat, newLng) => {
+                    setLat(newLat);
+                    setLng(newLng);
+                    setLocationSource('manual_pin');
+                    setLocationStatusText(`Location pin set to ${newLat.toFixed(4)}, ${newLng.toFixed(4)}`);
+                    runDuplicateCheck(newLat, newLng);
+
+                    const addr = await reverseGeocodeCoordinates(newLat, newLng);
+                    if (addr) setLocationAddress(addr);
+                  }}
+                />
+              </div>
+
+              {/* ADDRESS & COORDINATES DISPLAY */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1.5">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Location Address / Landmark</span>
+                <input
+                  type="text"
+                  value={locationAddress}
+                  onChange={(e) => setLocationAddress(e.target.value)}
+                  placeholder="Enter landmark or street name..."
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 font-bold text-xs text-gray-900 focus:border-emerald-500"
+                />
+                <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 pt-0.5">
+                  <span>Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}</span>
+                  <span className="font-bold text-emerald-700 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    {locationSource}
+                  </span>
+                </div>
+              </div>
             </div>
 
           </div>

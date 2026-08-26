@@ -49,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: t('dashboard'), path: '/citizen/portal', icon: Home },
         { label: t('myComplaints'), path: '/citizen/complaints', icon: FileText },
+        { label: 'Track Complaint', path: '/citizen/track', icon: Activity },
         { label: t('reportComplaint'), path: '/citizen/report', icon: PlusCircle },
         { label: t('nearbyIssues'), path: '/citizen/nearby', icon: MapPin },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell }
