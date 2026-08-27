@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nagarsetu_secret_key_2026_super_secure';
+const isProd = process.env.NODE_ENV === 'production';
+const JWT_SECRET = process.env.JWT_SECRET || (isProd ? null : 'nagarsetu_dev_secret_key_2026');
+
+if (isProd && !process.env.JWT_SECRET) {
+  console.error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production mode.');
+}
 
 function generateToken(user) {
   return jwt.sign(

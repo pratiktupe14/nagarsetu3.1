@@ -4,14 +4,13 @@ const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 
+const validateInput = require('../middleware/validateInput');
+const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
+
 // Register endpoint (Citizen, Officer, Staff, Admin)
-router.post('/register', async (req, res) => {
+router.post('/register', validateInput(registerSchema), async (req, res) => {
   try {
     const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
-
-    if (!name || !mobile || !password) {
-      return res.status(400).json({ error: 'Name, mobile, and password are required' });
-    }
 
     // Check existing user
     const checkSql = `SELECT id FROM users WHERE mobile = ? OR (email IS NOT NULL AND email = ?)`;
@@ -45,13 +44,9 @@ router.post('/register', async (req, res) => {
 });
 
 // Login endpoint
-router.post('/login', async (req, res) => {
+router.post('/login', validateInput(loginSchema), async (req, res) => {
   try {
     const { mobileOrEmail, password } = req.body;
-
-    if (!mobileOrEmail || !password) {
-      return res.status(400).json({ error: 'Mobile/Email and password are required' });
-    }
 
     const cleanIdentifier = String(mobileOrEmail).trim().toLowerCase();
     const sql = `SELECT * FROM users WHERE mobile = ? OR LOWER(email) = ?`;
@@ -162,15 +157,14 @@ router.post('/login', async (req, res) => {
 });
 
 // OTP Request (Simulated)
-router.post('/otp-request', (req, res) => {
+router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
   const { mobile } = req.body;
-  if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
   // Simulated OTP 123456
   return res.json({ message: 'OTP sent successfully to ' + mobile, demoOtp: '123456' });
 });
 
 // OTP Verify (Simulated)
-router.post('/otp-verify', async (req, res) => {
+router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   const { mobile, otp } = req.body;
   if (otp !== '123456') {
     return res.status(400).json({ error: 'Invalid OTP code' });

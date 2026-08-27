@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { uploadSingleImage } = require('../middleware/upload');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { query } = require('../config/db');
 const { notifyStatusChange } = require('../services/notificationService');
@@ -54,7 +54,7 @@ router.post('/task/:id/status', async (req, res) => {
 });
 
 // Resolve Task with "After" Photo Proof
-router.post('/task/:id/resolve', upload.single('photo_after'), async (req, res) => {
+router.post('/task/:id/resolve', uploadSingleImage('photo_after'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Resolution photo proof ("after" photo) is required' });

@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const upload = require('../middleware/upload');
+const { uploadSingleImage } = require('../middleware/upload');
 const { authenticateToken } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const { createComplaintSchema, updateStatusSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
 const { resolveLocation, checkForDuplicates } = require('../services/locationService');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
-router.post('/analyze-upload', authenticateToken, upload.single('photo'), async (req, res) => {
+router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No photo file provided' });
@@ -68,7 +70,7 @@ router.post('/analyze-upload', authenticateToken, upload.single('photo'), async 
 });
 
 // Step 2: Final Complaint Submission
-router.post('/submit', authenticateToken, async (req, res) => {
+router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
     const {
       photo_url,

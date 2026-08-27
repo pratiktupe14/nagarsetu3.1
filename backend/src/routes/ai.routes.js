@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { uploadSingleImage } = require('../middleware/upload');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const https = require('https');
 
@@ -126,7 +126,7 @@ router.get('/health', async (req, res) => {
  * POST /api/ai/analyze
  * Accepts uploaded photo file and returns Gemini 3.6 Flash structured classification
  */
-router.post('/analyze', upload.single('photo'), async (req, res) => {
+router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {
   const reqTime = new Date().toISOString();
   console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
 
