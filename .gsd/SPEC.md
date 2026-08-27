@@ -1,32 +1,17 @@
-# NAGARSETU 3.0 — Technical Specification & Audit Baseline
+# NAGARSETU 3.0 — Comprehensive Localization & Repair Specification
 
-## 1. Executive Overview
-NAGARSETU 3.0 is a smart civic issue reporting and municipal operations platform connecting Citizens, City Administration, Department Heads, and Service Staff in a unified digital system.
+## 1. Executive Summary
+This specification defines the complete overhaul of NAGARSETU 3.0's localization (i18n) framework and project reliability. The goal is to ensure 100% natural, consistent, and persistent translation across English (`en`), Hindi (`hi`), and Marathi (`mr`) for all user roles (Citizen, Department Head, Field Staff, City Admin).
 
-## 2. Core Architecture & Tech Stack
-- **Frontend**: React (v18), Vite, TypeScript, Tailwind CSS, Leaflet Maps, Lucide Icons, Chart.js.
-- **Backend API**: Node.js / Express REST API (`/api/*`).
-- **AI Microservice**: Python FastAPI + Gemini 3.6 Flash Computer Vision & Google Maps API.
-- **Database**: PostgreSQL (Supabase / Production) with SQLite fallback for local development.
-- **Auth**: JWT Authentication with role-based access control (Citizen, Officer, Staff, Department Head, City Admin).
+## 2. Root Cause Analysis of Localization Failure
+1. **Incomplete Translation Dictionaries**: `utils/i18n.ts` contains only ~50 keys, missing dictionary definitions for Admin Portal, Staff Portal, Citizen Settings, Landing Page, Auth forms, Table headers, Modal dialogs, and Dynamic alerts.
+2. **Hardcoded UI Strings in Pages**: Over 30 pages and components render hardcoded English strings instead of calling `useLanguage()` and `t(...)`.
+3. **Inconsistent Dynamic Content Translation**: Categories, Complaint Statuses, Priority levels, and Department names returned from API/DB are rendered in raw English without passing through `translateStatus()`, `translateCategory()`, `translatePriority()`, or `translateDepartment()`.
 
-## 3. Discovered Audit Findings & Inventory
-
-### P0 — Critical (0 Found)
-- All critical build compilation steps pass (`tsc` & Vite build succeed).
-
-### P1 — High (0 Found)
-- Authentication, SQLite/PostgreSQL schemas, and rate-limiting security guards are operational.
-
-### P2 — Medium (2 Found)
-1. **Frontend Large Bundle Chunk Warning**: Vite bundle produces a single `1,835 kB` index chunk.
-   - *Fix*: Implement `manualChunks` in `vite.config.js` to split vendor dependencies (`vendor-react`, `vendor-leaflet`, `vendor-charts`, `vendor-lucide`).
-2. **Async Error Propagation in Backend Routes**: Ensure all Express route handlers wrap async calls with `try-catch` calling `next(err)` to guarantee global `errorHandler` processing.
-
-### P3 — Low (1 Found)
-1. **Outdated Documentation**: Update README and `.env.example` to reflect the 6 GSD security enhancements and code-splitting configuration.
-
-## 4. Acceptance Criteria
-1. `npm run build` in `frontend` passes with vendor code-splitting enabled (`index` chunk size < 500 kB).
-2. All backend route endpoints propagate async exceptions to global `errorHandler.js`.
-3. End-to-end user workflows (Citizen submission, Department Head assignment, Staff resolution, Admin analytics) pass runtime validation.
+## 3. Required End State & Acceptance Criteria
+1. **Complete Dictionary Coverage**: `en`, `hi`, and `mr` in `utils/i18n.ts` contain natural, accurate civic terminology for every UI string.
+2. **Unified Single Source of Truth**: All components subscribe to `useLanguage()` from `LanguageContext.tsx`.
+3. **State Persistence**: Switching language updates state, stores preference in `localStorage` (`nagarsetu_lang`), syncs to user profile, and persists across navigation and page refresh.
+4. **Dynamic Data Translation**: Status badges, priority badges, category chips, and department names render in the active selected language.
+5. **Zero UI Overflow**: Layouts (buttons, cards, headers, tables) adjust cleanly without clipping text in Hindi or Marathi.
+6. **Zero Build & Runtime Errors**: Production build (`tsc && vite build`) and runtime console remain 100% clean.

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { UserPlus, User, Smartphone, Mail, Key, Shield, ArrowRight } from 'lucide-react';
+import { UserPlus, User, Smartphone, Mail, Key, ArrowRight } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { registerCitizen, loading } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -42,8 +44,8 @@ export const RegisterPage: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
               <UserPlus className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl font-extrabold text-gray-900 font-outfit">Create Citizen Account</h2>
-            <p className="text-xs text-gray-500">Register to report civic issues and track resolutions</p>
+            <h2 className="text-2xl font-extrabold text-gray-900 font-outfit">{t('registerTitle')}</h2>
+            <p className="text-xs text-gray-500">{t('registerSubtitle')}</p>
           </div>
 
           {errorMessage && (
@@ -54,7 +56,7 @@ export const RegisterPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t('fullName')}</label>
               <div className="relative">
                 <User className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
@@ -62,14 +64,14 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Ramesh Kumar"
+                  placeholder={t('enterFullName')}
                   className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Number</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t('mobileNumber')}</label>
               <div className="relative">
                 <Smartphone className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
@@ -77,28 +79,28 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
-                  placeholder="9876543210"
+                  placeholder={t('enterMobileNumber')}
                   className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Email Address (Optional)</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t('emailAddress')}</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ramesh@example.com"
+                  placeholder={t('enterEmailAddress')}
                   className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Set Password</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t('password')}</label>
               <div className="relative">
                 <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
@@ -115,17 +117,17 @@ export const RegisterPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all mt-2"
+              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all mt-2 min-h-[44px]"
             >
-              <span>{loading ? 'Creating Account...' : 'Register Account'}</span>
+              <span>{loading ? t('loading') : t('register')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
           <div className="text-center pt-2 border-t border-gray-100 text-xs text-gray-600">
-            Already have an account?{' '}
+            {t('alreadyHaveAccount')}{' '}
             <Link to="/login" className="text-emerald-700 font-bold hover:underline">
-              Log In
+              {t('login')}
             </Link>
           </div>
 
