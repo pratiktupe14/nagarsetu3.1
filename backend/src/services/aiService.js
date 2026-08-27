@@ -83,32 +83,56 @@ function mapDepartment(category) {
   return VALID_TAXONOMY[category] || 'Roads & Public Works Department (PWD)';
 }
 
-async function callDirectGeminiVision(filePath) {
+async function callDirectGeminiVision(fileInput) {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
 
   if (!apiKey) {
-    throw new Error('Gemini analysis failed: status: 401 reason: GEMINI_API_KEY missing in server environment');
+    const errObj = new Error('Gemini analysis failed: GEMINI_API_KEY is not configured in server environment.');
+    errObj.statusCode = 503;
+    errObj.errorCode = 'AI_SERVICE_UNCONFIGURED';
+    throw errObj;
   }
 
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Gemini analysis failed: status: 400 reason: Image file not found at ${filePath}`);
+  let fileBuffer;
+  let mimeType = 'image/jpeg';
+  let originalName = 'uploaded-photo.jpg';
+
+  if (Buffer.isBuffer(fileInput)) {
+    fileBuffer = fileInput;
+  } else if (fileInput && typeof fileInput === 'object' && Buffer.isBuffer(fileInput.buffer)) {
+    fileBuffer = fileInput.buffer;
+    if (fileInput.mimetype) mimeType = fileInput.mimetype;
+    if (fileInput.originalname) originalName = fileInput.originalname;
+  } else if (typeof fileInput === 'string') {
+    if (!fs.existsSync(fileInput)) {
+      const errObj = new Error(`Gemini analysis failed: Image file not found at ${fileInput}`);
+      errObj.statusCode = 400;
+      errObj.errorCode = 'INVALID_IMAGE';
+      throw errObj;
+    }
+    fileBuffer = fs.readFileSync(fileInput);
+    const ext = path.extname(fileInput).toLowerCase();
+    if (ext === '.png') mimeType = 'image/png';
+    if (ext === '.webp') mimeType = 'image/webp';
+    originalName = path.basename(fileInput);
+  } else {
+    const errObj = new Error('Gemini analysis failed: Invalid image payload provided.');
+    errObj.statusCode = 400;
+    errObj.errorCode = 'INVALID_IMAGE';
+    throw errObj;
   }
 
-  const stats = fs.statSync(filePath);
-  if (stats.size === 0) {
-    throw new Error('Gemini analysis failed: status: 400 reason: Image file size is 0 bytes');
+  if (!fileBuffer || fileBuffer.length === 0) {
+    const errObj = new Error('Gemini analysis failed: Image payload is empty (0 bytes).');
+    errObj.statusCode = 400;
+    errObj.errorCode = 'INVALID_IMAGE';
+    throw errObj;
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
   const base64Image = fileBuffer.toString('base64');
   const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   const analysisId = crypto.randomUUID();
-
-  const ext = path.extname(filePath).toLowerCase();
-  let mimeType = 'image/jpeg';
-  if (ext === '.png') mimeType = 'image/png';
-  if (ext === '.webp') mimeType = 'image/webp';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -235,15 +259,18 @@ async function callDirectGeminiVision(filePath) {
   });
 }
 
-async function analyzeComplaintPhoto(filePath) {
+async function analyzeComplaintPhoto(fileInput) {
   let imageHash = '';
   try {
-    const fileBuffer = fs.readFileSync(filePath);
-    imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    let buf;
+    if (Buffer.isBuffer(fileInput)) buf = fileInput;
+    else if (fileInput && fileInput.buffer) buf = fileInput.buffer;
+    else if (typeof fileInput === 'string' && fs.existsSync(fileInput)) buf = fs.readFileSync(fileInput);
+    if (buf) imageHash = crypto.createHash('sha256').update(buf).digest('hex');
   } catch (e) {}
 
   try {
-    const aiResult = await callDirectGeminiVision(filePath);
+    const aiResult = await callDirectGeminiVision(fileInput);
     return aiResult;
   } catch (err) {
     console.error('[NAGARSETU Backend Error]', err.message);

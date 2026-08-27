@@ -620,6 +620,15 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
   } else if (lastErrorObj?.statusCode === 504 || errorCode === 'AI_TIMEOUT') {
     errorCode = 'AI_TIMEOUT';
     errorMessage = 'AI Vision service connection timed out.';
+  } else if (
+    lastErrorObj?.statusCode === 500 ||
+    errorCode === 'AI_SERVER_ERROR' ||
+    errorMessage.includes('FUNCTION_INVOCATION_FAILED') ||
+    errorMessage.includes('500') ||
+    errorMessage.includes('server error')
+  ) {
+    errorCode = 'AI_SERVER_ERROR';
+    errorMessage = 'AI Vision analysis is temporarily unavailable. You can retry or continue manually.';
   } else if (errorCode === 'AI_NETWORK_ERROR' || errorMessage.includes('offline')) {
     errorCode = 'AI_NETWORK_ERROR';
     errorMessage = 'Backend server is offline or unreachable.';

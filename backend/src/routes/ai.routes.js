@@ -131,18 +131,19 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
   console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
 
   try {
-    if (!req.file) {
+    if (!req.file || (!req.file.buffer && !req.file.path)) {
       console.error(`[${reqTime}] [NAGARSETU AI] Error: No photo file provided.`);
       return res.status(400).json({
         success: false,
-        error: 'No photo file provided in request (expected multipart file field "photo").'
+        error: 'INVALID_IMAGE',
+        message: 'No valid photo file provided in request (expected multipart file field "photo").'
       });
     }
 
-    console.log(`[${reqTime}] [NAGARSETU AI] Image received: originalname="${req.file.originalname}", size=${req.file.size} bytes, mimetype="${req.file.mimetype}"`);
+    console.log(`[${reqTime}] [NAGARSETU AI] Image received: originalname="${req.file.originalname}", size=${req.file.size || req.file.buffer?.length} bytes, mimetype="${req.file.mimetype}"`);
 
-    const fullPath = req.file.path;
-    const aiAnalysis = await analyzeComplaintPhoto(fullPath);
+    // Pass req.file (contains in-memory buffer or disk path) directly
+    const aiAnalysis = await analyzeComplaintPhoto(req.file);
 
     if (aiAnalysis.success === false) {
       const statusCode = aiAnalysis.statusCode || 500;
@@ -152,7 +153,6 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
         error: aiAnalysis.error || 'AI_SERVER_ERROR',
         message: aiAnalysis.message || 'AI Vision analysis is temporarily unavailable.',
         retryable: aiAnalysis.retryable ?? true,
-        photo_url: `/uploads/${req.file.filename}`,
         ai: aiAnalysis
       });
     }
@@ -160,7 +160,6 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
     console.log(`[${reqTime}] [NAGARSETU AI] Success: model="${aiAnalysis.model}", category="${aiAnalysis.category}", department="${aiAnalysis.recommended_department}"`);
     return res.json({
       success: true,
-      photo_url: `/uploads/${req.file.filename}`,
       ai: aiAnalysis
     });
   } catch (err) {
