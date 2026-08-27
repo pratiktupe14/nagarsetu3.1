@@ -165,6 +165,7 @@ async function callDirectGeminiVision(filePath) {
             const confidence = typeof resultObj.confidence === 'number' ? resultObj.confidence : 0.92;
 
             resolve({
+              success: true,
               analysis_id: analysisId,
               image_hash: imageHash,
               model: model,
@@ -180,29 +181,53 @@ async function callDirectGeminiVision(filePath) {
               needs_manual_verification: resultObj.needs_manual_verification ?? (confidence < 0.80)
             });
           } catch (e) {
-            reject(new Error(`Gemini analysis failed: status: 422 reason: Structured JSON parse error: ${e.message}`));
+            const errObj = new Error(`Structured JSON parse error: ${e.message}`);
+            errObj.statusCode = 422;
+            errObj.errorCode = 'AI_PARSE_ERROR';
+            reject(errObj);
           }
         } else {
-          let errorReason = `API error response: ${data}`;
+          let errorCode = 'AI_SERVER_ERROR';
+          let errorReason = `Gemini API returned status ${res.statusCode}`;
+
           if (res.statusCode === 429) {
-            errorReason = 'Gemini API Rate Limit / Quota Exceeded (HTTP 429 RESOURCE_EXHAUSTED). Free tier limit reached. Please retry in 30s.';
+            errorCode = 'AI_QUOTA_EXCEEDED';
+            errorReason = 'AI Vision temporarily unavailable because the AI service quota has been reached.';
           } else if (res.statusCode === 401) {
-            errorReason = 'Gemini API Authentication Failed (HTTP 401 Unauthorized). Please check GEMINI_API_KEY.';
+            errorCode = 'AI_AUTHENTICATION_ERROR';
+            errorReason = 'Gemini API Authentication Failed (HTTP 401). Please check GEMINI_API_KEY.';
+          } else if (res.statusCode === 403) {
+            errorCode = 'AI_PERMISSION_ERROR';
+            errorReason = 'Gemini API Permission Denied (HTTP 403).';
+          } else if (res.statusCode === 404) {
+            errorCode = 'AI_MODEL_NOT_FOUND';
+            errorReason = 'Configured Gemini Model Not Found (HTTP 404).';
           } else if (res.statusCode === 400) {
+            errorCode = 'AI_INVALID_PAYLOAD';
             errorReason = 'Invalid Image Payload or Request (HTTP 400 Bad Request).';
           }
-          reject(new Error(`Gemini analysis failed: status: ${res.statusCode} reason: ${errorReason}`));
+
+          const errObj = new Error(errorReason);
+          errObj.statusCode = res.statusCode;
+          errObj.errorCode = errorCode;
+          reject(errObj);
         }
       });
     });
 
     req.on('error', (err) => {
-      reject(new Error(`Gemini analysis failed: status: 500 reason: Network transport error: ${err.message}`));
+      const errObj = new Error(`Network transport error: ${err.message}`);
+      errObj.statusCode = 500;
+      errObj.errorCode = 'AI_NETWORK_ERROR';
+      reject(errObj);
     });
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('Gemini analysis failed: status: 504 reason: API connection timeout (30s)'));
+      const errObj = new Error('API connection timeout (30s)');
+      errObj.statusCode = 504;
+      errObj.errorCode = 'AI_TIMEOUT';
+      reject(errObj);
     });
 
     req.write(payload);
@@ -223,19 +248,23 @@ async function analyzeComplaintPhoto(filePath) {
   } catch (err) {
     console.error('[NAGARSETU Backend Error]', err.message);
     return {
+      success: false,
+      statusCode: err.statusCode || 500,
+      error: err.errorCode || 'AI_SERVER_ERROR',
+      message: err.message || 'Gemini Vision AI Analysis failed.',
+      retryable: (err.statusCode === 429 || err.statusCode === 504 || err.statusCode === 500),
       analysis_id: crypto.randomUUID(),
       image_hash: imageHash,
       model: 'none',
       is_civic_issue: false,
       category: 'Other Civic Issue',
-      title: 'AI Analysis Failed',
-      description: err.message,
+      title: '', // Keep title clean
+      description: '', // Keep description clean
       priority: 'Medium',
-      recommended_department: 'Public Works Department (PWD)',
+      recommended_department: 'Roads & Public Works Department (PWD)',
       confidence: 0.0,
       detected_features: [],
-      needs_manual_verification: true,
-      error: err.message
+      needs_manual_verification: true
     };
   }
 }

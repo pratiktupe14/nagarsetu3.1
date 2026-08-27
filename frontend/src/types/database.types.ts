@@ -61,6 +61,9 @@ export interface AIVisionResult {
   department: string;
   title: string;
   description: string;
+  error_code?: string;
+  error_message?: string;
+  is_available?: boolean;
   visual_features?: VisualFeatures;
   detected_objects?: string[];
   quality_check?: {

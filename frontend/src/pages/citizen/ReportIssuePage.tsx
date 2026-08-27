@@ -135,6 +135,7 @@ export const ReportIssuePage: React.FC = () => {
   };
 
   const runAIVisionAndLocation = async (file: File, url: string, isRetry: boolean = false) => {
+    if (analyzingAI) return; // Enforce request lock: ignore duplicate triggers while analyzing
     setAnalyzingAI(true);
 
     const locResult = await resolveIssueLocation(file, lat, lng);
@@ -153,12 +154,16 @@ export const ReportIssuePage: React.FC = () => {
       const res = await detectCivicIssue(file, isRetry);
       setAiResult(res);
       setPrimaryFeatures(res.visual_features || null);
-      if (res.category) setCategory(res.category as CivicCategory);
-      if (res.title) setTitle(res.title);
-      if (res.description) setDescription(res.description);
-      if (res.priority) setPriority(res.priority);
-      if (res.department) {
-        setDepartment(normalizeDepartment(res.department, res.category));
+
+      // ONLY populate fields if AI analysis succeeded with high/medium confidence and valid result
+      if (res.is_available !== false && res.confidence > 0) {
+        if (res.category) setCategory(res.category as CivicCategory);
+        if (res.title) setTitle(res.title);
+        if (res.description) setDescription(res.description);
+        if (res.priority) setPriority(res.priority);
+        if (res.department) {
+          setDepartment(normalizeDepartment(res.department, res.category));
+        }
       }
     } catch (err) {
       console.error('AI Vision Error:', err);
@@ -254,7 +259,7 @@ export const ReportIssuePage: React.FC = () => {
         citizen_id: user?.id || '',
         photo_before_url: photoPreviewUrl,
         additional_photos: additionalUrls,
-        ai_vision_metadata: aiResult ? {
+        ai_vision_metadata: (aiResult && aiResult.confidence > 0) ? {
           category: aiResult.category,
           confidence: aiResult.confidence,
           confidence_level: aiResult.confidence_level,
@@ -312,14 +317,14 @@ export const ReportIssuePage: React.FC = () => {
           <div className={`flex items-center space-x-2 text-xs font-mono font-bold px-3.5 py-2 rounded-full border ${
             aiHealth?.reachable
               ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-              : 'text-rose-700 bg-rose-50 border-rose-200'
+              : 'text-amber-800 bg-amber-50 border-amber-200'
           }`}>
-            <Sparkles className={`w-4 h-4 ${aiHealth?.reachable ? 'text-emerald-600 animate-pulse' : 'text-rose-600'}`} />
+            <Sparkles className={`w-4 h-4 ${aiHealth?.reachable ? 'text-emerald-600 animate-pulse' : 'text-amber-600'}`} />
             <span>
               {aiHealth?.reachable
                 ? `🟢 Gemini Vision Active (${aiHealth.model})`
                 : aiHealth?.configured
-                ? '🔴 AI Vision Offline (API Unreachable)'
+                ? '🟡 AI Service Quota Limit (Manual Fallback Ready)'
                 : '🔴 AI Key Not Configured'}
             </span>
           </div>
@@ -461,34 +466,48 @@ export const ReportIssuePage: React.FC = () => {
             )}
 
             {/* AI ANALYSIS RESULT CARD */}
-            {aiResult && aiResult.confidence === 0 ? (
-              <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 space-y-3 text-xs">
+            {aiResult && (aiResult.confidence === 0 || aiResult.is_available === false) ? (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-rose-900 font-outfit uppercase tracking-wider flex items-center space-x-1">
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>AI Vision Analysis Failed</span>
+                  <span className="font-extrabold text-amber-900 font-outfit uppercase tracking-wider flex items-center space-x-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>AI Vision Analysis</span>
                   </span>
-                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded border text-rose-800 bg-white border-rose-200">
-                    Status: Analysis Unavailable
+                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded border text-amber-800 bg-white border-amber-200">
+                    Status: AI Temporarily Unavailable
                   </span>
                 </div>
 
-                <p className="text-rose-900 font-medium text-xs">
-                  {aiResult.description || 'AI service unavailable. Please review photo and fill complaint details manually.'}
+                <p className="text-amber-900 font-medium text-xs">
+                  {aiResult.error_message || 'AI Vision temporarily unavailable because the AI service quota has been reached. You can retry or enter the complaint details manually.'}
                 </p>
 
-                {selectedPhotoFile && (
+                <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                  {selectedPhotoFile && (
+                    <button
+                      type="button"
+                      disabled={analyzingAI}
+                      onClick={() => {
+                        if (selectedPhotoFile && !analyzingAI) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl, true);
+                      }}
+                      className="w-full sm:w-1/2 py-2.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 flex items-center justify-center space-x-1 min-h-[44px] cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${analyzingAI ? 'animate-spin' : ''}`} />
+                      <span>{analyzingAI ? 'Retrying...' : 'Retry AI Analysis'}</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedPhotoFile) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl, true);
+                      const titleInput = document.getElementById('complaint-title-input');
+                      if (titleInput) titleInput.focus();
                     }}
-                    className="w-full py-2.5 rounded-xl bg-white hover:bg-rose-100 text-rose-800 font-bold border border-rose-300 flex items-center justify-center space-x-1 min-h-[44px]"
+                    className="w-full sm:w-1/2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center space-x-1 min-h-[44px] cursor-pointer"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Retry AI Analysis</span>
+                    <span>Continue Manually</span>
                   </button>
-                )}
+                </div>
               </div>
             ) : aiResult && (
               <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-300 space-y-3 text-xs">
@@ -787,6 +806,7 @@ export const ReportIssuePage: React.FC = () => {
                 <label className="block font-bold text-gray-700 mb-1">{t('complaintTitle')}</label>
                 <input
                   type="text"
+                  id="complaint-title-input"
                   value={title}
                   onChange={(e) => {
                     setTitle(e.target.value);

@@ -144,11 +144,15 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
     const fullPath = req.file.path;
     const aiAnalysis = await analyzeComplaintPhoto(fullPath);
 
-    if (aiAnalysis.error) {
-      console.error(`[${reqTime}] [NAGARSETU AI] Vision analysis error:`, aiAnalysis.error);
-      return res.status(500).json({
+    if (aiAnalysis.success === false) {
+      const statusCode = aiAnalysis.statusCode || 500;
+      console.error(`[${reqTime}] [NAGARSETU AI] Vision analysis returned error status ${statusCode}:`, aiAnalysis.error || aiAnalysis.message);
+      return res.status(statusCode).json({
         success: false,
-        error: aiAnalysis.error,
+        error: aiAnalysis.error || 'AI_SERVER_ERROR',
+        message: aiAnalysis.message || 'AI Vision analysis is temporarily unavailable.',
+        retryable: aiAnalysis.retryable ?? true,
+        photo_url: `/uploads/${req.file.filename}`,
         ai: aiAnalysis
       });
     }
@@ -163,7 +167,8 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
     console.error(`[${reqTime}] [NAGARSETU AI] Express analyze route error:`, err.message);
     return res.status(500).json({
       success: false,
-      error: `Failed to analyze photo: ${err.message}`
+      error: 'AI_SERVER_ERROR',
+      message: `Failed to analyze photo: ${err.message}`
     });
   }
 });

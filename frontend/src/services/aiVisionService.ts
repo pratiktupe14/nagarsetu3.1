@@ -355,6 +355,50 @@ export function compareImageSimilarity(
 }
 
 /**
+ * Compress and resize uploaded image client-side before sending to Gemini API
+ * Reduces payload size and token usage while preserving visual defect details.
+ */
+export async function compressImageFile(file: File, maxDimension: number = 1280, quality: number = 0.85): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  if (file.size < 500 * 1024) return file; // Skip compression for small images (< 500KB)
+
+  try {
+    const img = await loadImage(file);
+    let width = img.width;
+    let height = img.height;
+
+    if (width > maxDimension || height > maxDimension) {
+      if (width > height) {
+        height = Math.round((height * maxDimension) / width);
+        width = maxDimension;
+      } else {
+        width = Math.round((width * maxDimension) / height);
+        height = maxDimension;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+
+    if (!blob || blob.size >= file.size) return file; // If larger, keep original
+
+    const newFilename = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+    return new File([blob], newFilename, { type: 'image/jpeg', lastModified: Date.now() });
+  } catch (e) {
+    return file; // Fallback to original file on failure
+  }
+}
+
+/**
  * 1. Calls Express Backend API (/api/ai/analyze) on port 5000
  */
 async function callExpressBackendAiAnalyze(file: File): Promise<any> {
@@ -368,71 +412,60 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
       body: formData
     });
 
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.ai) return json.ai;
-      if (json.ai) return json.ai;
-      return json;
+    const json = await res.json().catch(() => ({}));
+
+    if (res.ok && json.success && json.ai) {
+      return json.ai;
     }
 
-    const errText = await res.text();
-    let errorMessage = '';
-    try {
-      const parsed = JSON.parse(errText);
-      errorMessage = parsed.error || parsed.message || errText;
-    } catch (e) {
-      errorMessage = errText;
+    if (json.ai && json.ai.success !== false) {
+      return json.ai;
     }
 
-    if (res.status === 429) {
-      throw new Error('Gemini API Rate Limit / Quota Exceeded (HTTP 429). Please retry in 60 seconds.');
-    } else if (res.status === 401) {
-      throw new Error('Gemini API Authentication Failed (HTTP 401). Please verify server GEMINI_API_KEY.');
-    } else if (res.status === 400) {
-      throw new Error(`Invalid request or image payload (HTTP 400): ${errorMessage}`);
-    } else {
-      throw new Error(`Express Backend API returned status ${res.status}: ${errorMessage}`);
-    }
+    const errorCode = json.error || (res.status === 429 ? 'AI_QUOTA_EXCEEDED' : 'AI_SERVER_ERROR');
+    const errorMessage = json.message || `Express Backend API returned status ${res.status}`;
+    const errObj: any = new Error(errorMessage);
+    errObj.statusCode = res.status;
+    errObj.errorCode = errorCode;
+    errObj.backendJson = json;
+    throw errObj;
   } catch (err: any) {
-    if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError')) {
+    if (err.statusCode || (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError'))) {
       throw err;
     }
 
     // Direct localhost:5000 fallback
     try {
-      const directRes = await fetch('${getApiUrl()}/api/ai/analyze', {
+      const directRes = await fetch(`${getApiUrl()}/api/ai/analyze`, {
         method: 'POST',
         body: formData
       });
 
-      if (directRes.ok) {
-        const json = await directRes.json();
-        if (json.success && json.ai) return json.ai;
-        if (json.ai) return json.ai;
-        return json;
+      const directJson = await directRes.json().catch(() => ({}));
+
+      if (directRes.ok && directJson.success && directJson.ai) {
+        return directJson.ai;
       }
 
-      const errText = await directRes.text();
-      let errorMessage = '';
-      try {
-        const parsed = JSON.parse(errText);
-        errorMessage = parsed.error || parsed.message || errText;
-      } catch (e) {
-        errorMessage = errText;
+      if (directJson.ai && directJson.ai.success !== false) {
+        return directJson.ai;
       }
 
-      if (directRes.status === 429) {
-        throw new Error('Gemini API Rate Limit / Quota Exceeded (HTTP 429). Please retry in 60 seconds.');
-      } else if (directRes.status === 401) {
-        throw new Error('Gemini API Authentication Failed (HTTP 401). Please verify server GEMINI_API_KEY.');
-      } else {
-        throw new Error(`Express Backend API returned status ${directRes.status}: ${errorMessage}`);
-      }
+      const errorCode = directJson.error || (directRes.status === 429 ? 'AI_QUOTA_EXCEEDED' : 'AI_SERVER_ERROR');
+      const errorMessage = directJson.message || `Express Backend API returned status ${directRes.status}`;
+      const errObj: any = new Error(errorMessage);
+      errObj.statusCode = directRes.status;
+      errObj.errorCode = errorCode;
+      errObj.backendJson = directJson;
+      throw errObj;
     } catch (directErr: any) {
-      if (directErr.message && !directErr.message.includes('Failed to fetch')) {
+      if (directErr.statusCode || (directErr.message && !directErr.message.includes('Failed to fetch'))) {
         throw directErr;
       }
-      throw new Error('Backend server on ${getApiUrl()} is offline or unreachable.');
+      const netErr: any = new Error('Backend server is offline or unreachable.');
+      netErr.statusCode = 503;
+      netErr.errorCode = 'AI_NETWORK_ERROR';
+      throw netErr;
     }
   }
 }
@@ -481,14 +514,15 @@ async function callGeminiVisionEdgeFunction(file: File): Promise<any> {
 /**
  * Main Civic Image Classifier executing real Gemini Vision API via Node Express backend
  */
-export async function detectCivicIssue(file: File, bypassCache: boolean = false): Promise<AIVisionResult> {
+export async function detectCivicIssue(inputFile: File, bypassCache: boolean = false): Promise<AIVisionResult> {
   const startTime = performance.now();
+  const file = await compressImageFile(inputFile);
   const imageHash = await computeImageHash(file);
 
   // Check local cache by exact image hash unless bypassCache is requested
   if (!bypassCache) {
     const cache = getAnalysisCache();
-    if (cache[imageHash]) {
+    if (cache[imageHash] && cache[imageHash].is_available !== false && cache[imageHash].confidence > 0) {
       return cache[imageHash];
     }
   }
@@ -496,40 +530,40 @@ export async function detectCivicIssue(file: File, bypassCache: boolean = false)
   const visualFeatures = await extractVisualFeatures(file);
 
   let rawRes: any = null;
-  let lastErrorMsg: string | null = null;
+  let lastErrorObj: any = null;
 
   // Layer 1: Call Express Backend API (/api/ai/analyze on port 5000)
   try {
     rawRes = await callExpressBackendAiAnalyze(file);
   } catch (err: any) {
-    lastErrorMsg = err.message || 'Express Backend AI error';
-    console.log('[NAGARSETU AI] Express Backend API error:', lastErrorMsg);
+    lastErrorObj = err;
+    console.log('[NAGARSETU AI] Express Backend API error:', err.message);
   }
 
   // Layer 2: Call Python FastAPI microservice (http://localhost:8000/analyze)
-  if (!rawRes || rawRes.error) {
+  if (!rawRes || rawRes.success === false) {
     try {
       rawRes = await callPythonAiServiceDirect(file);
     } catch (err: any) {
-      if (!lastErrorMsg) lastErrorMsg = err.message;
+      if (!lastErrorObj) lastErrorObj = err;
       console.log('[NAGARSETU AI] Python service unavailable:', err.message);
     }
   }
 
   // Layer 3: Call Supabase Edge Function
-  if (!rawRes || rawRes.error) {
+  if (!rawRes || rawRes.success === false) {
     try {
       rawRes = await callGeminiVisionEdgeFunction(file);
     } catch (err: any) {
-      if (!lastErrorMsg) lastErrorMsg = err.message;
+      if (!lastErrorObj) lastErrorObj = err;
       console.log('[NAGARSETU AI] Supabase Edge Function unavailable:', err.message);
     }
   }
 
   const endTime = performance.now();
 
-  // If real Gemini response obtained:
-  if (rawRes && rawRes.category && !rawRes.error) {
+  // If real successful Gemini response obtained:
+  if (rawRes && rawRes.category && rawRes.success !== false && !rawRes.error) {
     const rawCategory = rawRes.category as CivicCategory;
     const category: CivicCategory = (CIVIC_CATEGORIES as readonly string[]).includes(rawCategory)
       ? rawCategory
@@ -552,6 +586,7 @@ export async function detectCivicIssue(file: File, bypassCache: boolean = false)
       department: normalizeDepartment(rawRes.recommended_department || meta.department, category),
       title: rawRes.title || meta.defaultTitle,
       description: rawRes.description || `Civic issue detected visually by Gemini Vision.`,
+      is_available: true,
       visual_features: visualFeatures,
       detected_objects: rawRes.detected_features || [],
       quality_check: {
@@ -566,10 +601,28 @@ export async function detectCivicIssue(file: File, bypassCache: boolean = false)
     return result;
   }
 
-  // Format error reason cleanly without generic 'Failed to fetch'
-  let errorReason = rawRes?.error || lastErrorMsg || 'Backend server on ${getApiUrl()} is offline or unreachable.';
-  if (errorReason.includes('Failed to fetch') || errorReason.includes('NetworkError')) {
-    errorReason = 'Backend server on ${getApiUrl()} is offline or unreachable.';
+  // Map exact error status and code cleanly without setting error text in title/description
+  let errorCode = lastErrorObj?.errorCode || rawRes?.error || 'AI_TEMPORARY_ERROR';
+  let errorMessage = lastErrorObj?.message || rawRes?.message || 'AI Vision analysis is temporarily unavailable.';
+
+  if (lastErrorObj?.statusCode === 429 || errorCode === 'AI_QUOTA_EXCEEDED') {
+    errorCode = 'AI_QUOTA_EXCEEDED';
+    errorMessage = 'AI Vision temporarily unavailable because the AI service quota has been reached.';
+  } else if (lastErrorObj?.statusCode === 401 || errorCode === 'AI_AUTHENTICATION_ERROR') {
+    errorCode = 'AI_AUTHENTICATION_ERROR';
+    errorMessage = 'AI Vision authentication failed. Please verify API key configuration.';
+  } else if (lastErrorObj?.statusCode === 403 || errorCode === 'AI_PERMISSION_ERROR') {
+    errorCode = 'AI_PERMISSION_ERROR';
+    errorMessage = 'AI service permission denied.';
+  } else if (lastErrorObj?.statusCode === 404 || errorCode === 'AI_MODEL_NOT_FOUND') {
+    errorCode = 'AI_MODEL_NOT_FOUND';
+    errorMessage = 'Configured Gemini Vision model was not found.';
+  } else if (lastErrorObj?.statusCode === 504 || errorCode === 'AI_TIMEOUT') {
+    errorCode = 'AI_TIMEOUT';
+    errorMessage = 'AI Vision service connection timed out.';
+  } else if (errorCode === 'AI_NETWORK_ERROR' || errorMessage.includes('offline')) {
+    errorCode = 'AI_NETWORK_ERROR';
+    errorMessage = 'Backend server is offline or unreachable.';
   }
 
   const errorResult: AIVisionResult = {
@@ -577,18 +630,21 @@ export async function detectCivicIssue(file: File, bypassCache: boolean = false)
     analysis_id: crypto.randomUUID(),
     image_hash: imageHash,
     category: 'Other Civic Issue',
-    issue_type: 'AI Vision Analysis Failed',
+    issue_type: 'AI Vision Analysis Unavailable',
     confidence: 0.0,
     confidence_level: 'Low',
     priority: 'Medium',
-    department: 'Public Works Department (PWD)',
-    title: 'AI Analysis Failed',
-    description: `Gemini AI Analysis: ${errorReason}`,
+    department: 'Roads & Public Works Department (PWD)',
+    title: '', // CLEAN TITLE - DO NOT FILL WITH ERROR TEXT
+    description: '', // CLEAN DESCRIPTION - DO NOT FILL WITH ERROR TEXT
+    error_code: errorCode,
+    error_message: errorMessage,
+    is_available: false,
     visual_features: visualFeatures,
     detected_objects: [],
     quality_check: {
       isUsable: true,
-      warning: `AI Service Warning: ${errorReason}`,
+      warning: errorMessage,
       brightness: visualFeatures.brightness,
       contrast: visualFeatures.contrast
     },
