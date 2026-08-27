@@ -16,5 +16,18 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-leaflet': ['leaflet', 'react-leaflet'],
+          'vendor-charts': ['chart.js', 'react-chartjs-2'],
+          'vendor-lucide': ['lucide-react']
+        }
+      }
+    }
   }
 })

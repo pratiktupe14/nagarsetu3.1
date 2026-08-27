@@ -6,7 +6,7 @@ const { notifyStatusChange } = require('../services/notificationService');
 
 // Officer Auth Guard
 router.use(authenticateToken);
-router.use(requireRole(['officer', 'admin']));
+router.use(requireRole(['officer', 'admin', 'city_admin', 'department_head']));
 
 // Command Center Dashboard Complaints list with filters
 router.get('/dashboard', async (req, res) => {
