@@ -41,7 +41,7 @@ export const Navbar: React.FC = () => {
               <span className="font-extrabold text-lg text-gray-900 tracking-tight leading-none font-outfit">
                 NAGARSETU
               </span>
-              <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold font-mono">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold font-mono hidden sm:block">
                 Civic Platform 3.0
               </span>
             </div>
@@ -128,14 +128,14 @@ export const Navbar: React.FC = () => {
                   className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
                 >
                   <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                  <span>City Admin View</span>
+                  <span>City Administration View</span>
                 </button>
                 <button
                   onClick={() => handleRoleSwitch('service_staff')}
                   className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
                 >
                   <Wrench className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Service Staff View</span>
+                  <span>Field Staff View</span>
                 </button>
               </div>
             </div>
@@ -207,13 +207,13 @@ export const Navbar: React.FC = () => {
               onClick={() => { handleRoleSwitch('city_admin'); setMobileMenuOpen(false); }}
               className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
             >
-              City Admin View
+               City Administration View
             </button>
             <button
               onClick={() => { handleRoleSwitch('service_staff'); setMobileMenuOpen(false); }}
               className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
             >
-              Service Staff View
+               Field Staff View
             </button>
           </div>
 

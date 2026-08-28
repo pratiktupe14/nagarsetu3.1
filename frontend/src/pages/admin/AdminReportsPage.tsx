@@ -27,7 +27,7 @@ type ReportType =
   | 'Citizen Feedback Report'
   | 'Ward-wise Complaint Report'
   | 'Category-wise Complaint Report'
-  | 'Service Staff Performance Report';
+  | 'Field Staff Performance Report';
 
 interface SavedReportItem {
   id: string;
@@ -73,7 +73,7 @@ export const AdminReportsPage: React.FC = () => {
   }>({
     id: 'RPT-2026-0821-492',
     generatedAt: new Date().toLocaleString(),
-    generatedBy: 'City Admin Officer'
+    generatedBy: 'City Administration Officer'
   });
 
   // Local Saved Reports History
@@ -84,7 +84,7 @@ export const AdminReportsPage: React.FC = () => {
       name: 'Daily Complaint Operations Report',
       type: 'Daily Complaint Report',
       generated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      generated_by: 'City Admin Officer',
+      generated_by: 'City Administration Officer',
       record_count: 32,
       status: 'Generated'
     },
@@ -104,7 +104,7 @@ export const AdminReportsPage: React.FC = () => {
       name: 'SLA Compliance & Breach Escalation Audit',
       type: 'SLA Compliance Report',
       generated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-      generated_by: 'City Admin Officer',
+      generated_by: 'City Administration Officer',
       record_count: 12,
       status: 'Generated'
     }
@@ -360,7 +360,7 @@ export const AdminReportsPage: React.FC = () => {
         name: `${selectedReportType} (${dateFrom} to ${dateTo})`,
         type: selectedReportType,
         generated_at: new Date().toISOString(),
-        generated_by: 'City Admin Officer',
+        generated_by: 'City Administration Officer',
         record_count: filteredComplaints.length,
         status: 'Generated'
       };
@@ -368,7 +368,7 @@ export const AdminReportsPage: React.FC = () => {
       setGeneratedReportMeta({
         id: rptNum,
         generatedAt: new Date().toLocaleString(),
-        generatedBy: 'City Admin Officer'
+        generatedBy: 'City Administration Officer'
       });
 
       setRecentReports((prev) => [newReport, ...prev]);
@@ -452,7 +452,7 @@ export const AdminReportsPage: React.FC = () => {
                 <option value="Citizen Feedback Report">Citizen Feedback Report</option>
                 <option value="Ward-wise Complaint Report">Ward-wise Complaint Report</option>
                 <option value="Category-wise Complaint Report">Category-wise Complaint Report</option>
-                <option value="Service Staff Performance Report">Service Staff Performance Report</option>
+                <option value="Field Staff Performance Report">Field Staff Performance Report</option>
               </select>
             </div>
 
@@ -928,7 +928,7 @@ export const AdminReportsPage: React.FC = () => {
                   )}
 
                   {/* TYPE F: SERVICE STAFF PERFORMANCE REPORT TABLE */}
-                  {selectedReportType === 'Service Staff Performance Report' && (
+                  {selectedReportType === 'Field Staff Performance Report' && (
                     <div className="overflow-x-auto border border-gray-200 rounded-xl">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>

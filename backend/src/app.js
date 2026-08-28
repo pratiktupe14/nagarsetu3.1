@@ -2,8 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { authRateLimiter, publicRateLimiter, authenticatedRateLimiter } = require('./middleware/rateLimiter');
-const { errorHandler } = require('./middleware/errorHandler');
+const { authRateLimiter, publicRateLimiter, authedRateLimiter, authenticatedRateLimiter } = require('./middleware/rateLimiter');
+const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes = require('./routes/auth.routes');
 const complaintRoutes = require('./routes/complaint.routes');
@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static uploads safely (Prevent execution as code)
+// Serve static uploads safely (Prevent execution as script/code)
 app.use('/uploads', (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
@@ -38,14 +38,14 @@ app.get('/api/health', publicRateLimiter, (req, res) => {
 // Register API Routes with Appropriate Rate Limiters
 app.use('/api/auth', authRateLimiter, authRoutes);
 app.use('/api/maps', publicRateLimiter, mapsRoutes);
-app.use('/api/ai', publicRateLimiter, aiRoutes);
+app.use('/api/ai', authedRateLimiter || publicRateLimiter, aiRoutes);
 
-app.use('/api/complaints', authenticatedRateLimiter, complaintRoutes);
-app.use('/api/officer', authenticatedRateLimiter, officerRoutes);
-app.use('/api/staff', authenticatedRateLimiter, staffRoutes);
-app.use('/api/admin', authenticatedRateLimiter, adminRoutes);
-app.use('/api/departments', authenticatedRateLimiter, departmentRoutes);
-app.use('/api/notifications', authenticatedRateLimiter, notificationRoutes);
+app.use('/api/complaints', authedRateLimiter || authenticatedRateLimiter, complaintRoutes);
+app.use('/api/officer', authedRateLimiter || authenticatedRateLimiter, officerRoutes);
+app.use('/api/staff', authedRateLimiter || authenticatedRateLimiter, staffRoutes);
+app.use('/api/admin', authedRateLimiter || authenticatedRateLimiter, adminRoutes);
+app.use('/api/departments', authedRateLimiter || authenticatedRateLimiter, departmentRoutes);
+app.use('/api/notifications', authedRateLimiter || authenticatedRateLimiter, notificationRoutes);
 
 // Centralized Error Handling Middleware (Prevents stack trace / information leakage)
 app.use(errorHandler);

@@ -3,42 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
-const { validateInput, CommonValidators } = require('../middleware/validateInput');
-
-// Register Schema
-const registerSchema = {
-  body: {
-    name: { type: 'string', required: true, minLength: 2, maxLength: 100 },
-    mobile: { type: 'string', required: true, pattern: CommonValidators.mobilePattern, message: 'must be a valid 10-digit Indian mobile number (e.g. 9876543210)' },
-    email: { type: 'string', required: false, minLength: 5, maxLength: 100, pattern: CommonValidators.emailPattern, message: 'must be a valid email address' },
-    password: { type: 'string', required: true, minLength: 6, maxLength: 128 },
-    role: { type: 'string', required: false, allowedValues: ['citizen', 'officer', 'staff', 'admin'] },
-    language_pref: { type: 'string', required: false, allowedValues: ['en', 'hi', 'mr'] }
-  }
-};
-
-// Login Schema
-const loginSchema = {
-  body: {
-    mobileOrEmail: { type: 'string', required: true, minLength: 3, maxLength: 100 },
-    password: { type: 'string', required: true, minLength: 1, maxLength: 128 }
-  }
-};
-
-// OTP Request Schema
-const otpRequestSchema = {
-  body: {
-    mobile: { type: 'string', required: true, pattern: CommonValidators.mobilePattern, message: 'must be a valid 10-digit Indian mobile number' }
-  }
-};
-
-// OTP Verify Schema
-const otpVerifySchema = {
-  body: {
-    mobile: { type: 'string', required: true, pattern: CommonValidators.mobilePattern, message: 'must be a valid 10-digit Indian mobile number' },
-    otp: { type: 'string', required: true, minLength: 6, maxLength: 6 }
-  }
-};
+const validateInput = require('../middleware/validateInput');
+const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
 
 // Register endpoint (Citizen, Officer, Staff, Admin)
 router.post('/register', validateInput(registerSchema), async (req, res) => {
@@ -64,6 +30,8 @@ router.post('/register', validateInput(registerSchema), async (req, res) => {
     const newUserId = result.rows[0].id;
     const userObj = { id: newUserId, name, mobile, email, role, language_pref };
     const token = generateToken(userObj);
+
+    if (res.clearAuthAttempts) res.clearAuthAttempts();
 
     return res.status(201).json({
       message: 'Registration successful',
@@ -130,8 +98,13 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       isMatch = await bcrypt.compare(password, user.password_hash);
     }
 
-    if (!isMatch && (password === 'NagarSetu@Admin2026!' || password === 'password123' || password === 'admin123' || password === 'head123' || password === 'staff123')) {
-      isMatch = true;
+    // Development-only fallback credential check
+    if (!isMatch && process.env.NODE_ENV !== 'production') {
+      const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
+      const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+      if (password === devAdminPass || password === devUserPass || password === 'admin123' || password === 'head123' || password === 'staff123') {
+        isMatch = true;
+      }
     }
 
     if (!isMatch) {
@@ -174,6 +147,8 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     const token = generateToken(userObj);
 
+    if (res.clearAuthAttempts) res.clearAuthAttempts();
+
     return res.json({
       message: 'Login successful',
       token,
@@ -185,13 +160,13 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   }
 });
 
-// OTP Request
+// OTP Request (Simulated)
 router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
   const { mobile } = req.body;
   return res.json({ message: 'OTP sent successfully to ' + mobile, demoOtp: '123456' });
 });
 
-// OTP Verify
+// OTP Verify (Simulated)
 router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   try {
     const { mobile, otp } = req.body;
@@ -206,13 +181,15 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
       const user = resUser.rows[0];
       const userObj = { id: user.id, name: user.name, mobile: user.mobile, email: user.email, role: user.role, language_pref: user.language_pref };
       const token = generateToken(userObj);
+      if (res.clearAuthAttempts) res.clearAuthAttempts();
       return res.json({ message: 'OTP verified successfully', token, user: userObj });
     } else {
+      if (res.clearAuthAttempts) res.clearAuthAttempts();
       return res.json({ verified: true, needsRegistration: true, message: 'OTP verified. Please complete profile.' });
     }
   } catch (err) {
     console.error('OTP verify error:', err);
-    return res.status(500).json({ error: 'Failed to verify OTP' });
+    return res.status(500).json({ error: 'Server error during OTP verification' });
   }
 });
 

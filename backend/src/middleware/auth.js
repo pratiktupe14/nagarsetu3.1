@@ -1,10 +1,13 @@
 const jwt = require('jsonwebtoken');
 
+const isProd = process.env.NODE_ENV === 'production';
+
 function getJwtSecret() {
   if (process.env.JWT_SECRET) {
     return process.env.JWT_SECRET;
   }
-  if (process.env.NODE_ENV === 'production') {
+  if (isProd) {
+    console.error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production mode.');
     throw new Error('[FATAL SECURITY ERROR] JWT_SECRET environment variable must be set in production!');
   }
   console.warn('[SECURITY WARNING] JWT_SECRET is not configured in environment variables. Falling back to development environment key.');

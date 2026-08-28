@@ -181,7 +181,7 @@ export const AdminComplaintsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 font-sans">
         
         {/* PAGE HEADER */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
               {isNewComplaintsPage ? 'New Complaints' : 'All Complaints'}
@@ -265,7 +265,7 @@ export const AdminComplaintsPage: React.FC = () => {
         </div>
 
         {/* PRACTICAL ADMINISTRATIVE FILTER TOOLBAR */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-3">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             
             <div className="relative flex-1 min-w-[220px]">
@@ -278,7 +278,7 @@ export const AdminComplaintsPage: React.FC = () => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-medium min-h-[44px]"
+                className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium min-h-[44px]"
               />
             </div>
 
@@ -286,7 +286,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
+                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">All Statuses ▼</option>
                 <option value="Submitted">Submitted (New)</option>
@@ -301,7 +301,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <select
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
+                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">All Priorities ▼</option>
                 <option value="Low">Low</option>
@@ -313,7 +313,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <select
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
+                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">All Departments ▼</option>
                 {DEPARTMENT_OPTIONS.map((d) => (
@@ -324,7 +324,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <select
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
+                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">All Categories ▼</option>
                 {CATEGORY_OPTIONS.map((c) => (
@@ -336,7 +336,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
+                className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
               />
 
               {(searchQuery || statusFilter !== 'All' || priorityFilter !== 'All' || departmentFilter !== 'All' || categoryFilter !== 'All' || dateFilter) && (
@@ -385,7 +385,7 @@ export const AdminComplaintsPage: React.FC = () => {
         </div>
 
         {/* CLASSIC MUNICIPAL COMPLAINT TABLE */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -536,7 +536,7 @@ export const AdminComplaintsPage: React.FC = () => {
       {/* TWO-COLUMN COMPLAINT REVIEW INTERFACE MODAL */}
       {selectedComplaint && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-          <div className="max-w-5xl w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto space-y-6">
+          <div className="max-w-5xl w-full bg-white rounded-xl p-6 border border-gray-200 shadow-2xl max-h-[90vh] overflow-y-auto space-y-6">
             
             {/* REVIEW MODAL HEADER */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">

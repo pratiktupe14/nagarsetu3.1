@@ -30,13 +30,59 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     login: "Sign In",
     register: "Register",
     welcome: "Welcome",
-    
+    home: "Home",
+    features: "Features",
+    howItWorks: "How It Works",
+    getStarted: "Get Started",
+    portalSelect: "Select Portal Access",
+
     // Roles
     roleCitizen: "Citizen",
     roleOfficer: "Municipal Officer",
     roleStaff: "Field Staff",
     roleAdmin: "Administrator",
     roleDeptHead: "Department Head",
+
+    // Landing Page
+    landingHeroTitle: "Smart Civic Issue Reporting & Municipal Operations",
+    landingHeroSubtitle: "Connecting citizens, city administration, department heads, and field service staff in one unified digital ecosystem.",
+    reportIssueNow: "Report Civic Issue Now",
+    trackStatusNow: "Track Complaint Status",
+    aiVisionFeatureTitle: "AI Vision Classification",
+    aiVisionFeatureDesc: "Automatically detects civic defects from photos and routes complaints to the correct department.",
+    geoTaggingFeatureTitle: "Precise Geotagging",
+    geoTaggingFeatureDesc: "GPS device tracking, photo EXIF verification, and interactive Leaflet map pin-drop.",
+    slaTrackingFeatureTitle: "SLA & Task Assignment",
+    slaTrackingFeatureDesc: "Department Heads assign tasks to service staff with real-time resolution evidence verification.",
+    howItWorksStep1: "1. Citizen Reports Problem",
+    howItWorksStep1Desc: "Upload photo, AI classifies defect & pre-fills department.",
+    howItWorksStep2: "2. Department Head Assigns",
+    howItWorksStep2Desc: "Department Head routes issue to designated field staff.",
+    howItWorksStep3: "3. Staff Resolves & Verifies",
+    howItWorksStep3Desc: "Staff fixes defect, uploads photo proof & citizen tracks progress.",
+
+    // Auth (Login / Register)
+    loginTitle: "Sign In to NAGARSETU",
+    loginSubtitle: "Access your role-based municipal dashboard",
+    mobileOrEmail: "Mobile Number or Official Email",
+    enterMobileOrEmail: "Enter 10-digit mobile or official email",
+    password: "Password",
+    enterPassword: "Enter your password",
+    rememberMe: "Remember me",
+    forgotPassword: "Forgot password?",
+    dontHaveAccount: "Don't have an account?",
+    registerHere: "Register here",
+    registerTitle: "Create Citizen Account",
+    registerSubtitle: "Join NAGARSETU to report and track civic issues",
+    fullName: "Full Name",
+    enterFullName: "Enter your full name",
+    mobileNumber: "10-Digit Mobile Number",
+    enterMobileNumber: "Enter 10-digit mobile number",
+    emailAddress: "Email Address (Optional)",
+    enterEmailAddress: "Enter official or personal email",
+    confirmPassword: "Confirm Password",
+    alreadyHaveAccount: "Already have an account?",
+    demoAccounts: "Pre-seeded Demo Login Accounts",
 
     // Complaint Form & Fields
     complaintTitle: "Complaint Title",
@@ -65,15 +111,18 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     manualPinRequiredTitle: "Location Couldn't Be Auto-Detected",
     manualPinRequiredMsg: "We couldn't detect the location for this photo. Please tap on the map to mark exactly where the issue is.",
     confirmPinLocation: "Confirm Selected Pin Location",
+    duplicateWarningTitle: "Similar Complaint Detected Nearby (100m Radius)",
+    duplicateWarningMsg: "A similar issue has already been reported nearby. You can view or upvote the existing report to avoid duplicate complaints.",
 
     // Complaint Categories
-    categoryRoadDamage: "Road Damage",
-    categoryGarbageWaste: "Garbage & Waste",
-    categoryWaterLeakage: "Water Leakage",
-    categoryDrainageSewage: "Drainage & Sewage",
-    categoryStreetlight: "Streetlight",
-    categoryTrafficSignal: "Traffic Signal",
-    categoryPublicInfrastructure: "Public Infrastructure",
+    categoryRoadDamage: "Road Damage / Pothole",
+    categoryGarbageWaste: "Garbage & Waste Accumulation",
+    categoryWaterLeakage: "Water Supply / Pipeline Leakage",
+    categoryDrainageSewage: "Drainage Blockage & Sewage Overflow",
+    categoryStreetlight: "Streetlight & Electrical Fault",
+    categoryTrafficSignal: "Traffic Signal & Safety Defect",
+    categoryPublicInfrastructure: "Public Infrastructure Damage",
+    categoryOther: "Other Civic Issue",
 
     // Complaint Statuses
     statusSubmitted: "Submitted",
@@ -89,6 +138,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     statusReopened: "Reopened",
     statusRejected: "Rejected",
     statusPending: "Pending",
+    statusOverdue: "Overdue",
 
     // Priorities
     priorityLow: "Low",
@@ -107,7 +157,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     departments: "Departments",
     departmentHeads: "Department Heads",
     departmentDashboard: "Department Dashboard",
-    serviceStaff: "Service Staff",
+    serviceStaff: "Field Staff",
     cityMap: "City Map",
     analytics: "Analytics",
     reports: "Reports",
@@ -119,6 +169,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     verifyReject: "Reject Complaint",
     assignStaff: "Assign Field Staff",
     possibleDuplicates: "Possible Duplicate Alerts (100m Radius)",
+    appointDeptHead: "Appoint Department Head",
+    manageStaff: "Manage Field Staff",
 
     // Department Head Portal
     departmentHeadPortal: "Department Head Portal",
@@ -128,9 +180,12 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     pendingReview: "Pending Review",
     taskAssignment: "Task Assignment",
     departmentMap: "Department Map",
+    unassignedTasks: "Unassigned Tasks",
+    activeStaffCount: "Active Staff Count",
+    departmentSlaRate: "Department SLA Compliance",
 
     // Service Staff Portal
-    serviceStaffPortal: "Service Staff Portal",
+    serviceStaffPortal: "Field Staff Portal",
     myTasks: "My Tasks",
     newAssignments: "New Assignments",
     completed: "Completed",
@@ -143,12 +198,12 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     resolutionProofPhoto: "Upload 'After' Photo Proof",
 
     // Departments
-    deptPWD: "Public Works Department (PWD)",
-    deptSanitation: "Sanitation & Waste Management",
-    deptWater: "Water Supply & Sewerage",
-    deptDrainage: "Drainage & Sewage Department",
-    deptElectrical: "Electrical & Street Lighting",
-    deptTraffic: "Traffic Management Department",
+    deptPWD: "Roads & Public Works Department (PWD)",
+    deptSanitation: "Sanitation & Solid Waste Management",
+    deptWater: "Water Supply & Sewerage Board",
+    deptDrainage: "Drainage & Sewerage Department",
+    deptElectrical: "Electrical & Public Lighting Department",
+    deptTraffic: "Traffic Engineering & Control Department",
 
     // Common Actions & Labels
     save: "Save",
@@ -168,6 +223,13 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     giveFeedback: "Submit Star Rating & Feedback",
     preferredLanguage: "Preferred Language",
     savedSuccessfully: "Saved successfully!",
+    actions: "Actions",
+    dateSubmitted: "Date Submitted",
+    assignedTo: "Assigned To",
+    contactNumber: "Contact Number",
+    status: "Status",
+    details: "Details",
+    noDataAvailable: "No data available",
 
     // Announcements
     createAnnouncement: "Create Official Announcement",
@@ -240,6 +302,11 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     login: "लॉग इन करें",
     register: "पंजीकरण करें",
     welcome: "स्वागत है",
+    home: "मुख्य पृष्ठ",
+    features: "विशेषताएं",
+    howItWorks: "यह कैसे काम करता है",
+    getStarted: "शुरू करें",
+    portalSelect: "पोर्टल का चयन करें",
 
     // Roles
     roleCitizen: "नागरिक",
@@ -247,6 +314,47 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     roleStaff: "फील्ड कर्मचारी",
     roleAdmin: "प्रशासक",
     roleDeptHead: "विभाग प्रमुख",
+
+    // Landing Page
+    landingHeroTitle: "स्मार्ट नागरिक शिकायत रिपोर्टिंग और नगर निगम संचालन प्रणाली",
+    landingHeroSubtitle: "नागरिकों, शहर प्रशासन, विभाग प्रमुखों और फील्ड कर्मचारियों को एक एकीकृत डिजिटल प्लेटफॉर्म पर जोड़ना।",
+    reportIssueNow: "अभी शिकायत दर्ज करें",
+    trackStatusNow: "शिकायत स्थिति ट्रैक करें",
+    aiVisionFeatureTitle: "एआई विज़न वर्गीकरण",
+    aiVisionFeatureDesc: "तस्वीरों से नागरिक समस्याओं की स्वचालित पहचान करता है और संबंधित विभाग को भेजता है।",
+    geoTaggingFeatureTitle: "सटीक जियो-टैगिंग",
+    geoTaggingFeatureDesc: "जीपीएस ट्रैकिंग, फोटो स्थान सत्यापन और मानचित्र पर पिन लगाना।",
+    slaTrackingFeatureTitle: "समय सीमा और कार्य आवंटन",
+    slaTrackingFeatureDesc: "विभाग प्रमुख फील्ड कर्मचारियों को काम सौंपते हैं और पूरा होने का प्रमाण सत्यापित करते हैं।",
+    howItWorksStep1: "1. नागरिक समस्या दर्ज करता है",
+    howItWorksStep1Desc: "फोटो अपलोड करें, एआई समस्या को पहचान कर विभाग चुनता है।",
+    howItWorksStep2: "2. विभाग प्रमुख काम सौंपता है",
+    howItWorksStep2Desc: "विभाग प्रमुख समस्या को संबंधित कर्मचारी को आवंटित करता है।",
+    howItWorksStep3: "3. कर्मचारी हल करता है और सत्यापित करता है",
+    howItWorksStep3Desc: "कर्मचारी समस्या ठीक कर फोटो प्रमाण अपलोड करता है।",
+
+    // Auth (Login / Register)
+    loginTitle: "नगरसेतु में लॉग इन करें",
+    loginSubtitle: "अपने डैशबोर्ड तक पहुँच प्राप्त करें",
+    mobileOrEmail: "मोबाइल नंबर या आधिकारिक ईमेल",
+    enterMobileOrEmail: "10-अंकों का मोबाइल या ईमेल दर्ज करें",
+    password: "पासवर्ड",
+    enterPassword: "अपना पासवर्ड दर्ज करें",
+    rememberMe: "मुझे याद रखें",
+    forgotPassword: "पासवर्ड भूल गए?",
+    dontHaveAccount: "खाता नहीं है?",
+    registerHere: "यहाँ पंजीकरण करें",
+    registerTitle: "नागरिक खाता बनाएं",
+    registerSubtitle: "शिकायत दर्ज और ट्रैक करने के लिए नगरसेतु से जुड़ें",
+    fullName: "पूरा नाम",
+    enterFullName: "अपना पूरा नाम दर्ज करें",
+    mobileNumber: "10-अंकों का मोबाइल नंबर",
+    enterMobileNumber: "10-अंकों का मोबाइल नंबर दर्ज करें",
+    emailAddress: "ईमेल पता (वैकल्पिक)",
+    enterEmailAddress: "ईमेल पता दर्ज करें",
+    confirmPassword: "पासवर्ड की पुष्टि करें",
+    alreadyHaveAccount: "पहले से ही खाता है?",
+    demoAccounts: "डेमो लॉगिन खाते",
 
     // Complaint Form & Fields
     complaintTitle: "शिकायत का शीर्षक",
@@ -275,15 +383,18 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     manualPinRequiredTitle: "स्थान स्वतः पहचान नहीं हो सका",
     manualPinRequiredMsg: "हम इस फोटो के लिए स्थान का पता नहीं लगा सके। कृपया सटीक स्थान चिन्हित करने के लिए मानचित्र पर टैप करें।",
     confirmPinLocation: "पिन किए गए स्थान की पुष्टि करें",
+    duplicateWarningTitle: "आस-पास समान शिकायत मिली (100 मीटर दायरा)",
+    duplicateWarningMsg: "आस-पास पहले से ही ऐसी शिकायत दर्ज है। दोहराव से बचने के लिए आप मौजूदा रिपोर्ट देख सकते हैं।",
 
     // Complaint Categories
-    categoryRoadDamage: "सड़क की क्षति",
-    categoryGarbageWaste: "कचरा और अपशिष्ट",
-    categoryWaterLeakage: "पानी का रिसाव",
-    categoryDrainageSewage: "जल निकासी और सीवेज",
-    categoryStreetlight: "स्ट्रीटलाइट",
-    categoryTrafficSignal: "ट्रैफिक सिग्नल",
-    categoryPublicInfrastructure: "सार्वजनिक बुनियादी ढाँचा",
+    categoryRoadDamage: "सड़क की खराबी / गड्ढा",
+    categoryGarbageWaste: "कचरा व अपशिष्ट जमाव",
+    categoryWaterLeakage: "जल आपूर्ति व पाइपलाइन रिसाव",
+    categoryDrainageSewage: "जल निकासी व सीवेज ओवरफ्लो",
+    categoryStreetlight: "स्ट्रीटलाइट व बिजली की खराबी",
+    categoryTrafficSignal: "ट्रैफिक सिग्नल व सुरक्षा दोष",
+    categoryPublicInfrastructure: "सार्वजनिक बुनियादी ढांचा क्षति",
+    categoryOther: "अन्य नागरिक समस्या",
 
     // Complaint Statuses
     statusSubmitted: "दर्ज की गई",
@@ -299,6 +410,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     statusReopened: "पुनः खोला गया",
     statusRejected: "अस्वीकृत",
     statusPending: "लंबित",
+    statusOverdue: "समय सीमा पार",
 
     // Priorities
     priorityLow: "कम",
@@ -315,6 +427,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     resolved: "समाधान किया गया",
     overdue: "समय सीमा पार",
     departments: "विभाग",
+    departmentHeads: "विभाग प्रमुख",
+    departmentDashboard: "विभाग डैशबोर्ड",
     serviceStaff: "सेवा कर्मचारी",
     cityMap: "शहर का मानचित्र",
     analytics: "विश्लेषण",
@@ -327,6 +441,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     verifyReject: "अस्वीकृत करें",
     assignStaff: "कर्मचारी को सौंपें",
     possibleDuplicates: "संभावित डुप्लिकेट शिकायतें",
+    appointDeptHead: "विभाग प्रमुख नियुक्त करें",
+    manageStaff: "कर्मचारी प्रबंधन",
 
     // Department Head Portal
     departmentHeadPortal: "विभाग प्रमुख पोर्टल",
@@ -336,6 +452,9 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     pendingReview: "समीक्षा लंबित",
     taskAssignment: "कार्य आवंटन",
     departmentMap: "विभाग मानचित्र",
+    unassignedTasks: "गैर-आवंटित कार्य",
+    activeStaffCount: "सक्रिय कर्मचारी",
+    departmentSlaRate: "विभाग समय सीमा अनुपालन",
 
     // Service Staff Portal
     serviceStaffPortal: "सेवा कर्मचारी पोर्टल",
@@ -353,7 +472,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // Departments
     deptPWD: "लोक निर्माण विभाग (PWD)",
     deptSanitation: "स्वच्छता एवं अपशिष्ट प्रबंधन",
-    deptWater: "जल आपूर्ति एवं सीवरेज",
+    deptWater: "जल आपूर्ति एवं सीवरेज बोर्ड",
     deptDrainage: "जल निकासी एवं सीवेज विभाग",
     deptElectrical: "विद्युत एवं स्ट्रीट लाइट विभाग",
     deptTraffic: "यातायात प्रबंधन विभाग",
@@ -376,9 +495,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     giveFeedback: "स्टार रेटिंग और फीडबैक दें",
     preferredLanguage: "पसंदीदा भाषा",
     savedSuccessfully: "सफलतापूर्वक सहेजा गया!",
+    actions: "कार्रवाई",
+    dateSubmitted: "दर्ज करने की तारीख",
+    assignedTo: "आवंटित कर्मचारी",
+    contactNumber: "संपर्क नंबर",
+    status: "स्थिति",
+    details: "विवरण",
+    noDataAvailable: "कोई डेटा उपलब्ध नहीं है",
 
     // Announcements
-    createAnnouncement: "आधिकारिक घोषणा बनाएं",
+    createAnnouncement: "अधिकृत घोषणाएं बनाएं",
     announcementTitle: "शीर्षक",
     announcementMessage: "संदेश / विवरण",
     englishTitle: "अंग्रेजी शीर्षक",
@@ -390,6 +516,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
 
     // Empty States
     noComplaintsFound: "कोई शिकायत नहीं मिली।",
+    noSanitationComplaintsFound: "स्वच्छता की कोई शिकायत नहीं मिली।",
+    noElectricalComplaintsFound: "बिजली की कोई शिकायत नहीं मिली।",
     noNotificationsAvailable: "कोई सूचना उपलब्ध नहीं है।",
     noTasksAssigned: "कोई कार्य सौंपा नहीं गया है।",
     noAnnouncementsAvailable: "कोई घोषणा उपलब्ध नहीं है।",
@@ -398,7 +526,30 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // Error Messages
     somethingWentWrong: "कुछ गलत हो गया।",
     unableToLoadData: "डेटा लोड करने में असमर्थ।",
+    unableToLoadSanitationData: "स्वच्छता विभाग का डेटा लोड करने में असमर्थ।",
+    unableToLoadElectricalData: "विद्युत विभाग का डेटा लोड करने में असमर्थ।",
     pleaseTryAgain: "कृपया पुनः प्रयास करें।",
+
+    // Sanitation Department Operational Metrics
+    garbageComplaints: "कचरा शिकायतें",
+    overflowingDustbins: "ओवरफ्लो कूड़ेदान",
+    wasteAccumulation: "अपशिष्ट जमाव",
+    publicDumping: "सार्वजनिक कचरा डंपिंग",
+    collectionRequests: "कचरा संग्रह अनुरोध",
+    pendingCleanup: "लंबित सफाई",
+    completedCleanup: "पूर्ण सफाई",
+    overdueCleanup: "विलंबित सफाई",
+
+    // Electrical Department Operational Metrics
+    brokenStreetlights: "टूटी हुई स्ट्रीटलाइट्स",
+    streetlightOutages: "स्ट्रीटलाइट ब्लैकआउट",
+    electricalPoleDamage: "खंभे की क्षति",
+    exposedWiring: "खुले तार",
+    electricalHazards: "बिजली के खतरे",
+    lightingMaintenance: "लाइटिंग रखरखाव",
+    pendingRepairs: "लंबित मरम्मत",
+    completedRepairs: "पूर्ण मरम्मत",
+    criticalElectricalSafetyAlerts: "गंभीर बिजली सुरक्षा चेतावनियाँ",
 
     // AI Analyzer
     aiLargePothole: "सड़क पर बड़ा गड्ढा",
@@ -423,6 +574,11 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     login: "लॉगिन करा",
     register: "नोंदणी करा",
     welcome: "सुस्वागतम",
+    home: "मुख्य पृष्ठ",
+    features: "वैशिष्ट्ये",
+    howItWorks: "हे कसे कार्य करते",
+    getStarted: "शुरू करा",
+    portalSelect: "पोर्टल निवडा",
 
     // Roles
     roleCitizen: "नागरीक",
@@ -430,6 +586,47 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     roleStaff: "फील्ड कर्मचारी",
     roleAdmin: "प्रशासक",
     roleDeptHead: "विभाग प्रमुख",
+
+    // Landing Page
+    landingHeroTitle: "स्मार्ट नागरी तक्रार निवारण आणि महापालिका कामकाज प्रणाली",
+    landingHeroSubtitle: "नागरिक, महापालिका प्रशासन, विभाग प्रमुख आणि फील्ड कर्मचाऱ्यांना एकाच डिजिटल प्लॅटफॉर्मवर जोडणारी प्रणाली.",
+    reportIssueNow: "आत्ताच तक्रार नोंदवा",
+    trackStatusNow: "तक्रारीची स्थिती तपासा",
+    aiVisionFeatureTitle: "एआय व्हिजन वर्गीकरण",
+    aiVisionFeatureDesc: "फोटोंवरून नागरी समस्यांची आपोआप ओळख करते आणि संबंधित विभागाकडे पाठवते.",
+    geoTaggingFeatureTitle: "अचूक जिओ-टॅगिंग",
+    geoTaggingFeatureDesc: "जीपीएस ट्रॅकिंग, फोटो स्थान पडताळणी आणि नकाशावर पिन लावणे.",
+    slaTrackingFeatureTitle: "मुदत आणि काम वाटप",
+    slaTrackingFeatureDesc: "विभाग प्रमुख फील्ड कर्मचाऱ्यांना काम सोपवतात आणि काम पूर्ण झाल्याचा पुरावा तपासतात.",
+    howItWorksStep1: "1. नागरिक समस्या नोंदवतो",
+    howItWorksStep1Desc: "फोटो अपलोड करा, एआय समस्येची ओळख पटवून विभाग निवडतो.",
+    howItWorksStep2: "2. विभाग प्रमुख काम सोपवतो",
+    howItWorksStep2Desc: "विभाग प्रमुख समस्या संबंधित कर्मचाऱ्याला वाटप करतो.",
+    howItWorksStep3: "3. कर्मचारी पूर्ण करतो व पडताळतो",
+    howItWorksStep3Desc: "कर्मचारी समस्या दुरुस्त करून फोटो पुरावा अपलोड करतो.",
+
+    // Auth (Login / Register)
+    loginTitle: "नगरसेतू मध्ये लॉगिन करा",
+    loginSubtitle: "आपल्या डॅशबोर्डवर प्रवेश करा",
+    mobileOrEmail: "मोबाइल नंबर किंवा अधिकृत ईमेल",
+    enterMobileOrEmail: "१०-अंकी मोबाइल किंवा ईमेल टाका",
+    password: "पासवर्ड",
+    enterPassword: "आपला पासवर्ड टाका",
+    rememberMe: "माहिती जतन करा",
+    forgotPassword: "पासवर्ड विसरलात?",
+    dontHaveAccount: "खाते नाही?",
+    registerHere: "येथे नोंदणी करा",
+    registerTitle: "नागरिक खाते तयार करा",
+    registerSubtitle: "तक्रार नोंदवण्यासाठी आणि मागोवा घेण्यासाठी नगरसेतूशी जोडा",
+    fullName: "पूर्ण नाव",
+    enterFullName: "आपले पूर्ण नाव टाका",
+    mobileNumber: "१०-अंकी मोबाइल नंबर",
+    enterMobileNumber: "१०-अंकी मोबाइल नंबर टाका",
+    emailAddress: "ईमेल पत्ता (पर्यायी)",
+    enterEmailAddress: "ईमेल पत्ता टाका",
+    confirmPassword: "पासवर्डची खात्री करा",
+    alreadyHaveAccount: "आधीपासून खाते आहे?",
+    demoAccounts: "डेमो लॉगिन खाती",
 
     // Complaint Form & Fields
     complaintTitle: "तक्रारीचे शीर्षक",
@@ -458,15 +655,18 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     manualPinRequiredTitle: "स्थान आपोआप सापडले नाही",
     manualPinRequiredMsg: "आम्हाला या फोटोचे स्थान सापडले नाही. कृपया समस्येचे अचूक स्थान चिन्हांकित करण्यासाठी नकाशावर टॅप करा.",
     confirmPinLocation: "निवडलेले स्थान निश्चित करा",
+    duplicateWarningTitle: "जवळील समान तक्रार आढळली (१०० मीटर परिसर)",
+    duplicateWarningMsg: "जवळच आधीच अशी तक्रार नोंदवली आहे. पुनरावृत्ती टाळण्यासाठी आपण विद्यमान तक्रार पाहू शकता.",
 
     // Complaint Categories
-    categoryRoadDamage: "रस्त्याची खराबी",
-    categoryGarbageWaste: "कचरा व घनकचरा",
-    categoryWaterLeakage: "पाणी गळती",
-    categoryDrainageSewage: "निचरा व सांडपाणी",
-    categoryStreetlight: "पथदिवा",
-    categoryTrafficSignal: "वाहतूक सिग्नल",
-    categoryPublicInfrastructure: "सार्वजनिक पायाभूत सुविधा",
+    categoryRoadDamage: "रस्त्याची खराबी व खड्डे",
+    categoryGarbageWaste: "कचरा व घनकचरा साचणे",
+    categoryWaterLeakage: "पाणी गळती व पाइपलाइन",
+    categoryDrainageSewage: "निचरा व सांडपाणी समस्या",
+    categoryStreetlight: "पथदिवा व वीज दोष",
+    categoryTrafficSignal: "वाहतूक सिग्नल व सुरक्षा त्रुटी",
+    categoryPublicInfrastructure: "सार्वजनिक पायाभूत सुविधा नुकसान",
+    categoryOther: "इतर नागरी समस्या",
 
     // Complaint Statuses
     statusSubmitted: "नोंदवली",
@@ -482,6 +682,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     statusReopened: "पुन्हा उघडली",
     statusRejected: "नाकारली",
     statusPending: "प्रलंबित",
+    statusOverdue: "मुदत संपलेली",
 
     // Priorities
     priorityLow: "कमी",
@@ -510,6 +711,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     verifyReject: "तक्रार नाकारा",
     assignStaff: "कर्मचार्‍याला सोपवा",
     possibleDuplicates: "संभाव्य डुप्लिकेट तक्रारी",
+    appointDeptHead: "विभाग प्रमुख नियुक्त करा",
+    manageStaff: "कर्मचारी व्यवस्थापन",
 
     // Department Head Portal
     departmentHeadPortal: "विभाग प्रमुख पोर्टल",
@@ -519,6 +722,9 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     pendingReview: "पुनरावलोकन प्रलंबित",
     taskAssignment: "कामाचे वाटप",
     departmentMap: "विभागाचा नकाशा",
+    unassignedTasks: "अवाटपित कामे",
+    activeStaffCount: "सक्रिय कर्मचारी",
+    departmentSlaRate: "विभाग वेळेचे पालन",
 
     // Service Staff Portal
     serviceStaffPortal: "सेवा कर्मचारी पोर्टल",
@@ -536,7 +742,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // Departments
     deptPWD: "सार्वजनिक बांधकाम विभाग (PWD)",
     deptSanitation: "स्वच्छता व घनकचरा व्यवस्थापन",
-    deptWater: "पाणीपुरवठा व मलनिस्सारण",
+    deptWater: "पाणीपुरवठा व मलनिस्सारण मंडळ",
     deptDrainage: "निचरा व सांडपाणी विभाग",
     deptElectrical: "विद्युत व पथदिवे विभाग",
     deptTraffic: "वाहतूक व्यवस्थापन विभाग",
@@ -559,6 +765,13 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     giveFeedback: "स्टार रेटिंग आणि अभिप्राय द्या",
     preferredLanguage: "पसंतीची भाषा",
     savedSuccessfully: "यशस्वीपणे जतन केले!",
+    actions: "कृती",
+    dateSubmitted: "नोंदणी तारीख",
+    assignedTo: "नियुक्त कर्मचारी",
+    contactNumber: "संपर्क क्रमांक",
+    status: "स्थिती",
+    details: "तपशील",
+    noDataAvailable: "माहिती उपलब्ध नाही",
 
     // Announcements
     createAnnouncement: "अधिकृत घोषणा तयार करा",
@@ -573,6 +786,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
 
     // Empty States
     noComplaintsFound: "कोणतीही तक्रार आढळली नाही.",
+    noSanitationComplaintsFound: "स्वच्छतेची कोणतीही तक्रार आढळली नाही.",
+    noElectricalComplaintsFound: "विद्युत विभागाची कोणतीही तक्रार आढळली नाही.",
     noNotificationsAvailable: "कोणत्याही सूचना उपलब्ध नाहीत.",
     noTasksAssigned: "कोणतेही काम सोपवलेले नाही.",
     noAnnouncementsAvailable: "कोणत्याही घोषणा उपलब्ध नाहीत.",
@@ -581,7 +796,30 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // Error Messages
     somethingWentWrong: "काहीतरी चुकीचे झाले.",
     unableToLoadData: "डेटा लोड करता आला नाही.",
+    unableToLoadSanitationData: "स्वच्छता विभागाचा डेटा लोड करता आला नाही.",
+    unableToLoadElectricalData: "विद्युत विभागाचा डेटा लोड करता आला नाही.",
     pleaseTryAgain: "कृपया पुन्हा प्रयत्न करा.",
+
+    // Sanitation Department Operational Metrics
+    garbageComplaints: "कचरा तक्रारी",
+    overflowingDustbins: "ओव्हरफ्लो कचराकुंड्या",
+    wasteAccumulation: "कचरा साचणे",
+    publicDumping: "सार्वजनिक कचरा डंपिंग",
+    collectionRequests: "कचरा संकलन विनंत्या",
+    pendingCleanup: "प्रलंबित स्वच्छता",
+    completedCleanup: "पूर्ण स्वच्छता",
+    overdueCleanup: "विलंबित स्वच्छता",
+
+    // Electrical Department Operational Metrics
+    brokenStreetlights: "पडलेले/खराब पथदिवे",
+    streetlightOutages: "पथदिवे बंद असणे",
+    electricalPoleDamage: "खांबाचे नुकसान",
+    exposedWiring: "उघड्या विजेच्या तारा",
+    electricalHazards: "विजेचे धोके",
+    lightingMaintenance: "प्रकाश व्यवस्था देखभाल",
+    pendingRepairs: "प्रलंबित दुरुस्ती",
+    completedRepairs: "पूर्ण दुरुस्ती",
+    criticalElectricalSafetyAlerts: "गंभीर विद्युत सुरक्षा इशारे",
 
     // AI Analyzer
     aiLargePothole: "रस्त्यावर मोठा खड्डा",
@@ -610,12 +848,12 @@ export function translateCategory(catName?: string, lang: SupportedLanguage = 'e
   if (!catName) return '';
   const normalized = catName.trim().toLowerCase();
   
-  if (normalized.includes('road')) return t('categoryRoadDamage', lang);
+  if (normalized.includes('road') || normalized.includes('pothole')) return t('categoryRoadDamage', lang);
   if (normalized.includes('garbage') || normalized.includes('waste')) return t('categoryGarbageWaste', lang);
-  if (normalized.includes('water') || normalized.includes('leakage')) return t('categoryWaterLeakage', lang);
-  if (normalized.includes('drainage') || normalized.includes('sewage')) return t('categoryDrainageSewage', lang);
-  if (normalized.includes('streetlight') || normalized.includes('light')) return t('categoryStreetlight', lang);
-  if (normalized.includes('traffic')) return t('categoryTrafficSignal', lang);
+  if (normalized.includes('water') || normalized.includes('leakage') || normalized.includes('pipeline')) return t('categoryWaterLeakage', lang);
+  if (normalized.includes('drainage') || normalized.includes('sewage') || normalized.includes('drain')) return t('categoryDrainageSewage', lang);
+  if (normalized.includes('streetlight') || normalized.includes('light') || normalized.includes('electrical')) return t('categoryStreetlight', lang);
+  if (normalized.includes('traffic') || normalized.includes('signal')) return t('categoryTrafficSignal', lang);
   if (normalized.includes('infrastructure') || normalized.includes('public')) return t('categoryPublicInfrastructure', lang);
   
   return catName;
@@ -631,16 +869,17 @@ export function translateStatus(status?: string, lang: SupportedLanguage = 'en')
   if (normalized === 'submitted') return t('statusSubmitted', lang);
   if (normalized === 'verified') return t('statusVerified', lang);
   if (normalized === 'approved') return t('statusApproved', lang);
-  if (normalized === 'department assigned') return t('statusDeptAssigned', lang);
-  if (normalized === 'staff assigned') return t('statusStaffAssigned', lang);
+  if (normalized === 'department assigned' || normalized === 'dept_assigned') return t('statusDeptAssigned', lang);
+  if (normalized === 'staff assigned' || normalized === 'staff_assigned') return t('statusStaffAssigned', lang);
   if (normalized === 'accepted') return t('statusAccepted', lang);
-  if (normalized === 'on the way') return t('statusOnTheWay', lang);
+  if (normalized === 'on the way' || normalized === 'ontheway') return t('statusOnTheWay', lang);
   if (normalized === 'in progress' || normalized === 'in_progress') return t('statusInProgress', lang);
   if (normalized === 'resolution submitted') return t('statusResolutionSubmitted', lang);
   if (normalized === 'resolved') return t('statusResolved', lang);
   if (normalized === 'reopened') return t('statusReopened', lang);
   if (normalized === 'rejected') return t('statusRejected', lang);
   if (normalized === 'pending') return t('statusPending', lang);
+  if (normalized === 'overdue') return t('statusOverdue', lang);
   
   return status;
 }
@@ -667,12 +906,12 @@ export function translateDepartment(deptName?: string, lang: SupportedLanguage =
   if (!deptName) return '';
   const normalized = deptName.trim().toLowerCase();
   
-  if (normalized.includes('public works') || normalized.includes('pwd')) return t('deptPWD', lang);
-  if (normalized.includes('sanitation') || normalized.includes('waste')) return t('deptSanitation', lang);
-  if (normalized.includes('water')) return t('deptWater', lang);
-  if (normalized.includes('drainage') || normalized.includes('sewerage')) return t('deptDrainage', lang);
-  if (normalized.includes('electrical') || normalized.includes('light')) return t('deptElectrical', lang);
-  if (normalized.includes('traffic')) return t('deptTraffic', lang);
+  if (normalized.includes('public works') || normalized.includes('pwd') || normalized.includes('road')) return t('deptPWD', lang);
+  if (normalized.includes('sanitation') || normalized.includes('waste') || normalized.includes('garbage')) return t('deptSanitation', lang);
+  if (normalized.includes('water') || normalized.includes('pipeline')) return t('deptWater', lang);
+  if (normalized.includes('drainage') || normalized.includes('sewerage') || normalized.includes('sewage')) return t('deptDrainage', lang);
+  if (normalized.includes('electrical') || normalized.includes('light') || normalized.includes('lighting')) return t('deptElectrical', lang);
+  if (normalized.includes('traffic') || normalized.includes('signal')) return t('deptTraffic', lang);
   
   return deptName;
 }

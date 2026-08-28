@@ -84,7 +84,7 @@ const SEED_STAFF_NOTIFICATIONS: NotificationItem[] = [
     complaint_number: 'NS-2026-100567',
     type: 'resolved',
     title: 'Work Verified & Approved',
-    message: 'Your completed repair work for NS-2026-100567 has been verified by City Admin.',
+    message: 'Your completed repair work for NS-2026-100567 has been verified by City Administration.',
     is_read: true,
     created_at: new Date(Date.now() - 86400000 * 2).toISOString()
   }

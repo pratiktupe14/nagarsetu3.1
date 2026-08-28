@@ -1,39 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const http = require('http');
-const { validateInput } = require('../middleware/validateInput');
+const validateInput = require('../middleware/validateInput');
+const {
+  geocodeSchema,
+  reverseGeocodeSchema,
+  directionsSchema,
+  validateLocationSchema
+} = require('../schemas/maps.schemas');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
-
-const geocodeSchema = {
-  body: {
-    address: { type: 'string', required: true, minLength: 2, maxLength: 500 }
-  }
-};
-
-const reverseGeocodeSchema = {
-  body: {
-    latitude: { type: 'number', required: true, min: -90, max: 90 },
-    longitude: { type: 'number', required: true, min: -180, max: 180 }
-  }
-};
-
-const directionsSchema = {
-  body: {
-    origin_latitude: { type: 'number', required: true, min: -90, max: 90 },
-    origin_longitude: { type: 'number', required: true, min: -180, max: 180 },
-    destination_latitude: { type: 'number', required: true, min: -90, max: 90 },
-    destination_longitude: { type: 'number', required: true, min: -180, max: 180 },
-    mode: { type: 'string', required: false, allowedValues: ['driving', 'walking', 'bicycling', 'transit'] }
-  }
-};
-
-const validateLocationSchema = {
-  body: {
-    latitude: { type: 'number', required: true, min: -90, max: 90 },
-    longitude: { type: 'number', required: true, min: -180, max: 180 }
-  }
-};
 
 function postToPythonService(endpoint, body) {
   return new Promise((resolve) => {
@@ -58,27 +34,29 @@ function postToPythonService(endpoint, body) {
             try {
               resolve(JSON.parse(responseData));
             } catch (e) {
-              resolve({ status: 'ERROR', message: 'Invalid response from location service.' });
+              console.error('[MAPS SERVICE ERROR] Invalid JSON from python maps service:', e.message);
+              resolve({ status: 'ERROR', message: 'Unable to process map request at this time.' });
             }
           });
         }
       );
 
       req.on('error', (err) => {
-        console.error('Maps service error:', err.message);
-        resolve({ status: 'SERVICE_UNAVAILABLE', message: 'Location service is currently unavailable.' });
+        console.error('[MAPS SERVICE ERROR] Network connection error:', err.message);
+        resolve({ status: 'SERVICE_UNAVAILABLE', message: 'Maps service is currently unavailable.' });
       });
 
       req.on('timeout', () => {
         req.destroy();
-        resolve({ status: 'TIMEOUT', message: 'Location service request timed out.' });
+        console.error('[MAPS SERVICE TIMEOUT] Request timed out after 5s');
+        resolve({ status: 'TIMEOUT', message: 'Google Maps service request timed out.' });
       });
 
       req.write(data);
       req.end();
     } catch (err) {
-      console.error('Maps service exception:', err.message);
-      resolve({ status: 'ERROR', message: 'Location processing failed.' });
+      console.error('[MAPS SERVICE EXCEPTION]:', err.message);
+      resolve({ status: 'ERROR', message: 'Unable to process map request.' });
     }
   });
 }

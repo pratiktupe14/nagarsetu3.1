@@ -1,182 +1,133 @@
 /**
  * NAGARSETU Security Middleware — Configurable Rate Limiter
  * Provides rate limiting for:
- * 1. Auth routes (Stricter, per-IP + per-account with exponential backoff)
- * 2. Public endpoints (Moderate sliding window)
- * 3. Authenticated actions (Looser sliding window)
+ * 1. Auth routes (per-IP + per-account exponential backoff with res.clearAuthAttempts())
+ * 2. Public endpoints (Health, Maps, Geocoding)
+ * 3. Authenticated actions (Complaints, Admin, Staff, Officer)
  */
 
-// In-memory stores for tracking rate limit windows and attempts
-const authStore = new Map();
-const publicStore = new Map();
-const authenticatedStore = new Map();
+const rateLimit = require('express-rate-limit');
 
-// Periodic cleanup of expired entries (every 10 minutes)
+// Helper to parse env int with fallback
+const getEnvInt = (key, fallback) => {
+  const val = parseInt(process.env[key], 10);
+  return !isNaN(val) && val > 0 ? val : fallback;
+};
+
+/**
+ * In-Memory Exponential Backoff Tracker for Authentication Routes.
+ * Combines per-IP and per-account (mobile/email) attempt tracking.
+ */
+const authAttemptTracker = new Map();
+
+// Periodic cleanup of stale attempt records every 10 minutes
 setInterval(() => {
   const now = Date.now();
-  
-  for (const [key, data] of authStore.entries()) {
-    if (now - data.lastAttempt > (data.windowMs || 900000) * 2) {
-      authStore.delete(key);
+  for (const [key, record] of authAttemptTracker.entries()) {
+    if (record.blockedUntil && record.blockedUntil < now && record.resetAt < now) {
+      authAttemptTracker.delete(key);
     }
   }
-
-  for (const [ip, data] of publicStore.entries()) {
-    if (now - data.startTime > (data.windowMs || 900000)) {
-      publicStore.delete(ip);
-    }
-  }
-
-  for (const [userIdKey, data] of authenticatedStore.entries()) {
-    if (now - data.startTime > (data.windowMs || 900000)) {
-      authenticatedStore.delete(userIdKey);
-    }
-  }
-}, 600000);
+}, 10 * 60 * 1000);
 
 /**
- * 1. Authentication Routes Limiter
- * Combination of per-IP and per-account tracking with exponential backoff
+ * Custom Exponential Backoff Auth Rate Limiter
+ * Enforces per-IP and per-account limits with progressive retry delays instead of hard lockout.
  */
 function authRateLimiter(req, res, next) {
-  const windowMs = parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, 10) || 15 * 60 * 1000; // Default 15 minutes
-  const maxAttempts = parseInt(process.env.RATE_LIMIT_AUTH_MAX_ATTEMPTS, 10) || 5; // 5 allowed free attempts
-  const baseBackoffMs = parseInt(process.env.RATE_LIMIT_AUTH_BASE_BACKOFF_MS, 10) || 2000; // Base backoff 2 seconds
+  const windowMs = getEnvInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000); // Default 15 minutes
+  const maxAttempts = getEnvInt('RATE_LIMIT_AUTH_MAX', 5); // Allow 5 free attempts before backoff
+  const baseBackoffSec = getEnvInt('RATE_LIMIT_AUTH_BACKOFF_BASE_SEC', 30); // 30s base multiplier
 
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown-ip';
-  const accountIdentifier = String(
-    req.body?.mobileOrEmail || req.body?.mobile || req.body?.email || ''
-  ).trim().toLowerCase();
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+  const identifier = req.body && (req.body.mobile || req.body.email || req.body.mobileOrEmail);
+  const cleanId = identifier ? String(identifier).trim().toLowerCase() : '';
 
-  const compositeKey = `auth:${ip}:${accountIdentifier || 'anon'}`;
+  const ipKey = `ip_${ip}`;
+  const accountKey = cleanId ? `account_${cleanId}` : null;
+
   const now = Date.now();
 
-  let record = authStore.get(compositeKey);
-
-  if (!record) {
-    record = { attempts: 0, lastAttempt: now, windowMs };
-    authStore.set(compositeKey, record);
-  }
-
-  // Reset window if elapsed time since last attempt is greater than windowMs
-  if (now - record.lastAttempt > windowMs) {
-    record.attempts = 0;
-  }
-
-  // Check if attempts exceed threshold and compute exponential backoff
-  if (record.attempts >= maxAttempts) {
-    const excess = record.attempts - maxAttempts + 1;
-    // Exponential backoff: baseBackoff * 2^(excess - 1), capped at windowMs
-    const backoffDelayMs = Math.min(baseBackoffMs * Math.pow(2, excess - 1), windowMs);
-    const timeSinceLastAttempt = now - record.lastAttempt;
-
-    if (timeSinceLastAttempt < backoffDelayMs) {
-      const retryAfterSeconds = Math.ceil((backoffDelayMs - timeSinceLastAttempt) / 1000);
-      res.setHeader('Retry-After', retryAfterSeconds);
-      res.setHeader('X-RateLimit-Limit', maxAttempts);
-      res.setHeader('X-RateLimit-Remaining', 0);
-      return res.status(429).json({
-        error: 'Too many authentication attempts. Please wait before trying again.',
-        retryAfterSeconds,
-        backoffDelayMs
-      });
+  // Helper to retrieve or create record
+  const getRecord = (key) => {
+    let rec = authAttemptTracker.get(key);
+    if (!rec || rec.resetAt < now) {
+      rec = { count: 0, blockedUntil: 0, resetAt: now + windowMs };
+      authAttemptTracker.set(key, rec);
     }
-  }
+    return rec;
+  };
 
-  // Increment attempts for this request attempt
-  record.attempts += 1;
-  record.lastAttempt = now;
-  record.windowMs = windowMs;
+  const ipRecord = getRecord(ipKey);
+  const accountRecord = accountKey ? getRecord(accountKey) : null;
 
-  const remaining = Math.max(0, maxAttempts - record.attempts);
-  res.setHeader('X-RateLimit-Limit', maxAttempts);
-  res.setHeader('X-RateLimit-Remaining', remaining);
+  // Check if either IP or account is currently blocked
+  const ipBlockedMs = ipRecord.blockedUntil - now;
+  const accountBlockedMs = accountRecord ? accountRecord.blockedUntil - now : 0;
+  const maxBlockedMs = Math.max(ipBlockedMs, accountBlockedMs);
 
-  // Attach a helper to reset count on successful authentication
-  res.on('finish', () => {
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      authStore.delete(compositeKey);
-    }
-  });
-
-  next();
-}
-
-/**
- * 2. Public Endpoints Limiter
- * Moderate limits on unauthenticated public routes (e.g. /api/health, /api/maps/*)
- */
-function publicRateLimiter(req, res, next) {
-  const windowMs = parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS, 10) || 15 * 60 * 1000; // 15 mins
-  const max = parseInt(process.env.RATE_LIMIT_PUBLIC_MAX, 10) || 100; // 100 requests per 15 mins
-
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown-ip';
-  const now = Date.now();
-
-  let record = publicStore.get(ip);
-
-  if (!record || now - record.startTime > windowMs) {
-    record = { count: 0, startTime: now, windowMs };
-    publicStore.set(ip, record);
-  }
-
-  record.count += 1;
-
-  if (record.count > max) {
-    const retryAfterSeconds = Math.ceil((windowMs - (now - record.startTime)) / 1000);
+  if (maxBlockedMs > 0) {
+    const retryAfterSeconds = Math.ceil(maxBlockedMs / 1000);
     res.setHeader('Retry-After', retryAfterSeconds);
-    res.setHeader('X-RateLimit-Limit', max);
-    res.setHeader('X-RateLimit-Remaining', 0);
     return res.status(429).json({
-      error: 'Too many requests to public endpoint. Please slow down.',
+      error: 'Too many authentication attempts. Please try again later.',
       retryAfterSeconds
     });
   }
 
-  res.setHeader('X-RateLimit-Limit', max);
-  res.setHeader('X-RateLimit-Remaining', Math.max(0, max - record.count));
+  // Increment attempt count on request trigger
+  ipRecord.count += 1;
+  if (accountRecord) accountRecord.count += 1;
+
+  // Calculate exponential backoff if max attempts exceeded
+  const checkAndApplyBackoff = (rec) => {
+    if (rec.count > maxAttempts) {
+      const exponent = rec.count - maxAttempts;
+      // Exponential backoff: baseSec * (2 ^ (exponent - 1)) capped at 1 hour max delay
+      const delaySec = Math.min(baseBackoffSec * Math.pow(2, exponent - 1), 3600);
+      rec.blockedUntil = Date.now() + (delaySec * 1000);
+    }
+  };
+
+  checkAndApplyBackoff(ipRecord);
+  if (accountRecord) checkAndApplyBackoff(accountRecord);
+
+  // Helper attached to res so route handlers can clear attempts upon successful login/register
+  res.clearAuthAttempts = () => {
+    authAttemptTracker.delete(ipKey);
+    if (accountKey) authAttemptTracker.delete(accountKey);
+  };
+
   next();
 }
 
-/**
- * 3. Authenticated User Actions Limiter
- * Looser limits on authenticated user actions (e.g. complaints, officer, staff actions)
- */
-function authenticatedRateLimiter(req, res, next) {
-  const windowMs = parseInt(process.env.RATE_LIMIT_AUTHENTICATED_WINDOW_MS, 10) || 15 * 60 * 1000; // 15 mins
-  const max = parseInt(process.env.RATE_LIMIT_AUTHENTICATED_MAX, 10) || 300; // 300 requests per 15 mins
-
-  const userId = req.user?.id || req.ip || 'unknown-user';
-  const key = `user:${userId}`;
-  const now = Date.now();
-
-  let record = authenticatedStore.get(key);
-
-  if (!record || now - record.startTime > windowMs) {
-    record = { count: 0, startTime: now, windowMs };
-    authenticatedStore.set(key, record);
+// 2. Public Endpoints Rate Limiter (Health, Geocoding, public maps)
+const publicRateLimiter = rateLimit({
+  windowMs: getEnvInt('RATE_LIMIT_PUBLIC_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
+  max: getEnvInt('RATE_LIMIT_PUBLIC_MAX', 100), // 100 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  message: {
+    error: 'Too many requests from this IP. Please try again later.'
   }
+});
 
-  record.count += 1;
-
-  if (record.count > max) {
-    const retryAfterSeconds = Math.ceil((windowMs - (now - record.startTime)) / 1000);
-    res.setHeader('Retry-After', retryAfterSeconds);
-    res.setHeader('X-RateLimit-Limit', max);
-    res.setHeader('X-RateLimit-Remaining', 0);
-    return res.status(429).json({
-      error: 'Rate limit exceeded for authenticated actions. Please slow down.',
-      retryAfterSeconds
-    });
+// 3. Authenticated User Actions Rate Limiter (Complaints, Admin, Staff, Officer)
+const authedRateLimiter = rateLimit({
+  windowMs: getEnvInt('RATE_LIMIT_AUTHED_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
+  max: getEnvInt('RATE_LIMIT_AUTHED_MAX', 300), // 300 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  message: {
+    error: 'Action rate limit exceeded. Please slow down your requests.'
   }
-
-  res.setHeader('X-RateLimit-Limit', max);
-  res.setHeader('X-RateLimit-Remaining', Math.max(0, max - record.count));
-  next();
-}
+});
 
 module.exports = {
   authRateLimiter,
   publicRateLimiter,
-  authenticatedRateLimiter
+  authedRateLimiter,
+  authenticatedRateLimiter: authedRateLimiter
 };

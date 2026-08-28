@@ -1,41 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const { upload, validateUploadedImageMagicBytes } = require('../middleware/upload');
+const { uploadSingleImage } = require('../middleware/upload');
 const { authenticateToken } = require('../middleware/auth');
-const { validateInput } = require('../middleware/validateInput');
+const validateInput = require('../middleware/validateInput');
+const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
 const { resolveLocation, checkForDuplicates } = require('../services/locationService');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
-// Submit Complaint Schema
-const submitSchema = {
-  body: {
-    photo_url: { type: 'string', required: true, minLength: 1 },
-    category: { type: 'string', required: true, minLength: 2, maxLength: 100 },
-    title: { type: 'string', required: true, minLength: 3, maxLength: 200 },
-    description: { type: 'string', required: false, maxLength: 2000 },
-    priority: { type: 'string', required: false, allowedValues: ['Low', 'Medium', 'High', 'Critical'] },
-    latitude: { type: 'number', required: true, min: -90, max: 90 },
-    longitude: { type: 'number', required: true, min: -180, max: 180 },
-    location_source: { type: 'string', required: true, minLength: 2, maxLength: 50 },
-    location_address: { type: 'string', required: false, maxLength: 500 },
-    department_id: { type: 'integer', required: false },
-    duplicate_of_id: { type: 'integer', required: false }
-  }
-};
-
-// Feedback Schema
-const feedbackSchema = {
-  body: {
-    rating: { type: 'integer', required: true, min: 1, max: 5 },
-    comment: { type: 'string', required: false, maxLength: 1000 }
-  }
-};
-
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
-router.post('/analyze-upload', authenticateToken, upload.single('photo'), validateUploadedImageMagicBytes, async (req, res) => {
+router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No photo file provided' });
@@ -94,7 +70,7 @@ router.post('/analyze-upload', authenticateToken, upload.single('photo'), valida
 });
 
 // Step 2: Final Complaint Submission
-router.post('/submit', authenticateToken, validateInput(submitSchema), async (req, res) => {
+router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
     const {
       photo_url,
@@ -245,7 +221,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Submit Feedback for resolved complaint
-router.post('/:id/feedback', authenticateToken, validateInput(feedbackSchema), async (req, res) => {
+router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema), async (req, res) => {
   try {
     const { rating, comment } = req.body;
 

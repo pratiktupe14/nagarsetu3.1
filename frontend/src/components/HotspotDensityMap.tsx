@@ -22,7 +22,7 @@ export const HotspotDensityMap: React.FC<HotspotDensityMapProps> = ({ complaints
   const lowCount = clusters.filter((c) => c.densityLevel === 'Low').length;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4 font-sans">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4 font-sans">
       
       {/* Header & Density Legend */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">

@@ -1,13 +1,50 @@
 const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
-// Allowed image MIME types and extensions
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
-const MAX_FILE_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE_BYTES, 10) || 10 * 1024 * 1024; // 10MB default
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
-// Memory storage engine keeps uploaded file in buffer (req.file.buffer)
-// This is 100% serverless compatible and avoids write errors on Vercel read-only filesystems.
+// Ensure isolated uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Allowed MIME types and extension mapping
+const ALLOWED_MIME_EXT_MAP = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp'
+};
+
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const MAX_FILE_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE_BYTES, 10) || (parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 10) * 1024 * 1024;
+
+// Magic byte signature patterns for safe image formats
+const MAGIC_BYTES = {
+  jpeg: [0xFF, 0xD8, 0xFF],
+  png:  [0x89, 0x50, 0x4E, 0x47],
+  gif:  [0x47, 0x49, 0x46, 0x38],
+  webp: [0x52, 0x49, 0x46, 0x46] // RIFF header
+};
+
+/**
+ * Validates file buffer against known image magic byte signatures.
+ * @param {Buffer} buffer 
+ * @returns {boolean}
+ */
+function isValidImageMagicBytes(buffer) {
+  if (!buffer || buffer.length < 4) return false;
+
+  const isJpeg = MAGIC_BYTES.jpeg.every((byte, i) => buffer[i] === byte);
+  const isPng  = MAGIC_BYTES.png.every((byte, i) => buffer[i] === byte);
+  const isGif  = MAGIC_BYTES.gif.every((byte, i) => buffer[i] === byte);
+  const isWebp = MAGIC_BYTES.webp.every((byte, i) => buffer[i] === byte) && buffer.slice(8, 12).toString('ascii') === 'WEBP';
+
+  return isJpeg || isPng || isGif || isWebp;
+}
+
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -18,8 +55,8 @@ const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mimetype = (file.mimetype || '').toLowerCase();
 
-  if (!ALLOWED_MIME_TYPES.includes(mimetype) || !ALLOWED_EXTENSIONS.includes(ext)) {
-    return cb(new Error('Only valid image files (.jpg, .jpeg, .png, .webp) are allowed!'), false);
+  if (!ALLOWED_MIME_EXT_MAP[mimetype] && !ALLOWED_EXTENSIONS.includes(ext)) {
+    return cb(new Error('Only valid image files (.jpg, .jpeg, .png, .webp, .gif) are allowed!'), false);
   }
 
   cb(null, true);
@@ -33,38 +70,61 @@ const upload = multer({
 
 /**
  * Binary Header (Magic Bytes) Verification Middleware
- * Validates actual binary content header of req.file.buffer to ensure non-executable image payload
  */
 function validateUploadedImageMagicBytes(req, res, next) {
   if (!req.file || !req.file.buffer) {
     return next();
   }
 
-  const buffer = req.file.buffer;
-  if (buffer.length < 4) {
-    return res.status(400).json({ error: 'Uploaded file payload is invalid or empty.' });
-  }
-
-  const hexHeader = buffer.slice(0, 12).toString('hex').toLowerCase();
-
-  // Magic Bytes Check:
-  // JPEG: Starts with ffd8ff
-  // PNG: Starts with 89504e47
-  // WebP: Starts with 52494646 (RIFF) and contains 57454250 (WEBP)
-  const isJpeg = hexHeader.startsWith('ffd8ff');
-  const isPng = hexHeader.startsWith('89504e47');
-  const isWebp = hexHeader.startsWith('52494646') && buffer.slice(8, 12).toString('ascii') === 'WEBP';
-
-  if (!isJpeg && !isPng && !isWebp) {
+  if (!isValidImageMagicBytes(req.file.buffer)) {
     return res.status(400).json({
-      error: 'Invalid image format. Binary signature does not match a genuine JPEG, PNG, or WebP image.'
+      error: 'Security Error: File content magic bytes do not match a valid image format. Upload rejected.'
     });
   }
 
   next();
 }
 
+/**
+ * Middleware wrapper that performs Magic Byte verification & safe disk writing with random filename
+ */
+function uploadSingleImage(fieldName) {
+  return (req, res, next) => {
+    upload.single(fieldName)(req, res, (err) => {
+      if (err) {
+        return next(err);
+      }
+
+      if (req.file && req.file.buffer) {
+        if (!isValidImageMagicBytes(req.file.buffer)) {
+          return res.status(400).json({
+            error: 'Security Error: File content magic bytes do not match a valid image format. Upload rejected.'
+          });
+        }
+
+        const safeExt = ALLOWED_MIME_EXT_MAP[req.file.mimetype] || path.extname(req.file.originalname) || '.jpg';
+        const randomFilename = `${crypto.randomUUID()}${safeExt}`;
+        const diskPath = path.join(UPLOADS_DIR, randomFilename);
+
+        try {
+          fs.writeFileSync(diskPath, req.file.buffer);
+          req.file.filename = randomFilename;
+          req.file.path = diskPath;
+        } catch (writeErr) {
+          console.error('[UPLOAD ERROR] Failed to write uploaded file to disk:', writeErr);
+          return res.status(500).json({ error: 'Failed to process file upload' });
+        }
+      }
+
+      next();
+    });
+  };
+}
+
 module.exports = {
   upload,
-  validateUploadedImageMagicBytes
+  multerUpload: upload,
+  uploadSingleImage,
+  validateUploadedImageMagicBytes,
+  isValidImageMagicBytes
 };

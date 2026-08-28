@@ -38,7 +38,7 @@ export const RelatedIssueCard: React.FC<RelatedIssueCardProps> = ({ item, onSupp
     : 'bg-blue-50 text-blue-800 border-blue-200';
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm hover:border-emerald-500 transition-all flex flex-col justify-between space-y-3 font-sans">
+    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:border-emerald-500 transition-all flex flex-col justify-between space-y-3 font-sans">
       
       <div className="space-y-3">
         {/* HEADER BADGE & DISTANCE */}
@@ -63,7 +63,7 @@ export const RelatedIssueCard: React.FC<RelatedIssueCardProps> = ({ item, onSupp
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
-              <span className="text-[10px] font-semibold text-gray-400">No image available</span>
+              <span className="text-[10px] font-semibold text-gray-500">No image available</span>
             </div>
           )}
           <div className="absolute top-2 left-2">

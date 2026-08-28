@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -34,6 +35,7 @@ const DEPARTMENT_OPTIONS = [
 ];
 
 export const AdminPortal: React.FC = () => {
+  const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -172,7 +174,7 @@ export const AdminPortal: React.FC = () => {
   const currentDepartmentStaffRoster = getDepartmentStaffRoster(editDepartment);
 
   return (
-    <DashboardLayout title="City Admin Command Center">
+    <DashboardLayout title="City Administration Command Center">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
         
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -692,7 +694,7 @@ export const AdminPortal: React.FC = () => {
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-gray-900 font-outfit">City Admin Verification & Overrides</span>
+                <span className="font-bold text-gray-900 font-outfit">City Administration Verification & Overrides</span>
                 <span className="font-mono text-emerald-700 font-bold bg-white px-2 py-0.5 rounded border border-gray-200">
                   Target Dept: {editDepartment}
                 </span>
@@ -738,7 +740,7 @@ export const AdminPortal: React.FC = () => {
             </div>
 
             <div className="space-y-3 pt-2 text-xs">
-              <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Assign Department Service Staff Member</h4>
+              <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Assign Department Field Staff Member</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

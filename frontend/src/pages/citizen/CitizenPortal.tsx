@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -8,7 +9,7 @@ import { getCitizenComplaints, getOfflineDrafts } from '../../services/complaint
 import { getOfficialAnnouncements, getMaintenanceWorks } from '../../services/announcementService';
 import { Complaint, OfficialAnnouncement, MaintenanceWork } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
-import { PlusCircle, Clock, ArrowRight, ShieldCheck, WifiOff, FileText, Zap, AlertTriangle, RefreshCw, Megaphone, HardHat, MapPin, Calendar, Building2 } from 'lucide-react';
+import { PlusCircle, Clock, ArrowRight, ShieldCheck, WifiOff, FileText, Zap, AlertTriangle, RefreshCw, Megaphone, HardHat } from 'lucide-react';
 
 function getMaintenanceBadge(status: MaintenanceWork['status']) {
   switch (status) {
@@ -24,6 +25,7 @@ function getMaintenanceBadge(status: MaintenanceWork['status']) {
 
 export const CitizenPortal: React.FC = () => {
   const { user } = useAuth();
+  const { t, translateCategory } = useLanguage();
   const navigate = useNavigate();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -49,11 +51,11 @@ export const CitizenPortal: React.FC = () => {
       setMaintenanceWorks(Array.isArray(works) ? works.slice(0, 3) : []);
     } catch (e: any) {
       console.error('Error in CitizenPortal loadComplaints:', e);
-      setErrorMsg('Unable to load your dashboard.');
+      setErrorMsg(t('unableToLoadData'));
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     loadComplaints(true);
@@ -90,19 +92,19 @@ export const CitizenPortal: React.FC = () => {
   // 1. ERROR STATE
   if (errorMsg) {
     return (
-      <DashboardLayout title="Citizen Dashboard">
+      <DashboardLayout title={t('dashboard')}>
         <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4 flex flex-col justify-center items-center font-sans">
           <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
             <AlertTriangle className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{errorMsg}</h2>
-          <p className="text-xs text-gray-500">There was a problem fetching your civic complaints.</p>
+          <p className="text-xs text-gray-500">{t('pleaseTryAgain')}</p>
           <button
             onClick={() => loadComplaints()}
             className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center space-x-1.5 min-h-[44px]"
           >
             <RefreshCw className="w-4 h-4" />
-            <span>Try Again</span>
+            <span>{t('apply')}</span>
           </button>
         </div>
       </DashboardLayout>
@@ -112,10 +114,10 @@ export const CitizenPortal: React.FC = () => {
   // 2. LOADING STATE
   if (loading) {
     return (
-      <DashboardLayout title="Citizen Dashboard">
+      <DashboardLayout title={t('dashboard')}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center space-y-4 flex flex-col justify-center items-center font-sans">
           <div className="w-10 h-10 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin" />
-          <p className="text-xs font-bold text-gray-700 font-outfit">Loading your dashboard...</p>
+          <p className="text-xs font-bold text-gray-700 font-outfit">{t('loading')}</p>
         </div>
       </DashboardLayout>
     );
@@ -123,7 +125,7 @@ export const CitizenPortal: React.FC = () => {
 
   // 3. SUCCESS STATE
   return (
-    <DashboardLayout title="Citizen Dashboard">
+    <DashboardLayout title={t('dashboard')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8 font-sans">
         
         {offlineDraftsCount > 0 && (
@@ -149,19 +151,19 @@ export const CitizenPortal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>NAGARSETU Verified Citizen</span>
+                <span>{t('roleCitizen')}</span>
               </span>
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
                 <Zap className="w-3 h-3 text-blue-600" />
-                <span>Realtime Active</span>
+                <span>Realtime</span>
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              Good Morning, {user?.full_name || 'Citizen'}
+              {t('welcome')}, {user?.full_name || t('roleCitizen')}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
-              Report civic issues and help make your city better. Status changes sync live in real time.
+              {t('tagline')}
             </p>
           </div>
 
@@ -171,14 +173,14 @@ export const CitizenPortal: React.FC = () => {
               className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
             >
               <Clock className="w-5 h-5 text-emerald-600" />
-              <span>Track Complaint Status</span>
+              <span>{t('myComplaints')}</span>
             </Link>
             <Link
               to="/citizen/report"
               className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
             >
               <PlusCircle className="w-5 h-5" />
-              <span>+ Report Civic Issue</span>
+              <span>+ {t('reportComplaint')}</span>
             </Link>
           </div>
         </div>
@@ -189,13 +191,12 @@ export const CitizenPortal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 flex items-center space-x-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-1" />
-                <span>Live Updates Enabled</span>
+                <span>Live Updates</span>
               </span>
-              <span className="text-xs text-emerald-200 font-mono">Real-time status tracking</span>
             </div>
-            <h2 className="text-xl font-extrabold text-white font-outfit">Complaint Status</h2>
+            <h2 className="text-xl font-extrabold text-white font-outfit">{t('myComplaints')}</h2>
             <p className="text-xs text-emerald-100/90 max-w-xl">
-              Track your complaint and see real-time updates. View live progress timeline, officer assignment, and resolution proof without refreshing the page.
+              {t('tagline')}
             </p>
           </div>
 
@@ -203,7 +204,7 @@ export const CitizenPortal: React.FC = () => {
             to="/citizen/track"
             className="px-6 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-extrabold text-xs uppercase tracking-wider shadow-md flex items-center space-x-2 transition-all shrink-0 min-h-[44px]"
           >
-            <span>Track My Complaints</span>
+            <span>{t('view')}</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -212,27 +213,23 @@ export const CitizenPortal: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Complaints</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('totalComplaints')}</span>
             <div className="text-3xl font-extrabold text-gray-900 font-mono">{activeCount}</div>
-            <span className="text-[11px] text-gray-500 block">Total issues in pipeline</span>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Pending</span>
+            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">{t('pending')}</span>
             <div className="text-3xl font-extrabold text-blue-700 font-mono">{pendingCount}</div>
-            <span className="text-[11px] text-gray-500 block">Under officer verification</span>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">In Progress</span>
+            <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">{t('inProgress')}</span>
             <div className="text-3xl font-extrabold text-amber-800 font-mono">{inProgressCount}</div>
-            <span className="text-[11px] text-gray-500 block">Staff assigned / repairing</span>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Resolved</span>
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">{t('resolved')}</span>
             <div className="text-3xl font-extrabold text-emerald-800 font-mono">{resolvedCount}</div>
-            <span className="text-[11px] text-gray-500 block">Verified with proof photo</span>
           </div>
 
         </div>
@@ -240,7 +237,7 @@ export const CitizenPortal: React.FC = () => {
         {/* MY REPORTED COMPLAINTS */}
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
-            <h2 className="text-lg font-extrabold text-gray-900 font-outfit">My Reported Complaints</h2>
+            <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{t('myComplaints')}</h2>
 
             <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 text-xs font-semibold">
               {(['All', 'Pending', 'In Progress', 'Resolved', 'Reopened'] as const).map((tab) => (
@@ -253,7 +250,7 @@ export const CitizenPortal: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  {tab}
+                  {tab === 'All' ? 'All' : tab === 'Pending' ? t('pending') : tab === 'In Progress' ? t('inProgress') : tab === 'Resolved' ? t('resolved') : tab}
                 </button>
               ))}
             </div>
@@ -264,16 +261,13 @@ export const CitizenPortal: React.FC = () => {
               <div className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center mx-auto border border-gray-200">
                 <FileText className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-gray-900 font-outfit">No complaints reported yet.</h3>
-              <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                You haven't submitted any complaints yet. Report a civic issue to get started.
-              </p>
+              <h3 className="text-base font-bold text-gray-900 font-outfit">{t('noComplaintsFound')}</h3>
               <Link
                 to="/citizen/report"
                 className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase shadow-sm hover:bg-emerald-700 min-h-[44px]"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>+ Report Civic Issue</span>
+                <span>+ {t('reportComplaint')}</span>
               </Link>
             </div>
           ) : (
@@ -294,7 +288,7 @@ export const CitizenPortal: React.FC = () => {
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
                           <FileText className="w-6 h-6 text-gray-300" />
-                          <span className="text-[11px] font-semibold text-gray-400">No image available</span>
+                          <span className="text-[11px] font-semibold text-gray-400">No image</span>
                         </div>
                       )}
                       <div className="absolute top-2 left-2">
@@ -310,7 +304,7 @@ export const CitizenPortal: React.FC = () => {
                         <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider font-mono">
                           {comp.complaint_number}
                         </span>
-                        <span className="text-[10px] text-gray-500">{comp.category}</span>
+                        <span className="text-[10px] text-gray-500">{translateCategory(comp.category)}</span>
                       </div>
                       <h3 className="text-sm font-extrabold text-gray-900 leading-snug mt-0.5 line-clamp-1">
                         {comp.title}
@@ -329,7 +323,7 @@ export const CitizenPortal: React.FC = () => {
                       to={`/citizen/complaint/${comp.id}`}
                       className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs transition-colors flex items-center space-x-1 min-h-[44px]"
                     >
-                      <span>Track Status</span>
+                      <span>{t('view')}</span>
                       <ArrowRight className="w-3 h-3" />
                     </Link>
                   </div>
@@ -345,18 +339,15 @@ export const CitizenPortal: React.FC = () => {
             <div>
               <h2 className="text-lg font-extrabold text-gray-900 font-outfit flex items-center space-x-2">
                 <Megaphone className="w-5 h-5 text-emerald-600" />
-                <span>Official Announcements & City Updates</span>
+                <span>{t('announcements')}</span>
               </h2>
-              <p className="text-xs text-gray-500">
-                Stay updated with important notices and advisories issued by city administration.
-              </p>
             </div>
 
             <Link
               to="/citizen/announcements"
               className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200 min-h-[44px]"
             >
-              <span>View All Announcements</span>
+              <span>{t('view')} {t('announcements')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -388,7 +379,7 @@ export const CitizenPortal: React.FC = () => {
                   </p>
 
                   <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-medium">
-                    <span>📍 Area: {ann.area}</span>
+                    <span>📍 {ann.area}</span>
                     <span>{ann.start_date}</span>
                   </div>
                 </div>
@@ -397,7 +388,7 @@ export const CitizenPortal: React.FC = () => {
                   to={`/citizen/announcements/${ann.id}`}
                   className="w-full py-2.5 rounded-xl bg-gray-50 hover:bg-emerald-50 text-gray-800 hover:text-emerald-800 font-extrabold text-xs uppercase tracking-wider border border-gray-200 flex items-center justify-center space-x-1 min-h-[44px]"
                 >
-                  <span>Read Notice</span>
+                  <span>{t('view')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -411,18 +402,15 @@ export const CitizenPortal: React.FC = () => {
             <div>
               <h2 className="text-lg font-extrabold text-gray-900 font-outfit flex items-center space-x-2">
                 <HardHat className="w-5 h-5 text-amber-600" />
-                <span>Ongoing Municipal Work Near You</span>
+                <span>{t('civicWorks')}</span>
               </h2>
-              <p className="text-xs text-gray-500">
-                Track active maintenance and repair projects performed by municipal departments.
-              </p>
             </div>
 
             <Link
               to="/citizen/work"
               className="text-xs font-extrabold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200 min-h-[44px]"
             >
-              <span>View All Work</span>
+              <span>{t('view')} {t('civicWorks')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -453,7 +441,7 @@ export const CitizenPortal: React.FC = () => {
 
                   <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-medium">
                     <span>📍 {work.area}</span>
-                    <span>Completion: {work.expected_completion}</span>
+                    <span>{work.expected_completion}</span>
                   </div>
                 </div>
 
@@ -461,7 +449,7 @@ export const CitizenPortal: React.FC = () => {
                   to={`/citizen/work/${work.id}`}
                   className="w-full py-2.5 rounded-xl bg-gray-50 hover:bg-emerald-50 text-gray-800 hover:text-emerald-800 font-extrabold text-xs uppercase tracking-wider border border-gray-200 flex items-center justify-center space-x-1 min-h-[44px]"
                 >
-                  <span>View Timeline</span>
+                  <span>{t('view')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

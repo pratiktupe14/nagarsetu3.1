@@ -298,7 +298,7 @@ export const ReportIssuePage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 font-sans">
         
         {/* HEADER BAR */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <Link to="/citizen/portal" className="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1">
@@ -342,7 +342,7 @@ export const ReportIssuePage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* LEFT 50% PANEL: IMAGE & AI ANALYSIS & LOCATION BADGE */}
-          <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6 lg:sticky lg:top-20">
+          <div className="lg:col-span-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 lg:sticky lg:top-20">
             
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
@@ -378,6 +378,7 @@ export const ReportIssuePage: React.FC = () => {
                   </div>
 
                   {/* Camera Direct Input */}
+                  <label htmlFor="citizen-photo-camera" className="sr-only">Take Photo with Camera</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -392,6 +393,7 @@ export const ReportIssuePage: React.FC = () => {
                   />
 
                   {/* Gallery / Files Standard Input (No Forced Capture) */}
+                  <label htmlFor="citizen-photo-upload" className="sr-only">Upload Issue Photo from Gallery</label>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/jpg"
@@ -686,7 +688,7 @@ export const ReportIssuePage: React.FC = () => {
             )}
 
             {/* AUTOMATIC & INTERACTIVE LOCATION CARD WITH EMBEDDED MAP */}
-            <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-3 font-sans">
+            <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm space-y-3 font-sans">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <MapPin className="w-5 h-5 text-rose-500" />
@@ -770,7 +772,7 @@ export const ReportIssuePage: React.FC = () => {
           </div>
 
           {/* RIGHT 50% PANEL: COMPLAINT DETAILS FORM & ACTIONS */}
-          <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+          <div className="lg:col-span-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
             
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
@@ -938,7 +940,7 @@ export const ReportIssuePage: React.FC = () => {
       {/* EDIT LOCATION MAP PICKER MODAL */}
       {showLocationPickerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-          <div className="max-w-xl w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-md space-y-4">
+          <div className="max-w-xl w-full bg-white rounded-xl p-6 border border-gray-200 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 font-outfit">Adjust Site Location Pin</h3>
               <button onClick={() => setShowLocationPickerModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>
@@ -983,7 +985,7 @@ export const ReportIssuePage: React.FC = () => {
       {/* FINAL REVIEW & SUBMIT MODAL */}
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-          <div className="max-w-lg w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-md space-y-4">
+          <div className="max-w-lg w-full bg-white rounded-xl p-6 border border-gray-200 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 font-outfit">Review Complaint Before Submission</h3>
               <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>

@@ -1621,7 +1621,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                 <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Active Service Staff</span>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Active Field Staff</span>
                   <span className="text-xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.staffCount}</span>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-1">

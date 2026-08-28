@@ -12,8 +12,10 @@ async function seedDefaultUsers() {
     if (resCount.rows && resCount.rows[0].count === 0) {
       console.log('Seeding default demo users (Citizen, Officer, Staff, Admin)...');
       const salt = await bcrypt.genSalt(10);
-      const defaultHash = await bcrypt.hash('password123', salt);
-      const adminHash = await bcrypt.hash('NagarSetu@Admin2026!', salt);
+      const userPass = process.env.DEMO_USER_PASSWORD || 'password123';
+      const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+      const defaultHash = await bcrypt.hash(userPass, salt);
+      const adminHash = await bcrypt.hash(adminPass, salt);
 
       const usersToSeed = [
         { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en', passHash: defaultHash },
@@ -34,7 +36,8 @@ async function seedDefaultUsers() {
       const adminCheck = await query(`SELECT * FROM users WHERE email = 'admin@nagarsetu.gov.in'`);
       if (!adminCheck.rows || adminCheck.rows.length === 0) {
         const salt = await bcrypt.genSalt(10);
-        const adminHash = await bcrypt.hash('NagarSetu@Admin2026!', salt);
+        const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+        const adminHash = await bcrypt.hash(adminPass, salt);
         await query(
           `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
           ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'en']

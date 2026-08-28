@@ -2,6 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const {
+  createUserSchema,
+  updateUserSchema,
+  createDeptHeadSchema,
+  assignStaffSchema,
+  reassignComplaintSchema
+} = require('../schemas/admin.schemas');
 const { query } = require('../config/db');
 
 // Admin Auth Guard
@@ -74,12 +82,9 @@ router.get('/users', async (req, res) => {
   }
 });
 
-router.post('/users', async (req, res) => {
+router.post('/users', validateInput(createUserSchema), async (req, res) => {
   try {
     const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
-    if (!name || !mobile || !password) {
-      return res.status(400).json({ error: 'Name, mobile, and password are required' });
-    }
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
@@ -92,11 +97,12 @@ router.post('/users', async (req, res) => {
 
     return res.status(201).json({ message: 'User created successfully', id: result.rows[0].id });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to create user: ' + err.message });
+    console.error('Create user error:', err);
+    return res.status(500).json({ error: 'Failed to create user' });
   }
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', validateInput(updateUserSchema), async (req, res) => {
   try {
     const { name, mobile, email, role, language_pref } = req.body;
     const sql = `
@@ -106,6 +112,7 @@ router.put('/users/:id', async (req, res) => {
     await query(sql, [name, mobile, email, role, language_pref, req.params.id]);
     return res.json({ message: 'User updated successfully' });
   } catch (err) {
+    console.error('Update user error:', err);
     return res.status(500).json({ error: 'Failed to update user' });
   }
 });
