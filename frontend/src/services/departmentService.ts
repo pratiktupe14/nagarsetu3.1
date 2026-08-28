@@ -363,9 +363,12 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
 
       // Attempt Auth registration for credential synchronization
       try {
+        if (!payload.password) {
+          throw new Error('Password is required when creating a new department head account.');
+        }
         const { data: signUpData, error: signUpErr } = await tempAuthClient.auth.signUp({
           email: cleanEmail,
-          password: payload.password || 'Nagarsetu@2026',
+          password: payload.password,
           options: {
             data: {
               full_name: payload.fullName,

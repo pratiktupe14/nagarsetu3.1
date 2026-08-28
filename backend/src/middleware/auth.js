@@ -1,6 +1,17 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'nagarsetu_secret_key_2026_super_secure';
+function getJwtSecret() {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[FATAL SECURITY ERROR] JWT_SECRET environment variable must be set in production!');
+  }
+  console.warn('[SECURITY WARNING] JWT_SECRET is not configured in environment variables. Falling back to development environment key.');
+  return 'nagarsetu_dev_secret_key_change_in_production_2026';
+}
+
+const JWT_SECRET = getJwtSecret();
 
 function generateToken(user) {
   return jwt.sign(
@@ -40,7 +51,7 @@ function requireRole(roles = []) {
       return res.status(401).json({ error: 'Authentication required' });
     }
     if (roles.length && !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: `Forbidden: Access restricted to roles [${roles.join(', ')}]` });
+      return res.status(403).json({ error: 'Forbidden: Access denied for user role' });
     }
     next();
   };

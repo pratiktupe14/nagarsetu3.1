@@ -1,22 +1,48 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const upload = require('../middleware/upload');
+const { upload, validateUploadedImageMagicBytes } = require('../middleware/upload');
 const { authenticateToken } = require('../middleware/auth');
+const { validateInput } = require('../middleware/validateInput');
 const { query } = require('../config/db');
 const { resolveLocation, checkForDuplicates } = require('../services/locationService');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
+// Submit Complaint Schema
+const submitSchema = {
+  body: {
+    photo_url: { type: 'string', required: true, minLength: 1 },
+    category: { type: 'string', required: true, minLength: 2, maxLength: 100 },
+    title: { type: 'string', required: true, minLength: 3, maxLength: 200 },
+    description: { type: 'string', required: false, maxLength: 2000 },
+    priority: { type: 'string', required: false, allowedValues: ['Low', 'Medium', 'High', 'Critical'] },
+    latitude: { type: 'number', required: true, min: -90, max: 90 },
+    longitude: { type: 'number', required: true, min: -180, max: 180 },
+    location_source: { type: 'string', required: true, minLength: 2, maxLength: 50 },
+    location_address: { type: 'string', required: false, maxLength: 500 },
+    department_id: { type: 'integer', required: false },
+    duplicate_of_id: { type: 'integer', required: false }
+  }
+};
+
+// Feedback Schema
+const feedbackSchema = {
+  body: {
+    rating: { type: 'integer', required: true, min: 1, max: 5 },
+    comment: { type: 'string', required: false, maxLength: 1000 }
+  }
+};
+
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
-router.post('/analyze-upload', authenticateToken, upload.single('photo'), async (req, res) => {
+router.post('/analyze-upload', authenticateToken, upload.single('photo'), validateUploadedImageMagicBytes, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No photo file provided' });
     }
 
-    const photoUrl = `/uploads/${req.file.filename}`;
-    const fullPath = req.file.path;
+    const photoUrl = req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-photo.jpg';
+    const fullPath = req.file.path || req.file;
 
     const liveLat = req.body.liveLat ? parseFloat(req.body.liveLat) : null;
     const liveLng = req.body.liveLng ? parseFloat(req.body.liveLng) : null;
@@ -63,12 +89,12 @@ router.post('/analyze-upload', authenticateToken, upload.single('photo'), async 
     });
   } catch (err) {
     console.error('Analyze upload error:', err);
-    return res.status(500).json({ error: 'Failed to process and analyze photo: ' + err.message });
+    return res.status(500).json({ error: 'Failed to process and analyze photo.' });
   }
 });
 
 // Step 2: Final Complaint Submission
-router.post('/submit', authenticateToken, async (req, res) => {
+router.post('/submit', authenticateToken, validateInput(submitSchema), async (req, res) => {
   try {
     const {
       photo_url,
@@ -83,10 +109,6 @@ router.post('/submit', authenticateToken, async (req, res) => {
       department_id,
       duplicate_of_id
     } = req.body;
-
-    if (!photo_url || !category || !title || latitude === undefined || longitude === undefined || !location_source) {
-      return res.status(400).json({ error: 'Missing required complaint parameters' });
-    }
 
     // Default department mapping if not provided
     let finalDeptId = department_id;
@@ -223,12 +245,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Submit Feedback for resolved complaint
-router.post('/:id/feedback', authenticateToken, async (req, res) => {
+router.post('/:id/feedback', authenticateToken, validateInput(feedbackSchema), async (req, res) => {
   try {
     const { rating, comment } = req.body;
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating between 1 and 5 is required' });
-    }
 
     const insertSql = `
       INSERT INTO feedback (complaint_id, rating, comment)

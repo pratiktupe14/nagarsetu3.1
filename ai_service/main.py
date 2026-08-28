@@ -1,7 +1,8 @@
 import os
+import sys
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from analyzer import analyze_complaint_image
 import google_maps_service as gms
@@ -36,22 +37,22 @@ class AnalysisResponse(BaseModel):
     needs_manual_verification: Optional[bool] = False
 
 class GeocodeRequest(BaseModel):
-    address: str
+    address: str = Field(..., min_length=2, max_length=500)
 
 class ReverseGeocodeRequest(BaseModel):
-    latitude: float
-    longitude: float
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
 
 class DirectionsRequest(BaseModel):
-    origin_latitude: float
-    origin_longitude: float
-    destination_latitude: float
-    destination_longitude: float
-    mode: Optional[str] = "driving"
+    origin_latitude: float = Field(..., ge=-90.0, le=90.0)
+    origin_longitude: float = Field(..., ge=-180.0, le=180.0)
+    destination_latitude: float = Field(..., ge=-90.0, le=90.0)
+    destination_longitude: float = Field(..., ge=-180.0, le=180.0)
+    mode: Optional[str] = Field("driving", pattern="^(driving|walking|bicycling|transit)$")
 
 class ValidateLocationRequest(BaseModel):
-    latitude: float
-    longitude: float
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
 
 @app.get("/")
 def health_check():
@@ -69,10 +70,25 @@ async def analyze_photo(file: UploadFile = File(...)):
         if not content:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
         
+        # Magic bytes check for JPEG, PNG, or WebP
+        if len(content) < 4:
+            raise HTTPException(status_code=400, detail="Invalid image payload")
+        
+        header = content[:12]
+        is_jpeg = header.startswith(b'\xff\xd8\xff')
+        is_png = header.startswith(b'\x89PNG')
+        is_webp = header.startswith(b'RIFF') and content[8:12] == b'WEBP'
+
+        if not (is_jpeg or is_png or is_webp):
+            raise HTTPException(status_code=400, detail="Invalid image binary signature. Must be JPEG, PNG, or WebP.")
+
         result = analyze_complaint_image(content, filename=file.filename or "")
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Processing Error: {str(e)}")
+        sys.stderr.write(f"[AI Service Error] {str(e)}\n")
+        raise HTTPException(status_code=500, detail="AI Processing Error. Please try again later.")
 
 # GOOGLE MAPS ENDPOINTS
 @app.post("/google-maps/geocode")

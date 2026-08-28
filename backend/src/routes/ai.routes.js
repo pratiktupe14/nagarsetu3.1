@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { upload, validateUploadedImageMagicBytes } = require('../middleware/upload');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const https = require('https');
 
@@ -23,7 +23,7 @@ router.get('/health', async (req, res) => {
       configured: false,
       model,
       reachable: false,
-      error: 'GEMINI_API_KEY is not configured in backend environment variables (.env).'
+      error: 'GEMINI_API_KEY is not configured in backend environment variables.'
     });
   }
 
@@ -57,7 +57,6 @@ router.get('/health', async (req, res) => {
           try {
             const parsed = JSON.parse(data);
             const replyText = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const isOk = replyText.includes('NAGARSETU_GEMINI_OK') || replyText.trim().length > 0;
             
             console.log(`[NAGARSETU AI Health Check] Success. Model: ${model}, Reply: ${replyText.trim()}`);
             return sendRes(200, {
@@ -73,15 +72,15 @@ router.get('/health', async (req, res) => {
               configured: true,
               model,
               reachable: false,
-              error: `Failed to parse JSON response from Gemini API: ${e.message}`
+              error: 'Failed to parse response from Gemini API'
             });
           }
         } else {
-          let errorMsg = `Gemini API returned status ${healthRes.statusCode}: ${data}`;
+          let errorMsg = `Gemini API returned status ${healthRes.statusCode}`;
           if (healthRes.statusCode === 429) {
-            errorMsg = 'Gemini API Quota Exceeded (HTTP 429 RESOURCE_EXHAUSTED). Free tier limit (20 req/min) reached. Please retry in 60 seconds.';
+            errorMsg = 'Gemini API Quota Exceeded (HTTP 429). Please retry in 60 seconds.';
           } else if (healthRes.statusCode === 401) {
-            errorMsg = 'Gemini API Authentication Failed (HTTP 401 Unauthorized). Please check GEMINI_API_KEY.';
+            errorMsg = 'Gemini API Authentication Failed (HTTP 401). Please check API configuration.';
           }
           console.error(`[NAGARSETU AI Health Check] Failed: ${errorMsg}`);
           return sendRes(healthRes.statusCode, {
@@ -100,7 +99,7 @@ router.get('/health', async (req, res) => {
         configured: true,
         model,
         reachable: false,
-        error: `Network error connecting to Gemini API: ${err.message}`
+        error: 'Network error connecting to Gemini API'
       });
     });
 
@@ -116,7 +115,7 @@ router.get('/health', async (req, res) => {
       configured: true,
       model,
       reachable: false,
-      error: err.message
+      error: 'AI Health Check request failed.'
     });
   }
 });
@@ -126,7 +125,7 @@ router.get('/health', async (req, res) => {
  * POST /api/ai/analyze
  * Accepts uploaded photo file and returns Gemini 3.6 Flash structured classification
  */
-router.post('/analyze', upload.single('photo'), async (req, res) => {
+router.post('/analyze', upload.single('photo'), validateUploadedImageMagicBytes, async (req, res) => {
   const reqTime = new Date().toISOString();
   console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
 
@@ -151,9 +150,8 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
       return res.status(statusCode).json({
         success: false,
         error: aiAnalysis.error || 'AI_SERVER_ERROR',
-        message: aiAnalysis.message || 'AI Vision analysis is temporarily unavailable.',
-        retryable: aiAnalysis.retryable ?? true,
-        ai: aiAnalysis
+        message: 'AI Vision analysis is temporarily unavailable. Please try again.',
+        retryable: aiAnalysis.retryable ?? true
       });
     }
 
@@ -167,7 +165,7 @@ router.post('/analyze', upload.single('photo'), async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'AI_SERVER_ERROR',
-      message: `Failed to analyze photo: ${err.message}`
+      message: 'Failed to analyze photo. An internal processing error occurred.'
     });
   }
 });

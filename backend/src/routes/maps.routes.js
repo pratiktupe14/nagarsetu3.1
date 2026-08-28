@@ -1,11 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const http = require('http');
+const { validateInput } = require('../middleware/validateInput');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
+const geocodeSchema = {
+  body: {
+    address: { type: 'string', required: true, minLength: 2, maxLength: 500 }
+  }
+};
+
+const reverseGeocodeSchema = {
+  body: {
+    latitude: { type: 'number', required: true, min: -90, max: 90 },
+    longitude: { type: 'number', required: true, min: -180, max: 180 }
+  }
+};
+
+const directionsSchema = {
+  body: {
+    origin_latitude: { type: 'number', required: true, min: -90, max: 90 },
+    origin_longitude: { type: 'number', required: true, min: -180, max: 180 },
+    destination_latitude: { type: 'number', required: true, min: -90, max: 90 },
+    destination_longitude: { type: 'number', required: true, min: -180, max: 180 },
+    mode: { type: 'string', required: false, allowedValues: ['driving', 'walking', 'bicycling', 'transit'] }
+  }
+};
+
+const validateLocationSchema = {
+  body: {
+    latitude: { type: 'number', required: true, min: -90, max: 90 },
+    longitude: { type: 'number', required: true, min: -180, max: 180 }
+  }
+};
+
 function postToPythonService(endpoint, body) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     try {
       const url = new URL(`${AI_SERVICE_URL}${endpoint}`);
       const data = JSON.stringify(body);
@@ -27,47 +58,41 @@ function postToPythonService(endpoint, body) {
             try {
               resolve(JSON.parse(responseData));
             } catch (e) {
-              resolve({ status: 'ERROR', message: 'Invalid response from Google Maps service' });
+              resolve({ status: 'ERROR', message: 'Invalid response from location service.' });
             }
           });
         }
       );
 
       req.on('error', (err) => {
-        resolve({ status: 'SERVICE_UNAVAILABLE', message: err.message });
+        console.error('Maps service error:', err.message);
+        resolve({ status: 'SERVICE_UNAVAILABLE', message: 'Location service is currently unavailable.' });
       });
 
       req.on('timeout', () => {
         req.destroy();
-        resolve({ status: 'TIMEOUT', message: 'Google Maps service request timed out' });
+        resolve({ status: 'TIMEOUT', message: 'Location service request timed out.' });
       });
 
       req.write(data);
       req.end();
     } catch (err) {
-      resolve({ status: 'ERROR', message: err.message });
+      console.error('Maps service exception:', err.message);
+      resolve({ status: 'ERROR', message: 'Location processing failed.' });
     }
   });
 }
 
 // POST /api/maps/geocode
-router.post('/geocode', async (req, res) => {
+router.post('/geocode', validateInput(geocodeSchema), async (req, res) => {
   const { address } = req.body;
-  if (!address) {
-    return res.status(400).json({ status: 'INVALID_INPUT', error: 'Address is required' });
-  }
-
   const result = await postToPythonService('/google-maps/geocode', { address });
   return res.json(result);
 });
 
 // POST /api/maps/reverse-geocode
-router.post('/reverse-geocode', async (req, res) => {
+router.post('/reverse-geocode', validateInput(reverseGeocodeSchema), async (req, res) => {
   const { latitude, longitude } = req.body;
-  if (latitude === undefined || longitude === undefined) {
-    return res.status(400).json({ status: 'INVALID_INPUT', error: 'Latitude and longitude are required' });
-  }
-
   const result = await postToPythonService('/google-maps/reverse-geocode', {
     latitude: Number(latitude),
     longitude: Number(longitude)
@@ -76,12 +101,8 @@ router.post('/reverse-geocode', async (req, res) => {
 });
 
 // POST /api/maps/directions
-router.post('/directions', async (req, res) => {
+router.post('/directions', validateInput(directionsSchema), async (req, res) => {
   const { origin_latitude, origin_longitude, destination_latitude, destination_longitude, mode } = req.body;
-  if (origin_latitude === undefined || origin_longitude === undefined || destination_latitude === undefined || destination_longitude === undefined) {
-    return res.status(400).json({ status: 'INVALID_INPUT', error: 'Origin and destination coordinates are required' });
-  }
-
   const result = await postToPythonService('/google-maps/directions', {
     origin_latitude: Number(origin_latitude),
     origin_longitude: Number(origin_longitude),
@@ -93,12 +114,8 @@ router.post('/directions', async (req, res) => {
 });
 
 // POST /api/maps/validate
-router.post('/validate', async (req, res) => {
+router.post('/validate', validateInput(validateLocationSchema), async (req, res) => {
   const { latitude, longitude } = req.body;
-  if (latitude === undefined || longitude === undefined) {
-    return res.status(400).json({ status: 'INVALID_INPUT', error: 'Latitude and longitude are required' });
-  }
-
   const result = await postToPythonService('/google-maps/validate', {
     latitude: Number(latitude),
     longitude: Number(longitude)

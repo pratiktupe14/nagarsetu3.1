@@ -29,6 +29,18 @@ async function seedDefaultUsers() {
         );
       }
       console.log('Default demo users seeded successfully.');
+    } else {
+      // Ensure Municipal Admin exists even if DB already has other users
+      const adminCheck = await query(`SELECT * FROM users WHERE email = 'admin@nagarsetu.gov.in'`);
+      if (!adminCheck.rows || adminCheck.rows.length === 0) {
+        const salt = await bcrypt.genSalt(10);
+        const adminHash = await bcrypt.hash('NagarSetu@Admin2026!', salt);
+        await query(
+          `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
+          ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'en']
+        );
+        console.log('Municipal Admin user added.');
+      }
     }
   } catch (err) {
     console.error('Error seeding default users:', err);

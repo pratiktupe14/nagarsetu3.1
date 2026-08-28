@@ -701,10 +701,13 @@ export async function saveOrReplaceDepartmentHeadInSupabase(payload: {
       if (existingUser?.id) {
         userId = existingUser.id;
       } else {
+        if (!payload.password) {
+          throw new Error('Password is required when creating a new department head account.');
+        }
         // Sign up new user via Supabase Auth
         const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
           email: cleanEmail,
-          password: payload.password || 'Nagarsetu@2026',
+          password: payload.password,
           options: {
             data: {
               full_name: payload.fullName,
