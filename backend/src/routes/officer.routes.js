@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const { officerDashboardSchema, verifyComplaintSchema, assignStaffSchema } = require('../schemas/officer.schemas');
 const { query } = require('../config/db');
 const { notifyStatusChange } = require('../services/notificationService');
 
@@ -9,7 +11,7 @@ router.use(authenticateToken);
 router.use(requireRole(['officer', 'admin', 'city_admin', 'department_head']));
 
 // Command Center Dashboard Complaints list with filters
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res) => {
   try {
     const { department_id, priority, status, search } = req.query;
 
@@ -62,12 +64,9 @@ router.get('/staff-list', async (req, res) => {
 });
 
 // Verify & Approve / Reject Complaint
-router.post('/verify', async (req, res) => {
+router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {
   try {
-    const { complaint_id, action, rejection_reason } = req.body; // action: 'approve' or 'reject'
-    if (!complaint_id || !action) {
-      return res.status(400).json({ error: 'complaint_id and action are required' });
-    }
+    const { complaint_id, action, rejection_reason } = req.body;
 
     const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [complaint_id]);
     if (!compRes.rows || compRes.rows.length === 0) {
@@ -101,12 +100,9 @@ router.post('/verify', async (req, res) => {
 });
 
 // Assign complaint to staff member
-router.post('/assign', async (req, res) => {
+router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
   try {
-    const { complaint_id, staff_id, department_id } = req.body;
-    if (!complaint_id || !staff_id) {
-      return res.status(400).json({ error: 'complaint_id and staff_id are required' });
-    }
+    const { complaint_id, staff_id } = req.body;
 
     const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [complaint_id]);
     if (!compRes.rows || compRes.rows.length === 0) {
@@ -121,16 +117,9 @@ router.post('/assign', async (req, res) => {
     `;
     await query(assignSql, [complaint_id, staff_id, req.user.id]);
 
-    // Update complaint status & department
-    let updateSql = `UPDATE complaints SET status = 'Assigned', updated_at = CURRENT_TIMESTAMP`;
-    const params = [];
-    if (department_id) {
-      updateSql += `, department_id = ?`;
-      params.push(department_id);
-    }
-    updateSql += ` WHERE id = ?`;
-    params.push(complaint_id);
-    await query(updateSql, params);
+    // Update complaint status
+    let updateSql = `UPDATE complaints SET status = 'Assigned', updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    await query(updateSql, [complaint_id]);
 
     // Record status history
     try {

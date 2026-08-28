@@ -32,6 +32,8 @@ router.post('/register', validateInput(registerSchema), async (req, res) => {
     const userObj = { id: newUserId, name, mobile, email, role, language_pref };
     const token = generateToken(userObj);
 
+    if (res.clearAuthAttempts) res.clearAuthAttempts();
+
     return res.status(201).json({
       message: 'Registration successful',
       token,
@@ -97,14 +99,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       isMatch = await bcrypt.compare(password, user.password_hash);
     }
 
-    // Secondary fallback for default provisioning password
-    if (!isMatch && (password === 'Nagarsetu@2026' || password === 'nagarsetu123')) {
-      const salt = await bcrypt.genSalt(10);
-      const updatedHash = await bcrypt.hash(password, salt);
-      await query(`UPDATE users SET password_hash = ? WHERE id = ?`, [updatedHash, user.id]);
-      isMatch = true;
-    }
-
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
@@ -145,6 +139,8 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     const token = generateToken(userObj);
 
+    if (res.clearAuthAttempts) res.clearAuthAttempts();
+
     return res.json({
       message: 'Login successful',
       token,
@@ -165,21 +161,28 @@ router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
 
 // OTP Verify (Simulated)
 router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
-  const { mobile, otp } = req.body;
-  if (otp !== '123456') {
-    return res.status(400).json({ error: 'Invalid OTP code' });
-  }
+  try {
+    const { mobile, otp } = req.body;
+    if (otp !== '123456') {
+      return res.status(400).json({ error: 'Invalid OTP code' });
+    }
 
-  const sql = `SELECT * FROM users WHERE mobile = ?`;
-  const resUser = await query(sql, [mobile]);
-  
-  if (resUser.rows && resUser.rows.length > 0) {
-    const user = resUser.rows[0];
-    const userObj = { id: user.id, name: user.name, mobile: user.mobile, email: user.email, role: user.role, language_pref: user.language_pref };
-    const token = generateToken(userObj);
-    return res.json({ message: 'OTP verified successfully', token, user: userObj });
-  } else {
-    return res.json({ verified: true, needsRegistration: true, message: 'OTP verified. Please complete profile.' });
+    const sql = `SELECT * FROM users WHERE mobile = ?`;
+    const resUser = await query(sql, [mobile]);
+    
+    if (resUser.rows && resUser.rows.length > 0) {
+      const user = resUser.rows[0];
+      const userObj = { id: user.id, name: user.name, mobile: user.mobile, email: user.email, role: user.role, language_pref: user.language_pref };
+      const token = generateToken(userObj);
+      if (res.clearAuthAttempts) res.clearAuthAttempts();
+      return res.json({ message: 'OTP verified successfully', token, user: userObj });
+    } else {
+      if (res.clearAuthAttempts) res.clearAuthAttempts();
+      return res.json({ verified: true, needsRegistration: true, message: 'OTP verified. Please complete profile.' });
+    }
+  } catch (err) {
+    console.error('OTP verify error:', err);
+    return res.status(500).json({ error: 'Server error during OTP verification' });
   }
 });
 

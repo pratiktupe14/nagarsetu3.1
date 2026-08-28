@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { uploadSingleImage } = require('../middleware/upload');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const { updateTaskStatusSchema, resolveTaskParamsSchema } = require('../schemas/staff.schemas');
 const { query } = require('../config/db');
 const { notifyStatusChange } = require('../services/notificationService');
 
@@ -29,10 +31,9 @@ router.get('/tasks', async (req, res) => {
 });
 
 // Update Task status (e.g. to 'In Progress')
-router.post('/task/:id/status', async (req, res) => {
+router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (req, res) => {
   try {
-    const { status } = req.body; // 'In Progress'
-    if (!status) return res.status(400).json({ error: 'Status is required' });
+    const { status } = req.body;
 
     const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [req.params.id]);
     if (!compRes.rows || compRes.rows.length === 0) {
@@ -54,9 +55,9 @@ router.post('/task/:id/status', async (req, res) => {
 });
 
 // Resolve Task with "After" Photo Proof
-router.post('/task/:id/resolve', uploadSingleImage('photo_after'), async (req, res) => {
+router.post('/task/:id/resolve', validateInput(resolveTaskParamsSchema), uploadSingleImage('photo_after'), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.file || !req.file.filename) {
       return res.status(400).json({ error: 'Resolution photo proof ("after" photo) is required' });
     }
 

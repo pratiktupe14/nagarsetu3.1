@@ -10,9 +10,9 @@ const validateInput = (schemas = {}) => {
 
     for (const target of targets) {
       if (schemas[target]) {
-        const { error, value } = schemas[target].validate(req[target], {
+        const { error, value } = schemas[target].validate(req[target] || {}, {
           abortEarly: false,
-          stripUnknown: true, // Remove extra unallowed properties
+          stripUnknown: false, // Reject extra unallowed properties
           allowUnknown: false
         });
 

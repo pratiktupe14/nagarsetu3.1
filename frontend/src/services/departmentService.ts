@@ -279,19 +279,18 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 }
 
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_PROJECT_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_PROJECT_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Non-persisted isolated auth client so Admin session is not overwritten during user creation
-const tempAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+const tempAuthClient = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false
   }
-});
+}) : null;
 
 /**
  * Add or Replace Department Head atomically in Express API & Supabase

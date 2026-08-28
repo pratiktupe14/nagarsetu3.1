@@ -65,7 +65,7 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
     });
   } catch (err) {
     console.error('Analyze upload error:', err);
-    return res.status(500).json({ error: 'Failed to process and analyze photo: ' + err.message });
+    return res.status(500).json({ error: 'Failed to process and analyze photo' });
   }
 });
 

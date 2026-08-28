@@ -1,4 +1,22 @@
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+
+// Ensure isolated uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Allowed mime types & whitelisted extension mapping
+const ALLOWED_MIME_EXT_MAP = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp'
+};
 
 // Magic byte signature patterns for safe image formats
 const MAGIC_BYTES = {
@@ -24,26 +42,30 @@ function isValidImageMagicBytes(buffer) {
   return isJpeg || isPng || isGif || isWebp;
 }
 
-// Memory storage engine keeps uploaded file in buffer (req.file.buffer)
 const storage = multer.memoryStorage();
-
 const maxMb = parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 10;
 
 const fileFilter = (req, file, cb) => {
-  if (file && file.mimetype && file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only valid image files (JPEG, PNG, WEBP, GIF) are allowed!'), false);
+  if (!file || !file.mimetype || !ALLOWED_MIME_EXT_MAP[file.mimetype]) {
+    return cb(new Error('Only valid image files (JPEG, PNG, WEBP, GIF) are allowed!'), false);
   }
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  if (ext && !allowedExts.includes(ext)) {
+    return cb(new Error('Disallowed file extension detected! Upload rejected.'), false);
+  }
+  cb(null, true);
 };
 
 const multerUpload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+  storage,
+  fileFilter,
   limits: { fileSize: maxMb * 1024 * 1024 }
 });
 
-// Middleware wrapper that performs second-pass Magic Byte buffer verification
+/**
+ * Middleware wrapper that performs Magic Byte verification & safe disk writing with random filename
+ */
 function uploadSingleImage(fieldName) {
   return (req, res, next) => {
     multerUpload.single(fieldName)(req, res, (err) => {
@@ -52,10 +74,25 @@ function uploadSingleImage(fieldName) {
       }
 
       if (req.file) {
+        // Deep content magic byte verification
         if (!isValidImageMagicBytes(req.file.buffer)) {
           return res.status(400).json({
             error: 'Security Error: File content magic bytes do not match a valid image format. Upload rejected.'
           });
+        }
+
+        // Determine safe extension based on verified MIME type
+        const safeExt = ALLOWED_MIME_EXT_MAP[req.file.mimetype] || '.jpg';
+        const randomFilename = `${crypto.randomUUID()}${safeExt}`;
+        const diskPath = path.join(UPLOADS_DIR, randomFilename);
+
+        try {
+          fs.writeFileSync(diskPath, req.file.buffer);
+          req.file.filename = randomFilename;
+          req.file.path = diskPath;
+        } catch (writeErr) {
+          console.error('[UPLOAD ERROR] Failed to write uploaded file to disk:', writeErr);
+          return res.status(500).json({ error: 'Failed to process file upload' });
         }
       }
 

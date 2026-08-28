@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const { markReadSchema } = require('../schemas/notification.schemas');
 const { query } = require('../config/db');
 
 router.use(authenticateToken);
@@ -25,7 +27,7 @@ router.get('/my', async (req, res) => {
 });
 
 // Mark notifications read
-router.post('/mark-read', async (req, res) => {
+router.post('/mark-read', validateInput(markReadSchema), async (req, res) => {
   try {
     const { notification_id } = req.body;
     if (notification_id) {
@@ -35,6 +37,7 @@ router.post('/mark-read', async (req, res) => {
     }
     return res.json({ message: 'Notifications marked as read' });
   } catch (err) {
+    console.error('Mark read notifications error:', err);
     return res.status(500).json({ error: 'Failed to update notifications' });
   }
 });

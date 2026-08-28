@@ -167,7 +167,7 @@ router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'AI_SERVER_ERROR',
-      message: `Failed to analyze photo: ${err.message}`
+      message: 'Failed to analyze photo. Please try again later.'
     });
   }
 });
