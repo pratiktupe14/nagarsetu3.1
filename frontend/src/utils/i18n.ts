@@ -157,7 +157,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     departments: "Departments",
     departmentHeads: "Department Heads",
     departmentDashboard: "Department Dashboard",
-    serviceStaff: "Service Staff",
+    serviceStaff: "Field Staff",
     cityMap: "City Map",
     analytics: "Analytics",
     reports: "Reports",
@@ -170,7 +170,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     assignStaff: "Assign Field Staff",
     possibleDuplicates: "Possible Duplicate Alerts (100m Radius)",
     appointDeptHead: "Appoint Department Head",
-    manageStaff: "Manage Service Staff",
+    manageStaff: "Manage Field Staff",
 
     // Department Head Portal
     departmentHeadPortal: "Department Head Portal",
@@ -185,7 +185,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     departmentSlaRate: "Department SLA Compliance",
 
     // Service Staff Portal
-    serviceStaffPortal: "Service Staff Portal",
+    serviceStaffPortal: "Field Staff Portal",
     myTasks: "My Tasks",
     newAssignments: "New Assignments",
     completed: "Completed",

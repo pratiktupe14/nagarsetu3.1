@@ -18,7 +18,7 @@ export const AdminSettingsPage: React.FC = () => {
   >('profile');
 
   // Profile Form State
-  const [fullName, setFullName] = useState(user?.full_name || 'City Admin');
+  const [fullName, setFullName] = useState(user?.full_name || 'City Administration');
   const [email, setEmail] = useState(user?.email || 'admin@nagarsetu.gov.in');
   const [mobile, setMobile] = useState(user?.mobile || '+91 9876543210');
   const [department, setDepartment] = useState('Municipal Administration');
@@ -129,7 +129,7 @@ export const AdminSettingsPage: React.FC = () => {
                 Settings
               </h1>
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-50 text-emerald-800 border border-emerald-300">
-                City Admin Settings
+                City Administration Settings
               </span>
             </div>
             <p className="text-sm text-gray-600 font-medium">
@@ -264,7 +264,7 @@ export const AdminSettingsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          setFullName(user?.full_name || 'City Admin');
+                          setFullName(user?.full_name || 'City Administration');
                           setEmail(user?.email || 'admin@nagarsetu.gov.in');
                           setMobile(user?.mobile || '+91 9876543210');
                         }}
@@ -298,7 +298,7 @@ export const AdminSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                     <div className="p-3 bg-slate-50 border border-gray-200 rounded-lg space-y-1">
                       <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Role</span>
-                      <span className="font-extrabold text-gray-900 block font-outfit">City Admin</span>
+                      <span className="font-extrabold text-gray-900 block font-outfit">City Administration</span>
                     </div>
 
                     <div className="p-3 bg-slate-50 border border-gray-200 rounded-lg space-y-1">
@@ -350,7 +350,7 @@ export const AdminSettingsPage: React.FC = () => {
                   />
 
                   <ToggleRow
-                    title="Service Staff Dispatched"
+                    title="Field Staff Dispatched"
                     desc="Alert when field officers accept or begin work on site."
                     checked={notifStaffAssignment}
                     onChange={setNotifStaffAssignment}

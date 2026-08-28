@@ -1020,7 +1020,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                         </p>
                       )}
                       <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono pt-1 border-t border-gray-100">
-                        <span>Updated By: {selectedComplaint.assigned_staff_name || 'Service Staff'}</span>
+                        <span>Updated By: {selectedComplaint.assigned_staff_name || 'Field Staff'}</span>
                         <span>Updated On: {new Date(selectedComplaint.updated_at).toLocaleString()}</span>
                       </div>
                     </div>

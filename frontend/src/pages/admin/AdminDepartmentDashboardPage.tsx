@@ -314,7 +314,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             <select
               value={selectedDeptId}
               onChange={(e) => setSelectedDeptId(e.target.value)}
-              className="bg-white border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs text-gray-900 font-extrabold shadow-2xs focus:outline-none min-h-[38px] font-outfit cursor-pointer"
+              className="bg-white border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs text-gray-900 font-extrabold shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[38px] font-outfit cursor-pointer"
             >
               {SIX_MUNICIPAL_DEPARTMENTS.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -628,7 +628,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
@@ -637,7 +637,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
                   <th className="p-3">Location Address</th>
                   <th className="p-3 text-center">Priority</th>
                   <th className="p-3 text-center">Status</th>
-                  <th className="p-3">Assigned Service Staff</th>
+                  <th className="p-3">Assigned Field Staff</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">

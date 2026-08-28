@@ -85,7 +85,7 @@ export const AdminNotificationsPage: React.FC = () => {
             complaint_number: 'NS-2026-000210',
             type: 'resolution_submitted',
             title: 'Resolution Proof Uploaded for Review',
-            message: 'Service Staff Ramesh Kumar submitted after-work photos for Road Pothole repair NS-2026-000210.',
+            message: 'Field Staff Ramesh Kumar submitted after-work photos for Road Pothole repair NS-2026-000210.',
             is_read: false,
             created_at: new Date(Date.now() - 3600000 * 6).toISOString()
           },

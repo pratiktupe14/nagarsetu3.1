@@ -20,7 +20,7 @@ export const StatusBadge: React.FC<{ status: ComplaintStatus }> = ({ status }) =
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Submitted}`}>
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${styles[status] || styles.Submitted}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5" />
       {translateStatus(status)}
     </span>

@@ -368,7 +368,7 @@ export const StaffSettingsPage: React.FC = () => {
                     { label: 'Task Reassigned / Department Update', state: notifTaskReassigned, set: setNotifTaskReassigned, desc: 'Notify if a task is reassigned or updated by department head.' },
                     { label: 'SLA Due Soon Warning', state: notifSlaDueSoon, set: setNotifSlaDueSoon, desc: 'Receive alert when SLA completion deadline is approaching.' },
                     { label: 'Task Overdue Alert', state: notifTaskOverdue, set: setNotifTaskOverdue, desc: 'Receive immediate alert when a task breaches its SLA.' },
-                    { label: 'Admin Instructions', state: notifAdminInstructions, set: setNotifAdminInstructions, desc: 'Notify when City Admin adds special work instructions.' },
+                    { label: 'Admin Instructions', state: notifAdminInstructions, set: setNotifAdminInstructions, desc: 'Notify when City Administration adds special work instructions.' },
                     { label: 'Task Verification & Approval', state: notifTaskVerification, set: setNotifTaskVerification, desc: 'Notify when your completed work proof is verified by admin.' },
                     { label: 'Complaint Reopened', state: notifComplaintReopened, set: setNotifComplaintReopened, desc: 'Notify if a resolved task is reopened by citizen or admin.' },
                     { label: 'System Announcements', state: notifSystemAnnounce, set: setNotifSystemAnnounce, desc: 'Receive municipal administrative system updates.' }

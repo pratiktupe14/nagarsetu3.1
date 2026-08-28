@@ -752,7 +752,7 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                 {/* SERVICE STAFF SELECTION */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                   <div>
-                    <label className="block font-bold text-gray-700 mb-1">Service Staff Officer</label>
+                    <label className="block font-bold text-gray-700 mb-1">Field Staff Officer</label>
                     <select
                       value={selectedStaffId}
                       onChange={(e) => setSelectedStaffId(e.target.value)}

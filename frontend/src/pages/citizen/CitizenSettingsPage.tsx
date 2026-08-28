@@ -206,7 +206,7 @@ export const CitizenSettingsPage: React.FC = () => {
                     },
                     {
                       title: 'Resolution Notifications',
-                      desc: 'Get notified when field repair proof is submitted or verified by City Admin.',
+                      desc: 'Get notified when field repair proof is submitted or verified by City Administration.',
                       state: notifyResolutionUpdates,
                       setState: setNotifyResolutionUpdates
                     },

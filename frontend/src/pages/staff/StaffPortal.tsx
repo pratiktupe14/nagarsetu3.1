@@ -424,7 +424,7 @@ export const StaffPortal: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{deptInfo.fullName}</h2>
                 <span className="font-mono text-[10px] font-bold bg-white text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
-                  Service Staff Portal
+                  Field Staff Portal
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-0.5">{deptInfo.description}</p>
@@ -536,7 +536,7 @@ export const StaffPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
                   <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Operational Scope</span>
-                  <span className="font-extrabold text-gray-900 block">Service Staff (Field Operations)</span>
+                  <span className="font-extrabold text-gray-900 block">Field Staff (Field Operations)</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
@@ -551,7 +551,7 @@ export const StaffPortal: React.FC = () => {
                   <span className="font-bold">Security Notice:</span>
                 </div>
                 <p className="text-gray-600">
-                  Department assignment and role permissions are set by City Administration. Contact your Department Manager or City Admin to request role or department transfers.
+                  Department assignment and role permissions are set by City Administration. Contact your Department Manager or City Administration to request role or department transfers.
                 </p>
               </div>
             </div>

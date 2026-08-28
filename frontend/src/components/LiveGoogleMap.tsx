@@ -282,7 +282,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
         <div className="absolute top-4 right-4 z-[400] flex items-center space-x-2 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-gray-200 shadow-md">
           <button
             onClick={centerMapOnComplaint}
-            className="p-2 text-gray-700 hover:text-emerald-700 hover:bg-slate-100 rounded-xl font-bold text-xs flex items-center space-x-1"
+            className="p-2 text-gray-700 hover:text-emerald-700 hover:bg-slate-100 rounded-xl font-bold text-xs flex items-center space-x-1 min-h-[44px]"
             title="Recenter Map"
           >
             <Compass className="w-4 h-4 text-emerald-600" />
@@ -292,7 +292,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
             href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold text-xs flex items-center space-x-1"
+            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold text-xs flex items-center space-x-1 min-h-[44px]"
           >
             <Navigation className="w-4 h-4" />
             <span className="hidden sm:inline">Directions</span>
@@ -359,7 +359,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
         <div className="bg-white/95 backdrop-blur-md p-1 rounded-2xl border border-gray-200 shadow-md flex flex-col items-center space-y-1">
           <button
             onClick={handleZoomIn}
-            className="w-9 h-9 rounded-xl hover:bg-slate-100 text-gray-700 font-extrabold text-lg flex items-center justify-center transition-colors"
+            className="w-11 h-11 rounded-xl hover:bg-slate-100 text-gray-700 font-extrabold text-lg flex items-center justify-center transition-colors"
             title="Zoom In"
           >
             +
@@ -367,7 +367,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
           <div className="w-6 h-[1px] bg-gray-200" />
           <button
             onClick={handleZoomOut}
-            className="w-9 h-9 rounded-xl hover:bg-slate-100 text-gray-700 font-extrabold text-lg flex items-center justify-center transition-colors"
+            className="w-11 h-11 rounded-xl hover:bg-slate-100 text-gray-700 font-extrabold text-lg flex items-center justify-center transition-colors"
             title="Zoom Out"
           >
             −
@@ -375,7 +375,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
           <div className="w-6 h-[1px] bg-gray-200" />
           <button
             onClick={centerMapOnComplaint}
-            className="w-9 h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors"
+            className="w-11 h-11 rounded-xl hover:bg-emerald-50 text-emerald-600 flex items-center justify-center transition-colors"
             title="Recenter Map"
           >
             <Compass className="w-5 h-5" />
@@ -385,7 +385,7 @@ export const LiveGoogleMap: React.FC<LiveGoogleMapProps> = ({
 
       {/* FLOATING LEGEND BOTTOM RIGHT */}
       <div className="absolute bottom-16 right-4 z-20 bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border border-gray-200 shadow-lg font-sans text-xs space-y-1.5 min-w-[150px]">
-        <div className="font-extrabold text-[10px] uppercase tracking-wider text-gray-400 font-mono border-b border-gray-100 pb-1">
+        <div className="font-extrabold text-[10px] uppercase tracking-wider text-gray-500 font-mono border-b border-gray-100 pb-1">
           LEGEND
         </div>
         <div className="flex items-center space-x-2 text-[11px] font-bold text-gray-800">

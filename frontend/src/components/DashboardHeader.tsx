@@ -71,14 +71,14 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
             >
               <Building2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>City Admin View</span>
+              <span>City Administration View</span>
             </button>
             <button
               onClick={() => handleRoleSwitch('service_staff')}
               className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
             >
               <Wrench className="w-3.5 h-3.5 text-amber-600" />
-              <span>Service Staff View</span>
+              <span>Field Staff View</span>
             </button>
           </div>
         </div>

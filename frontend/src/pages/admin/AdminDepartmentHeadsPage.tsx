@@ -324,7 +324,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-gray-600 font-medium mt-1">
-              City Admin oversight for Nashik's 6 municipal departments. Assign leadership, monitor staff workloads, and review operational tasks.
+              City Administration oversight for Nashik's 6 municipal departments. Assign leadership, monitor staff workloads, and review operational tasks.
             </p>
           </div>
 
@@ -816,7 +816,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               {/* ASSIGNED SERVICE STAFF LIST */}
               <div className="space-y-2">
                 <h4 className="font-extrabold text-gray-900 text-xs font-outfit flex items-center justify-between border-b border-gray-200 pb-1">
-                  <span>Assigned Service Staff ({viewHeadProfileModal.assignedStaff.length})</span>
+                  <span>Assigned Field Staff ({viewHeadProfileModal.assignedStaff.length})</span>
                 </h4>
                 
                 {viewHeadProfileModal.assignedStaff.length === 0 ? (

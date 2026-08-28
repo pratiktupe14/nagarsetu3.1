@@ -420,7 +420,7 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
       message: `Field officer ${comp.assigned_staff_name || 'Officer'} has accepted task ${comp.complaint_number}.`
     });
 
-    broadcastComplaintChange(comp.id, prevStatus, 'Accepted', comp.assigned_staff_name || 'Service Staff', 'Staff accepted field task');
+    broadcastComplaintChange(comp.id, prevStatus, 'Accepted', comp.assigned_staff_name || 'Field Staff', 'Staff accepted field task');
     return true;
   }
   return false;
@@ -454,7 +454,7 @@ export async function startStaffTravel(complaintId: string): Promise<boolean> {
       message: `Maintenance officer is traveling to ${comp.location_address || 'the complaint location'}.`
     });
 
-    broadcastComplaintChange(comp.id, prevStatus, 'On the Way', comp.assigned_staff_name || 'Service Staff', 'En route to site');
+    broadcastComplaintChange(comp.id, prevStatus, 'On the Way', comp.assigned_staff_name || 'Field Staff', 'En route to site');
     return true;
   }
   return false;
@@ -493,7 +493,7 @@ export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: s
       message: `On-site repair work has started for complaint ${comp.complaint_number}.`
     });
 
-    broadcastComplaintChange(comp.id, prevStatus, 'In Progress', comp.assigned_staff_name || 'Service Staff', 'Commenced site repair');
+    broadcastComplaintChange(comp.id, prevStatus, 'In Progress', comp.assigned_staff_name || 'Field Staff', 'Commenced site repair');
     return true;
   }
   return false;
@@ -541,7 +541,7 @@ export async function submitStaffResolution(
       complaint_number: comp.complaint_number,
       type: 'resolution_submitted',
       title: 'Resolution Proof Submitted',
-      message: `Maintenance team submitted repair proof for ${comp.complaint_number}. Under City Admin verification.`
+      message: `Maintenance team submitted repair proof for ${comp.complaint_number}. Under City Administration verification.`
     });
 
     pushNotification({
@@ -554,7 +554,7 @@ export async function submitStaffResolution(
       message: `Staff ${comp.assigned_staff_name || 'Officer'} uploaded resolution proof for ${comp.complaint_number}.`
     });
 
-    broadcastComplaintChange(comp.id, prevStatus, 'Resolution Submitted', comp.assigned_staff_name || 'Service Staff', 'Submitted repair proof & work notes');
+    broadcastComplaintChange(comp.id, prevStatus, 'Resolution Submitted', comp.assigned_staff_name || 'Field Staff', 'Submitted repair proof & work notes');
     return true;
   }
   return false;
@@ -593,10 +593,10 @@ export async function reviewResolutionAdmin(
         complaint_number: comp.complaint_number,
         type: 'resolved',
         title: 'Complaint Officially Resolved',
-        message: `City Admin verified repair proof for ${comp.complaint_number}. Please rate the repair quality!`
+        message: `City Administration verified repair proof for ${comp.complaint_number}. Please rate the repair quality!`
       });
 
-      broadcastComplaintChange(comp.id, prevStatus, 'Resolved', 'City Admin', 'Approved resolution proof & closed issue');
+      broadcastComplaintChange(comp.id, prevStatus, 'Resolved', 'City Administration', 'Approved resolution proof & closed issue');
     } else {
       comp.status = 'Reopened';
       comp.admin_rejection_reason = rejectionReason;
@@ -612,7 +612,7 @@ export async function reviewResolutionAdmin(
         message: `Resolution for ${comp.complaint_number} was rejected: ${rejectionReason}. Re-inspection required.`
       });
 
-      broadcastComplaintChange(comp.id, prevStatus, 'Reopened', 'City Admin', `Rejected resolution proof: ${rejectionReason}`);
+      broadcastComplaintChange(comp.id, prevStatus, 'Reopened', 'City Administration', `Rejected resolution proof: ${rejectionReason}`);
     }
     comp.updated_at = new Date().toISOString();
     saveStoredComplaints(all);

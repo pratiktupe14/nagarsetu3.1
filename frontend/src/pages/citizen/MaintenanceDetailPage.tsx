@@ -136,7 +136,7 @@ export const MaintenanceDetailPage: React.FC = () => {
                 <UserCheck className="w-4 h-4 text-emerald-600" />
                 <span>Assigned Field Incharge: <strong>{work.assigned_staff_name}</strong></span>
               </div>
-              <span className="font-mono text-[10px] text-gray-500">Verified Service Staff</span>
+              <span className="font-mono text-[10px] text-gray-500">Verified Field Staff</span>
             </div>
           )}
 

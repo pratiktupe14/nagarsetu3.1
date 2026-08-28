@@ -1188,7 +1188,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                 {activeTab === 'staff' && (
                   <div className="space-y-4">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 font-outfit">
-                      Department Service Staff Roster
+                      Department Field Staff Roster
                     </h3>
 
                     {selectedDeptStaff.length === 0 ? (
@@ -1253,7 +1253,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                         <div className="relative">
                           <div className="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
                           <span className="font-bold text-gray-900 block">3. Field Staff Dispatch & SLA Timer Activation</span>
-                          <p className="text-[11px] text-gray-600">City Admin dispatches assigned technician with 24h SLA deadline.</p>
+                          <p className="text-[11px] text-gray-600">City Administration dispatches assigned technician with 24h SLA deadline.</p>
                         </div>
 
                         <div className="relative">
@@ -1265,7 +1265,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                         <div className="relative">
                           <div className="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
                           <span className="font-bold text-gray-900 block">5. Admin Verification & Official Resolution</span>
-                          <p className="text-[11px] text-gray-600">City Admin verifies proof, closes complaint, and requests citizen rating.</p>
+                          <p className="text-[11px] text-gray-600">City Administration verifies proof, closes complaint, and requests citizen rating.</p>
                         </div>
 
                       </div>

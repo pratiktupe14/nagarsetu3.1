@@ -316,7 +316,7 @@ export const AdminStaffPage: React.FC = () => {
         ...formData
       });
 
-      setToastMessage(editingStaff ? `Staff record '${saved.name}' updated.` : `New Service Staff '${saved.name}' registered.`);
+      setToastMessage(editingStaff ? `Staff record '${saved.name}' updated.` : `New Field Staff '${saved.name}' registered.`);
       setShowAddEditModal(false);
       loadData();
       setTimeout(() => setToastMessage(null), 4000);
@@ -349,7 +349,7 @@ export const AdminStaffPage: React.FC = () => {
         assigningForStaff.id,
         assigningForStaff.name,
         assignSlaHours,
-        'City Admin Officer'
+        'City Administration Officer'
       );
 
       if (success) {
@@ -381,7 +381,7 @@ export const AdminStaffPage: React.FC = () => {
         targetStaff.id,
         targetStaff.name,
         24,
-        'City Admin Officer'
+        'City Administration Officer'
       );
 
       if (success) {
@@ -408,7 +408,7 @@ export const AdminStaffPage: React.FC = () => {
   }, [selectedStaff, complaints]);
 
   return (
-    <DashboardLayout title="Service Staff">
+    <DashboardLayout title="Field Staff">
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen">
         
         {/* TOAST SUCCESS NOTIFICATION */}
@@ -431,7 +431,7 @@ export const AdminStaffPage: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight font-outfit">
-                Service Staff
+                Field Staff
               </h1>
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-50 text-emerald-800 border border-emerald-300">
                 {globalSummary.totalStaff} Field Officers
@@ -672,7 +672,7 @@ export const AdminStaffPage: React.FC = () => {
             /* 27. EMPTY STATE */
             <div className="p-12 text-center space-y-3">
               <Users className="w-10 h-10 text-gray-400 mx-auto" />
-              <h3 className="text-base font-bold text-gray-900 font-outfit">No Service Staff Found</h3>
+              <h3 className="text-base font-bold text-gray-900 font-outfit">No Field Staff Found</h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
                 No field staff members match your current filters.
               </p>
@@ -1432,7 +1432,7 @@ export const AdminStaffPage: React.FC = () => {
             >
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <h3 className="text-base font-extrabold text-gray-900 font-outfit">
-                  {editingStaff ? `Edit Staff Member: ${editingStaff.employee_id}` : 'Register Service Staff'}
+                  {editingStaff ? `Edit Staff Member: ${editingStaff.employee_id}` : 'Register Field Staff'}
                 </h3>
                 <button type="button" onClick={() => setShowAddEditModal(false)}>
                   <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />

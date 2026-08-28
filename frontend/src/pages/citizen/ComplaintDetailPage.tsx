@@ -251,7 +251,7 @@ export const ComplaintDetailPage: React.FC = () => {
             </div>
 
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-1">
-              <span className="text-gray-500 font-medium block">Assigned Service Staff Officer</span>
+              <span className="text-gray-500 font-medium block">Assigned Field Staff Officer</span>
               <span className="font-extrabold text-gray-900 text-sm font-outfit block">{complaint.assigned_staff_name || 'Awaiting Officer Dispatch'}</span>
             </div>
           </div>

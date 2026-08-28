@@ -175,11 +175,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : citizenNav;
 
   const roleLabel = activeRole === 'city_admin' 
-    ? 'CITY ADMIN' 
+    ? 'CITY ADMINISTRATION' 
     : activeRole === 'department_head'
-    ? 'DEPT HEAD'
+    ? 'DEPARTMENT HEAD'
     : activeRole === 'service_staff' 
-    ? 'SERVICE STAFF' 
+    ? 'FIELD STAFF' 
     : 'CITIZEN';
 
   const roleBadgeStyle = activeRole === 'city_admin' 
@@ -243,7 +243,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {navGroups.map((group) => (
           <div key={group.title} className="space-y-1">
             {!isCollapsed && (
-              <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 px-3 py-1 font-outfit">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 px-3 py-1 font-outfit">
                 {group.title}
               </h4>
             )}
