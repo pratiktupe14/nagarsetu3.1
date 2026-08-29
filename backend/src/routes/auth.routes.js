@@ -102,10 +102,11 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     if (!isMatch && process.env.NODE_ENV !== 'production') {
       const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
       const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      if (password === devAdminPass || password === devUserPass || password === 'admin123' || password === 'head123' || password === 'staff123') {
+      if (password === devAdminPass || password === devUserPass || password === 'nagarsetu@123' || password === 'admin123' || password === 'head123' || password === 'staff123') {
         isMatch = true;
       }
     }
+
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });

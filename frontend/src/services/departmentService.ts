@@ -66,8 +66,10 @@ export const TARGET_MUNICIPAL_DEPARTMENTS = [
   { code: 'WTR', name: 'Water Supply & Sewerage Board' },
   { code: 'DRN', name: 'Drainage & Sewage Department' },
   { code: 'ELE', name: 'Electrical & Street Lighting' },
-  { code: 'TRF', name: 'Traffic Management Department' }
+  { code: 'TRF', name: 'Traffic Management Department' },
+  { code: 'MNT', name: 'Maintenance Department' }
 ];
+
 
 /**
  * Get all municipal departments from Supabase

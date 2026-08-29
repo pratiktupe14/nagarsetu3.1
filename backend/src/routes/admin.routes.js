@@ -211,9 +211,14 @@ async function resolveDepartmentId(deptInput) {
     const r = await query(`SELECT id FROM departments WHERE name LIKE '%Public Works%' OR name LIKE '%PWD%' LIMIT 1`);
     if (r.rows && r.rows.length > 0) return r.rows[0].id;
   }
+  if (strUpper.includes('MNT') || strUpper.includes('MAINT')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Maintenance%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
 
   return null;
 }
+
 
 // POST Create or Appoint Department Head
 router.post('/department-heads', async (req, res) => {

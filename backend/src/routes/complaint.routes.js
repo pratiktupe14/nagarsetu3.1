@@ -89,14 +89,24 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     // Default department mapping if not provided
     let finalDeptId = department_id;
     if (!finalDeptId) {
+      let searchToken = category ? category.split(' ')[0] : 'Public Works';
+      if (category.includes('Pothole') || category.includes('Road')) searchToken = 'Public Works';
+      else if (category.includes('Garbage') || category.includes('Waste')) searchToken = 'Sanitation';
+      else if (category.includes('Water')) searchToken = 'Water';
+      else if (category.includes('Drainage') || category.includes('Sewage')) searchToken = 'Drainage';
+      else if (category.includes('Streetlight') || category.includes('Electrical')) searchToken = 'Electric';
+      else if (category.includes('Traffic')) searchToken = 'Traffic';
+      else if (category.includes('Infrastructure') || category.includes('Maintenance') || category.includes('Other')) searchToken = 'Maintenance';
+
       const deptSql = `SELECT id FROM departments WHERE name LIKE ? LIMIT 1`;
-      const deptRes = await query(deptSql, [`%${category.split(' ')[0]}%`]);
+      const deptRes = await query(deptSql, [`%${searchToken}%`]);
       if (deptRes.rows && deptRes.rows.length > 0) {
         finalDeptId = deptRes.rows[0].id;
       } else {
         finalDeptId = 1; // Default to PWD
       }
     }
+
 
     const insertSql = `
       INSERT INTO complaints (

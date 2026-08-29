@@ -158,10 +158,12 @@ async function createTablesPostgres() {
       await pgPool.query(`
         INSERT INTO departments (id, name, description) VALUES
           (1, 'Public Works Department (PWD)', 'Road repairs, potholes, and asphalt infrastructure'),
-          (2, 'Sanitation & Solid Waste Management', 'Garbage pickup, trash overflow, and public cleanliness'),
+          (2, 'Sanitation & Waste Management', 'Garbage pickup, trash overflow, and public cleanliness'),
           (3, 'Water Supply & Sewerage Board', 'Pipeline leakages, drainage overflows, and water supply'),
-          (4, 'Electrical & Lighting Department', 'Streetlight repair, electrical poles, and public lighting'),
-          (5, 'Traffic Management Department', 'Traffic signal repairs, road signage, and junction issues')
+          (4, 'Drainage & Sewage Department', 'Drainage blockage, sewage overflow, open drains, and culverts'),
+          (5, 'Electrical & Street Lighting', 'Streetlight repair, electrical poles, and public lighting'),
+          (6, 'Traffic Management Department', 'Traffic signal repairs, road signage, and junction issues'),
+          (7, 'Maintenance Department', 'General civic facility repairs, building maintenance, and public asset upkeep')
         ON CONFLICT (id) DO NOTHING;
       `);
     }
@@ -169,6 +171,7 @@ async function createTablesPostgres() {
     console.error('Error creating PostgreSQL tables:', err);
   }
 }
+
 
 function setupSqlite(resolve, reject) {
   useSqlite = true;
@@ -317,14 +320,17 @@ function createTablesSqlite() {
         if (!err && row && row.count === 0) {
           const stmt = sqliteDb.prepare("INSERT INTO departments (name, description) VALUES (?, ?)");
           stmt.run("Public Works Department (PWD)", "Road repairs, potholes, and asphalt infrastructure");
-          stmt.run("Sanitation & Solid Waste Management", "Garbage pickup, trash overflow, and public cleanliness");
+          stmt.run("Sanitation & Waste Management", "Garbage pickup, trash overflow, and public cleanliness");
           stmt.run("Water Supply & Sewerage Board", "Pipeline leakages, drainage overflows, and water supply");
-          stmt.run("Electrical & Lighting Department", "Streetlight repair, electrical poles, and public lighting");
+          stmt.run("Drainage & Sewage Department", "Drainage blockage, sewage overflow, open drains, and culverts");
+          stmt.run("Electrical & Street Lighting", "Streetlight repair, electrical poles, and public lighting");
           stmt.run("Traffic Management Department", "Traffic signal repairs, road signage, and junction issues");
+          stmt.run("Maintenance Department", "General civic facility repairs, building maintenance, and public asset upkeep");
           stmt.finalize();
         }
         resolve();
       });
+
     });
   });
 }

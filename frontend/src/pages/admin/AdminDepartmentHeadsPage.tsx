@@ -23,14 +23,16 @@ import {
 } from 'lucide-react';
 
 
-const SIX_DEPARTMENTS_META = [
+const SEVEN_DEPARTMENTS_META = [
   { id: 'dept-pwd', code: 'PWD', name: 'Public Works Department (PWD)', scope: 'Potholes, road damage, public infrastructure' },
   { id: 'dept-san', code: 'SAN', name: 'Sanitation & Waste Management', scope: 'Garbage, overflowing dustbins, waste' },
   { id: 'dept-wtr', code: 'WTR', name: 'Water Supply & Sewerage Board', scope: 'Water leakage, pipelines, water supply' },
   { id: 'dept-drn', code: 'DRN', name: 'Drainage & Sewage Department', scope: 'Drainage blockage, sewage overflow, open drains' },
   { id: 'dept-ele', code: 'ELE', name: 'Electrical & Street Lighting', scope: 'Streetlights, electrical civic issues' },
-  { id: 'dept-trf', code: 'TRF', name: 'Traffic Management Department', scope: 'Traffic signals, traffic infrastructure, road safety' }
+  { id: 'dept-trf', code: 'TRF', name: 'Traffic Management Department', scope: 'Traffic signals, traffic infrastructure, road safety' },
+  { id: 'dept-mnt', code: 'MNT', name: 'Maintenance Department', scope: 'Building maintenance, civic asset upkeep, general maintenance' }
 ];
+
 
 export const AdminDepartmentHeadsPage: React.FC = () => {
   const { t } = useLanguage();
@@ -198,7 +200,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         (h.deptCode && h.deptCode.toLowerCase() === formDeptId.toLowerCase()) ||
         (h.deptId && h.deptId.toLowerCase() === formDeptId.toLowerCase()) ||
         (h.deptName && h.deptName.toLowerCase().includes(formDeptId.toLowerCase()))
-      ) || SIX_DEPARTMENTS_META.find((d) => d.code === formDeptId || d.id === formDeptId);
+      ) || SEVEN_DEPARTMENTS_META.find((d) => d.code === formDeptId || d.id === formDeptId);
 
       const deptIdToUse = selectedTarget ? ('deptId' in selectedTarget ? selectedTarget.deptId : selectedTarget.id) : formDeptId;
       const deptName = selectedTarget ? ('deptName' in selectedTarget ? selectedTarget.deptName : selectedTarget.name) : 'Department';
@@ -359,11 +361,11 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
             <button
               onClick={() => {
                 setShowAddHeadModal(true);
-                handleDepartmentSelectionChange(SIX_DEPARTMENTS_META[0].code);
+                handleDepartmentSelectionChange(SEVEN_DEPARTMENTS_META[0].code);
                 setFormFullName('');
                 setFormEmail('');
                 setFormPhone('');
-                setFormEmployeeId(`EMP-${SIX_DEPARTMENTS_META[0].code}-001`);
+                setFormEmployeeId(`EMP-${SEVEN_DEPARTMENTS_META[0].code}-001`);
               }}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center space-x-1.5 min-h-[42px]"
             >
@@ -415,8 +417,9 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               onChange={(e) => setDeptFilter(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
             >
-              <option value="All">All 6 Departments</option>
-              {SIX_DEPARTMENTS_META.map((d) => (
+              <option value="All">All 7 Departments</option>
+
+              {SEVEN_DEPARTMENTS_META.map((d) => (
                 <option key={d.code} value={d.code}>{d.name} ({d.code})</option>
               ))}
             </select>
@@ -684,7 +687,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-bold min-h-[44px]"
                   >
                     <option value="">Select Municipal Department...</option>
-                    {SIX_DEPARTMENTS_META.map((d) => (
+                    {SEVEN_DEPARTMENTS_META.map((d) => (
                       <option key={d.code} value={d.code}>{d.name} ({d.code})</option>
                     ))}
                   </select>
@@ -998,7 +1001,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                       onChange={(e) => setFormDeptId(e.target.value)}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500"
                     >
-                      {SIX_DEPARTMENTS_META.map((d) => (
+                      {SEVEN_DEPARTMENTS_META.map((d) => (
                         <option key={d.code} value={d.code}>{d.name}</option>
                       ))}
                     </select>

@@ -50,10 +50,13 @@ async function seedDefaultUsers() {
   }
 }
 
+const seed7DemoDepartmentHeads = require('./scripts/seedDemoDepartmentHeads');
+
 // Start Server after DB Init
 initDatabase()
   .then(async () => {
     await seedDefaultUsers();
+    await seed7DemoDepartmentHeads();
     app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);
@@ -63,3 +66,4 @@ initDatabase()
   .catch((err) => {
     console.error('Failed to initialize database:', err);
   });
+

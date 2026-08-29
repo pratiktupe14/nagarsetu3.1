@@ -172,7 +172,9 @@ export const AdminDepartmentsPage: React.FC = () => {
     if (dName.includes('electric') || dName.includes('light')) return cDept.includes('electric') || cDept.includes('light');
     if (dName.includes('drain')) return cDept.includes('drain');
     if (dName.includes('traffic')) return cDept.includes('traffic');
+    if (dName.includes('maintenance') || dName.includes('mnt')) return cDept.includes('maintenance') || cDept.includes('mnt') || cDept.includes('building') || cDept.includes('civic');
     if (dName.includes('park')) return cDept.includes('park');
+
 
     return cDept.includes(dName) || dName.includes(cDept);
   }, []);

@@ -204,6 +204,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     deptDrainage: "Drainage & Sewerage Department",
     deptElectrical: "Electrical & Public Lighting Department",
     deptTraffic: "Traffic Engineering & Control Department",
+    deptMaintenance: "Maintenance Department",
 
     // Common Actions & Labels
     save: "Save",
@@ -912,6 +913,8 @@ export function translateDepartment(deptName?: string, lang: SupportedLanguage =
   if (normalized.includes('drainage') || normalized.includes('sewerage') || normalized.includes('sewage')) return t('deptDrainage', lang);
   if (normalized.includes('electrical') || normalized.includes('light') || normalized.includes('lighting')) return t('deptElectrical', lang);
   if (normalized.includes('traffic') || normalized.includes('signal')) return t('deptTraffic', lang);
+  if (normalized.includes('maintenance') || normalized.includes('mnt')) return t('deptMaintenance', lang);
   
   return deptName;
 }
+

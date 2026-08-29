@@ -1,0 +1,208 @@
+const bcrypt = require('bcryptjs');
+const { query } = require('../config/db');
+
+const OFFICIAL_DEPARTMENTS = [
+  {
+    code: 'PWD',
+    name: 'Public Works Department (PWD)',
+    searchTerms: ['Public Works', 'PWD', 'Road'],
+    description: 'Asphalt road repairs, pothole filling, sidewalk paving, and structural civic infrastructure maintenance.',
+    headName: 'PWD Department Head',
+    email: 'pwd.head@nagarsetu.gov.in',
+    mobile: '9822000001',
+    employeeId: 'EMP-PWD-001'
+  },
+  {
+    code: 'SAN',
+    name: 'Sanitation & Waste Management',
+    searchTerms: ['Sanitation', 'Solid Waste', 'Waste', 'Garbage'],
+    description: 'Solid waste collection, dumpster clearing, street sweeping, market sanitation, and public hygiene.',
+    headName: 'Sanitation Department Head',
+    email: 'sanitation.head@nagarsetu.gov.in',
+    mobile: '9822000002',
+    employeeId: 'EMP-SAN-001'
+  },
+  {
+    code: 'WTR',
+    name: 'Water Supply & Sewerage Board',
+    searchTerms: ['Water Supply', 'Water Board', 'Water'],
+    description: 'Potable water mains, underground pipeline leakage sealing, valve control, and sewage network maintenance.',
+    headName: 'Water Supply Department Head',
+    email: 'water.head@nagarsetu.gov.in',
+    mobile: '9822000003',
+    employeeId: 'EMP-WTR-001'
+  },
+  {
+    code: 'DRN',
+    name: 'Drainage & Sewage Department',
+    searchTerms: ['Drainage', 'Sewerage', 'Sewage', 'Drain'],
+    description: 'Drainage blockage, sewage overflow, open drains, and culvert maintenance.',
+    headName: 'Drainage Department Head',
+    email: 'drainage.head@nagarsetu.gov.in',
+    mobile: '9822000004',
+    employeeId: 'EMP-DRN-001'
+  },
+  {
+    code: 'ELE',
+    name: 'Electrical & Street Lighting',
+    searchTerms: ['Electrical', 'Lighting', 'Streetlight', 'Electric'],
+    description: 'Streetlight repair, electrical poles, transformer inspection, and public lighting.',
+    headName: 'Electrical Department Head',
+    email: 'electrical.head@nagarsetu.gov.in',
+    mobile: '9822000005',
+    employeeId: 'EMP-ELE-001'
+  },
+  {
+    code: 'TRF',
+    name: 'Traffic Management Department',
+    searchTerms: ['Traffic', 'Signal', 'Junction'],
+    description: 'Traffic signal repairs, road signage, lane markings, and junction safety.',
+    headName: 'Traffic Department Head',
+    email: 'traffic.head@nagarsetu.gov.in',
+    mobile: '9822000006',
+    employeeId: 'EMP-TRF-001'
+  },
+  {
+    code: 'MNT',
+    name: 'Maintenance Department',
+    searchTerms: ['Maintenance', 'Building', 'Civic Asset'],
+    description: 'General civic facility repairs, building maintenance, public park upkeep, and municipal asset management.',
+    headName: 'Maintenance Department Head',
+    email: 'maintenance.head@nagarsetu.gov.in',
+    mobile: '9822000007',
+    employeeId: 'EMP-MNT-001'
+  }
+];
+
+const DEMO_PASSWORD = 'nagarsetu@123';
+const OFFICIAL_EMAILS = OFFICIAL_DEPARTMENTS.map((d) => d.email.toLowerCase());
+
+async function seed7DemoDepartmentHeads() {
+  console.log('=======================================================');
+  console.log('  Synchronizing 7 Active Department Heads for NAGARSETU ');
+  console.log('=======================================================');
+
+  try {
+    // 1. Ensure all 7 official departments exist in DB
+    const deptIdMap = {};
+
+    for (const dMeta of OFFICIAL_DEPARTMENTS) {
+      let deptId = null;
+
+      // Try finding by exact name or wildcard search terms
+      for (const term of dMeta.searchTerms) {
+        const findRes = await query(
+          `SELECT id, name FROM departments WHERE name LIKE ? OR description LIKE ? LIMIT 1`,
+          [`%${term}%`, `%${term}%`]
+        );
+        if (findRes.rows && findRes.rows.length > 0) {
+          deptId = findRes.rows[0].id;
+          break;
+        }
+      }
+
+      // If not found, insert department
+      if (!deptId) {
+        const insRes = await query(
+          `INSERT INTO departments (name, description) VALUES (?, ?)`,
+          [dMeta.name, dMeta.description]
+        );
+        deptId = insRes.rows[0].id;
+        console.log(`Created department: '${dMeta.name}' (ID: ${deptId})`);
+      }
+
+      deptIdMap[dMeta.code] = deptId;
+    }
+
+    // 2. Unassign/Deactivate legacy active Department Heads not in OFFICIAL_EMAILS
+    const legacyHeadsRes = await query(`SELECT * FROM department_heads WHERE status = 'active'`);
+    if (legacyHeadsRes.rows && legacyHeadsRes.rows.length > 0) {
+      for (const legHead of legacyHeadsRes.rows) {
+        const legEmail = (legHead.email || '').toLowerCase();
+        if (!OFFICIAL_EMAILS.includes(legEmail)) {
+          // Deactivate department_heads row
+          await query(
+            `UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [legHead.id]
+          );
+          // Detach role and department from user table
+          if (legHead.user_id) {
+            await query(
+              `UPDATE users SET role = 'citizen', department_id = NULL WHERE id = ? AND role = 'department_head'`,
+              [legHead.user_id]
+            );
+          } else if (legEmail) {
+            await query(
+              `UPDATE users SET role = 'citizen', department_id = NULL WHERE LOWER(email) = ? AND role = 'department_head'`,
+              [legEmail]
+            );
+          }
+          console.log(`Unassigned legacy Department Head: '${legHead.name}' (${legEmail})`);
+        }
+      }
+    }
+
+    // 3. Create or Update the 7 official active Department Heads idempotently
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(DEMO_PASSWORD, salt);
+
+    for (const dMeta of OFFICIAL_DEPARTMENTS) {
+      const cleanEmail = dMeta.email.toLowerCase();
+      const targetDeptId = deptIdMap[dMeta.code];
+
+      // Check users table
+      const userCheck = await query(`SELECT id, email FROM users WHERE LOWER(email) = ? OR mobile = ?`, [cleanEmail, dMeta.mobile]);
+      let userId = null;
+
+      if (userCheck.rows && userCheck.rows.length > 0) {
+        userId = userCheck.rows[0].id;
+        await query(
+          `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = 'department_head', department_id = ?, employee_id = ?, status = 'active' WHERE id = ?`,
+          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId, userId]
+        );
+      } else {
+        const insUser = await query(
+          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, 'active')`,
+          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId]
+        );
+        userId = insUser.rows[0].id;
+      }
+
+      // Deactivate any other heads for this department
+      await query(
+        `UPDATE department_heads SET status = 'inactive' WHERE department_id = ? AND (user_id != ? AND LOWER(email) != ?)`,
+        [targetDeptId, userId, cleanEmail]
+      );
+
+      // Upsert department_heads record
+      const dhCheck = await query(
+        `SELECT id FROM department_heads WHERE user_id = ? OR LOWER(email) = ?`,
+        [userId, cleanEmail]
+      );
+
+      if (dhCheck.rows && dhCheck.rows.length > 0) {
+        await query(
+          `UPDATE department_heads SET user_id = ?, department_id = ?, name = ?, email = ?, phone = ?, employee_id = ?, designation = 'Department Head', status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [userId, targetDeptId, dMeta.headName, cleanEmail, `+91 ${dMeta.mobile}`, dMeta.employeeId, dhCheck.rows[0].id]
+        );
+      } else {
+        await query(
+          `INSERT INTO department_heads (user_id, department_id, name, email, phone, employee_id, designation, status) VALUES (?, ?, ?, ?, ?, ?, 'Department Head', 'active')`,
+          [userId, targetDeptId, dMeta.headName, cleanEmail, `+91 ${dMeta.mobile}`, dMeta.employeeId]
+        );
+      }
+
+      console.log(`✓ Active Head set for ${dMeta.code} (${dMeta.name}) -> ${dMeta.email}`);
+    }
+
+    console.log('=======================================================');
+    console.log('  All 7 Active Department Heads Successfully Seeded!  ');
+    console.log('=======================================================');
+    return true;
+  } catch (err) {
+    console.error('Error seeding 7 demo department heads:', err);
+    return false;
+  }
+}
+
+module.exports = seed7DemoDepartmentHeads;

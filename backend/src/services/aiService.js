@@ -4,15 +4,17 @@ const https = require('https');
 const crypto = require('crypto');
 
 const VALID_TAXONOMY = {
-  'Road Damage / Pothole': 'Roads & Public Works Department (PWD)',
+  'Road Damage / Pothole': 'Public Works Department (PWD)',
   'Water Leakage / Pipeline': 'Water Supply & Sewerage Board',
-  'Garbage / Waste': 'Sanitation & Solid Waste Management',
-  'Drainage / Sewage': 'Drainage & Sewerage Department',
-  'Streetlight / Electrical': 'Electrical & Public Lighting Department',
-  'Traffic Infrastructure': 'Traffic Engineering & Control Department',
-  'Public Infrastructure Damage': 'Roads & Public Works Department (PWD)',
-  'Other Civic Issue': 'Roads & Public Works Department (PWD)'
+  'Garbage / Waste': 'Sanitation & Waste Management',
+  'Drainage / Sewage': 'Drainage & Sewage Department',
+  'Streetlight / Electrical': 'Electrical & Street Lighting',
+  'Traffic Infrastructure': 'Traffic Management Department',
+  'Public Infrastructure Damage': 'Maintenance Department',
+  'Other Civic Issue': 'Maintenance Department',
+  'Building Maintenance': 'Maintenance Department'
 };
+
 
 const SYSTEM_PROMPT = `You are NAGARSETU 3.0's civic issue vision analyzer.
 
