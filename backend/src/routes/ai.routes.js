@@ -11,7 +11,7 @@ console.log(`[NAGARSETU AI] Gemini API configured: ${Boolean(GEMINI_API_KEY)}`);
 /**
  * Real Gemini Health Check Endpoint
  * GET /api/ai/health
- * Verifies API key, client initialization, reachability, and model gemini-3.6-flash
+ * Verifies API key, client initialization, reachability, and model gemini-2.5-flash
  */
 router.get('/health', async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
@@ -123,7 +123,7 @@ router.get('/health', async (req, res) => {
 /**
  * Direct Image Vision Analysis Endpoint
  * POST /api/ai/analyze
- * Accepts uploaded photo file and returns Gemini 3.6 Flash structured classification
+ * Accepts uploaded photo file and returns Gemini 2.5 Flash structured classification
  */
 router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {
   const reqTime = new Date().toISOString();

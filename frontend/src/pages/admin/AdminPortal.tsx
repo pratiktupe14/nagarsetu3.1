@@ -175,7 +175,7 @@ export const AdminPortal: React.FC = () => {
   const currentDepartmentStaffRoster = getDepartmentStaffRoster(editDepartment);
 
   return (
-    <DashboardLayout title="City Administration Command Center">
+    <DashboardLayout title={t('adminCommandCenter')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
         
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -183,19 +183,19 @@ export const AdminPortal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Central Municipal Command Center</span>
+                <span>{t('centralCommandCenter')}</span>
               </span>
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <BarChart3 className="w-3 h-3 text-emerald-600" />
-                <span>Realtime Analytics Engine</span>
+                <span>{t('realtimeAnalyticsEngine')}</span>
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              City Operations & Triage Headquarters
+              {t('cityOperationsTriage')}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
-              End-to-end municipal triage: Verification ➔ AI Routing ➔ Staff Dispatch ➔ Resolution Verification.
+              {t('endToEndTriageSubtitle')}
             </p>
           </div>
 
@@ -205,7 +205,7 @@ export const AdminPortal: React.FC = () => {
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center space-x-1.5 transition-all min-h-[44px]"
             >
               <Download className="w-4 h-4" />
-              <span>Export Municipal CSV Report</span>
+              <span>{t('exportCSVReport')}</span>
             </button>
           </div>
         </div>
@@ -214,47 +214,47 @@ export const AdminPortal: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2 text-center">
           
           <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-gray-500 block">Total</span>
+            <span className="text-[9px] uppercase font-bold text-gray-500 block">{t('total')}</span>
             <div className="text-xl font-extrabold text-gray-900 font-mono">{kpiStats.total}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-blue-700 block">New</span>
+            <span className="text-[9px] uppercase font-bold text-blue-700 block">{t('newComplaints')}</span>
             <div className="text-xl font-extrabold text-blue-700 font-mono">{kpiStats.newCount}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-sky-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-sky-700 block">Pending Ver.</span>
+            <span className="text-[9px] uppercase font-bold text-sky-700 block">{t('pendingVerification')}</span>
             <div className="text-xl font-extrabold text-sky-700 font-mono">{kpiStats.pendingVerification}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-indigo-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-indigo-700 block">Approved</span>
+            <span className="text-[9px] uppercase font-bold text-indigo-700 block">{t('approved')}</span>
             <div className="text-xl font-extrabold text-indigo-700 font-mono">{kpiStats.approved}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-amber-800 block">In Progress</span>
+            <span className="text-[9px] uppercase font-bold text-amber-800 block">{t('inProgress')}</span>
             <div className="text-xl font-extrabold text-amber-800 font-mono">{kpiStats.inProgress}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-purple-200 shadow-xs space-y-0.5 relative">
-            <span className="text-[9px] uppercase font-bold text-purple-800 block">Reviews</span>
+            <span className="text-[9px] uppercase font-bold text-purple-800 block">{t('resolutionReviews')}</span>
             <div className="text-xl font-extrabold text-purple-800 font-mono">{resolutionReviewsList.length}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-emerald-800 block">Resolved</span>
+            <span className="text-[9px] uppercase font-bold text-emerald-800 block">{t('resolved')}</span>
             <div className="text-xl font-extrabold text-emerald-800 font-mono">{kpiStats.resolved}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-orange-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-orange-800 block">Reopened</span>
+            <span className="text-[9px] uppercase font-bold text-orange-800 block">{t('reopened')}</span>
             <div className="text-xl font-extrabold text-orange-800 font-mono">{kpiStats.reopened}</div>
           </div>
 
           <div className="bg-white p-3 rounded-xl border border-rose-200 shadow-xs space-y-0.5">
-            <span className="text-[9px] uppercase font-bold text-rose-800 block">Critical</span>
+            <span className="text-[9px] uppercase font-bold text-rose-800 block">{t('priorityCritical')}</span>
             <div className="text-xl font-extrabold text-rose-800 font-mono">{kpiStats.critical}</div>
           </div>
 
@@ -271,7 +271,7 @@ export const AdminPortal: React.FC = () => {
             }`}
           >
             <ListFilter className="w-4 h-4" />
-            <span>Incoming Triage Queue</span>
+            <span>{t('incomingTriageQueue')}</span>
           </button>
 
           <button
@@ -283,7 +283,7 @@ export const AdminPortal: React.FC = () => {
             }`}
           >
             <CheckSquare className="w-4 h-4" />
-            <span>Resolution Reviews</span>
+            <span>{t('resolutionReviews')}</span>
             {resolutionReviewsList.length > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold animate-pulse">
                 {resolutionReviewsList.length}
@@ -300,7 +300,7 @@ export const AdminPortal: React.FC = () => {
             }`}
           >
             <Map className="w-4 h-4" />
-            <span>Map Command Center</span>
+            <span>{t('mapCommandCenter')}</span>
           </button>
 
           <button
@@ -312,7 +312,7 @@ export const AdminPortal: React.FC = () => {
             }`}
           >
             <BarChart3 className="w-4 h-4" />
-            <span>Smart Analytics & Insights</span>
+            <span>{t('smartAnalyticsInsights')}</span>
           </button>
         </div>
 
@@ -321,14 +321,14 @@ export const AdminPortal: React.FC = () => {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden space-y-4 p-6">
             
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
-              <h3 className="text-base font-extrabold text-gray-900 font-outfit">Incoming Complaint Management Log</h3>
+              <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('incomingManagementLog')}</h3>
 
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    placeholder="Search ID, Title, Location..."
+                    placeholder={t('searchPlaceholderAdmin')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-medium"
@@ -340,12 +340,12 @@ export const AdminPortal: React.FC = () => {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
                 >
-                  <option value="All">All Statuses</option>
-                  <option value="Submitted">Submitted</option>
-                  <option value="Verified">Verified</option>
-                  <option value="Approved">Approved</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved</option>
+                  <option value="All">{t('allStatuses')}</option>
+                  <option value="Submitted">{translateStatus('Submitted')}</option>
+                  <option value="Verified">{translateStatus('Verified')}</option>
+                  <option value="Approved">{translateStatus('Approved')}</option>
+                  <option value="In Progress">{translateStatus('In Progress')}</option>
+                  <option value="Resolved">{translateStatus('Resolved')}</option>
                 </select>
 
                 <select
@@ -353,11 +353,11 @@ export const AdminPortal: React.FC = () => {
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
                 >
-                  <option value="All">All Priorities</option>
-                  <option value="Critical">Critical Only</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
+                  <option value="All">{t('allPriorities')}</option>
+                  <option value="Critical">{t('criticalOnly')}</option>
+                  <option value="High">{translatePriority('High')}</option>
+                  <option value="Medium">{translatePriority('Medium')}</option>
+                  <option value="Low">{translatePriority('Low')}</option>
                 </select>
               </div>
             </div>
@@ -366,21 +366,21 @@ export const AdminPortal: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-gray-50 text-gray-700 font-extrabold border-b border-gray-200 uppercase tracking-wider font-outfit">
-                    <th className="p-3.5">Complaint ID</th>
-                    <th className="p-3.5">Issue & Category</th>
-                    <th className="p-3.5">Location</th>
-                    <th className="p-3.5">Priority</th>
-                    <th className="p-3.5">Department</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">SLA Time</th>
-                    <th className="p-3.5">Action</th>
+                    <th className="p-3.5">{t('complaintId')}</th>
+                    <th className="p-3.5">{t('issueAndCategory')}</th>
+                    <th className="p-3.5">{t('location')}</th>
+                    <th className="p-3.5">{t('priority')}</th>
+                    <th className="p-3.5">{t('department')}</th>
+                    <th className="p-3.5">{t('status')}</th>
+                    <th className="p-3.5">{t('slaTime')}</th>
+                    <th className="p-3.5">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {filteredComplaints.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-gray-400">
-                        No complaints match current filters.
+                        {t('noComplaintsMatchFilters')}
                       </td>
                     </tr>
                   ) : (
@@ -392,11 +392,11 @@ export const AdminPortal: React.FC = () => {
                           <td className="p-3.5 font-mono font-bold text-emerald-700">{c.complaint_number}</td>
                           <td className="p-3.5">
                             <span className="font-bold text-gray-900 block">{c.title}</span>
-                            <span className="text-[11px] text-gray-500">{c.category}</span>
+                            <span className="text-[11px] text-gray-500">{translateCategory(c.category)}</span>
                           </td>
                           <td className="p-3.5 text-gray-700 font-mono text-[11px]">{c.location_address || 'City Center'}</td>
                           <td className="p-3.5"><PriorityBadge priority={c.priority} /></td>
-                          <td className="p-3.5 text-gray-700">{c.department_name || 'PWD'}</td>
+                          <td className="p-3.5 text-gray-700">{translateDepartment(c.department_name)}</td>
                           <td className="p-3.5"><StatusBadge status={c.status} /></td>
                           <td className="p-3.5 font-mono">
                             <span className={slaInfo.isOverdue ? 'text-rose-700 font-bold' : 'text-gray-600'}>
@@ -409,7 +409,7 @@ export const AdminPortal: React.FC = () => {
                               className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-[11px] border border-emerald-300 flex items-center space-x-1 min-h-[44px]"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              <span>Verify & Triage</span>
+                              <span>{t('verifyAndTriage')}</span>
                             </button>
                           </td>
                         </tr>
@@ -427,15 +427,15 @@ export const AdminPortal: React.FC = () => {
         {activeTab === 'Resolution Reviews' && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
             <div className="border-b border-gray-100 pb-4">
-              <h3 className="text-base font-extrabold text-gray-900 font-outfit">Staff Resolution Proof Review Queue</h3>
-              <p className="text-xs text-gray-500 mt-1">Review side-by-side Before/After photos and field notes before marking complaints officially resolved.</p>
+              <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('staffResolutionReviewQueue')}</h3>
+              <p className="text-xs text-gray-500 mt-1">{t('staffResolutionReviewSubtitle')}</p>
             </div>
 
             {resolutionReviewsList.length === 0 ? (
               <div className="text-center py-12 space-y-3">
                 <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                <h3 className="text-base font-bold text-gray-900 font-outfit">No Pending Resolution Reviews</h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">All staff resolution submissions have been reviewed and verified.</p>
+                <h3 className="text-base font-bold text-gray-900 font-outfit">{t('noPendingResolutionReviews')}</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">{t('allResolutionsVerified')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -450,7 +450,7 @@ export const AdminPortal: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report)</span>
+                        <span className="font-bold text-gray-700 block mb-1">{t('beforeCitizenReport')}</span>
                         <img
                           src={getValidImageUrl(c.photo_before_url)}
                           alt="Before"
@@ -459,7 +459,7 @@ export const AdminPortal: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <span className="font-bold text-emerald-800 block mb-1">AFTER (Staff Proof)</span>
+                        <span className="font-bold text-emerald-800 block mb-1">{t('afterStaffProof')}</span>
                         <img
                           src={getValidImageUrl(c.photo_after_url)}
                           alt="After Proof"
@@ -470,8 +470,8 @@ export const AdminPortal: React.FC = () => {
                     </div>
 
                     <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs space-y-1">
-                      <p className="text-gray-800 font-medium"><strong>Work Performed:</strong> {c.work_performed || 'Patched asphalt depression'}</p>
-                      {c.materials_used && <p className="text-gray-600"><strong>Materials Used:</strong> {c.materials_used}</p>}
+                      <p className="text-gray-800 font-medium"><strong>{t('workPerformed')}:</strong> {c.work_performed || 'Patched asphalt depression'}</p>
+                      {c.materials_used && <p className="text-gray-600"><strong>{t('materialsUsed')}:</strong> {c.materials_used}</p>}
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-gray-100">
@@ -479,14 +479,14 @@ export const AdminPortal: React.FC = () => {
                         onClick={() => { setSelectedComplaint(c); setShowRejectModal(true); }}
                         className="px-4 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-300 font-bold text-xs min-h-[44px]"
                       >
-                        Reject
+                        {t('reject')}
                       </button>
 
                       <button
                         onClick={() => handleApproveResolution(c.id)}
                         className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px]"
                       >
-                        Approve Resolution
+                        {t('approveResolution')}
                       </button>
                     </div>
                   </div>
@@ -511,44 +511,44 @@ export const AdminPortal: React.FC = () => {
             {/* 6 TOP ANALYTICS KPI CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Resolution Rate</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-800 block">{t('resolvedRate')}</span>
                 <div className="text-2xl font-extrabold text-emerald-800 font-mono">{analyticsSummary.resolutionRatePercentage}%</div>
-                <span className="text-[9px] text-gray-400 block">Official Proof Verified</span>
+                <span className="text-[9px] text-gray-400 block">{t('officialProofVerified')}</span>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-blue-700 block">Avg Response Time</span>
+                <span className="text-[10px] uppercase font-bold text-blue-700 block">{t('avgResponseTime')}</span>
                 <div className="text-2xl font-extrabold text-blue-700 font-mono">{analyticsSummary.avgResponseHours}h</div>
-                <span className="text-[9px] text-gray-400 block">Triage & Verification</span>
+                <span className="text-[9px] text-gray-400 block">{t('triageAndVerification')}</span>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-indigo-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-indigo-700 block">Avg Resolution Time</span>
+                <span className="text-[10px] uppercase font-bold text-indigo-700 block">{t('avgResolutionTime')}</span>
                 <div className="text-2xl font-extrabold text-indigo-700 font-mono">{analyticsSummary.avgResolutionHours}h</div>
-                <span className="text-[9px] text-gray-400 block">Site Work Duration</span>
+                <span className="text-[9px] text-gray-400 block">{t('siteWorkDuration')}</span>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-rose-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-rose-800 block">Overdue Rate</span>
+                <span className="text-[10px] uppercase font-bold text-rose-800 block">{t('overdueRate')}</span>
                 <div className="text-2xl font-extrabold text-rose-800 font-mono">{analyticsSummary.overdueRatePercentage}%</div>
-                <span className="text-[9px] text-gray-400 block">Exceeded SLA Deadline</span>
+                <span className="text-[9px] text-gray-400 block">{t('exceededSlaDeadline')}</span>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-orange-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-orange-800 block">Reopened Rate</span>
+                <span className="text-[10px] uppercase font-bold text-orange-800 block">{t('reopenedRate')}</span>
                 <div className="text-2xl font-extrabold text-orange-800 font-mono">{analyticsSummary.reopenedRatePercentage}%</div>
-                <span className="text-[9px] text-gray-400 block">Citizen Re-inspections</span>
+                <span className="text-[9px] text-gray-400 block">{t('citizenReinspections')}</span>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm text-center space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-600 block">Report Export</span>
+                <span className="text-[10px] uppercase font-bold text-gray-600 block">{t('reportExport')}</span>
                 <button
                   onClick={() => exportComplaintsToCSV(complaints)}
                   className="w-full py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors min-h-[44px]"
                 >
-                  Download CSV
+                  {t('downloadCSV')}
                 </button>
-                <span className="text-[9px] text-gray-400 block">Municipal CSV Format</span>
+                <span className="text-[9px] text-gray-400 block">{t('municipalCSVFormat')}</span>
               </div>
             </div>
 
@@ -559,8 +559,8 @@ export const AdminPortal: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="space-y-0.5">
-                  <h3 className="text-base font-extrabold text-gray-900 font-outfit">Municipal Department Performance Matrix</h3>
-                  <p className="text-xs text-gray-500">Real-time performance comparison across municipal service boards.</p>
+                  <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('deptPerformanceMatrix')}</h3>
+                  <p className="text-xs text-gray-500">{t('deptPerformanceSubtitle')}</p>
                 </div>
               </div>
 
@@ -568,17 +568,17 @@ export const AdminPortal: React.FC = () => {
                 <table className="w-full text-left text-xs font-sans">
                   <thead>
                     <tr className="bg-gray-50 text-gray-700 font-extrabold border-b border-gray-200 uppercase tracking-wider font-outfit">
-                      <th className="p-3.5">Department Name</th>
-                      <th className="p-3.5 text-center">Total Complaints</th>
-                      <th className="p-3.5 text-center">Resolved</th>
-                      <th className="p-3.5 text-center">Pending Active</th>
-                      <th className="p-3.5 text-center">Avg Resolution Time</th>
+                      <th className="p-3.5">{t('department')}</th>
+                      <th className="p-3.5 text-center">{t('totalComplaints')}</th>
+                      <th className="p-3.5 text-center">{t('resolved')}</th>
+                      <th className="p-3.5 text-center">{t('pendingActive')}</th>
+                      <th className="p-3.5 text-center">{t('avgResolutionTime')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {deptPerformance.map((dept) => (
                       <tr key={dept.departmentName} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-3.5 font-bold text-gray-900">{dept.departmentName}</td>
+                        <td className="p-3.5 font-bold text-gray-900">{translateDepartment(dept.departmentName)}</td>
                         <td className="p-3.5 text-center font-mono font-bold text-gray-800">{dept.totalComplaints}</td>
                         <td className="p-3.5 text-center font-mono font-bold text-emerald-700">{dept.resolvedCount}</td>
                         <td className="p-3.5 text-center font-mono font-bold text-amber-700">{dept.pendingCount}</td>
@@ -594,8 +594,8 @@ export const AdminPortal: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="space-y-0.5">
-                  <h3 className="text-base font-extrabold text-gray-900 font-outfit">Authorized Field Officer Performance Roster</h3>
-                  <p className="text-xs text-gray-500">Track field officer task completion rates, SLA compliance, and workload.</p>
+                  <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('staffPerformanceRoster')}</h3>
+                  <p className="text-xs text-gray-500">{t('staffPerformanceSubtitle')}</p>
                 </div>
               </div>
 
@@ -603,11 +603,11 @@ export const AdminPortal: React.FC = () => {
                 <table className="w-full text-left text-xs font-sans">
                   <thead>
                     <tr className="bg-gray-50 text-gray-700 font-extrabold border-b border-gray-200 uppercase tracking-wider font-outfit">
-                      <th className="p-3.5">Employee Name & ID</th>
-                      <th className="p-3.5 text-center">Tasks Completed</th>
-                      <th className="p-3.5 text-center">Pending Active Tasks</th>
-                      <th className="p-3.5 text-center">Overdue Tasks</th>
-                      <th className="p-3.5 text-center">Avg Completion Hours</th>
+                      <th className="p-3.5">{t('employeeNameAndId')}</th>
+                      <th className="p-3.5 text-center">{t('tasksCompleted')}</th>
+                      <th className="p-3.5 text-center">{t('pendingActiveTasks')}</th>
+                      <th className="p-3.5 text-center">{t('overdueTasks')}</th>
+                      <th className="p-3.5 text-center">{t('avgCompletionHours')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
@@ -659,7 +659,7 @@ export const AdminPortal: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
               <div>
-                <span className="font-bold text-gray-700 block mb-1">Citizen Photo Evidence</span>
+                <span className="font-bold text-gray-700 block mb-1">{t('citizenPhotoEvidence')}</span>
                 <img
                   src={selectedComplaint.photo_before_url}
                   alt="Defect"
@@ -672,30 +672,30 @@ export const AdminPortal: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-1.5 font-bold">
                       <Sparkles className="w-4 h-4 text-amber-600" />
-                      <span>AI Vision Defect Classification</span>
+                      <span>{t('aiVisionClassification')}</span>
                     </div>
                     <span className="font-mono font-bold text-[10px] bg-white px-2 py-0.5 rounded border border-amber-300">
                       [DEMO AI ENGINE]
                     </span>
                   </div>
-                  <p className="font-semibold text-gray-900">Detected Category: {selectedComplaint.category} (94% Confidence)</p>
-                  <p className="text-[11px] text-amber-800">Recommended Priority: {selectedComplaint.priority}</p>
+                  <p className="font-semibold text-gray-900">{t('aiDetectedCategory')} {translateCategory(selectedComplaint.category)} (94% Confidence)</p>
+                  <p className="text-[11px] text-amber-800">{t('recommendedPriority')}: {translatePriority(selectedComplaint.priority)}</p>
                 </div>
 
                 <div>
-                  <span className="font-bold text-gray-700 block mb-1">Description</span>
+                  <span className="font-bold text-gray-700 block mb-1">{t('description')}</span>
                   <p className="text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-200 leading-relaxed">{selectedComplaint.description}</p>
                 </div>
 
                 <div>
-                  <span className="font-bold text-gray-700 block">Location Coordinates</span>
+                  <span className="font-bold text-gray-700 block">{t('locationCoordinates')}</span>
                   <span className="font-mono text-gray-600">{Number(selectedComplaint.latitude).toFixed(4)}, {Number(selectedComplaint.longitude).toFixed(4)} ({selectedComplaint.location_source})</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider font-outfit">Site Map Pin</span>
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider font-outfit">{t('siteMapPin')}</span>
               <LocationMapPicker
                 initialLat={Number(selectedComplaint.latitude)}
                 initialLng={Number(selectedComplaint.longitude)}
@@ -705,36 +705,36 @@ export const AdminPortal: React.FC = () => {
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-gray-900 font-outfit">City Administration Verification & Overrides</span>
+                <span className="font-bold text-gray-900 font-outfit">{t('adminVerificationOverrides')}</span>
                 <span className="font-mono text-emerald-700 font-bold bg-white px-2 py-0.5 rounded border border-gray-200">
-                  Target Dept: {editDepartment}
+                  {t('targetDept')}: {translateDepartment(editDepartment)}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Override Priority Level</label>
+                  <label className="block font-bold text-gray-700 mb-1">{t('overridePriorityLevel')}</label>
                   <select
                     value={editPriority}
                     onChange={(e) => setEditPriority(e.target.value as PriorityLevel)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
                   >
-                    <option value="Low">Low Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="High">High Priority</option>
-                    <option value="Critical">Critical Priority</option>
+                    <option value="Low">{translatePriority('Low')}</option>
+                    <option value="Medium">{translatePriority('Medium')}</option>
+                    <option value="High">{translatePriority('High')}</option>
+                    <option value="Critical">{translatePriority('Critical')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Override Department</label>
+                  <label className="block font-bold text-gray-700 mb-1">{t('overrideDepartment')}</label>
                   <select
                     value={editDepartment}
                     onChange={(e) => handleChangeDepartment(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
                   >
                     {DEPARTMENT_OPTIONS.map((dept) => (
-                      <option key={dept} value={dept}>{dept}</option>
+                      <option key={dept} value={dept}>{translateDepartment(dept)}</option>
                     ))}
                   </select>
                 </div>
@@ -746,16 +746,16 @@ export const AdminPortal: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase shadow-sm flex items-center justify-center space-x-1"
               >
                 <Check className="w-4 h-4" />
-                <span>Approve Verification & Department Routing</span>
+                <span>{t('approveVerificationRouting')}</span>
               </button>
             </div>
 
             <div className="space-y-3 pt-2 text-xs">
-              <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Assign Department Field Staff Member</h4>
+              <h4 className="font-extrabold text-gray-900 font-outfit text-sm">{t('assignFieldStaffMember')}</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Department Staff Roster</label>
+                  <label className="block font-bold text-gray-700 mb-1">{t('departmentStaffRoster')}</label>
                   <select
                     value={selectedStaffId}
                     onChange={(e) => setSelectedStaffId(e.target.value)}
@@ -770,7 +770,7 @@ export const AdminPortal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">SLA Resolution Hours</label>
+                  <label className="block font-bold text-gray-700 mb-1">{t('slaResolutionHours')}</label>
                   <select
                     value={slaHours}
                     onChange={(e) => setSlaHours(Number(e.target.value))}
@@ -791,7 +791,7 @@ export const AdminPortal: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-1.5 min-h-[44px]"
               >
                 <UserCheck className="w-4 h-4" />
-                <span>Assign Staff Member & Set SLA</span>
+                <span>{t('assignStaffAndSetSLA')}</span>
               </button>
             </div>
 
@@ -807,18 +807,18 @@ export const AdminPortal: React.FC = () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
           <form onSubmit={handleRejectResolution} className="max-w-md w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-base font-extrabold text-gray-900 font-outfit">Reject Resolution #{selectedComplaint.complaint_number}</h3>
+              <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('rejectResolution')} #{selectedComplaint.complaint_number}</h3>
               <button type="button" onClick={() => setShowRejectModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
             <div className="space-y-2 text-xs">
-              <label className="block font-bold text-gray-700">Rejection Reason for Field Staff</label>
+              <label className="block font-bold text-gray-700">{t('rejectionReasonForStaff')}</label>
               <textarea
                 required
                 rows={3}
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Explain why repair proof is incomplete..."
+                placeholder={t('rejectionReasonPlaceholder')}
                 className="w-full bg-white border border-gray-300 rounded-xl p-3 text-xs text-gray-900 focus:border-orange-600"
               />
             </div>
@@ -827,7 +827,7 @@ export const AdminPortal: React.FC = () => {
               type="submit"
               className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px]"
             >
-              Confirm Rejection & Reopen Complaint
+              {t('confirmRejectionReopen')}
             </button>
           </form>
         </div>
