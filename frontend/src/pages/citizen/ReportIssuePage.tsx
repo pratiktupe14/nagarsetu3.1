@@ -63,7 +63,7 @@ export const ReportIssuePage: React.FC = () => {
   const [lat, setLat] = useState<number>(20.0059);
   const [lng, setLng] = useState<number>(73.7898);
   const [locationAccuracy, setLocationAccuracy] = useState<number | undefined>(15);
-  const [locationSource, setLocationSource] = useState<'live_gps' | 'exif' | 'manual_pin'>('manual_pin');
+  const [locationSource, setLocationSource] = useState<'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps'>('manual_pin');
   const [locationStatusText, setLocationStatusText] = useState<string>('Select defect location on Leaflet map pin');
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [detectingLocation, setDetectingLocation] = useState<boolean>(false);
@@ -89,9 +89,9 @@ export const ReportIssuePage: React.FC = () => {
       if (gps && gps.latitude && gps.longitude) {
         setLat(gps.latitude);
         setLng(gps.longitude);
-        setLocationAccuracy(gps.accuracy ? Math.round(gps.accuracy) : 10);
+        setLocationAccuracy(gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10);
         setLocationSource('live_gps');
-        setLocationStatusText(`Verified Live GPS Location (±${gps.accuracy ? Math.round(gps.accuracy) : 10}m accuracy)`);
+        setLocationStatusText(`Verified Live GPS Location (±${gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10}m accuracy)`);
         runDuplicateCheck(gps.latitude, gps.longitude);
 
         const addr = await reverseGeocodeCoordinates(gps.latitude, gps.longitude);
@@ -136,11 +136,11 @@ export const ReportIssuePage: React.FC = () => {
       if (resolvedLoc.latitude && resolvedLoc.longitude) {
         setLat(resolvedLoc.latitude);
         setLng(resolvedLoc.longitude);
-        setLocationSource(resolvedLoc.location_source);
+        setLocationSource(resolvedLoc.source);
         setLocationStatusText(
-          resolvedLoc.location_source === 'live_gps'
+          resolvedLoc.source === 'live_gps'
             ? '✓ Verified Live GPS Device Location'
-            : resolvedLoc.location_source === 'exif'
+            : resolvedLoc.source === 'exif_gps'
             ? '📷 Location Extracted from Photo EXIF Metadata'
             : '📍 Location Pin Set Manually'
         );

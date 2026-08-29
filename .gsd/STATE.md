@@ -10,4 +10,5 @@ COMPLETE — Full Project Audit, Comprehensive i18n Wiring, Environment Alignmen
 - **Language Wiring (`en`, `hi`, `mr`)**: PASS (All portals — Admin, Citizen Report Issue, Department Head — fully wired with natural civic translations in English, Hindi, and Marathi).
 - **Environment Alignment (`frontend/.env.example`)**: PASS (Cleaned up drift vs root `.env.example`, placeholder format `https://your-supabase-project.supabase.co`).
 - **Dynamic Content Translators**: PASS (Dynamic status, priority, category, and department translation functions active across all portals).
+- **Image Upload Visibility Fix**: PASS (Primary and additional angle photo files converted/uploaded to permanent public URLs or Data URIs before database insertion; temporary `blob:` URLs removed; wrapped image elements in `getValidImageUrl` across all portals).
 - **End-to-End User Workflows**: PASS 100%.

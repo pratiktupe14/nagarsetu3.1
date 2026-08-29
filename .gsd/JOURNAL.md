@@ -26,3 +26,8 @@
 - **Task 2-4: i18n Wiring (`AdminPortal.tsx`, `ReportIssuePage.tsx`, `DepartmentHeadPortal.tsx`)**: Added ~70 new translation keys across English, Hindi, and Marathi blocks in `i18n.ts`. Wired `t()` calls and dynamic translators across Admin Portal, Report Issue Page, and Department Head Portal.
 - **Task 5: Env Drift Fix (`frontend/.env.example`)**: Updated `frontend/.env.example` to remove hardcoded Supabase project URL and align with root `.env.example`.
 - **Task 6: Build Verification**: Ran `tsc && vite build` in `frontend/`, verifying 0 TypeScript errors and clean production bundle compilation.
+
+## Entry 4: Image Upload Visibility Fix Across All Portals
+- **Issue**: Images uploaded when filing complaints in Citizen Portal were not visible in Admin, Department Head, Staff, or Citizen portals.
+- **Root Cause**: `ReportIssuePage.tsx` passed `photoPreviewUrl` (`blob:http://localhost:3000/...`) into complaint creation without converting/uploading the file. Temporary `blob:` URLs exist only in local browser memory for that specific tab session.
+- **Fix**: Updated `ReportIssuePage.tsx` to process primary and additional photo files using `uploadComplaintImage()`, generating permanent public storage URLs or Data URIs before database insertion. Updated backend `/api/ai/analyze` route to return `photo_url`. Wrapped all remaining portal `<img src="..." />` tags in `getValidImageUrl()`. Built and verified `tsc && vite build` with 0 errors.

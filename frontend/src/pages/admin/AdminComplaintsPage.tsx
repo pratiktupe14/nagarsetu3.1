@@ -809,7 +809,7 @@ export const AdminComplaintsPage: React.FC = () => {
             >
               ✕
             </button>
-            <img src={selectedComplaint.photo_before_url} alt="Fullscreen Evidence" className="w-full max-h-[85vh] object-contain rounded-2xl" />
+            <img src={getValidImageUrl(selectedComplaint.photo_before_url)} alt="Fullscreen Evidence" className="w-full max-h-[85vh] object-contain rounded-2xl" />
           </div>
         </div>
       )}
