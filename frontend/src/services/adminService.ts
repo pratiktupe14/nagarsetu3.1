@@ -3,6 +3,7 @@ import { getStoredComplaints, saveStoredComplaints } from './complaintService';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getApiUrl } from '../config/apiConfig';
 
 const LOCAL_STORAGE_ACTIVITY_LOGS_KEY = 'nagarsetu_activity_logs_v5';
 
@@ -141,6 +142,150 @@ export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRe
 }
 
 const LOCAL_STORAGE_STAFF_KEY = 'nagarsetu_service_staff_v3';
+
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('nagarsetu_token') || localStorage.getItem('token') || '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+}
+
+export interface DepartmentStaffApiItem {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string;
+  contact_number: string;
+  employee_id: string;
+  designation: string;
+  department_id?: string | null;
+  department_name?: string;
+  status: 'Active' | 'Inactive' | 'Archived';
+  active_tasks: number;
+  completed_tasks: number;
+  overdue_tasks: number;
+  language: string;
+  joined_date: string;
+  created_at: string;
+}
+
+export interface DepartmentStaffApiSummary {
+  totalStaff: number;
+  activeStaff: number;
+  inactiveStaff: number;
+  activeTasks: number;
+}
+
+export async function fetchDepartmentStaffApi(params?: {
+  status?: string;
+  search?: string;
+  department_id?: string;
+}): Promise<{ staff: DepartmentStaffApiItem[]; summary: DepartmentStaffApiSummary }> {
+  try {
+    const qParams = new URLSearchParams();
+    if (params?.status) qParams.append('status', params.status);
+    if (params?.search) qParams.append('search', params.search);
+    if (params?.department_id) qParams.append('department_id', params.department_id);
+
+    const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
+      headers: getAuthHeaders()
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        staff: data.staff || [],
+        summary: data.summary || { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to fetch staff from API:', err);
+  }
+  return {
+    staff: [],
+    summary: { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
+  };
+}
+
+export async function createServiceStaffApi(payload: {
+  name: string;
+  mobile: string;
+  email?: string;
+  password: string;
+  employee_id?: string;
+  designation?: string;
+  language?: string;
+  department_id?: string;
+}): Promise<{ success: boolean; staff?: DepartmentStaffApiItem; error?: string }> {
+  try {
+    const res = await fetch(`${getApiUrl()}/api/department/staff`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, staff: data.staff };
+    }
+    return { success: false, error: data.error || 'Failed to create staff member' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Server error' };
+  }
+}
+
+export async function updateServiceStaffApi(id: string, payload: Partial<DepartmentStaffApiItem>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    return { success: res.ok && data.success, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Server error' };
+  }
+}
+
+export async function deactivateServiceStaffApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to deactivate staff:', err);
+    return false;
+  }
+}
+
+export async function activateServiceStaffApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to activate staff:', err);
+    return false;
+  }
+}
+
+export async function removeServiceStaffApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to remove staff:', err);
+    return false;
+  }
+}
 
 export interface ServiceStaffMemberRecord {
   id: string;

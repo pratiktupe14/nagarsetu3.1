@@ -45,6 +45,8 @@ import { StaffTaskMapPage } from './pages/staff/StaffTaskMapPage';
 import { StaffNotificationsPage } from './pages/staff/StaffNotificationsPage';
 import { StaffSettingsPage } from './pages/staff/StaffSettingsPage';
 import { DepartmentHeadPortal } from './pages/departmentHead/DepartmentHeadPortal';
+import { AnnouncementsWorkspacePage } from './pages/announcements/AnnouncementsWorkspacePage';
+import { StaffManagementWorkspacePage } from './pages/departmentHead/StaffManagementWorkspacePage';
 
 export default function App() {
   return (
@@ -84,17 +86,41 @@ export default function App() {
               }
             />
             <Route
+              path="/announcements"
+              element={
+                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
+                  <AnnouncementsWorkspacePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/citizen/announcements"
               element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenAnnouncementsPage />
+                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
+                  <AnnouncementsWorkspacePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/department-head/announcements"
+              element={
+                <ProtectedRoute allowedRoles={['department_head', 'city_admin']}>
+                  <AnnouncementsWorkspacePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/announcements"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff', 'city_admin']}>
+                  <AnnouncementsWorkspacePage />
                 </ProtectedRoute>
               }
             />
             <Route
               path="/citizen/announcements/:id"
               element={
-                <ProtectedRoute allowedRoles={['citizen']}>
+                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
                   <AnnouncementDetailPage />
                 </ProtectedRoute>
               }
@@ -280,7 +306,7 @@ export default function App() {
               path="/admin/staff"
               element={
                 <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminStaffPage />
+                  <StaffManagementWorkspacePage />
                 </ProtectedRoute>
               }
             />
@@ -409,6 +435,15 @@ export default function App() {
               }
             />
 
+            <Route
+              path="/department-head/staff"
+              element={
+                <ProtectedRoute allowedRoles={['department_head']}>
+                  <StaffManagementWorkspacePage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Department Head Protected Portal & Navigation Sub-routes */}
             {[
               '/department/portal',
@@ -418,7 +453,6 @@ export default function App() {
               '/department-head/tasks/in-progress',
               '/department-head/tasks/completed',
               '/department-head/tasks/overdue',
-              '/department-head/staff',
               '/department-head/staff/:staffId',
               '/department-head/map',
               '/department-head/notifications',

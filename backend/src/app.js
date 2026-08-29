@@ -12,6 +12,7 @@ const staffRoutes = require('./routes/staff.routes');
 const adminRoutes = require('./routes/admin.routes');
 const departmentRoutes = require('./routes/department.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const announcementRoutes = require('./routes/announcement.routes');
 const mapsRoutes = require('./routes/maps.routes');
 const aiRoutes = require('./routes/ai.routes');
 
@@ -46,6 +47,7 @@ app.use('/api/staff', authedRateLimiter || authenticatedRateLimiter, staffRoutes
 app.use('/api/admin', authedRateLimiter || authenticatedRateLimiter, adminRoutes);
 app.use('/api/departments', authedRateLimiter || authenticatedRateLimiter, departmentRoutes);
 app.use('/api/notifications', authedRateLimiter || authenticatedRateLimiter, notificationRoutes);
+app.use('/api/announcements', authedRateLimiter || authenticatedRateLimiter, announcementRoutes);
 
 // Centralized Error Handling Middleware (Prevents stack trace / information leakage)
 app.use(errorHandler);

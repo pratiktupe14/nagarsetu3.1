@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import {
   Home, FileText, PlusCircle, MapPin, Bell, User, Settings, HelpCircle, Info,
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
-  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard
+  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -58,6 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'ACCOUNT',
       items: [
+        { label: 'Announcements', path: '/citizen/announcements', icon: Megaphone },
+        { label: t('notifications'), path: '/citizen/notifications', icon: Bell },
         { label: t('profile'), path: '/citizen/profile', icon: User },
         { label: t('settings'), path: '/citizen/settings', icon: Settings }
       ]
@@ -102,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'SYSTEM',
       items: [
-        { label: t('announcements'), path: '/admin/announcements', icon: FileText },
+        { label: t('announcements'), path: '/admin/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/admin/notifications', icon: Bell },
         { label: t('settings'), path: '/admin/settings', icon: Settings }
       ]
@@ -130,6 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'ACCOUNT',
       items: [
+        { label: 'Announcements', path: '/staff/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/staff/notifications', icon: Bell },
         { label: t('profile'), path: '/staff/profile', icon: User },
         { label: t('settings'), path: '/staff/settings', icon: Settings }
@@ -157,8 +160,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'ACCOUNT',
+      title: 'COMMUNICATION',
       items: [
+        { label: 'Announcements', path: '/department-head/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/department-head/notifications', icon: Bell },
         { label: t('profile'), path: '/department-head/profile', icon: User },
         { label: t('settings'), path: '/department-head/settings', icon: Settings }

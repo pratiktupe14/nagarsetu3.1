@@ -8,6 +8,7 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
+import { DepartmentHeadAnnouncements } from '../../components/DepartmentHeadAnnouncements';
 import {
   getStoredComplaints, getStaffTasks, assignTaskByDepartmentHead,
   requestReworkDepartmentHead, approveResolutionDepartmentHead, getComplaintById,
@@ -1995,6 +1996,12 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* ANNOUNCEMENTS SECTION FOR ALL DEPARTMENT HEAD PORTALS */}
+            <DepartmentHeadAnnouncements
+              departmentName={deptInfo.fullName}
+              departmentShortName={deptInfo.shortName}
+            />
 
             {/* 3. TOOLBAR FOR SEARCH & CATEGORY FILTERS */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">

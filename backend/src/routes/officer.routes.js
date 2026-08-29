@@ -68,11 +68,32 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
 });
 
 
-// Get available field staff for assignment
+// Get available field staff for assignment (Only Active staff of user's department)
 router.get('/staff-list', async (req, res) => {
   try {
-    const sql = `SELECT id, name, mobile, email FROM users WHERE role = 'staff'`;
-    const result = await query(sql);
+    let sql = `SELECT id, name, mobile, email, employee_id, designation FROM users WHERE (role = 'service_staff' OR role = 'staff') AND LOWER(COALESCE(status, 'active')) = 'active'`;
+    const params = [];
+
+    if (req.user.role === 'department_head') {
+      let targetDeptId = req.user.department_id;
+      if (!targetDeptId) {
+        const dhRes = await query(
+          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
+          [req.user.id, (req.user.email || '').toLowerCase()]
+        );
+        if (dhRes.rows && dhRes.rows.length > 0) {
+          targetDeptId = dhRes.rows[0].department_id;
+        }
+      }
+      if (targetDeptId) {
+        sql += ` AND department_id = ?`;
+        params.push(targetDeptId);
+      }
+    }
+
+    sql += ` ORDER BY name ASC`;
+
+    const result = await query(sql, params);
     return res.json({ staff: result.rows });
   } catch (err) {
     console.error('Fetch staff list error:', err);

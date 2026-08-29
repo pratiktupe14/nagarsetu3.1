@@ -154,6 +154,40 @@ async function createTablesPostgres() {
       );
     `);
 
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS announcements (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        type TEXT DEFAULT 'General',
+        priority TEXT DEFAULT 'Medium',
+        status TEXT DEFAULT 'Published',
+        target_type TEXT DEFAULT 'all',
+        target_audience TEXT DEFAULT 'all_departments',
+        target_role TEXT,
+        department_id INTEGER REFERENCES departments(id),
+        department_name TEXT,
+        created_by TEXT DEFAULT 'City Admin',
+        posted_by TEXT DEFAULT 'City Admin',
+        created_by_role TEXT DEFAULT 'city_admin',
+        is_published INTEGER DEFAULT 1,
+        published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS announcement_reads (
+        id SERIAL PRIMARY KEY,
+        announcement_id INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(announcement_id, user_id)
+      );
+    `);
+
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
     if (parseInt(deptCheck.rows[0].count, 10) === 0) {
       await pgPool.query(`
@@ -230,6 +264,7 @@ function createTablesSqlite() {
       };
       safeAddColumn('users', 'department_id INTEGER');
       safeAddColumn('users', 'employee_id TEXT');
+      safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
       safeAddColumn('complaints', 'location_address TEXT');
       safeAddColumn('complaints', 'complaint_number TEXT');
@@ -315,6 +350,53 @@ function createTablesSqlite() {
           updated_by TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (complaint_id) REFERENCES complaints(id)
+        );
+      `);
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS announcements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          type TEXT DEFAULT 'General',
+          priority TEXT DEFAULT 'Medium',
+          status TEXT DEFAULT 'Published',
+          target_type TEXT DEFAULT 'all',
+          target_audience TEXT DEFAULT 'all_departments',
+          target_role TEXT,
+          department_id INTEGER,
+          department_name TEXT,
+          created_by TEXT DEFAULT 'City Admin',
+          posted_by TEXT DEFAULT 'City Admin',
+          created_by_role TEXT DEFAULT 'city_admin',
+          is_published INTEGER DEFAULT 1,
+          published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          expires_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (department_id) REFERENCES departments(id)
+        );
+      `);
+
+      // Safe column additions for SQLite migrations
+      const safeAddSqliteColumn = (table, colDef) => {
+        sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef}`, () => {});
+      };
+      safeAddSqliteColumn('users', "designation TEXT DEFAULT 'Field Service Staff'");
+      safeAddSqliteColumn('announcements', "status TEXT DEFAULT 'Published'");
+      safeAddSqliteColumn('announcements', "target_audience TEXT DEFAULT 'all_departments'");
+      safeAddSqliteColumn('announcements', 'target_role TEXT');
+      safeAddSqliteColumn('announcements', "created_by_role TEXT DEFAULT 'city_admin'");
+      safeAddSqliteColumn('announcements', 'expires_at DATETIME');
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS announcement_reads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          announcement_id INTEGER NOT NULL,
+          user_id TEXT NOT NULL,
+          read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(announcement_id, user_id),
+          FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
         );
       `);
 
