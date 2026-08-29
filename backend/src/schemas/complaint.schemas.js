@@ -2,6 +2,7 @@ const Joi = require('joi');
 
 const createComplaintSchema = {
   body: Joi.object({
+    complaint_number: Joi.string().max(100).allow('', null).optional(),
     photo_url: Joi.string().required(),
     category: Joi.string().min(2).max(100).required(),
     title: Joi.string().min(3).max(200).required(),
@@ -10,7 +11,7 @@ const createComplaintSchema = {
     department_id: Joi.number().integer().positive().allow(null).optional(),
     latitude: Joi.number().min(-90).max(90).required(),
     longitude: Joi.number().min(-180).max(180).required(),
-    location_source: Joi.string().valid('live_gps', 'exif', 'manual_pin').default('manual_pin'),
+    location_source: Joi.string().allow('', null).optional(),
     location_address: Joi.string().max(500).allow('', null).optional(),
     duplicate_of_id: Joi.number().integer().positive().allow(null).optional()
   })

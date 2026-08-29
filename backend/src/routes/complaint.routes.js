@@ -73,6 +73,7 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
 router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
     const {
+      complaint_number,
       photo_url,
       category,
       title,
@@ -85,6 +86,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       department_id,
       duplicate_of_id
     } = req.body;
+
+    const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // Default department mapping if not provided
     let finalDeptId = department_id;
@@ -110,13 +113,14 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     const insertSql = `
       INSERT INTO complaints (
-        citizen_id, photo_before_url, category, title, description, priority,
+        complaint_number, citizen_id, photo_before_url, category, title, description, priority,
         status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
+      finalComplaintNumber,
       req.user.id,
       photo_url,
       category,
@@ -126,7 +130,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       finalDeptId,
       latitude,
       longitude,
-      location_source,
+      location_source || 'manual_pin',
       location_address || '',
       duplicate_of_id || null
     ]);
@@ -150,7 +154,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     return res.status(201).json({
       message: 'Complaint submitted successfully',
-      complaint_id: complaintId
+      complaint_id: complaintId,
+      complaint_number: finalComplaintNumber
     });
   } catch (err) {
     console.error('Submit complaint error:', err);
@@ -162,8 +167,11 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 router.get('/:id/history', authenticateToken, async (req, res) => {
   try {
     const historyRes = await query(
-      `SELECT * FROM complaint_status_history WHERE complaint_id = ? ORDER BY created_at ASC`,
-      [req.params.id]
+      `SELECT h.* FROM complaint_status_history h
+       LEFT JOIN complaints c ON h.complaint_id = c.id
+       WHERE h.complaint_id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
+       ORDER BY h.created_at ASC`,
+      [req.params.id, req.params.id, req.params.id]
     );
     return res.json({ history: historyRes.rows || [] });
   } catch (err) {
@@ -202,9 +210,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN users u ON c.citizen_id = u.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.id = ? OR c.complaint_number = ?
+      WHERE c.id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
     `;
-    const result = await query(sql, [req.params.id, req.params.id]);
+    const result = await query(sql, [req.params.id, req.params.id, req.params.id]);
     if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }

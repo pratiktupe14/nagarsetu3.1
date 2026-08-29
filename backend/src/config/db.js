@@ -89,6 +89,7 @@ async function createTablesPostgres() {
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS complaints (
         id SERIAL PRIMARY KEY,
+        complaint_number TEXT,
         citizen_id INTEGER REFERENCES users(id),
         photo_before_url TEXT NOT NULL,
         photo_after_url TEXT,
@@ -231,6 +232,7 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
       safeAddColumn('complaints', 'location_address TEXT');
+      safeAddColumn('complaints', 'complaint_number TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (
@@ -243,6 +245,7 @@ function createTablesSqlite() {
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS complaints (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
+          complaint_number TEXT,
           citizen_id INTEGER,
           photo_before_url TEXT NOT NULL,
           photo_after_url TEXT,
