@@ -20,7 +20,7 @@ import {
   CIVIC_CATEGORIES,
   CivicCategory
 } from '../../services/aiVisionService';
-import { createComplaint, generateComplaintNumber, saveOfflineDraft, getStoredComplaints } from '../../services/complaintService';
+import { createComplaint, uploadComplaintImage, generateComplaintNumber, saveOfflineDraft, getStoredComplaints } from '../../services/complaintService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
@@ -40,122 +40,124 @@ export const ReportIssuePage: React.FC = () => {
   const { t, translateCategory, translatePriority, translateDepartment } = useLanguage();
   const navigate = useNavigate();
 
-  // Primary Photo & EXIF State
+  // Primary Photo & AI State
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
-  const [primaryFeatures, setPrimaryFeatures] = useState<VisualFeatures | null>(null);
-
-  // Additional Evidence / Angles (Max 4 additional photos)
   const [additionalPhotos, setAdditionalPhotos] = useState<AdditionalPhotoItem[]>([]);
-  const [analyzingAngle, setAnalyzingAngle] = useState(false);
+  const [analyzingAI, setAnalyzingAI] = useState<boolean>(false);
+  const [analyzingAngle, setAnalyzingAngle] = useState<boolean>(false);
+  const [aiResult, setAiResult] = useState<AIVisionResult | null>(null);
+  const [aiHealth, setAiHealth] = useState<{ reachable: boolean; configured: boolean; model: string } | null>(null);
+  const [primaryFeatures, setPrimaryFeatures] = useState<VisualFeatures | null>(null);
   const [angleErrorMsg, setAngleErrorMsg] = useState<string | null>(null);
 
-  // Location Priority State
-  const [lat, setLat] = useState<number>(20.0059);
-  const [lng, setLng] = useState<number>(73.7898);
-  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
-  const [detectingLocation, setDetectingLocation] = useState<boolean>(false);
-  const [locationStatusText, setLocationStatusText] = useState<string>('Detecting your location...');
-  const [locationSource, setLocationSource] = useState<'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps'>('manual_pin');
-  const [locationAddress, setLocationAddress] = useState<string>('Detecting location...');
-  const [showLocationPickerModal, setShowLocationPickerModal] = useState(false);
-
-  // AI Vision Analysis State
-  const [analyzingAI, setAnalyzingAI] = useState(false);
-  const [aiResult, setAiResult] = useState<AIVisionResult | null>(null);
-  const [isManuallyEdited, setIsManuallyEdited] = useState(false);
-  const [aiHealth, setAiHealth] = useState<{ configured: boolean; model: string; reachable: boolean; error?: string | null } | null>(null);
-
-  React.useEffect(() => {
-    checkAiHealth().then((res) => {
-      setAiHealth(res);
-    });
-  }, []);
-
-  // Request fresh GPS location for every new complaint creation
-  const requestFreshLocation = React.useCallback(async () => {
-    setDetectingLocation(true);
-    setLocationStatusText('Detecting your current location...');
-
-    const result = await requestFreshGpsLocation(10000);
-    setDetectingLocation(false);
-
-    if (result.status === 'success' && result.latitude != null && result.longitude != null) {
-      setLat(result.latitude);
-      setLng(result.longitude);
-      setLocationAccuracy(result.accuracyMeters);
-      setLocationSource('live_gps');
-      setLocationStatusText(result.message);
-
-      const addr = await reverseGeocodeCoordinates(result.latitude, result.longitude);
-      if (addr) setLocationAddress(addr);
-
-      runDuplicateCheck(result.latitude, result.longitude);
-    } else {
-      setLocationStatusText(result.message);
-    }
-  }, []);
-
-  // Trigger GPS detection automatically on initial mount
-  React.useEffect(() => {
-    requestFreshLocation();
-  }, [requestFreshLocation]);
-
-  // Citizen Editable Fields
+  // Form Field States
   const [category, setCategory] = useState<CivicCategory>('Road Damage / Pothole');
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [priority, setPriority] = useState<PriorityLevel>('High');
+  const [priority, setPriority] = useState<PriorityLevel>('Medium');
   const [department, setDepartment] = useState<string>('Roads & Public Works Department (PWD)');
+  const [isManuallyEdited, setIsManuallyEdited] = useState<boolean>(false);
 
-  // 100m Duplicate Check State
-  const [nearbyDuplicates, setNearbyDuplicates] = useState<any[]>([]);
+  // Location States
+  const [lat, setLat] = useState<number>(20.0059);
+  const [lng, setLng] = useState<number>(73.7898);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | undefined>(15);
+  const [locationSource, setLocationSource] = useState<'live_gps' | 'exif' | 'manual_pin'>('manual_pin');
+  const [locationStatusText, setLocationStatusText] = useState<string>('Select defect location on Leaflet map pin');
+  const [locationAddress, setLocationAddress] = useState<string>('');
+  const [detectingLocation, setDetectingLocation] = useState<boolean>(false);
 
-  // Modal Review & Submission State
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [draftSavedToast, setDraftSavedToast] = useState(false);
+  // Duplicate Check & UI Modal States
+  const [nearbyDuplicates, setNearbyDuplicates] = useState<Array<{ complaint: any; distanceMeters: number }>>([]);
+  const [showLocationPickerModal, setShowLocationPickerModal] = useState<boolean>(false);
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
 
-  // Handle Primary Photo Upload / Capture
+  // Initial AI Health & Location Check
+  React.useEffect(() => {
+    checkAiHealth().then(setAiHealth).catch(() => setAiHealth({ reachable: false, configured: false, model: 'Offline' }));
+    requestFreshLocation();
+  }, []);
+
+  // Request Fresh Live GPS Location
+  const requestFreshLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const gps = await requestFreshGpsLocation();
+      if (gps && gps.latitude && gps.longitude) {
+        setLat(gps.latitude);
+        setLng(gps.longitude);
+        setLocationAccuracy(gps.accuracy ? Math.round(gps.accuracy) : 10);
+        setLocationSource('live_gps');
+        setLocationStatusText(`Verified Live GPS Location (±${gps.accuracy ? Math.round(gps.accuracy) : 10}m accuracy)`);
+        runDuplicateCheck(gps.latitude, gps.longitude);
+
+        const addr = await reverseGeocodeCoordinates(gps.latitude, gps.longitude);
+        if (addr) setLocationAddress(addr);
+      }
+    } catch (e) {
+      console.warn('GPS detection failed, fallback to Nashik Center pin');
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
+
+  // Primary Photo Select & AI Vision Trigger
   const handlePhotoSelect = async (file: File) => {
-    // 1. Clear previous photo & AI state immediately
     setSelectedPhotoFile(file);
-    setAiResult(null);
-    setIsManuallyEdited(false);
-    setPrimaryFeatures(null);
-    setCategory('Road Damage / Pothole');
-    setTitle('');
-    setDescription('');
-    setPriority('High');
-    setDepartment('Roads & Public Works Department (PWD)');
-
     const url = URL.createObjectURL(file);
     setPhotoPreviewUrl(url);
+    setPrimaryFeatures(null);
+    setAiResult(null);
+    setAdditionalPhotos([]);
+
+    // Extract visual features locally for visual similarity check
+    try {
+      const feats = await extractVisualFeatures(file);
+      setPrimaryFeatures(feats);
+    } catch (e) {
+      console.warn('Local visual feature extraction skipped:', e);
+    }
+
+    // Run AI Vision & Location Resolution
     await runAIVisionAndLocation(file, url);
   };
 
-  const runAIVisionAndLocation = async (file: File, url: string, isRetry: boolean = false) => {
-    if (analyzingAI) return; // Enforce request lock: ignore duplicate triggers while analyzing
+  // Run AI Vision Analysis & Location Extraction
+  const runAIVisionAndLocation = async (file: File, photoUrlStr: string, isRetry: boolean = false) => {
     setAnalyzingAI(true);
+    setAngleErrorMsg(null);
 
-    const locResult = await resolveIssueLocation(file, lat, lng);
-    if (locResult.latitude && locResult.longitude && locationSource !== 'manual_pin') {
-      setLat(locResult.latitude);
-      setLng(locResult.longitude);
-      setLocationSource(locResult.source);
-      runDuplicateCheck(locResult.latitude, locResult.longitude);
+    // Extract EXIF location if available and not set by live GPS
+    try {
+      const resolvedLoc = await resolveIssueLocation(file, lat, lng);
+      if (resolvedLoc.latitude && resolvedLoc.longitude) {
+        setLat(resolvedLoc.latitude);
+        setLng(resolvedLoc.longitude);
+        setLocationSource(resolvedLoc.location_source);
+        setLocationStatusText(
+          resolvedLoc.location_source === 'live_gps'
+            ? '✓ Verified Live GPS Device Location'
+            : resolvedLoc.location_source === 'exif'
+            ? '📷 Location Extracted from Photo EXIF Metadata'
+            : '📍 Location Pin Set Manually'
+        );
+        runDuplicateCheck(resolvedLoc.latitude, resolvedLoc.longitude);
 
-      const addr = await reverseGeocodeCoordinates(locResult.latitude, locResult.longitude);
-      if (addr) setLocationAddress(addr);
+        const addr = await reverseGeocodeCoordinates(resolvedLoc.latitude, resolvedLoc.longitude);
+        if (addr) setLocationAddress(addr);
+      }
+    } catch (err) {
+      console.warn('Location resolution warning:', err);
     }
 
     try {
-      // Pass actual uploaded File object to detectCivicIssue (bypassing cache on retry)
       const res = await detectCivicIssue(file, isRetry);
       setAiResult(res);
       setPrimaryFeatures(res.visual_features || null);
 
-      // ONLY populate fields if AI analysis succeeded with high/medium confidence and valid result
       if (res.is_available !== false && res.confidence > 0) {
         if (res.category) setCategory(res.category as CivicCategory);
         if (res.title) setTitle(res.title);
@@ -186,7 +188,6 @@ export const ReportIssuePage: React.FC = () => {
       const angleUrl = URL.createObjectURL(file);
       const angleFeatures = await extractVisualFeatures(file);
 
-      // Compare against primary photo
       if (primaryFeatures) {
         const similarity = compareImageSimilarity(primaryFeatures, angleFeatures, 0);
 
@@ -252,12 +253,36 @@ export const ReportIssuePage: React.FC = () => {
     setSubmitting(true);
     try {
       const complaintNumber = generateComplaintNumber();
-      const additionalUrls = additionalPhotos.map((p) => p.previewUrl);
+
+      // Convert/upload primary photo file to permanent public URL or Base64 Data URI
+      let finalPhotoBeforeUrl = photoPreviewUrl;
+      if (selectedPhotoFile) {
+        try {
+          finalPhotoBeforeUrl = await uploadComplaintImage(selectedPhotoFile);
+        } catch (uploadErr) {
+          console.warn('Primary image upload fallback triggered:', uploadErr);
+        }
+      }
+
+      // Convert/upload additional photo files to permanent URLs
+      const additionalUrls: string[] = [];
+      for (const p of additionalPhotos) {
+        if (p.file) {
+          try {
+            const uploadedUrl = await uploadComplaintImage(p.file);
+            additionalUrls.push(uploadedUrl);
+          } catch (e) {
+            additionalUrls.push(p.previewUrl);
+          }
+        } else {
+          additionalUrls.push(p.previewUrl);
+        }
+      }
 
       const newComplaintData = {
         complaint_number: complaintNumber,
         citizen_id: user?.id || '',
-        photo_before_url: photoPreviewUrl,
+        photo_before_url: finalPhotoBeforeUrl,
         additional_photos: additionalUrls,
         ai_vision_metadata: (aiResult && aiResult.confidence > 0) ? {
           category: aiResult.category,
