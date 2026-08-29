@@ -12,15 +12,20 @@ import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import {
   Search, Plus, RefreshCw, Building2, Users, FileText, CheckCircle2,
   AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, X, Phone, Mail,
-  Edit, Eye, Layers, Sparkles, Activity, Check, Clock, UserCheck, ShieldCheck
+  Edit, Eye, Layers, Sparkles, Activity, Check, Clock, UserCheck, ShieldCheck,
+  Trash2, UserX
 } from 'lucide-react';
-import { getDepartmentHeads, getDepartments } from '../../services/departmentService';
+import { getDepartmentHeads, getDepartments, deleteDepartmentHead, DepartmentLeadershipSummary } from '../../services/departmentService';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+
 
 type SortField = 'name' | 'code' | 'staff_count' | 'pending' | 'in_progress' | 'resolved' | 'overdue' | 'performance';
 
 export const AdminDepartmentsPage: React.FC = () => {
+  const { user } = useAuth();
   const [departments, setDepartments] = useState<MunicipalDepartmentRecord[]>([]);
+  const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,23 +64,30 @@ export const AdminDepartmentsPage: React.FC = () => {
   const [submittingForm, setSubmittingForm] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Delete Department Head Modal State
+  const [deleteModalDept, setDeleteModalDept] = useState<MunicipalDepartmentRecord | null>(null);
+  const [deletingHead, setDeletingHead] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Load Data
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [headSummaries, compList] = await Promise.all([
+      const [headSummariesData, compList] = await Promise.all([
         getDepartmentHeads(),
         getAllComplaints()
       ]);
 
-      const mappedDepts: MunicipalDepartmentRecord[] = headSummaries.map((s) => ({
+      setHeadSummaries(headSummariesData);
+
+      const mappedDepts: MunicipalDepartmentRecord[] = headSummariesData.map((s) => ({
         id: s.deptId,
         name: s.deptName,
         code: s.deptCode,
         department_head: s.hasActiveHead ? s.headName : 'No Active Head',
-        contact_number: s.headPhone || '+91 98220 00000',
-        email: s.headEmail || 'head@nagarsetu.gov.in',
+        contact_number: s.hasActiveHead ? (s.headPhone || '+91 98220 00000') : 'N/A',
+        email: s.hasActiveHead ? (s.headEmail || 'head@nagarsetu.gov.in') : 'unassigned@nagarsetu.gov.in',
         description: `${s.deptName} operations & infrastructure maintenance.`,
         status: s.hasActiveHead ? 'Active' : 'Inactive',
         created_at: new Date().toISOString()
@@ -90,6 +102,36 @@ export const AdminDepartmentsPage: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  // Selected Department Head Summary for Delete Modal
+  const activeHeadSummary = useMemo(() => {
+    if (!deleteModalDept) return null;
+    return headSummaries.find(
+      (s) => s.deptId === deleteModalDept.id || s.deptCode === deleteModalDept.code
+    );
+  }, [deleteModalDept, headSummaries]);
+
+  // Execute Delete Department Head
+  const handleExecuteDeleteHead = async () => {
+    if (!deleteModalDept) return;
+    setDeletingHead(true);
+    setDeleteError(null);
+    try {
+      const headIdOrDeptId = activeHeadSummary?.headId || deleteModalDept.id;
+      await deleteDepartmentHead(headIdOrDeptId, user?.id);
+
+      setToastMessage(`Department Head for '${deleteModalDept.name}' removed successfully.`);
+      setTimeout(() => setToastMessage(null), 4000);
+      setDeleteModalDept(null);
+      await loadData();
+    } catch (err: any) {
+      console.error('Delete department head error:', err);
+      setDeleteError(err.message || 'Unable to remove Department Head. Please try again.');
+    } finally {
+      setDeletingHead(false);
+    }
+  };
+
 
   useEffect(() => {
     loadData();
@@ -823,24 +865,76 @@ export const AdminDepartmentsPage: React.FC = () => {
                         {/* 17. Action Buttons */}
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end space-x-1.5">
+                            {/* View */}
                             <button
                               onClick={() => {
                                 setSelectedDept(dept);
                                 setActiveTab('overview');
                               }}
                               className="px-2.5 py-1 bg-white border border-gray-300 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 text-gray-700 font-bold rounded-lg text-xs transition-colors"
+                              title="View Department Details"
                             >
                               View
                             </button>
 
-                            <button
-                              onClick={() => handleOpenEditModal(dept)}
-                              className="px-2 py-1 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg text-xs transition-colors"
-                            >
-                              Edit
-                            </button>
+                            {dept.department_head !== 'No Active Head' ? (
+                              <>
+                                {/* Edit Profile */}
+                                <button
+                                  onClick={() => handleOpenEditModal(dept)}
+                                  className="px-2 py-1 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold rounded-lg text-xs transition-colors"
+                                  title="Edit Department Profile"
+                                >
+                                  Edit Profile
+                                </button>
+
+                                {/* Change Head */}
+                                <button
+                                  onClick={() => handleOpenEditModal(dept)}
+                                  className="px-2 py-1 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors"
+                                  title="Change Department Head"
+                                >
+                                  Change Head
+                                </button>
+
+                                {/* Delete Head */}
+                                <button
+                                  onClick={() => {
+                                    setDeleteModalDept(dept);
+                                    setDeleteError(null);
+                                  }}
+                                  className="inline-flex items-center space-x-1 px-2 py-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors"
+                                  title="Delete Department Head"
+                                >
+                                  <Trash2 className="w-3 h-3 text-rose-600" />
+                                  <span>Delete Head</span>
+                                </button>
+
+                                {/* Deactivate */}
+                                <button
+                                  onClick={() => handleOpenEditModal(dept)}
+                                  className="px-2 py-1 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 font-bold rounded-lg text-xs transition-colors"
+                                  title="Deactivate Department"
+                                >
+                                  Deactivate
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* Change Head for department with No Active Head */}
+                                <button
+                                  onClick={() => handleOpenEditModal(dept)}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors"
+                                  title="Appoint / Change Department Head"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>Change Head</span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
+
 
                       </tr>
                     );
@@ -1428,7 +1522,126 @@ export const AdminDepartmentsPage: React.FC = () => {
           </div>
         )}
 
+        {/* ================================================== */}
+        {/* DELETE DEPARTMENT HEAD CONFIRMATION MODAL */}
+        {/* ================================================== */}
+        {deleteModalDept && (
+          <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md p-6 space-y-4 text-gray-900 animate-in zoom-in-95">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">
+                      Delete Department Head?
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Explicit confirmation required
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={() => {
+                    setDeleteModalDept(null);
+                    setDeleteError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Error Alert if any */}
+              {deleteError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-start space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              {/* Details Card */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Department</span>
+                  <span className="font-extrabold text-gray-900 font-outfit">{deleteModalDept.name} ({deleteModalDept.code})</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Department Head</span>
+                  <span className="font-extrabold text-rose-700 font-mono">{activeHeadSummary?.headName || deleteModalDept.department_head}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Employee ID</span>
+                  <span className="font-bold text-gray-800 font-mono">{activeHeadSummary?.employeeId || 'EMP-HEAD-001'}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Official Email</span>
+                  <span className="font-bold text-gray-800 font-mono">{activeHeadSummary?.headEmail || deleteModalDept.email}</span>
+                </div>
+              </div>
+
+              {/* Warning Box */}
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-amber-900">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs font-medium space-y-1">
+                  <p className="font-extrabold text-amber-950 font-outfit">Role Revocation & Detachment Warning</p>
+                  <p className="leading-relaxed">
+                    This will remove the user from the Department Head role and detach them from this department.
+                  </p>
+                  <p className="text-[11px] text-amber-800 font-normal">
+                    Historical complaints, staff assignments, and audit logs will remain preserved.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end space-x-2.5 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={() => {
+                    setDeleteModalDept(null);
+                    setDeleteError(null);
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={handleExecuteDeleteHead}
+                  className="inline-flex items-center space-x-1.5 px-4.5 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {deletingHead ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Deleting Head...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Head</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
     </DashboardLayout>
   );
 };
+

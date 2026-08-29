@@ -399,4 +399,88 @@ router.post('/department-heads/:id/reactivate', async (req, res) => {
   }
 });
 
+// DELETE Department Head by ID or Department ID
+router.delete('/department-heads/:id', async (req, res) => {
+  try {
+    const paramId = req.params.id;
+    if (!paramId) {
+      return res.status(400).json({ error: 'Department Head ID or Department selection is required.' });
+    }
+
+    // Try finding by department_heads.id, user_id, or department_id
+    let dhRes = await query(
+      `SELECT * FROM department_heads WHERE id = ? OR user_id = ? OR department_id = ?`,
+      [paramId, paramId, paramId]
+    );
+
+    // If not found directly, try resolving department ID string/code
+    if ((!dhRes.rows || dhRes.rows.length === 0) && isNaN(Number(paramId))) {
+      const cleanDeptId = await resolveDepartmentId(paramId);
+      if (cleanDeptId) {
+        dhRes = await query(`SELECT * FROM department_heads WHERE department_id = ?`, [cleanDeptId]);
+      }
+    }
+
+    if (!dhRes.rows || dhRes.rows.length === 0) {
+      // Check if user table has a department_head for this ID/department
+      const uRes = await query(
+        `SELECT * FROM users WHERE (id = ? OR department_id = ?) AND role = 'department_head'`,
+        [paramId, paramId]
+      );
+      if (!uRes.rows || uRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Department Head not found.' });
+      }
+    }
+
+    // Filter active head records
+    const allRecords = dhRes.rows || [];
+    const activeHead = allRecords.find((r) => r.status === 'active') || allRecords[0];
+
+    if (allRecords.length > 0 && allRecords.every((r) => r.status !== 'active')) {
+      // All head records for this department/head are already inactive
+      return res.status(400).json({ error: 'Department Head is already unassigned.' });
+    }
+
+    const headIdToDeactivate = activeHead?.id;
+    const userIdToDetach = activeHead?.user_id;
+    const deptIdToDetach = activeHead?.department_id || paramId;
+    const targetEmail = activeHead?.email;
+
+    // 1. Update department_heads table to set status = 'inactive'
+    if (headIdToDeactivate) {
+      await query(
+        `UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ? OR department_id = ?`,
+        [headIdToDeactivate, deptIdToDetach]
+      );
+    } else {
+      await query(
+        `UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE department_id = ?`,
+        [deptIdToDetach]
+      );
+    }
+
+    // 2. Update users table: remove department_head role and detach department_id
+    if (userIdToDetach || targetEmail) {
+      await query(
+        `UPDATE users SET role = 'citizen', department_id = NULL WHERE id = ? OR LOWER(email) = LOWER(?)`,
+        [userIdToDetach || -1, targetEmail || '']
+      );
+    } else {
+      await query(
+        `UPDATE users SET role = 'citizen', department_id = NULL WHERE department_id = ? AND role = 'department_head'`,
+        [deptIdToDetach]
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: 'Department Head removed successfully'
+    });
+  } catch (err) {
+    console.error('Error deleting department head:', err);
+    return res.status(500).json({ error: 'Unable to remove Department Head. Please try again.' });
+  }
+});
+
 module.exports = router;
+

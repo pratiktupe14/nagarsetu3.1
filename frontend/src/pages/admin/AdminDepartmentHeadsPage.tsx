@@ -6,6 +6,7 @@ import {
   updateDepartmentHead,
   deactivateDepartmentHead,
   reactivateDepartmentHead,
+  deleteDepartmentHead,
   DepartmentLeadershipSummary
 } from '../../services/departmentService';
 import { pushNotification } from '../../services/notificationService';
@@ -18,8 +19,9 @@ import {
   AlertTriangle, ChevronLeft, ChevronRight, X, Phone, Mail,
   Edit, Eye, Layers, Activity, Check, Clock, UserCheck, ShieldCheck,
   UserPlus, RotateCcw, AlertCircle, ShieldAlert, Sparkles, Sliders,
-  UserX, ArrowRight, Info, Shield, CheckCircle
+  UserX, ArrowRight, Info, Shield, CheckCircle, Trash2
 } from 'lucide-react';
+
 
 const SIX_DEPARTMENTS_META = [
   { id: 'dept-pwd', code: 'PWD', name: 'Public Works Department (PWD)', scope: 'Potholes, road damage, public infrastructure' },
@@ -49,6 +51,31 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
   const [viewHeadProfileModal, setViewHeadProfileModal] = useState<DepartmentLeadershipSummary | null>(null);
   const [deactivateModalHead, setDeactivateModalHead] = useState<DepartmentLeadershipSummary | null>(null);
   const [editHeadModal, setEditHeadModal] = useState<DepartmentLeadershipSummary | null>(null);
+  const [deleteModalHead, setDeleteModalHead] = useState<DepartmentLeadershipSummary | null>(null);
+  const [deletingHead, setDeletingHead] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Execute Delete Department Head
+  const handleExecuteDeleteHead = async () => {
+    if (!deleteModalHead) return;
+    setDeletingHead(true);
+    setDeleteError(null);
+    try {
+      const targetId = deleteModalHead.headId || deleteModalHead.deptId;
+      await deleteDepartmentHead(targetId, user?.id);
+
+      setToastMessage(`Department Head '${deleteModalHead.headName}' removed successfully.`);
+      setTimeout(() => setToastMessage(null), 4000);
+      setDeleteModalHead(null);
+      await loadData();
+    } catch (e: any) {
+      console.error('Error removing department head:', e);
+      setDeleteError(e.message || 'Unable to remove Department Head. Please try again.');
+    } finally {
+      setDeletingHead(false);
+    }
+  };
+
 
   // Form State for Add / Edit Department Head
   const [formFullName, setFormFullName] = useState('');
@@ -542,6 +569,20 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                           <span>Change Head</span>
                         </button>
 
+                        {row.status === 'Active' && row.hasActiveHead && (
+                          <button
+                            onClick={() => {
+                              setDeleteModalHead(row);
+                              setDeleteError(null);
+                            }}
+                            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[11px] rounded-lg transition-colors inline-flex items-center space-x-1"
+                            title="Delete Department Head"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete Head</span>
+                          </button>
+                        )}
+
                         {row.status === 'Active' && row.headId && (
                           <button
                             onClick={() => setDeactivateModalHead(row)}
@@ -552,6 +593,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                             <span>Deactivate</span>
                           </button>
                         )}
+
 
                         {row.status !== 'Active' && row.headId && (
                           <button
@@ -1037,7 +1079,126 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
           </div>
         )}
 
+        {/* ================================================== */}
+        {/* DELETE DEPARTMENT HEAD CONFIRMATION MODAL */}
+        {/* ================================================== */}
+        {deleteModalHead && (
+          <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md p-6 space-y-4 text-gray-900 animate-in zoom-in-95 font-sans">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">
+                      Delete Department Head?
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Explicit confirmation required
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={() => {
+                    setDeleteModalHead(null);
+                    setDeleteError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Error Alert if any */}
+              {deleteError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-start space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              {/* Details Card */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Department</span>
+                  <span className="font-extrabold text-gray-900 font-outfit">{deleteModalHead.deptName} ({deleteModalHead.deptCode})</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Department Head</span>
+                  <span className="font-extrabold text-rose-700 font-mono">{deleteModalHead.headName}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-gray-200/60 pb-1.5">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Employee ID</span>
+                  <span className="font-bold text-gray-800 font-mono">{deleteModalHead.employeeId || 'EMP-HEAD-001'}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Official Email</span>
+                  <span className="font-bold text-gray-800 font-mono">{deleteModalHead.headEmail}</span>
+                </div>
+              </div>
+
+              {/* Warning Box */}
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-amber-900">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs font-medium space-y-1">
+                  <p className="font-extrabold text-amber-950 font-outfit font-bold">Role Revocation & Detachment Warning</p>
+                  <p className="leading-relaxed">
+                    This will remove the user from the Department Head role and detach them from this department.
+                  </p>
+                  <p className="text-[11px] text-amber-800 font-normal">
+                    Historical complaints, staff assignments, and audit logs will remain preserved.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end space-x-2.5 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={() => {
+                    setDeleteModalHead(null);
+                    setDeleteError(null);
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={deletingHead}
+                  onClick={handleExecuteDeleteHead}
+                  className="inline-flex items-center space-x-1.5 px-4.5 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {deletingHead ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Deleting Head...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Head</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
     </DashboardLayout>
   );
 };
+
