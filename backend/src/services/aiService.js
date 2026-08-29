@@ -83,11 +83,11 @@ function mapDepartment(category) {
   return VALID_TAXONOMY[category] || 'Roads & Public Works Department (PWD)';
 }
 
-async function callDirectGeminiVision(fileInput) {
+async function callDirectGeminiVision(fileInput, targetModel = null) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
+  const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
 
-  if (!apiKey) {
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
     const errObj = new Error('Gemini analysis failed: GEMINI_API_KEY is not configured in server environment.');
     errObj.statusCode = 503;
     errObj.errorCode = 'AI_SERVICE_UNCONFIGURED';
@@ -273,6 +273,15 @@ async function analyzeComplaintPhoto(fileInput) {
     const aiResult = await callDirectGeminiVision(fileInput);
     return aiResult;
   } catch (err) {
+    if (err.statusCode === 404 || err.errorCode === 'AI_MODEL_NOT_FOUND') {
+      try {
+        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-1.5-flash...');
+        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-1.5-flash');
+        return fallbackResult;
+      } catch (fbErr) {
+        err = fbErr;
+      }
+    }
     console.error('[NAGARSETU Backend Error]', err.message);
     return {
       success: false,

@@ -105,7 +105,7 @@ export const TrackComplaintPage: React.FC = () => {
 
       if (targetComp) {
         setActiveComplaint(targetComp);
-        fetchStatusHistory(targetComp.id);
+        fetchStatusHistory(targetComp);
       } else if (lookupId) {
         setSearchError(`No complaint found with ID "${lookupId}". Please verify the complaint number.`);
         setActiveComplaint(null);
@@ -120,21 +120,36 @@ export const TrackComplaintPage: React.FC = () => {
     }
   }, [user, id, searchInput]);
 
-  const fetchStatusHistory = async (complaintId: string) => {
+  const fetchStatusHistory = async (targetComp: Complaint) => {
+    if (!targetComp) return;
+    const lookupKey = targetComp.complaint_number || targetComp.id;
     try {
       const token = localStorage.getItem('nagarsetu_token');
-      const response = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/history`, {
+      const response = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(lookupKey)}/history`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (response.ok) {
         const data = await response.json();
-        if (data.history && Array.isArray(data.history)) {
+        if (data.history && Array.isArray(data.history) && data.history.length > 0) {
           setHistoryLogs(data.history);
+          return;
         }
       }
     } catch (e) {
       // Fallback silent
     }
+
+    // Default synthetic history entry if backend history is unavailable
+    setHistoryLogs([
+      {
+        id: `hist-${targetComp.id}`,
+        status: targetComp.status || 'Submitted',
+        remark: `Complaint registered in municipal system with status: ${targetComp.status || 'Submitted'}.`,
+        department: targetComp.department_name || 'Municipal Triage Queue',
+        updated_by: targetComp.assigned_staff_name || 'System Dispatch',
+        created_at: targetComp.created_at || new Date().toISOString()
+      }
+    ]);
   };
 
   useEffect(() => {
@@ -153,7 +168,7 @@ export const TrackComplaintPage: React.FC = () => {
             setTimeout(() => setToastMessage(null), 6000);
           }
           setActiveComplaint(updated);
-          fetchStatusHistory(updated.id);
+          fetchStatusHistory(updated);
         }
       });
     } else {
@@ -285,7 +300,7 @@ export const TrackComplaintPage: React.FC = () => {
                     key={c.id}
                     onClick={() => {
                       setActiveComplaint(c);
-                      fetchStatusHistory(c.id);
+                      fetchStatusHistory(c);
                     }}
                     className={`p-4 rounded-xl border text-left shrink-0 w-64 transition-all min-h-[44px] ${
                       isSelected
@@ -317,13 +332,203 @@ export const TrackComplaintPage: React.FC = () => {
             <p className="text-xs font-bold text-gray-600 font-outfit">Fetching live GIS complaint status...</p>
           </div>
         ) : activeComplaint ? (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-            {/* MAIN RELATIVE GOOGLE MAP STAGE WITH FLOATING LEFT CARDS */}
-            <div className="relative w-full h-[660px] sm:h-[720px] rounded-3xl overflow-hidden border border-gray-200 shadow-xl bg-slate-50 font-sans">
+            {/* LEFT COLUMN: COMPLAINT DETAILS & TIMELINE STEPPER */}
+            <div className="lg:col-span-5 space-y-5">
               
-              {/* 1. BACKGROUND FULL-HEIGHT GIS MAP */}
-              <div className="absolute inset-0 z-0">
+              {/* CARD 1: LIVE COMPLAINT DETAILS */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 font-sans">
+                
+                {/* CARD HEADER & LIVE STATUS ACCENT */}
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider font-mono">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse mr-0.5" />
+                    <span>LIVE COMPLAINT TRACKING</span>
+                  </span>
+
+                  <span className="text-[10px] font-bold text-gray-500 font-mono">
+                    NAGARSETU GIS
+                  </span>
+                </div>
+
+                {/* COMPLAINT ID & TITLE */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-extrabold text-emerald-700 font-mono bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 inline-block">
+                    {activeComplaint.complaint_number}
+                  </span>
+                  <h2 className="text-base sm:text-lg font-extrabold text-gray-900 font-outfit leading-tight pt-1">
+                    {activeComplaint.title}
+                  </h2>
+                </div>
+
+                {/* LOCATION ADDRESS */}
+                <div className="flex items-start space-x-2 text-xs text-gray-600 bg-slate-50 p-2.5 rounded-xl border border-gray-100 font-mono">
+                  <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span className="truncate">{activeComplaint.location_address || 'Rajaram Road, Kolhapur, Maharashtra'}</span>
+                </div>
+
+                {/* STATUS & PRIORITY BADGES */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <StatusBadge status={activeComplaint.status} />
+                  <PriorityBadge priority={activeComplaint.priority} />
+                </div>
+
+                {/* METADATA GRID */}
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-gray-100">
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Department</span>
+                    <span className="font-extrabold text-gray-900 text-[11px] block truncate font-outfit">
+                      {activeComplaint.department_name || 'Streetlight / Electrical'}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Assigned Officer</span>
+                    <span className="font-extrabold text-emerald-800 text-[11px] block truncate font-outfit flex items-center space-x-1">
+                      <User className="w-3 h-3 text-emerald-600 inline mr-0.5" />
+                      <span>{activeComplaint.assigned_staff_name || 'Electrical Maintenance Team'}</span>
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Reported On</span>
+                    <span className="font-mono text-[10px] text-gray-700 block">
+                      {new Date(activeComplaint.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Last Updated</span>
+                    <span className="font-mono text-[10px] text-gray-700 block">
+                      {new Date(activeComplaint.updated_at).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* PHOTO EVIDENCE THUMBNAILS */}
+                {activeComplaint.photo_before_url && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-mono mb-1.5">
+                      Photo Evidence
+                    </span>
+                    <div className="flex space-x-2">
+                      <div className="w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
+                        <img
+                          src={getValidImageUrl(activeComplaint.photo_before_url)}
+                          alt="Before"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
+                      </div>
+                      {activeComplaint.photo_after_url && (
+                        <div className="w-20 h-16 rounded-xl overflow-hidden border-2 border-emerald-400 shrink-0 bg-emerald-50">
+                          <img
+                            src={getValidImageUrl(activeComplaint.photo_after_url)}
+                            alt="After"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* CARD 2: LIVE STATUS TIMELINE STEPPER */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3.5 font-sans">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <h3 className="text-xs font-extrabold text-gray-900 font-outfit uppercase tracking-wider flex items-center space-x-1.5">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    <span>LIVE STATUS TIMELINE</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+                    {activeComplaint.status}
+                  </span>
+                </div>
+
+                {/* VERTICAL STEPPER LIST */}
+                <div className="relative pl-3 border-l-2 border-emerald-200 space-y-3.5 text-xs font-sans my-1">
+                  {TIMELINE_STEPS.map((step) => {
+                    const stepState = getStepStatus(step, activeComplaint.status);
+
+                    let iconNode = <span className="w-2 h-2 rounded-full bg-gray-300" />;
+                    let labelColor = 'text-gray-400 font-normal';
+                    let badgeTag = null;
+
+                    if (stepState === 'completed') {
+                      iconNode = <span className="w-3.5 h-3.5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-extrabold">✓</span>;
+                      labelColor = 'text-gray-900 font-bold';
+                    } else if (stepState === 'current') {
+                      iconNode = <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-extrabold animate-pulse">●</span>;
+                      labelColor = 'text-emerald-800 font-extrabold';
+                      badgeTag = <span className="ml-2 text-[9px] font-mono font-extrabold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">Active</span>;
+                    } else if (stepState === 'rejected') {
+                      iconNode = <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-extrabold">✕</span>;
+                      labelColor = 'text-rose-700 font-bold';
+                    }
+
+                    return (
+                      <div key={step.key} className="relative flex items-start space-x-2.5">
+                        <div className="absolute -left-[19px] top-0.5 flex items-center justify-center bg-white rounded-full">
+                          {iconNode}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs ${labelColor} font-outfit`}>
+                              {step.label}
+                              {badgeTag}
+                            </span>
+                            {stepState === 'completed' && (
+                              <span className="text-[10px] font-mono text-gray-400">
+                                {new Date(activeComplaint.updated_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-gray-500 block leading-tight pt-0.5 font-sans">
+                            {step.description}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CARD 3: LATEST OFFICER REMARKS */}
+              {historyLogs.length > 0 && (
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3 font-sans">
+                  <h4 className="font-extrabold text-gray-900 font-outfit text-xs border-b border-gray-100 pb-2 flex items-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Latest Officer Remarks</span>
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                    {historyLogs.slice(0, 5).map((log, index) => (
+                      <div key={log.id || index} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-gray-900">{log.updated_by || 'Officer'}</span>
+                          <span className="font-mono text-[10px] text-gray-400">{new Date(log.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        {log.remark && (
+                          <p className="text-[11px] text-gray-700 italic bg-white p-2 rounded-lg border border-gray-100">
+                            "{log.remark}"
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* RIGHT COLUMN: INTERACTIVE GIS MAP & LIVE STATUS BAR */}
+            <div className="lg:col-span-7 space-y-4 lg:sticky lg:top-20">
+              
+              {/* GIS MAP CONTAINER */}
+              <div className="relative w-full h-[520px] sm:h-[580px] rounded-3xl overflow-hidden border border-gray-200 shadow-sm bg-slate-50">
                 <LiveGoogleMap
                   complaint={activeComplaint}
                   nearbyComplaints={complaints.filter((nc) => {
@@ -335,204 +540,14 @@ export const TrackComplaintPage: React.FC = () => {
                       Number(nc.latitude),
                       Number(nc.longitude)
                     );
-                    return d <= 1000; // 1km radius
+                    return d <= 1000;
                   })}
                   isRealtimeConnected={true}
                 />
               </div>
 
-              {/* 2. FLOATING OVERLAY LEFT COMPLAINT INFORMATION & TIMELINE PANEL */}
-              <div className="absolute left-3 sm:left-5 top-3 sm:top-5 bottom-16 z-20 w-80 sm:w-96 max-w-[calc(100vw-32px)] overflow-y-auto space-y-4 font-sans pointer-events-auto pr-1 scrollbar-thin">
-                
-                {/* FLOATING CARD 1: LIVE COMPLAINT DETAILS */}
-                <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-gray-200 shadow-xl space-y-4">
-                  
-                  {/* CARD HEADER & LIVE STATUS ACCENT */}
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                    <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider font-mono">
-                      <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse mr-0.5" />
-                      <span>LIVE COMPLAINT TRACKING</span>
-                    </span>
-
-                    <span className="text-[10px] font-bold text-gray-500 font-mono">
-                      NAGARSETU GIS
-                    </span>
-                  </div>
-
-                  {/* COMPLAINT ID & TITLE */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-extrabold text-emerald-700 font-mono bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 inline-block">
-                      {activeComplaint.complaint_number}
-                    </span>
-                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900 font-outfit leading-tight pt-1">
-                      {activeComplaint.title}
-                    </h2>
-                  </div>
-
-                  {/* LOCATION ADDRESS */}
-                  <div className="flex items-start space-x-2 text-xs text-gray-600 bg-slate-50 p-2.5 rounded-xl border border-gray-100 font-mono">
-                    <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                    <span className="truncate">{activeComplaint.location_address || 'Rajaram Road, Kolhapur, Maharashtra'}</span>
-                  </div>
-
-                  {/* STATUS & PRIORITY BADGES */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <StatusBadge status={activeComplaint.status} />
-                    <PriorityBadge priority={activeComplaint.priority} />
-                  </div>
-
-                  {/* METADATA GRID */}
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-gray-100">
-                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Department</span>
-                      <span className="font-extrabold text-gray-900 text-[11px] block truncate font-outfit">
-                        {activeComplaint.department_name || 'Streetlight / Electrical'}
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Assigned Officer</span>
-                      <span className="font-extrabold text-emerald-800 text-[11px] block truncate font-outfit flex items-center space-x-1">
-                        <User className="w-3 h-3 text-emerald-600 inline mr-0.5" />
-                        <span>{activeComplaint.assigned_staff_name || 'Electrical Maintenance Team'}</span>
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Reported On</span>
-                      <span className="font-mono text-[10px] text-gray-700 block">
-                        {new Date(activeComplaint.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Last Updated</span>
-                      <span className="font-mono text-[10px] text-gray-700 block">
-                        {new Date(activeComplaint.updated_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* PHOTO EVIDENCE THUMBNAILS */}
-                  {activeComplaint.photo_before_url && (
-                    <div className="pt-2 border-t border-gray-100">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-mono mb-1.5">
-                        Photo Evidence
-                      </span>
-                      <div className="flex space-x-2">
-                        <div className="w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
-                          <img
-                            src={getValidImageUrl(activeComplaint.photo_before_url)}
-                            alt="Before"
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
-                          />
-                        </div>
-                        {activeComplaint.photo_after_url && (
-                          <div className="w-20 h-16 rounded-xl overflow-hidden border-2 border-emerald-400 shrink-0 bg-emerald-50">
-                            <img
-                              src={getValidImageUrl(activeComplaint.photo_after_url)}
-                              alt="After"
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* FLOATING CARD 2: LIVE STATUS TIMELINE */}
-                <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-gray-200 shadow-xl space-y-3.5">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h3 className="text-xs font-extrabold text-gray-900 font-outfit uppercase tracking-wider flex items-center space-x-1.5">
-                      <Activity className="w-4 h-4 text-emerald-600" />
-                      <span>LIVE STATUS TIMELINE</span>
-                    </h3>
-                    <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      {activeComplaint.status}
-                    </span>
-                  </div>
-
-                  {/* VERTICAL STEPPER LIST */}
-                  <div className="relative pl-3 border-l-2 border-emerald-200 space-y-3 text-xs font-sans my-1">
-                    {TIMELINE_STEPS.map((step) => {
-                      const stepState = getStepStatus(step, activeComplaint.status);
-
-                      let iconNode = <span className="w-2 h-2 rounded-full bg-gray-300" />;
-                      let labelColor = 'text-gray-400 font-normal';
-                      let badgeTag = null;
-
-                      if (stepState === 'completed') {
-                        iconNode = <span className="w-3.5 h-3.5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-extrabold">✓</span>;
-                        labelColor = 'text-gray-900 font-bold';
-                      } else if (stepState === 'current') {
-                        iconNode = <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-extrabold animate-pulse">●</span>;
-                        labelColor = 'text-emerald-800 font-extrabold';
-                        badgeTag = <span className="ml-2 text-[9px] font-mono font-extrabold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">Active</span>;
-                      } else if (stepState === 'rejected') {
-                        iconNode = <span className="w-3.5 h-3.5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px] font-extrabold">✕</span>;
-                        labelColor = 'text-rose-700 font-bold';
-                      }
-
-                      return (
-                        <div key={step.key} className="relative flex items-start space-x-2.5">
-                          <div className="absolute -left-[19px] top-0.5 flex items-center justify-center bg-white rounded-full">
-                            {iconNode}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className={`text-xs ${labelColor} font-outfit`}>
-                                {step.label}
-                                {badgeTag}
-                              </span>
-                              {stepState === 'completed' && (
-                                <span className="text-[10px] font-mono text-gray-400">
-                                  {new Date(activeComplaint.updated_at).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-gray-500 block leading-tight pt-0.5 font-sans">
-                              {step.description}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* FLOATING CARD 3: OFFICER REMARKS STREAM (If logs exist) */}
-                {historyLogs.length > 0 && (
-                  <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-gray-200 shadow-xl space-y-2 text-xs">
-                    <h4 className="font-extrabold text-gray-900 font-outfit text-xs border-b border-gray-100 pb-1.5 flex items-center space-x-1.5">
-                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Latest Officer Remarks</span>
-                    </h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                      {historyLogs.slice(0, 3).map((log, index) => (
-                        <div key={log.id || index} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-gray-900">{log.updated_by || 'Officer'}</span>
-                            <span className="font-mono text-[10px] text-gray-400">{new Date(log.created_at).toLocaleTimeString()}</span>
-                          </div>
-                          {log.remark && (
-                            <p className="text-[11px] text-gray-700 italic bg-white p-2 rounded border border-gray-100">
-                              "{log.remark}"
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* 3. FLOATING BOTTOM LIVE STATUS BAR */}
-              <div className="absolute left-3 sm:left-5 right-3 sm:right-5 bottom-3 z-20 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3 rounded-2xl border border-gray-200 shadow-md flex items-center justify-between font-sans text-xs">
+              {/* LIVE STATUS BAR (POSITIONED CLEANLY BELOW MAP) */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between font-sans text-xs">
                 <div className="flex items-center space-x-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
                   <span className="font-extrabold text-emerald-800 font-outfit">● Live Updates Active</span>

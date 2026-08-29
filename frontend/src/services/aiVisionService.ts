@@ -140,16 +140,16 @@ export async function checkAiHealth(): Promise<{ configured: boolean; model: str
       return await res.json();
     } else {
       const errText = await res.text();
-      return { configured: true, model: 'gemini-3.6-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
+      return { configured: true, model: 'gemini-2.5-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
     }
   } catch (err: any) {
     try {
-      const directRes = await fetch('${getApiUrl()}/api/ai/health');
+      const directRes = await fetch(`${getApiUrl()}/api/ai/health`);
       if (directRes.ok) return await directRes.json();
     } catch (e) {}
     return {
       configured: false,
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       reachable: false,
       error: `Express Backend server on port 5000 is not reachable (${err.message}).`
     };

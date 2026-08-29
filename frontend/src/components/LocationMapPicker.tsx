@@ -24,15 +24,21 @@ function MapController({ center, zoom = 16 }: { center: [number, number]; zoom?:
   const map = useMap();
 
   useEffect(() => {
+    try {
+      map.invalidateSize();
+    } catch (e) {}
+
     if (center && typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
       map.setView(center, zoom, { animate: true });
-      const timer = setTimeout(() => {
-        try {
-          map.invalidateSize();
-        } catch (e) {}
-      }, 100);
-      return () => clearTimeout(timer);
     }
+
+    const t1 = setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 100);
+    const t2 = setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 300);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [center[0], center[1], zoom, map]);
 
   return null;
@@ -97,7 +103,7 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
   );
 
   return (
-    <div className="w-full h-64 sm:h-72 rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
+    <div className="w-full h-full min-h-[450px] rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
       <MapContainer
         center={position}
         zoom={16}
@@ -105,8 +111,9 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
         className="w-full h-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
         />
 
         <MapController center={position} zoom={16} />

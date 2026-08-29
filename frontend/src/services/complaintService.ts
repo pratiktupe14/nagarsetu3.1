@@ -137,11 +137,30 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   return cleanList;
 }
 
-// Fetch citizen complaints from Supabase
+// Fetch citizen complaints from backend API, Supabase & LocalStorage
 export async function getCitizenComplaints(citizenId: string): Promise<Complaint[]> {
-  if (!citizenId || citizenId.trim() === '') return [];
+  let list: Complaint[] = [];
 
-  if (isSupabaseConfigured() && isValidUuid(citizenId)) {
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    if (token) {
+      const res = await fetch(`${getApiUrl()}/api/complaints/my`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.complaints)) {
+          list = data.complaints as Complaint[];
+        }
+      }
+    }
+  } catch (bErr) {
+    console.warn('Express backend getCitizenComplaints fallback note:', bErr);
+  }
+
+  // 2. Try Supabase if configured
+  if (list.length === 0 && isSupabaseConfigured() && citizenId && isValidUuid(citizenId)) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -150,18 +169,49 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        return (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+        list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
       }
     } catch (err) {
       console.warn('Supabase getCitizenComplaints fallback:', err);
     }
   }
 
-  const all = getStoredComplaints();
-  return all.filter((c) => c.citizen_id === citizenId && !isDemoComplaint(c));
+  // 3. Merge with LocalStorage cached complaints so local creations are preserved
+  const localAll = getStoredComplaints();
+  const filteredLocal = localAll.filter((c) => {
+    if (isDemoComplaint(c)) return false;
+    if (!citizenId || citizenId.trim() === '') return true;
+    return (
+      !c.citizen_id ||
+      String(c.citizen_id) === String(citizenId) ||
+      c.citizen_id === 'demo-citizen-id' ||
+      c.citizen_id === ''
+    );
+  });
+
+  const map = new Map<string, Complaint>();
+
+  // Add backend / Supabase list items
+  list.forEach((c) => {
+    const key = c.complaint_number || String(c.id);
+    if (key) map.set(key, c);
+  });
+
+  // Merge local items (preserving preview photos & local IDs)
+  filteredLocal.forEach((lc) => {
+    const key = lc.complaint_number || String(lc.id);
+    if (key) {
+      const existing = map.get(key);
+      map.set(key, existing ? { ...existing, ...lc } : lc);
+    }
+  });
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
-// Fetch staff tasks from Supabase
+// Fetch staff tasks from Supabase & LocalStorage
 export async function getStaffTasks(staffId?: string, departmentName?: string): Promise<Complaint[]> {
   if (isSupabaseConfigured()) {
     try {
@@ -270,9 +320,14 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
   }
 
   // 3. Try LocalStorage cached complaints fallback
-  if (!comp) {
-    const all = getStoredComplaints();
-    comp = all.find((c) => String(c.id) === String(idOrNumber) || (c.complaint_number && c.complaint_number.toLowerCase() === idOrNumber.toLowerCase())) || null;
+  const all = getStoredComplaints();
+  const localMatch = all.find((c) =>
+    String(c.id) === String(idOrNumber) ||
+    (c.complaint_number && c.complaint_number.toLowerCase() === idOrNumber.toLowerCase())
+  );
+
+  if (localMatch) {
+    comp = comp ? { ...localMatch, ...comp } : localMatch;
   }
 
   if (comp) {
@@ -337,13 +392,14 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
   try {
     const token = localStorage.getItem('nagarsetu_token');
     if (token) {
-      const res = await fetch('${getApiUrl()}/api/complaints/submit', {
+      const res = await fetch(`${getApiUrl()}/api/complaints/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          complaint_number: newComplaint.complaint_number,
           photo_url: newComplaint.photo_before_url,
           category: newComplaint.category,
           title: newComplaint.title,
@@ -358,8 +414,9 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
       });
       if (res.ok) {
         const bData = await res.json();
-        if (bData && bData.complaint_id) {
-          newComplaint.id = String(bData.complaint_id);
+        if (bData) {
+          if (bData.complaint_id) newComplaint.id = String(bData.complaint_id);
+          if (bData.complaint_number) newComplaint.complaint_number = bData.complaint_number;
         }
       }
     }
