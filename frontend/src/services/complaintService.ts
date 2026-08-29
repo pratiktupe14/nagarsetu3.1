@@ -254,12 +254,23 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('complaints').select('*');
-      if (departmentId && isValidUuid(departmentId)) {
-        query = query.eq('department_id', departmentId);
-      } else if (departmentName && departmentName !== 'All') {
-        const cleanDept = departmentName.split('(')[0].trim();
-        query = query.or(`department_name.ilike.%${cleanDept}%,category.ilike.%${cleanDept}%`);
+      
+      let targetUuid = (departmentId && isValidUuid(departmentId)) ? departmentId : null;
+      if (!targetUuid && departmentName && departmentName !== 'All') {
+        const { data: deptData } = await supabase.from('departments').select('id, name, code');
+        const cleanName = departmentName.split('(')[0].trim().toLowerCase();
+        const matched = (deptData || []).find((d) =>
+          d.name.toLowerCase().includes(cleanName) || cleanName.includes(d.name.toLowerCase())
+        );
+        if (matched) targetUuid = matched.id;
       }
+
+      if (targetUuid) {
+        query = query.eq('department_id', targetUuid);
+      } else if (departmentId) {
+        query = query.eq('department_id', departmentId);
+      }
+
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (!error && data && Array.isArray(data)) {
@@ -275,10 +286,10 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   return all.filter((c) => {
     if (departmentId && c.department_id === departmentId) return true;
     const cDept = (c.department_name || '').toLowerCase();
-    const cCat = (c.category || '').toLowerCase();
-    return cDept.includes(cleanHeadDept) || cleanHeadDept.includes(cDept) || cCat.includes(cleanHeadDept);
+    return cDept.includes(cleanHeadDept) || cleanHeadDept.includes(cDept);
   });
 }
+
 
 export async function getComplaintById(idOrNumber: string): Promise<Complaint | null> {
   if (!idOrNumber) return null;
@@ -356,6 +367,28 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
   if (isSupabaseConfigured()) {
     try {
+      const SUPABASE_DEPT_MAP: Record<string, string> = {
+        PWD: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
+        SAN: '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
+        WTR: 'ead370cc-459c-44f0-899f-8a97f0928beb',
+        DRN: 'ee73cb82-cc47-4333-b7d6-4491353c1354',
+        ELE: '31842723-23ac-490b-912b-9f6d9afbdfb3',
+        TRF: 'ae5e4d0c-996f-4d81-9528-d642664c93ae'
+      };
+
+      let resolvedDeptUuid = newComplaint.department_id;
+      if (!resolvedDeptUuid || !isValidUuid(resolvedDeptUuid)) {
+        const deptNameStr = (newComplaint.department_name || '').toLowerCase();
+        const catStr = (newComplaint.category || '').toLowerCase();
+
+        if (deptNameStr.includes('water') || catStr.includes('water')) resolvedDeptUuid = SUPABASE_DEPT_MAP.WTR;
+        else if (deptNameStr.includes('sanitation') || deptNameStr.includes('waste') || catStr.includes('garbage') || catStr.includes('waste')) resolvedDeptUuid = SUPABASE_DEPT_MAP.SAN;
+        else if (deptNameStr.includes('drain') || deptNameStr.includes('sewag') || catStr.includes('drain') || catStr.includes('sewag')) resolvedDeptUuid = SUPABASE_DEPT_MAP.DRN;
+        else if (deptNameStr.includes('electric') || deptNameStr.includes('light') || catStr.includes('electric') || catStr.includes('light')) resolvedDeptUuid = SUPABASE_DEPT_MAP.ELE;
+        else if (deptNameStr.includes('traffic') || catStr.includes('traffic')) resolvedDeptUuid = SUPABASE_DEPT_MAP.TRF;
+        else if (deptNameStr.includes('public works') || deptNameStr.includes('pwd') || catStr.includes('road') || catStr.includes('pothole')) resolvedDeptUuid = SUPABASE_DEPT_MAP.PWD;
+      }
+
       const dbPayload: Record<string, any> = {
         complaint_number: newComplaint.complaint_number,
         photo_before_url: newComplaint.photo_before_url,
@@ -364,6 +397,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
         description: newComplaint.description,
         priority: newComplaint.priority || 'Medium',
         status: newComplaint.status || 'Submitted',
+        department_id: resolvedDeptUuid || null,
         latitude: newComplaint.latitude,
         longitude: newComplaint.longitude,
         location_source: newComplaint.location_source,
@@ -382,11 +416,13 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
       if (!error && data) {
         newComplaint.id = data.id;
+        if (data.department_id) newComplaint.department_id = data.department_id;
       }
     } catch (err) {
       console.warn('Supabase createComplaint insert fallback:', err);
     }
   }
+
 
   // Sync with Express backend API if authenticated
   try {

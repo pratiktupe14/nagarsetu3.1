@@ -861,12 +861,13 @@ export const ReportIssuePage: React.FC = () => {
                     }}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 focus:border-emerald-500 min-h-[44px]"
                   >
-                    <option value="Roads & Public Works Department (PWD)">{translateDepartment('Roads & Public Works Department (PWD)')}</option>
-                    <option value="Sanitation & Solid Waste Management">{translateDepartment('Sanitation & Solid Waste Management')}</option>
+                    <option value="Public Works Department">{translateDepartment('Public Works Department')}</option>
+                    <option value="Sanitation & Waste Management">{translateDepartment('Sanitation & Waste Management')}</option>
                     <option value="Water Supply & Sewerage Board">{translateDepartment('Water Supply & Sewerage Board')}</option>
-                    <option value="Electrical & Public Lighting Department">{translateDepartment('Electrical & Public Lighting Department')}</option>
-                    <option value="Drainage & Sewerage Department">{translateDepartment('Drainage & Sewerage Department')}</option>
-                    <option value="Traffic Engineering & Control Department">{translateDepartment('Traffic Engineering & Control Department')}</option>
+                    <option value="Drainage & Sewage Department">{translateDepartment('Drainage & Sewage Department')}</option>
+                    <option value="Electrical & Street Lighting">{translateDepartment('Electrical & Street Lighting')}</option>
+                    <option value="Traffic Management Department">{translateDepartment('Traffic Management Department')}</option>
+                    <option value="Maintenance Department">{translateDepartment('Maintenance Department')}</option>
                   </select>
                 </div>
               </div>

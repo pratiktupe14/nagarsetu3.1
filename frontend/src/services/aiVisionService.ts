@@ -43,22 +43,31 @@ export function normalizeDepartment(dept?: string, category?: string): string {
   if (str.includes('water supply') || str.includes('water leakage') || str.includes('pipeline') || (str.includes('water') && !str.includes('drain') && !str.includes('sew')) || (cat.includes('water') && !cat.includes('drain'))) {
     return 'Water Supply & Sewerage Board';
   }
+  if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
+    return 'Sanitation & Waste Management';
+  }
   if (str.includes('drain') || str.includes('sewag') || str.includes('sewer') || cat.includes('drainage') || cat.includes('sewage')) {
-    return 'Drainage & Sewerage Department';
+    return 'Drainage & Sewage Department';
+  }
+  if (str.includes('electric') || str.includes('streetlight') || str.includes('lighting') || cat.includes('streetlight') || cat.includes('electrical')) {
+    return 'Electrical & Street Lighting';
   }
   if (str.includes('traffic') || str.includes('signal') || cat.includes('traffic')) {
-    return 'Traffic Engineering & Control Department';
+    return 'Traffic Management Department';
   }
-  if (str.includes('road') || str.includes('pothole') || str.includes('public works') || str.includes('pwd') || str.includes('footpath') || cat.includes('road') || cat.includes('infrastructure')) {
-    return 'Roads & Public Works Department (PWD)';
+  if (str.includes('maintenance') || cat.includes('infrastructure') || cat.includes('other')) {
+    return 'Maintenance Department';
+  }
+  if (str.includes('road') || str.includes('pothole') || str.includes('public works') || str.includes('pwd') || str.includes('footpath') || cat.includes('road')) {
+    return 'Public Works Department';
   }
 
-  return 'Roads & Public Works Department (PWD)';
+  return 'Public Works Department';
 }
 
 export const VALID_TAXONOMY_MAP: Record<CivicCategory, { department: string; defaultTitle: string; defaultPriority: PriorityLevel }> = {
   'Road Damage / Pothole': {
-    department: 'Roads & Public Works Department (PWD)',
+    department: 'Public Works Department',
     defaultTitle: 'Asphalt Pothole / Road Surface Crater',
     defaultPriority: 'High'
   },
@@ -68,32 +77,32 @@ export const VALID_TAXONOMY_MAP: Record<CivicCategory, { department: string; def
     defaultPriority: 'High'
   },
   'Garbage / Waste': {
-    department: 'Sanitation & Solid Waste Management',
+    department: 'Sanitation & Waste Management',
     defaultTitle: 'Uncollected Solid Waste Accumulation',
     defaultPriority: 'Medium'
   },
   'Drainage / Sewage': {
-    department: 'Drainage & Sewerage Department',
+    department: 'Drainage & Sewage Department',
     defaultTitle: 'Blocked Stormwater Drain & Sewage Overflow',
     defaultPriority: 'Critical'
   },
   'Streetlight / Electrical': {
-    department: 'Electrical & Public Lighting Department',
+    department: 'Electrical & Street Lighting',
     defaultTitle: 'Damaged / Inoperative Streetlight Fixture',
     defaultPriority: 'Medium'
   },
   'Traffic Infrastructure': {
-    department: 'Traffic Engineering & Control Department',
+    department: 'Traffic Management Department',
     defaultTitle: 'Malfunctioning / Damaged Traffic Signal',
     defaultPriority: 'High'
   },
   'Public Infrastructure Damage': {
-    department: 'Roads & Public Works Department (PWD)',
+    department: 'Maintenance Department',
     defaultTitle: 'Damaged Public Footpath / Railing',
     defaultPriority: 'High'
   },
   'Other Civic Issue': {
-    department: 'Roads & Public Works Department (PWD)',
+    department: 'Maintenance Department',
     defaultTitle: 'General Civic Defect / Public Grievance',
     defaultPriority: 'Medium'
   }

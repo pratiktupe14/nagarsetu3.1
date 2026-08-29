@@ -4,71 +4,71 @@ const { query } = require('../config/db');
 const OFFICIAL_DEPARTMENTS = [
   {
     code: 'PWD',
-    name: 'Public Works Department (PWD)',
-    searchTerms: ['Public Works', 'PWD', 'Road'],
+    name: 'Public Works Department',
+    searchTerms: ['Public Works Department', 'Public Works', 'PWD'],
     description: 'Asphalt road repairs, pothole filling, sidewalk paving, and structural civic infrastructure maintenance.',
-    headName: 'PWD Department Head',
-    email: 'pwd.head@nagarsetu.gov.in',
+    headName: 'Rahul Kumar',
+    email: 'rahul.kumar@nagarsetu.gov.in',
     mobile: '9822000001',
     employeeId: 'EMP-PWD-001'
   },
   {
     code: 'SAN',
     name: 'Sanitation & Waste Management',
-    searchTerms: ['Sanitation', 'Solid Waste', 'Waste', 'Garbage'],
+    searchTerms: ['Sanitation & Waste Management', 'Sanitation & Solid Waste Management', 'Sanitation'],
     description: 'Solid waste collection, dumpster clearing, street sweeping, market sanitation, and public hygiene.',
-    headName: 'Sanitation Department Head',
-    email: 'sanitation.head@nagarsetu.gov.in',
+    headName: 'Amit Sharma',
+    email: 'amit.sharma@nagarsetu.gov.in',
     mobile: '9822000002',
     employeeId: 'EMP-SAN-001'
   },
   {
     code: 'WTR',
     name: 'Water Supply & Sewerage Board',
-    searchTerms: ['Water Supply', 'Water Board', 'Water'],
-    description: 'Potable water mains, underground pipeline leakage sealing, valve control, and sewage network maintenance.',
-    headName: 'Water Supply Department Head',
-    email: 'water.head@nagarsetu.gov.in',
+    searchTerms: ['Water Supply & Sewerage Board', 'Water Supply'],
+    description: 'Potable water mains, underground pipeline leakage sealing, valve control, and water network maintenance.',
+    headName: 'Vikram Patil',
+    email: 'vikram.patil@nagarsetu.gov.in',
     mobile: '9822000003',
     employeeId: 'EMP-WTR-001'
   },
   {
     code: 'DRN',
     name: 'Drainage & Sewage Department',
-    searchTerms: ['Drainage', 'Sewerage', 'Sewage', 'Drain'],
-    description: 'Drainage blockage, sewage overflow, open drains, and culvert maintenance.',
-    headName: 'Drainage Department Head',
-    email: 'drainage.head@nagarsetu.gov.in',
+    searchTerms: ['Drainage & Sewage Department', 'Drainage & Sewerage Department', 'Drainage Department'],
+    description: 'Drainage blockage, sewage overflow, open drains, culverts, and storm channels.',
+    headName: 'Sanjay More',
+    email: 'sanjay.more@nagarsetu.gov.in',
     mobile: '9822000004',
     employeeId: 'EMP-DRN-001'
   },
   {
     code: 'ELE',
     name: 'Electrical & Street Lighting',
-    searchTerms: ['Electrical', 'Lighting', 'Streetlight', 'Electric'],
+    searchTerms: ['Electrical & Street Lighting', 'Electrical & Lighting Department', 'Electrical Department'],
     description: 'Streetlight repair, electrical poles, transformer inspection, and public lighting.',
-    headName: 'Electrical Department Head',
-    email: 'electrical.head@nagarsetu.gov.in',
+    headName: 'Aditya Joshi',
+    email: 'aditya.joshi@nagarsetu.gov.in',
     mobile: '9822000005',
     employeeId: 'EMP-ELE-001'
   },
   {
     code: 'TRF',
     name: 'Traffic Management Department',
-    searchTerms: ['Traffic', 'Signal', 'Junction'],
+    searchTerms: ['Traffic Management Department', 'Traffic Management'],
     description: 'Traffic signal repairs, road signage, lane markings, and junction safety.',
-    headName: 'Traffic Department Head',
-    email: 'traffic.head@nagarsetu.gov.in',
+    headName: 'Rohan Deshmukh',
+    email: 'rohan.deshmukh@nagarsetu.gov.in',
     mobile: '9822000006',
     employeeId: 'EMP-TRF-001'
   },
   {
     code: 'MNT',
     name: 'Maintenance Department',
-    searchTerms: ['Maintenance', 'Building', 'Civic Asset'],
+    searchTerms: ['Maintenance Department', 'Building Maintenance'],
     description: 'General civic facility repairs, building maintenance, public park upkeep, and municipal asset management.',
-    headName: 'Maintenance Department Head',
-    email: 'maintenance.head@nagarsetu.gov.in',
+    headName: 'Kunal Kulkarni',
+    email: 'kunal.kulkarni@nagarsetu.gov.in',
     mobile: '9822000007',
     employeeId: 'EMP-MNT-001'
   }
@@ -89,11 +89,11 @@ async function seed7DemoDepartmentHeads() {
     for (const dMeta of OFFICIAL_DEPARTMENTS) {
       let deptId = null;
 
-      // Try finding by exact name or wildcard search terms
+      // Search by NAME first (strict match on terms)
       for (const term of dMeta.searchTerms) {
         const findRes = await query(
-          `SELECT id, name FROM departments WHERE name LIKE ? OR description LIKE ? LIMIT 1`,
-          [`%${term}%`, `%${term}%`]
+          `SELECT id, name FROM departments WHERE name LIKE ? LIMIT 1`,
+          [`%${term}%`]
         );
         if (findRes.rows && findRes.rows.length > 0) {
           deptId = findRes.rows[0].id;
@@ -101,7 +101,7 @@ async function seed7DemoDepartmentHeads() {
         }
       }
 
-      // If not found, insert department
+      // If not found by name, insert department
       if (!deptId) {
         const insRes = await query(
           `INSERT INTO departments (name, description) VALUES (?, ?)`,
@@ -109,6 +109,12 @@ async function seed7DemoDepartmentHeads() {
         );
         deptId = insRes.rows[0].id;
         console.log(`Created department: '${dMeta.name}' (ID: ${deptId})`);
+      } else {
+        // Update department name and description to match official standard
+        await query(
+          `UPDATE departments SET name = ?, description = ? WHERE id = ?`,
+          [dMeta.name, dMeta.description, deptId]
+        );
       }
 
       deptIdMap[dMeta.code] = deptId;
@@ -192,7 +198,7 @@ async function seed7DemoDepartmentHeads() {
         );
       }
 
-      console.log(`✓ Active Head set for ${dMeta.code} (${dMeta.name}) -> ${dMeta.email}`);
+      console.log(`✓ Active Head set for ${dMeta.code} (${dMeta.name}) -> ${dMeta.headName} (${dMeta.email})`);
     }
 
     console.log('=======================================================');

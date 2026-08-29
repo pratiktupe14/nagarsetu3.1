@@ -61,7 +61,7 @@ export interface CreateDepartmentHeadPayload {
 }
 
 export const TARGET_MUNICIPAL_DEPARTMENTS = [
-  { code: 'PWD', name: 'Public Works Department (PWD)' },
+  { code: 'PWD', name: 'Public Works Department' },
   { code: 'SAN', name: 'Sanitation & Waste Management' },
   { code: 'WTR', name: 'Water Supply & Sewerage Board' },
   { code: 'DRN', name: 'Drainage & Sewage Department' },
@@ -69,6 +69,7 @@ export const TARGET_MUNICIPAL_DEPARTMENTS = [
   { code: 'TRF', name: 'Traffic Management Department' },
   { code: 'MNT', name: 'Maintenance Department' }
 ];
+
 
 
 /**
@@ -88,7 +89,8 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
 
   // Backend API fallback
   try {
-    const res = await fetch('${getApiUrl()}/api/admin/departments');
+    const res = await fetch(`${getApiUrl()}/api/admin/departments`);
+
     if (res.ok) {
       const bData = await res.json();
       if (bData && bData.departments && bData.departments.length > 0) {
@@ -149,10 +151,11 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
     const [dhRes, deptRes, compRes] = await Promise.all([
-      fetch('${getApiUrl()}/api/admin/department-heads', { headers }),
-      fetch('${getApiUrl()}/api/admin/departments', { headers }),
-      fetch('${getApiUrl()}/api/complaints', { headers })
+      fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }),
+      fetch(`${getApiUrl()}/api/admin/departments`, { headers }),
+      fetch(`${getApiUrl()}/api/complaints`, { headers })
     ]);
+
 
     if (dhRes.ok) {
       const dhData = await dhRes.json();
@@ -213,11 +216,23 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       (p) => p.role === 'department_head' && (String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id)
     );
 
+    const defaultMeta: Record<string, { name: string; email: string; phone: string }> = {
+      PWD: { name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001' },
+      SAN: { name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002' },
+      WTR: { name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003' },
+      DRN: { name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004' },
+      ELE: { name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005' },
+      TRF: { name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006' },
+      MNT: { name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007' }
+    };
+    const def = defaultMeta[(deptCode || '').toUpperCase()] || { name: 'Department Head', email: 'head@nagarsetu.gov.in', phone: '+91 98220 00000' };
+
     const hasActiveHead = Boolean(activeHeadRow && activeHeadRow.status === 'active');
-    const headName = activeHeadRow?.name || headProf?.full_name || (hasActiveHead ? 'Department Head' : 'No Active Head');
-    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'unassigned@nagarsetu.gov.in');
-    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? '+91 98220 00000' : 'N/A');
-    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
+    const headName = activeHeadRow?.name || headProf?.full_name || (hasActiveHead ? def.name : def.name);
+    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? def.email : def.email);
+    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? def.phone : def.phone);
+    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || `EMP-${deptCode}-001`;
+
     const designation = activeHeadRow?.designation || 'Department Head';
     const status: 'Active' | 'Inactive' | 'No Active Head' = activeHeadRow ? (activeHeadRow.status === 'active' ? 'Active' : 'Inactive') : 'No Active Head';
 
