@@ -294,7 +294,7 @@ export const ReportIssuePage: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title="Report Civic Issue">
+    <DashboardLayout title={t('reportComplaint')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 font-sans">
         
         {/* HEADER BAR */}
@@ -303,14 +303,14 @@ export const ReportIssuePage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Link to="/citizen/portal" className="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1">
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back to Dashboard</span>
+                <span>{t('backToDashboard')}</span>
               </Link>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              Report Civic Issue
+              {t('reportComplaint')}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
-              Upload photos and provide details of the civic defect. AI Vision automatically classifies the issue.
+              {t('reportIssueSubtitle')}
             </p>
           </div>
 
@@ -334,7 +334,7 @@ export const ReportIssuePage: React.FC = () => {
         {draftSavedToast && (
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center space-x-2 shadow-xs">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>✓ Complaint draft saved offline to your device.</span>
+            <span>{t('draftSavedSuccess')}</span>
           </div>
         )}
 
@@ -346,7 +346,7 @@ export const ReportIssuePage: React.FC = () => {
             
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                1. Civic Issue Photo Evidence
+                {t('photoEvidenceStep')}
               </h2>
               {photoPreviewUrl && (
                 <button
@@ -359,7 +359,7 @@ export const ReportIssuePage: React.FC = () => {
                   }}
                   className="text-xs text-rose-600 font-bold hover:underline min-h-[44px]"
                 >
-                  Remove Photo
+                  {t('removePhoto')}
                 </button>
               )}
             </div>
@@ -373,8 +373,8 @@ export const ReportIssuePage: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">Upload Primary Photo</h3>
-                    <p className="text-xs text-gray-500">Take a photo or upload an image of the civic issue.</p>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('uploadPrimaryPhoto')}</h3>
+                    <p className="text-xs text-gray-500">{t('uploadPhotoSubtitle')}</p>
                   </div>
 
                   {/* Camera Direct Input */}
@@ -412,7 +412,7 @@ export const ReportIssuePage: React.FC = () => {
                       className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-sm min-h-[44px] flex items-center justify-center space-x-2"
                     >
                       <Camera className="w-4 h-4" />
-                      <span>Take Photo (Camera)</span>
+                      <span>{t('takePhotoCamera')}</span>
                     </label>
 
                     <label
@@ -420,7 +420,7 @@ export const ReportIssuePage: React.FC = () => {
                       className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 font-extrabold text-xs uppercase tracking-wider cursor-pointer border border-gray-300 shadow-xs min-h-[44px] flex items-center justify-center space-x-2"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>Gallery / Files</span>
+                      <span>{t('galleryFiles')}</span>
                     </label>
                   </div>
                 </div>
@@ -433,7 +433,7 @@ export const ReportIssuePage: React.FC = () => {
                   {analyzingAI && (
                     <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-2 font-outfit text-xs font-extrabold">
                       <Sparkles className="w-6 h-6 animate-spin text-emerald-400" />
-                      <span>AI Vision Analyzing Visual Evidence...</span>
+                      <span>{t('analyzingPhoto')}</span>
                     </div>
                   )}
                 </div>
@@ -444,7 +444,7 @@ export const ReportIssuePage: React.FC = () => {
                     className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs text-center border border-gray-300 cursor-pointer min-h-[44px] flex items-center justify-center space-x-1"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Replace Primary Photo</span>
+                    <span>{t('replacePrimaryPhoto')}</span>
                   </label>
 
                   <button
@@ -461,7 +461,7 @@ export const ReportIssuePage: React.FC = () => {
                     }}
                     className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[44px]"
                   >
-                    Remove
+                    {t('removePhoto')}
                   </button>
                 </div>
               </div>
@@ -473,7 +473,7 @@ export const ReportIssuePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold text-amber-900 font-outfit uppercase tracking-wider flex items-center space-x-1.5">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>AI Vision Analysis</span>
+                    <span>{t('aiVisionAnalysis')}</span>
                   </span>
                   <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded border text-amber-800 bg-white border-amber-200">
                     Status: AI Temporarily Unavailable
@@ -495,7 +495,7 @@ export const ReportIssuePage: React.FC = () => {
                       className="w-full sm:w-1/2 py-2.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 flex items-center justify-center space-x-1 min-h-[44px] cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${analyzingAI ? 'animate-spin' : ''}`} />
-                      <span>{analyzingAI ? 'Retrying...' : 'Retry AI Analysis'}</span>
+                      <span>{analyzingAI ? t('retrying') : t('retryAiAnalysis')}</span>
                     </button>
                   )}
 
@@ -507,7 +507,7 @@ export const ReportIssuePage: React.FC = () => {
                     }}
                     className="w-full sm:w-1/2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center space-x-1 min-h-[44px] cursor-pointer"
                   >
-                    <span>Continue Manually</span>
+                    <span>{t('continueManually')}</span>
                   </button>
                 </div>
               </div>
@@ -516,7 +516,7 @@ export const ReportIssuePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold text-emerald-900 font-outfit uppercase tracking-wider flex items-center space-x-1">
                     <Sparkles className="w-4 h-4 text-emerald-600" />
-                    <span>AI Vision Analysis Result</span>
+                    <span>{t('aiVisionAnalysisResult')}</span>
                   </span>
 
                   <span
@@ -542,18 +542,18 @@ export const ReportIssuePage: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-2 text-gray-800 pt-1 font-medium">
                   <div>
-                    <span className="text-gray-500 block text-[10px]">Detected Category:</span>
-                    <strong className="text-emerald-900 font-outfit text-sm">✓ {aiResult.category}</strong>
+                    <span className="text-gray-500 block text-[10px]">{t('aiDetectedCategory')}</span>
+                    <strong className="text-emerald-900 font-outfit text-sm">✓ {translateCategory(aiResult.category)}</strong>
                   </div>
                   <div>
-                    <span className="text-gray-500 block text-[10px]">Recommended Department:</span>
-                    <strong className="text-gray-900 text-xs truncate block">{aiResult.department}</strong>
+                    <span className="text-gray-500 block text-[10px]">{t('recommendedDepartment')}</span>
+                    <strong className="text-gray-900 text-xs truncate block">{translateDepartment(aiResult.department)}</strong>
                   </div>
                 </div>
 
                 {aiResult.detected_objects && aiResult.detected_objects.length > 0 && (
                   <div className="pt-1 border-t border-emerald-200/60 flex flex-wrap gap-1 items-center">
-                    <span className="text-[10px] text-gray-500 mr-1">Detected Features:</span>
+                    <span className="text-[10px] text-gray-500 mr-1">{t('detectedFeatures')}</span>
                     {aiResult.detected_objects.map((obj) => (
                       <span key={obj} className="px-1.5 py-0.5 bg-white rounded border border-emerald-200 text-[10px] font-mono text-emerald-800">
                         #{obj}
@@ -570,7 +570,7 @@ export const ReportIssuePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1.5">
                     <ImageIcon className="w-4 h-4 text-emerald-600" />
-                    <span className="font-extrabold text-gray-900 font-outfit">Additional Angles & Evidence ({additionalPhotos.length}/4)</span>
+                    <span className="font-extrabold text-gray-900 font-outfit">{t('additionalAnglesEvidence')} ({additionalPhotos.length}/4)</span>
                   </div>
 
                   {/* Additional Angle Camera Input */}
@@ -610,7 +610,7 @@ export const ReportIssuePage: React.FC = () => {
                         title="Take photo with camera"
                       >
                         <Camera className="w-3.5 h-3.5" />
-                        <span>Camera</span>
+                        <span>{t('camera')}</span>
                       </label>
 
                       <label
@@ -619,7 +619,7 @@ export const ReportIssuePage: React.FC = () => {
                         title="Choose photo from gallery or files"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Gallery/Files</span>
+                        <span>{t('galleryFiles')}</span>
                       </label>
                     </div>
                   )}
@@ -635,7 +635,7 @@ export const ReportIssuePage: React.FC = () => {
                 {analyzingAngle && (
                   <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center space-x-2">
                     <Sparkles className="w-4 h-4 animate-spin text-emerald-600" />
-                    <span>AI Visual Similarity Comparing New Angle...</span>
+                    <span>{t('comparingNewAngle')}</span>
                   </div>
                 )}
 
@@ -681,7 +681,7 @@ export const ReportIssuePage: React.FC = () => {
                   </div>
                 ) : (
                   <p className="text-[11px] text-gray-500 italic">
-                    You can capture up to 4 additional vantage angles to provide stronger visual evidence.
+                    {t('additionalAnglesHint')}
                   </p>
                 )}
               </div>
@@ -692,7 +692,7 @@ export const ReportIssuePage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <MapPin className="w-5 h-5 text-rose-500" />
-                  <span className="font-extrabold text-gray-900 font-outfit text-sm">📍 Complaint Location</span>
+                  <span className="font-extrabold text-gray-900 font-outfit text-sm">📍 {t('complaintLocation')}</span>
                 </div>
 
                 <button
@@ -702,7 +702,7 @@ export const ReportIssuePage: React.FC = () => {
                   className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs border border-emerald-200 flex items-center space-x-1 min-h-[36px] cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${detectingLocation ? 'animate-spin' : ''}`} />
-                  <span>{detectingLocation ? 'Detecting...' : 'Detect My Location'}</span>
+                  <span>{detectingLocation ? t('detecting') : t('detectMyLocation')}</span>
                 </button>
               </div>
 
@@ -752,12 +752,12 @@ export const ReportIssuePage: React.FC = () => {
 
               {/* ADDRESS & COORDINATES DISPLAY */}
               <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1.5">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Location Address / Landmark</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">{t('locationAddressLandmark')}</span>
                 <input
                   type="text"
                   value={locationAddress}
                   onChange={(e) => setLocationAddress(e.target.value)}
-                  placeholder="Enter landmark or street name..."
+                  placeholder={t('locationLandmarkPlaceholder')}
                   className="w-full bg-white border border-gray-200 rounded-lg p-2 font-bold text-xs text-gray-900 focus:border-emerald-500"
                 />
                 <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 pt-0.5">
@@ -776,11 +776,11 @@ export const ReportIssuePage: React.FC = () => {
             
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                2. Complaint Details & Form
+                {t('complaintDetailsFormStep')}
               </h2>
               {isManuallyEdited && (
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  ✓ Manually Edited
+                  ✓ {t('manuallyEdited')}
                 </span>
               )}
             </div>
@@ -877,34 +877,34 @@ export const ReportIssuePage: React.FC = () => {
             {/* 100M NEARBY DUPLICATE CHECK */}
             <div className="pt-2 border-t border-gray-100">
               <span className="font-extrabold text-gray-900 font-outfit block text-xs mb-2">
-                3. Nearby Complaint Check (100m Radius)
+                {t('nearbyComplaintCheck')}
               </span>
 
               {nearbyDuplicates.length === 0 ? (
                 <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>✓ No similar complaint found nearby in the 100m radius.</span>
+                  <span>{t('noSimilarComplaintNearby')}</span>
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 text-xs">
                   <div className="flex items-center space-x-2 font-bold">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>⚠ Similar complaint found nearby ({nearbyDuplicates[0].distanceMeters}m away)</span>
+                    <span>{t('similarComplaintFoundNearby')} ({nearbyDuplicates[0].distanceMeters}m away)</span>
                   </div>
-                  <p className="text-amber-800 text-[11px]">An existing complaint for a similar issue was reported nearby.</p>
+                  <p className="text-amber-800 text-[11px]">{t('existingComplaintReportedNearby')}</p>
                   <div className="flex items-center space-x-2 pt-1">
                     <Link
                       to={`/citizen/complaint/${nearbyDuplicates[0].complaint.id}`}
                       className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px] flex items-center"
                     >
-                      View Existing
+                      {t('viewExisting')}
                     </Link>
                     <button
                       type="button"
                       onClick={() => alert(`Thank you! Your support for complaint ${nearbyDuplicates[0].complaint.complaint_number} has been recorded.`)}
                       className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 min-h-[44px]"
                     >
-                      Support Existing
+                      {t('supportExisting')}
                     </button>
                   </div>
                 </div>
@@ -919,7 +919,7 @@ export const ReportIssuePage: React.FC = () => {
                 className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs border border-gray-300 min-h-[44px] flex items-center justify-center space-x-1.5"
               >
                 <Save className="w-4 h-4 text-gray-600" />
-                <span>Save Draft</span>
+                <span>{t('saveDraft')}</span>
               </button>
 
               <button
@@ -927,7 +927,7 @@ export const ReportIssuePage: React.FC = () => {
                 onClick={() => setShowReviewModal(true)}
                 className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px] flex items-center justify-center space-x-2 transition-all"
               >
-                <span>Review Complaint ({additionalPhotos.length + 1} Photos)</span>
+                <span>{t('reviewComplaint')} ({additionalPhotos.length + 1} Photos)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -961,7 +961,7 @@ export const ReportIssuePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Landmark / Address Note</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t('locationAddressLandmark')}</label>
               <input
                 type="text"
                 value={locationAddress}
@@ -988,7 +988,7 @@ export const ReportIssuePage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
           <div className="max-w-lg w-full bg-white rounded-xl p-6 border border-gray-200 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-base font-extrabold text-gray-900 font-outfit">Review Complaint Before Submission</h3>
+              <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('reviewBeforeSubmission')}</h3>
               <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>
             </div>
 
@@ -1011,17 +1011,17 @@ export const ReportIssuePage: React.FC = () => {
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-emerald-800 font-outfit">Category: {category}</span>
-                <span className="font-extrabold text-gray-900">Priority: {priority}</span>
+                <span className="font-bold text-emerald-800 font-outfit">{t('category')}: {translateCategory(category)}</span>
+                <span className="font-extrabold text-gray-900">{t('priority')}: {translatePriority(priority)}</span>
               </div>
 
               <div>
-                <strong className="block text-gray-900 font-outfit text-sm">{title || `${category} Issue`}</strong>
+                <strong className="block text-gray-900 font-outfit text-sm">{title || `${translateCategory(category)} Issue`}</strong>
                 <p className="text-gray-600 text-[11px] mt-0.5">{description || 'No description provided.'}</p>
               </div>
 
               <div className="pt-2 border-t border-gray-200 flex flex-wrap justify-between text-gray-500 text-[11px]">
-                <span>Dept: {department}</span>
+                <span>Dept: {translateDepartment(department)}</span>
                 <span>Address: {locationAddress}</span>
               </div>
 
@@ -1039,7 +1039,7 @@ export const ReportIssuePage: React.FC = () => {
                 onClick={() => setShowReviewModal(false)}
                 className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs min-h-[44px]"
               >
-                Edit Form
+                {t('editForm')}
               </button>
 
               <button
@@ -1049,7 +1049,7 @@ export const ReportIssuePage: React.FC = () => {
                 className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase min-h-[44px] flex items-center space-x-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{submitting ? 'Submitting...' : 'Submit Complaint'}</span>
+                <span>{submitting ? t('submitting') : t('submitComplaint')}</span>
               </button>
             </div>
           </div>

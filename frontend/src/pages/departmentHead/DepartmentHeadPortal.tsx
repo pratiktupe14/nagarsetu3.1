@@ -211,7 +211,7 @@ const formatRelativeTimestamp = (isoDateString: string) => {
 
 export const DepartmentHeadPortal: React.FC = () => {
   const { user, logout } = useAuth();
-  const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority } = useLanguage();
+  const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -1799,42 +1799,42 @@ export const DepartmentHeadPortal: React.FC = () => {
             {/* 1. PRIMARY STATISTICS CARDS (DERIVED FROM SUPABASE DB) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Complaints</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('totalComplaints')}</span>
                 <span className="text-xl font-extrabold text-gray-900 font-mono block">{complaintMetrics.total}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1 bg-amber-50/40">
-                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-outfit">Unassigned</span>
+                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-outfit">{t('unassigned')}</span>
                 <span className="text-xl font-extrabold text-amber-900 font-mono block">{complaintMetrics.unassigned}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Assigned</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('assigned')}</span>
                 <span className="text-xl font-extrabold text-blue-700 font-mono block">{complaintMetrics.assigned}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('inProgress')}</span>
                 <span className="text-xl font-extrabold text-amber-600 font-mono block">{complaintMetrics.inProgress}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Pending Review</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('pendingReview')}</span>
                 <span className="text-xl font-extrabold text-purple-700 font-mono block">{complaintMetrics.completedReviews}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1 bg-rose-50/50">
-                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Overdue</span>
+                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">{t('overdue')}</span>
                 <span className="text-xl font-extrabold text-rose-900 font-mono block">{complaintMetrics.overdue}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1 bg-red-50/30">
-                <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block font-outfit">Critical Priority</span>
+                <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block font-outfit">{t('criticalPriority')}</span>
                 <span className="text-xl font-extrabold text-red-700 font-mono block">{complaintMetrics.critical}</span>
               </div>
 
               <div className="p-3.5 text-center space-y-1 bg-emerald-50/40">
-                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block font-outfit">Resolved</span>
+                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block font-outfit">{t('resolved')}</span>
                 <span className="text-xl font-extrabold text-emerald-700 font-mono block">{complaintMetrics.resolved}</span>
               </div>
             </div>
