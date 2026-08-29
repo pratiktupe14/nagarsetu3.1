@@ -102,7 +102,9 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     if (!isMatch && process.env.NODE_ENV !== 'production') {
       const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
       const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      if (password === devAdminPass || password === devUserPass || password === 'nagarsetu@123' || password === 'admin123' || password === 'head123' || password === 'staff123') {
+      const devHeadPass = process.env.DEMO_HEAD_PASSWORD || 'head123';
+      const devStaffPass = process.env.DEMO_STAFF_PASSWORD || 'staff123';
+      if (password === devAdminPass || password === devUserPass || password === devHeadPass || password === devStaffPass) {
         isMatch = true;
       }
     }

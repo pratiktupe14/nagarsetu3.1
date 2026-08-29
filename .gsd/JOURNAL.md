@@ -31,3 +31,11 @@
 - **Issue**: Images uploaded when filing complaints in Citizen Portal were not visible in Admin, Department Head, Staff, or Citizen portals.
 - **Root Cause**: `ReportIssuePage.tsx` passed `photoPreviewUrl` (`blob:http://localhost:3000/...`) into complaint creation without converting/uploading the file. Temporary `blob:` URLs exist only in local browser memory for that specific tab session.
 - **Fix**: Updated `ReportIssuePage.tsx` to process primary and additional photo files using `uploadComplaintImage()`, generating permanent public storage URLs or Data URIs before database insertion. Updated backend `/api/ai/analyze` route to return `photo_url`. Wrapped all remaining portal `<img src="..." />` tags in `getValidImageUrl()`. Built and verified `tsc && vite build` with 0 errors.
+
+## Entry 5: Security & Production Hardening
+- **Rate Limiting**: Implemented `authRateLimiter` combining per-IP and per-account (mobile/email) tracking with exponential backoff on auth endpoints, `publicRateLimiter` on public maps/health, and `authedRateLimiter` on authenticated user actions. All thresholds configurable via `.env`.
+- **Input Validation**: Enforced strict schema validation (`validateInput` middleware) across all mutation routes. Added `createDepartmentSchema` for admin department creation.
+- **Secrets Cleanup**: Replaced hardcoded default passwords in `LoginPage.tsx`, `AuthContext.tsx`, `auth.routes.js`, and `server.js` with `process.env.DEMO_ADMIN_PASSWORD` / `import.meta.env.VITE_DEMO_ADMIN_PASSWORD`.
+- **Error Handling & Information Leakage**: Centralized Express error handler (`errorHandler.js`) strips stack traces, raw SQL queries, and file paths. Removed `err.message` string concat in `admin.routes.js`.
+- **File Upload Safety**: Validated magic byte binary signatures (JPEG, PNG, GIF, WEBP), MIME types, extensions, 10MB size limits, and UUID filename randomization. Applied `X-Content-Type-Options: nosniff` and CSP headers to static `/uploads`.
+- **Dependency Audit**: Verified backend audit (0 vulnerabilities) and updated frontend packages. Verified clean build (`tsc && vite build`).

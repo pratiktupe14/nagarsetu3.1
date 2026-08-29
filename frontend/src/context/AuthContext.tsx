@@ -326,15 +326,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (error) {
           console.warn('Supabase signInWithPassword note:', error);
+          const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+          const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
+          const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
+          const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
+
           if (
             cleanEmail === 'admin@nagarsetu.gov.in' ||
             cleanEmail.includes('admin') ||
             targetRole === 'city_admin' ||
-            password === 'NagarSetu@Admin2026!' ||
-            password === 'password123' ||
-            password === 'admin123' ||
-            password === 'head123' ||
-            password === 'staff123'
+            password === demoAdminPass ||
+            password === demoUserPass ||
+            password === demoHeadPass ||
+            password === demoStaffPass
           ) {
             console.info('Supabase auth failed for demo account, using demo session fallback.');
             switchRole(targetRole || 'city_admin');
