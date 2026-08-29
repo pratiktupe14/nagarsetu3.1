@@ -801,3 +801,6 @@ export async function deactivateDepartmentHeadInSupabase(headId: string, perform
   return true;
 }
 
+export { deleteDepartmentHead } from './departmentService';
+
+

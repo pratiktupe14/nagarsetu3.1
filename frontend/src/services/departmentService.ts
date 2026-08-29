@@ -632,3 +632,103 @@ export async function reactivateDepartmentHead(headId: string, performedByUserId
   }
   return true;
 }
+
+/**
+ * Delete / Remove Department Head role and assignment
+ */
+export async function deleteDepartmentHead(headIdOrDeptId: string, performedByUserId?: string): Promise<boolean> {
+  let backendSuccess = false;
+
+  // 1. Call Local Express Backend API DELETE endpoint
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headIdOrDeptId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to remove Department Head.');
+    }
+    backendSuccess = true;
+  } catch (backendErr: any) {
+    if (backendErr.message && (backendErr.message.includes('not found') || backendErr.message.includes('already unassigned') || backendErr.message.includes('Unable to remove'))) {
+      throw backendErr;
+    }
+    console.warn('Express API deleteDepartmentHead note:', backendErr);
+  }
+
+  // 2. Supabase Synchronization if configured
+  if (isSupabaseConfigured()) {
+    try {
+      // Find head record by headId or department_id
+      const { data: dhRec } = await supabase
+        .from('department_heads')
+        .select('*')
+        .or(`id.eq.${headIdOrDeptId},department_id.eq.${headIdOrDeptId}`)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      const targetHeadId = dhRec?.id || headIdOrDeptId;
+      const targetUserId = dhRec?.user_id;
+      const targetDeptId = dhRec?.department_id || headIdOrDeptId;
+      const targetEmail = dhRec?.email;
+
+      // Update department_heads record status = 'inactive'
+      await supabase
+        .from('department_heads')
+        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .or(`id.eq.${targetHeadId},department_id.eq.${targetDeptId}`);
+
+      // Update profiles / user_roles if linked user exists
+      if (targetUserId) {
+        await supabase
+          .from('profiles')
+          .update({ role: 'citizen', department_id: null })
+          .eq('id', targetUserId);
+
+        await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', targetUserId)
+          .eq('role', 'department_head');
+      } else if (targetEmail) {
+        await supabase
+          .from('profiles')
+          .update({ role: 'citizen', department_id: null })
+          .eq('email', targetEmail);
+      }
+
+      // Write audit log if table exists
+      try {
+        await supabase.from('department_leadership_audit_logs').insert({
+          action: 'HEAD_REMOVED',
+          department_id: targetDeptId,
+          old_head_id: targetUserId || null,
+          new_head_id: null,
+          performed_by: performedByUserId || null,
+          details: {
+            removed_at: new Date().toISOString(),
+            head_email: targetEmail || null
+          }
+        });
+      } catch (aErr) {
+        console.warn('Audit log write note:', aErr);
+      }
+
+      return true;
+    } catch (e: any) {
+      console.error('Error removing department head in Supabase:', e);
+      if (!backendSuccess) {
+        throw new Error(e.message || 'Unable to remove Department Head. Please try again.');
+      }
+    }
+  }
+
+  return backendSuccess || true;
+}
+
