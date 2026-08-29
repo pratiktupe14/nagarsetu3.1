@@ -39,3 +39,13 @@
 - **Error Handling & Information Leakage**: Centralized Express error handler (`errorHandler.js`) strips stack traces, raw SQL queries, and file paths. Removed `err.message` string concat in `admin.routes.js`.
 - **File Upload Safety**: Validated magic byte binary signatures (JPEG, PNG, GIF, WEBP), MIME types, extensions, 10MB size limits, and UUID filename randomization. Applied `X-Content-Type-Options: nosniff` and CSP headers to static `/uploads`.
 - **Dependency Audit**: Verified backend audit (0 vulnerabilities) and updated frontend packages. Verified clean build (`tsc && vite build`).
+
+## Entry 6: Mobile Responsiveness Overhaul (2-Pass Verification)
+- **Objective**: Full mobile responsiveness across 320px, 375px, 390px, 414px mobile, 768px tablet, 1024px, and desktop resolutions without altering branding, design tokens, or core functionality.
+- **Fixes**:
+  - `NotificationCenter.tsx`: Restrained popover to `w-[calc(100vw-32px)] sm:w-96 max-w-sm right-0`.
+  - `Navbar.tsx`: Integrated `LanguageSelector` in mobile menu drawer.
+  - `LanguageSelector.tsx`: Wrapped compact language selector with `inline-flex flex-wrap items-center gap-1 max-w-full`.
+  - Modal Overlays: Added `overflow-y-auto` to backdrops and `max-h-[90vh] my-auto overflow-y-auto` to inner containers across `AdminDepartmentHeadsPage.tsx`, `ReportIssuePage.tsx`, `ComplaintDetailPage.tsx`.
+  - Tables & Cards: Ensured all tables have `w-full overflow-x-auto` wrappers and touch targets meet `min-h-[44px]` standards.
+- **Verification**: Executed 2-pass responsive audit and built cleanly (`tsc && vite build` in 7.97s with 0 errors).

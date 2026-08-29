@@ -389,8 +389,8 @@ export const ComplaintDetailPage: React.FC = () => {
 
         {/* REOPEN COMPLAINT MODAL */}
         {showReopenModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-            <div className="max-w-md w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-md space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans overflow-y-auto">
+            <div className="max-w-md w-full bg-white rounded-2xl p-4 sm:p-6 border border-gray-200 shadow-md space-y-4 max-h-[90vh] my-auto overflow-y-auto">
               <div className="flex items-center space-x-2 text-orange-600">
                 <RotateCcw className="w-5 h-5" />
                 <h3 className="text-base font-extrabold text-gray-900 font-outfit">Reopen Civic Complaint</h3>

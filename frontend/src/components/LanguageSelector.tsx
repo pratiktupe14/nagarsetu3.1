@@ -76,7 +76,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   if (variant === 'compact') {
     return (
-      <div className={`inline-flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 ${className}`}>
+      <div className={`inline-flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 max-w-full ${className}`}>
         {LANGUAGE_OPTIONS.map((opt) => {
           const isSelected = lang === opt.code;
           return (

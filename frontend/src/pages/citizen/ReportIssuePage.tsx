@@ -965,8 +965,8 @@ export const ReportIssuePage: React.FC = () => {
 
       {/* EDIT LOCATION MAP PICKER MODAL */}
       {showLocationPickerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-          <div className="max-w-xl w-full bg-white rounded-xl p-6 border border-gray-200 shadow-md space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans overflow-y-auto">
+          <div className="max-w-xl w-full bg-white rounded-xl p-4 sm:p-6 border border-gray-200 shadow-md space-y-4 max-h-[90vh] my-auto overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 font-outfit">Adjust Site Location Pin</h3>
               <button onClick={() => setShowLocationPickerModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>
@@ -1010,8 +1010,8 @@ export const ReportIssuePage: React.FC = () => {
 
       {/* FINAL REVIEW & SUBMIT MODAL */}
       {showReviewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
-          <div className="max-w-lg w-full bg-white rounded-xl p-6 border border-gray-200 shadow-md space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans overflow-y-auto">
+          <div className="max-w-lg w-full bg-white rounded-xl p-4 sm:p-6 border border-gray-200 shadow-md space-y-4 max-h-[90vh] my-auto overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('reviewBeforeSubmission')}</h3>
               <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>

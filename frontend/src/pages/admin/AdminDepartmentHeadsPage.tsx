@@ -624,8 +624,8 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         {/* ADD / REPLACE DEPARTMENT HEAD MODAL */}
         {/* ================================================== */}
         {(showAddHeadModal || showChangeHeadModal) && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 border border-gray-200 shadow-xl font-sans animate-fade-in">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-5 border border-gray-200 shadow-xl font-sans animate-fade-in max-h-[90vh] my-auto overflow-y-auto">
               
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2 text-emerald-700">
@@ -800,8 +800,8 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         {/* VIEW DEPARTMENT HEAD PROFILE MODAL */}
         {/* ================================================== */}
         {viewHeadProfileModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-5 border border-gray-200 shadow-xl font-sans max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-3xl w-full p-4 sm:p-6 space-y-5 border border-gray-200 shadow-xl font-sans max-h-[90vh] my-auto overflow-y-auto">
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2">
                   <UserCheck className="w-5 h-5 text-emerald-600" />
@@ -1088,8 +1088,8 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         {/* DELETE DEPARTMENT HEAD CONFIRMATION MODAL */}
         {/* ================================================== */}
         {deleteModalHead && (
-          <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md p-6 space-y-4 text-gray-900 animate-in zoom-in-95 font-sans">
+          <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md p-4 sm:p-6 space-y-4 text-gray-900 animate-in zoom-in-95 font-sans max-h-[90vh] my-auto overflow-y-auto">
               
               {/* Header */}
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
