@@ -155,9 +155,15 @@ router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {
       });
     }
 
+    const photoUrl = req.file?.publicUrl || req.file?.supabaseUrl || (req.file?.filename ? `/uploads/${req.file.filename}` : undefined);
+    if (photoUrl) {
+      aiAnalysis.photo_url = photoUrl;
+    }
+
     console.log(`[${reqTime}] [NAGARSETU AI] Success: model="${aiAnalysis.model}", category="${aiAnalysis.category}", department="${aiAnalysis.recommended_department}"`);
     return res.json({
       success: true,
+      photo_url: photoUrl,
       ai: aiAnalysis
     });
   } catch (err) {

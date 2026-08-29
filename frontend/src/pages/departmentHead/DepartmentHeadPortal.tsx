@@ -2625,7 +2625,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Submitted Image</span>
                   <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(detailModalComplaint.photo_before_url)}>
                     {detailModalComplaint.photo_before_url ? (
-                      <img src={detailModalComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                      <img src={getValidImageUrl(detailModalComplaint.photo_before_url)} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image Submitted</div>
                     )}

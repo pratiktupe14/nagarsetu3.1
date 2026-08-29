@@ -661,7 +661,7 @@ export const AdminPortal: React.FC = () => {
               <div>
                 <span className="font-bold text-gray-700 block mb-1">{t('citizenPhotoEvidence')}</span>
                 <img
-                  src={selectedComplaint.photo_before_url}
+                  src={getValidImageUrl(selectedComplaint.photo_before_url)}
                   alt="Defect"
                   className="w-full h-48 rounded-xl object-cover border border-gray-200 shadow-xs"
                 />

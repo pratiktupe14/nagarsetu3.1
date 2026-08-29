@@ -7,6 +7,7 @@ const {
   createUserSchema,
   updateUserSchema,
   createDeptHeadSchema,
+  createDepartmentSchema,
   assignStaffSchema,
   reassignComplaintSchema
 } = require('../schemas/admin.schemas');
@@ -136,13 +137,13 @@ router.get('/departments', async (req, res) => {
   }
 });
 
-router.post('/departments', async (req, res) => {
+router.post('/departments', validateInput(createDepartmentSchema), async (req, res) => {
   try {
     const { name, description } = req.body;
-    if (!name) return res.status(400).json({ error: 'Department name is required' });
     const result = await query(`INSERT INTO departments (name, description) VALUES (?, ?)`, [name, description || '']);
     return res.status(201).json({ message: 'Department created', id: result.rows[0].id });
   } catch (err) {
+    console.error('Create department error:', err);
     return res.status(500).json({ error: 'Failed to create department' });
   }
 });
@@ -290,7 +291,7 @@ router.post('/department-heads', async (req, res) => {
     });
   } catch (err) {
     console.error('Error saving department head:', err);
-    return res.status(500).json({ error: 'Failed to save Department Head: ' + err.message });
+    return res.status(500).json({ error: 'Failed to save Department Head. Please try again later.' });
   }
 });
 
@@ -363,7 +364,7 @@ router.put('/department-heads/:id', async (req, res) => {
     return res.json({ message: 'Department Head updated successfully' });
   } catch (err) {
     console.error('Error updating department head:', err);
-    return res.status(500).json({ error: 'Failed to update Department Head: ' + err.message });
+    return res.status(500).json({ error: 'Failed to update Department Head. Please try again later.' });
   }
 });
 

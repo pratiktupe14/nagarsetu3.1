@@ -700,7 +700,7 @@ export const NearbyIssuesPage: React.FC = () => {
                         <div className="flex gap-3">
                           {complaint.photo_before_url ? (
                             <img
-                              src={complaint.photo_before_url}
+                              src={getValidImageUrl(complaint.photo_before_url)}
                               alt={complaint.title}
                               className="w-24 h-24 rounded-xl object-cover border border-gray-200 shrink-0"
                               loading="lazy"

@@ -196,6 +196,11 @@ export const Navbar: React.FC = () => {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-gray-200 p-4 space-y-4 text-xs font-semibold">
+          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+            <span className="text-gray-500 font-bold">Language</span>
+            <LanguageSelector variant="compact" />
+          </div>
+
           <div className="space-y-2">
             <button
               onClick={() => { handleRoleSwitch('citizen'); setMobileMenuOpen(false); }}
@@ -220,7 +225,7 @@ export const Navbar: React.FC = () => {
           {user && (
             <button
               onClick={handleLogout}
-              className="w-full p-2.5 rounded-xl bg-rose-50 text-rose-700 font-bold text-left flex items-center space-x-2"
+              className="w-full p-2.5 rounded-xl bg-rose-50 text-rose-700 font-bold text-left flex items-center space-x-2 min-h-[44px]"
             >
               <LogOut className="w-4 h-4" />
               <span>Log Out</span>
