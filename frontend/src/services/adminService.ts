@@ -587,14 +587,15 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
 
   // Target 7 Municipal Departments
   const SEVEN_MUNICIPAL_TARGETS = [
-    { code: 'PWD', name: 'Public Works Department (PWD)', defaultHead: 'PWD Department Head', email: 'pwd.head@nagarsetu.gov.in', phone: '+91 98220 00001', empId: 'EMP-PWD-001' },
-    { code: 'SAN', name: 'Sanitation & Waste Management', defaultHead: 'Sanitation Department Head', email: 'sanitation.head@nagarsetu.gov.in', phone: '+91 98220 00002', empId: 'EMP-SAN-001' },
-    { code: 'WTR', name: 'Water Supply & Sewerage Board', defaultHead: 'Water Supply Department Head', email: 'water.head@nagarsetu.gov.in', phone: '+91 98220 00003', empId: 'EMP-WTR-001' },
-    { code: 'DRN', name: 'Drainage & Sewage Department', defaultHead: 'Drainage Department Head', email: 'drainage.head@nagarsetu.gov.in', phone: '+91 98220 00004', empId: 'EMP-DRN-001' },
-    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Electrical Department Head', email: 'electrical.head@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
-    { code: 'TRF', name: 'Traffic Management Department', defaultHead: 'Traffic Department Head', email: 'traffic.head@nagarsetu.gov.in', phone: '+91 98220 00006', empId: 'EMP-TRF-001' },
-    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Maintenance Department Head', email: 'maintenance.head@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
+    { code: 'PWD', name: 'Public Works Department', defaultHead: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001', empId: 'EMP-PWD-001' },
+    { code: 'SAN', name: 'Sanitation & Waste Management', defaultHead: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002', empId: 'EMP-SAN-001' },
+    { code: 'WTR', name: 'Water Supply & Sewerage Board', defaultHead: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003', empId: 'EMP-WTR-001' },
+    { code: 'DRN', name: 'Drainage & Sewage Department', defaultHead: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004', empId: 'EMP-DRN-001' },
+    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
+    { code: 'TRF', name: 'Traffic Management Department', defaultHead: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006', empId: 'EMP-TRF-001' },
+    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
   ];
+
 
   return SEVEN_MUNICIPAL_TARGETS.map((target) => {
 

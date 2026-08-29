@@ -24,7 +24,7 @@ import {
 
 
 const SEVEN_DEPARTMENTS_META = [
-  { id: 'dept-pwd', code: 'PWD', name: 'Public Works Department (PWD)', scope: 'Potholes, road damage, public infrastructure' },
+  { id: 'dept-pwd', code: 'PWD', name: 'Public Works Department', scope: 'Potholes, road damage, public infrastructure' },
   { id: 'dept-san', code: 'SAN', name: 'Sanitation & Waste Management', scope: 'Garbage, overflowing dustbins, waste' },
   { id: 'dept-wtr', code: 'WTR', name: 'Water Supply & Sewerage Board', scope: 'Water leakage, pipelines, water supply' },
   { id: 'dept-drn', code: 'DRN', name: 'Drainage & Sewage Department', scope: 'Drainage blockage, sewage overflow, open drains' },
@@ -32,6 +32,7 @@ const SEVEN_DEPARTMENTS_META = [
   { id: 'dept-trf', code: 'TRF', name: 'Traffic Management Department', scope: 'Traffic signals, traffic infrastructure, road safety' },
   { id: 'dept-mnt', code: 'MNT', name: 'Maintenance Department', scope: 'Building maintenance, civic asset upkeep, general maintenance' }
 ];
+
 
 
 export const AdminDepartmentHeadsPage: React.FC = () => {
@@ -712,7 +713,8 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                     required
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    placeholder="e.g. pwd.head@nagarsetu.gov.in"
+                    placeholder="e.g. rahul.kumar@nagarsetu.gov.in"
+
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-medium focus:border-emerald-600"
                   />
                 </div>

@@ -1508,7 +1508,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       Department Head • {deptInfo.fullName}
                     </span>
                     <span className="text-[11px] text-gray-500 font-mono block mt-0.5">
-                      {user?.email || 'pwd.head@nagarsetu.gov.in'}
+                      {user?.email || 'rahul.kumar@nagarsetu.gov.in'}
                     </span>
                   </div>
                 </div>
@@ -1592,7 +1592,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
                     <span className="font-mono text-gray-500 text-[10px] block uppercase font-bold">Official Email</span>
-                    <span className="font-semibold text-gray-900 block truncate">{user?.email || 'pwd.head@nagarsetu.gov.in'}</span>
+                    <span className="font-semibold text-gray-900 block truncate">{user?.email || 'rahul.kumar@nagarsetu.gov.in'}</span>
                   </div>
 
                   <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1">
