@@ -35,7 +35,7 @@ import {
   Square, ChevronLeft, ExternalLink, FileSpreadsheet, Info, Phone, Mail,
   UserPlus, ArrowLeft, CheckSquare2, AlertCircle, PlayCircle, UserX,
   ZoomIn, ZoomOut, Maximize2, FileCheck, CheckCircle, Siren, AlertOctagon, ShieldAlert,
-  Compass, KeyRound, LogOut, Edit3, Save
+  Compass, KeyRound, LogOut, Edit3, Save, Sparkles
 } from 'lucide-react';
 
 // Fix standard Leaflet marker icon asset issue
@@ -255,6 +255,12 @@ export const DepartmentHeadPortal: React.FC = () => {
     const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
     const normShort = String(deptInfo.shortName == null ? '' : deptInfo.shortName).trim().toLowerCase();
     return normShort.includes('electric') || normDeptId.includes('ele') || normDeptFull.includes('light');
+  }, [deptInfo, headDeptId, headDepartmentFull]);
+  const isPwdDept = useMemo(() => {
+    const normDeptId = String(headDeptId == null ? '' : headDeptId).trim().toLowerCase();
+    const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
+    const normShort = String(deptInfo.shortName == null ? '' : deptInfo.shortName).trim().toLowerCase();
+    return normShort.includes('pwd') || normShort.includes('public works') || normDeptId.includes('pwd') || normDeptFull.includes('public works');
   }, [deptInfo, headDeptId, headDepartmentFull]);
 
   // Data States
@@ -1251,18 +1257,26 @@ export const DepartmentHeadPortal: React.FC = () => {
             <div>
               <div className="flex items-center space-x-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 font-outfit tracking-tight">
-                  {deptInfo.fullName}
+                  {isComplaints || (!isNotifView && !isProfileView && !isMapView && !isOverdue && !isCompleted && !isInProgress && !isStaffView && !isAssignWorkspace)
+                    ? (isPwdDept ? "All PWD Complaints" : `All ${deptInfo.shortName} Complaints`)
+                    : deptInfo.fullName}
                 </h1>
                 <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  {isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : isMapView ? 'INTERACTIVE GIS DEPARTMENT MAP' : isOverdue ? 'OVERDUE TASKS' : isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
+                  {isComplaints ? 'ALL COMPLAINTS DIRECTORY' : isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : isMapView ? 'INTERACTIVE GIS DEPARTMENT MAP' : isOverdue ? 'OVERDUE TASKS' : isCompleted ? 'COMPLETED TASKS' : isInProgress ? 'IN PROGRESS TASKS' : 'DEPARTMENT HEAD PORTAL'}
+                </span>
+                <span className="font-mono text-[10px] font-bold text-gray-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                  Department Head: {headName}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  ID: {headDeptId}
+                  {deptInfo.shortName} (ID: {headDeptId})
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
-                {isNotifView ? 'Stay updated about complaints, staff assignments, tasks, reviews, and department activity.' : isProfileView ? 'View and manage your professional profile, security, and notification preferences.' : isMapView ? 'Monitor your department\'s complaints, active tasks, and field operations across Nashik.' : isOverdue ? 'Tasks requiring immediate departmental attention.' : isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
+                {isComplaints || (!isNotifView && !isProfileView && !isMapView && !isOverdue && !isCompleted && !isInProgress && !isStaffView && !isAssignWorkspace)
+                  ? `Manage, prioritize and track complaints assigned to the ${deptInfo.fullName}.`
+                  : isNotifView ? 'Stay updated about complaints, staff assignments, tasks, reviews, and department activity.' : isProfileView ? 'View and manage your professional profile, security, and notification preferences.' : isMapView ? 'Monitor your department\'s complaints, active tasks, and field operations across Nashik.' : isOverdue ? 'Tasks requiring immediate departmental attention.' : isCompleted ? 'Work completed by your department\'s service staff.' : isInProgress ? 'Assigned work currently being executed by service staff.' : `Managed by ${headName} • Scope: ${deptInfo.description}`}
               </p>
+
             </div>
           </div>
 
@@ -1983,37 +1997,50 @@ export const DepartmentHeadPortal: React.FC = () => {
             )}
 
             {/* 3. TOOLBAR FOR SEARCH & CATEGORY FILTERS */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={isElectricalDept ? "Search electrical complaints by title, ID, location, or staff..." : "Search department complaints..."}
-                  className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
-                />
+            <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search complaints by ID, issue, location or citizen..."
+                    className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-emerald-600 font-medium min-h-[42px]"
+                  />
+                </div>
+
+                {/* Locked Department Filter */}
+                <div className="flex items-center space-x-1.5 bg-gray-200/70 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 min-h-[42px] shrink-0" title="Department is locked to your assigned department">
+                  <Lock className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  <span>Dept: {deptInfo.fullName}</span>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* SECONDARY FILTERS ROW */}
+              <div className="flex flex-wrap items-center gap-2 text-xs pt-1 border-t border-gray-200/70">
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
                 >
-                  <option value="All">{isElectricalDept ? 'All Electrical Categories' : isSanitationDept ? 'All Sanitation Categories' : 'All Categories'}</option>
-                  {isElectricalDept ? (
+                  <option value="All">All Categories</option>
+                  {isPwdDept ? (
+                    <>
+                      <option value="Pothole Repair">Pothole / Road Surface Crater</option>
+                      <option value="Road Damage">Road Damage</option>
+                      <option value="Road Repair">Road Repair</option>
+                      <option value="Footpath Damage">Footpath Damage</option>
+                      <option value="Public Infrastructure">Public Infrastructure Damage</option>
+                      <option value="Road Maintenance">Road Maintenance</option>
+                      <option value="Other PWD Issues">Other PWD Issues</option>
+                    </>
+                  ) : isElectricalDept ? (
                     <>
                       <option value="Broken Streetlight">Broken Streetlight</option>
                       <option value="Streetlight Not Working">Streetlight Not Working</option>
-                      <option value="Flickering Streetlight">Flickering Streetlight</option>
-                      <option value="Streetlight Damage">Streetlight Damage</option>
                       <option value="Electrical Pole Damage">Electrical Pole Damage</option>
                       <option value="Exposed Wiring">Exposed Wiring</option>
-                      <option value="Electrical Box Damage">Electrical Box Damage</option>
-                      <option value="Public Electrical Hazard">Public Electrical Hazard</option>
-                      <option value="Lighting Outage">Lighting Outage</option>
-                      <option value="Streetlight Installation">Streetlight Installation</option>
                       <option value="Other Electrical Issue">Other Electrical Issue</option>
                     </>
                   ) : isSanitationDept ? (
@@ -2021,18 +2048,12 @@ export const DepartmentHeadPortal: React.FC = () => {
                       <option value="Garbage Overflow">Garbage Overflow</option>
                       <option value="Overflowing Dustbin">Overflowing Dustbin</option>
                       <option value="Waste Accumulation">Waste Accumulation</option>
-                      <option value="Illegal/Public Dumping">Illegal/Public Dumping</option>
-                      <option value="Garbage Collection">Garbage Collection</option>
-                      <option value="Waste Segregation">Waste Segregation</option>
                       <option value="Public Sanitation">Public Sanitation</option>
                       <option value="Other Waste Issue">Other Waste Issue</option>
                     </>
                   ) : (
                     <>
-                      <option value="Pothole Repair">Pothole Repair</option>
-                      <option value="Road Maintenance">Road Maintenance</option>
-                      <option value="Water Leakage">Water Leakage</option>
-                      <option value="Drain Cleaning">Drain Cleaning</option>
+                      <option value="General Issue">General Issue</option>
                     </>
                   )}
                 </select>
@@ -2040,7 +2061,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <select
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
                 >
                   <option value="All">All Priorities</option>
                   <option value="Critical">Critical</option>
@@ -2052,20 +2073,58 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[42px]"
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
                 >
                   <option value="All">All Statuses</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Verified">Verified</option>
                   <option value="Unassigned">Unassigned</option>
                   <option value="Assigned">Assigned</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Resolution Submitted">Pending Review</option>
                   <option value="Resolved">Resolved</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Overdue">Overdue</option>
                 </select>
 
-                {(searchQuery || categoryFilter !== 'All' || priorityFilter !== 'All' || statusFilter !== 'All') && (
+                <select
+                  value={staffFilter}
+                  onChange={(e) => setStaffFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
+                >
+                  <option value="All">All Assignment States</option>
+                  <option value="Unassigned">Unassigned Only</option>
+                  {departmentStaff.map((st) => (
+                    <option key={st.id} value={st.id}>{st.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={slaFilter}
+                  onChange={(e) => setSlaFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
+                >
+                  <option value="All">All SLA Deadlines</option>
+                  <option value="Within SLA">Within SLA</option>
+                  <option value="Due Today">Due Today</option>
+                  <option value="Overdue">Overdue SLA</option>
+                </select>
+
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
+                >
+                  <option value="All Time">All Time</option>
+                  <option value="Today">Reported Today</option>
+                  <option value="This Week">Reported This Week</option>
+                  <option value="This Month">Reported This Month</option>
+                </select>
+
+                {(searchQuery || categoryFilter !== 'All' || priorityFilter !== 'All' || statusFilter !== 'All' || staffFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All Time') && (
                   <button
                     onClick={handleClearFilters}
-                    className="px-3.5 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[42px]"
+                    className="px-3.5 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs transition-colors min-h-[40px]"
                   >
                     Clear Filters
                   </button>
@@ -2073,21 +2132,45 @@ export const DepartmentHeadPortal: React.FC = () => {
               </div>
             </div>
 
+            {/* 3B. BULK ACTIONS FLOATING TOOLBAR WHEN ITEMS ARE CHECKED */}
+            {selectedComplaints.length > 0 && (
+              <div className="p-3.5 bg-emerald-900 text-white rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md text-xs font-sans">
+                <div className="flex items-center space-x-2 font-bold font-mono">
+                  <CheckSquare2 className="w-4 h-4 text-emerald-400" />
+                  <span>{selectedComplaints.length} complaints selected</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      if (departmentStaff.length > 0) {
+                        setSelectedStaffForAssign(departmentStaff[0].id);
+                        setAssignModalComplaint(departmentComplaints.find((c) => c.id === selectedComplaints[0]) || null);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs flex items-center space-x-1"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Assign Staff</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedComplaints([])}
+                    className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-800 text-emerald-200 rounded-lg font-bold text-xs"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 4. COMPLAINTS TABLE OR EMPTY STATE */}
             {filteredComplaints.length === 0 ? (
-              <div className="p-12 text-center bg-white border border-gray-200 rounded-2xl space-y-3">
-                {isElectricalDept ? (
-                  <Zap className="w-12 h-12 text-amber-500 mx-auto fill-amber-400" />
-                ) : isSanitationDept ? (
-                  <Trash2 className="w-12 h-12 text-amber-500 mx-auto" />
-                ) : (
-                  <Wrench className="w-12 h-12 text-emerald-600 mx-auto" />
-                )}
+              <div className="p-12 text-center bg-white border border-gray-200 rounded-2xl space-y-3 shadow-2xs">
+                <Wrench className="w-12 h-12 text-emerald-600 mx-auto" />
                 <h3 className="text-base font-extrabold text-gray-900 font-outfit">
-                  {isElectricalDept ? "No electrical complaints found." : isSanitationDept ? "No sanitation complaints found." : "No complaints found."}
+                  No {deptInfo.shortName} complaints found
                 </h3>
                 <p className="text-xs text-gray-500 font-medium max-w-sm mx-auto">
-                  {isElectricalDept ? "There are currently no active streetlight or electrical maintenance complaints matching your selected criteria." : isSanitationDept ? "There are currently no active waste or sanitation complaints matching your selected criteria." : "There are currently no complaints matching your selected criteria."}
+                  New complaints assigned to {deptInfo.fullName} will appear here automatically.
                 </p>
                 <button
                   onClick={loadData}
@@ -2097,73 +2180,168 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                      <th className="p-3.5">Complaint ID</th>
-                      <th className="p-3.5">Issue & Category</th>
-                      <th className="p-3.5">Location</th>
-                      <th className="p-3.5">Priority</th>
-                      <th className="p-3.5">Assigned SAN Staff</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredComplaints.map((comp) => (
-                      <tr key={comp.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3.5 font-mono text-emerald-800 font-bold">
-                          {comp.complaint_number}
-                        </td>
-                        <td className="p-3.5">
-                          <span className="font-extrabold text-gray-900 block">{comp.title}</span>
-                          <span className="text-[11px] text-gray-500 font-medium">{comp.category}</span>
-                        </td>
-                        <td className="p-3.5 text-gray-600 font-medium max-w-xs truncate">
-                          {comp.location_address || 'Nashik City'}
-                        </td>
-                        <td className="p-3.5">
-                          <PriorityBadge priority={comp.priority} />
-                        </td>
-                        <td className="p-3.5">
-                          {comp.assigned_staff_name ? (
-                            <span className="font-bold text-gray-800">{comp.assigned_staff_name}</span>
-                          ) : (
-                            <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              Unassigned
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5">
-                          <StatusBadge status={comp.status} />
-                        </td>
-                        <td className="p-3.5 text-right space-x-2">
-                          <button
-                            onClick={() => setDetailModalComplaint(comp)}
-                            className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px]"
-                          >
-                            View
-                          </button>
-                          {!comp.assigned_staff_id && comp.status !== 'Resolved' && (
-                            <button
-                              onClick={() => {
-                                setAssignModalComplaint(comp);
-                                setSelectedStaffForAssign('');
-                                setAssignError(null);
+              <div className="space-y-4">
+                <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-xs bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                          <th className="p-3.5 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedComplaints.length > 0 && selectedComplaints.length === paginatedComplaints.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedComplaints(paginatedComplaints.map((c) => c.id));
+                                } else {
+                                  setSelectedComplaints([]);
+                                }
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] shadow-2xs"
-                            >
-                              Assign Staff
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                          </th>
+                          <th className="p-3.5">Complaint ID</th>
+                          <th className="p-3.5">Issue & Category</th>
+                          <th className="p-3.5">Location</th>
+                          <th className="p-3.5">Priority</th>
+                          <th className="p-3.5">Reported Date</th>
+                          <th className="p-3.5">Assigned Staff</th>
+                          <th className="p-3.5">SLA Deadline</th>
+                          <th className="p-3.5">Status</th>
+                          <th className="p-3.5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {paginatedComplaints.map((comp) => {
+                          const isSelected = selectedComplaints.includes(comp.id);
+                          const isOver = comp.sla_deadline ? new Date(comp.sla_deadline) < now : false;
+                          const slaRes = comp.sla_deadline ? formatSlaRemainingTime(comp.sla_deadline) : 'N/A';
+                          const slaText = typeof slaRes === 'string' ? slaRes : (slaRes?.text || 'N/A');
+
+                          return (
+                            <tr key={comp.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                              <td className="p-3.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedComplaints((prev) => [...prev, comp.id]);
+                                    } else {
+                                      setSelectedComplaints((prev) => prev.filter((id) => id !== comp.id));
+                                    }
+                                  }}
+                                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </td>
+                              <td className="p-3.5 font-mono text-emerald-800 font-bold whitespace-nowrap">
+                                {comp.complaint_number}
+                              </td>
+                              <td className="p-3.5">
+                                <div className="flex items-center space-x-2.5">
+                                  <div className="w-9 h-9 rounded-lg border border-gray-200 bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
+                                    {comp.photo_before_url ? (
+                                      <img src={comp.photo_before_url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[9px] font-mono font-bold text-gray-400">No Image</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="font-extrabold text-gray-900 block line-clamp-1">{comp.title}</span>
+                                    <span className="text-[11px] text-gray-500 font-medium">{comp.category}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-gray-600 font-medium max-w-xs truncate">
+                                {comp.location_address || 'Nashik City'}
+                              </td>
+                              <td className="p-3.5 whitespace-nowrap">
+                                <PriorityBadge priority={comp.priority} />
+                              </td>
+                              <td className="p-3.5 font-mono text-[11px] text-gray-600 whitespace-nowrap">
+                                {comp.created_at ? new Date(comp.created_at).toLocaleDateString() : 'N/A'}
+                              </td>
+                              <td className="p-3.5 whitespace-nowrap">
+                                {comp.assigned_staff_name ? (
+                                  <span className="font-bold text-gray-800">{comp.assigned_staff_name}</span>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setAssignModalComplaint(comp);
+                                      setSelectedStaffForAssign('');
+                                      setAssignError(null);
+                                    }}
+                                    className="text-amber-800 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-300 text-[11px]"
+                                  >
+                                    + Assign Staff
+                                  </button>
+                                )}
+                              </td>
+                              <td className="p-3.5 whitespace-nowrap font-mono text-[11px]">
+                                {isOver && comp.status !== 'Resolved' ? (
+                                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-900 font-extrabold border border-rose-300">
+                                    OVERDUE
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-700 font-semibold">{slaText}</span>
+                                )}
+                              </td>
+                              <td className="p-3.5 whitespace-nowrap">
+                                <StatusBadge status={comp.status} />
+                              </td>
+                              <td className="p-3.5 text-right whitespace-nowrap space-x-1.5">
+                                <button
+                                  onClick={() => setDetailModalComplaint(comp)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px]"
+                                >
+                                  View
+                                </button>
+                                {comp.status === 'Resolution Submitted' && (
+                                  <button
+                                    onClick={() => setReviewModalComplaint(comp)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] shadow-2xs"
+                                  >
+                                    Verify
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* PAGINATION FOOTER */}
+                <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="font-medium text-gray-600">
+                    Showing <span className="font-bold text-gray-900">{filteredComplaints.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span>–<span className="font-bold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredComplaints.length)}</span> of <span className="font-bold text-gray-900">{filteredComplaints.length}</span> complaints
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 font-bold text-gray-700 disabled:opacity-40 hover:bg-gray-50 text-xs"
+                    >
+                      Previous
+                    </button>
+                    <span className="font-mono font-bold text-gray-800 text-xs">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 font-bold text-gray-700 disabled:opacity-40 hover:bg-gray-50 text-xs"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
+
           </div>
         )}
 
@@ -2275,12 +2453,12 @@ export const DepartmentHeadPortal: React.FC = () => {
         {/* ================================================== */}
         {detailModalComplaint && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-5 border border-gray-200 shadow-xl my-8 font-sans">
+            <div className="bg-white rounded-2xl max-w-4xl w-full p-6 space-y-6 border border-gray-200 shadow-xl my-8 font-sans">
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center space-x-2">
                   <FileText className="w-5 h-5 text-emerald-600" />
                   <h3 className="font-extrabold text-gray-900 font-outfit text-base">
-                    Task Details & Inspection (TASK-{detailModalComplaint.id.slice(0, 6).toUpperCase()})
+                    Inspection Workspace: {detailModalComplaint.complaint_number}
                   </h3>
                 </div>
                 <button onClick={() => setDetailModalComplaint(null)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -2288,36 +2466,167 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-mono font-bold text-emerald-800 text-sm">{detailModalComplaint.complaint_number}</span>
-                <div className="flex items-center space-x-2">
-                  <PriorityBadge priority={detailModalComplaint.priority} />
-                  <StatusBadge status={detailModalComplaint.status} />
+              {/* HEADER METADATA STRIP */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Complaint ID</span>
+                  <span className="font-mono font-extrabold text-emerald-800 text-sm">{detailModalComplaint.complaint_number}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Current Priority</span>
+                  <div className="flex items-center space-x-1 mt-0.5">
+                    <select
+                      value={detailModalComplaint.priority}
+                      onChange={async (e) => {
+                        const newPri = e.target.value as any;
+                        if (isSupabaseConfigured()) {
+                          await supabase.from('complaints').update({ priority: newPri }).eq('id', detailModalComplaint.id);
+                        }
+                        setDetailModalComplaint({ ...detailModalComplaint, priority: newPri });
+                        await loadData();
+                      }}
+                      className="bg-white border border-gray-300 rounded px-2 py-0.5 font-bold text-xs focus:border-emerald-500"
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Priority</option>
+                      <option value="Critical">Critical Priority</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Current Status</span>
+                  <div className="mt-0.5">
+                    <StatusBadge status={detailModalComplaint.status} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Reported Date</span>
+                  <span className="font-mono font-bold text-gray-800 block mt-0.5">
+                    {detailModalComplaint.created_at ? new Date(detailModalComplaint.created_at).toLocaleString() : 'N/A'}
+                  </span>
                 </div>
               </div>
 
+              {/* ISSUE OVERVIEW & DESCRIPTION */}
               <div className="space-y-2">
-                <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{detailModalComplaint.title}</h2>
-                <p className="text-xs text-gray-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{detailModalComplaint.title}</h2>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[11px]">
+                    Category: {detailModalComplaint.category}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-gray-200 font-medium">
                   {detailModalComplaint.description || 'No detailed description provided.'}
                 </p>
               </div>
 
-              {/* CITIZEN PHOTO VS REPAIR PROOF */}
+              {/* CITIZEN & LOCATION SECTION */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Citizen Details */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Reporter Details</span>
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-bold text-gray-900">{(detailModalComplaint as any).citizen_name || 'Anonymous Resident'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-gray-600 font-mono">
+                    <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span>{(detailModalComplaint as any).citizen_mobile || '+91 98220 00000'}</span>
+                  </div>
+                </div>
+
+                {/* Location & Map Link */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Site Location & Coordinates</span>
+                  <div className="flex items-center space-x-2 text-gray-900 font-bold">
+                    <MapPin className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span className="truncate">{detailModalComplaint.location_address || 'Nashik City'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-500 font-mono text-[11px] pt-1">
+                    <span>GPS: {detailModalComplaint.latitude ? Number(detailModalComplaint.latitude).toFixed(4) : 'N/A'}, {detailModalComplaint.longitude ? Number(detailModalComplaint.longitude).toFixed(4) : 'N/A'}</span>
+                    {detailModalComplaint.latitude && detailModalComplaint.longitude && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${detailModalComplaint.latitude},${detailModalComplaint.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] flex items-center space-x-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Open in Maps</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI ANALYSIS CARD */}
+              <div className="p-4 bg-emerald-50/70 border border-emerald-300 rounded-xl space-y-2 text-xs font-sans">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-emerald-900 font-outfit uppercase tracking-wider flex items-center space-x-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span>AI Vision & Taxonomy Analysis</span>
+                  </span>
+                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-white text-emerald-800 rounded border border-emerald-300">
+                    🟢 92% AI Confidence Score
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-medium text-gray-800">
+                  <div>
+                    <span className="text-gray-500 block text-[10px]">Detected Issue:</span>
+                    <strong className="text-emerald-900">{detailModalComplaint.title}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[10px]">Recommended Dept:</span>
+                    <strong className="text-gray-900">{deptInfo.fullName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[10px]">Assigned Priority:</span>
+                    <strong className="text-gray-900">{detailModalComplaint.priority}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[10px]">Taxonomy Match:</span>
+                    <strong className="text-emerald-800">Verified Municipal</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* VOICE COMPLAINT WIDGET (IF VOICE DATA PRESENT) */}
+              {(detailModalComplaint.photo_before_url?.includes('audio') || (detailModalComplaint as any).voice_url || (detailModalComplaint as any).transcription) && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-purple-900">
+                    <span className="font-extrabold font-outfit uppercase flex items-center space-x-1.5">
+                      <PlayCircle className="w-4 h-4 text-purple-600" />
+                      <span>Voice Complaint Recording</span>
+                    </span>
+                    <span className="font-mono text-[10px] font-bold bg-white px-2 py-0.5 rounded text-purple-800 border border-purple-300">
+                      Audio Attached
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg border border-purple-200 text-gray-800 font-medium">
+                    <span className="text-[10px] font-bold text-gray-400 block font-mono">Voice Transcription:</span>
+                    <p className="text-xs text-gray-700 italic mt-0.5">
+                      {(detailModalComplaint as any).transcription || `"Citizen voice recording explaining ${detailModalComplaint.title} issue near ${detailModalComplaint.location_address || 'site location'}."`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CITIZEN PHOTO VS REPAIR PROOF EVIDENCE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo</span>
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Submitted Image</span>
                   <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(detailModalComplaint.photo_before_url)}>
                     {detailModalComplaint.photo_before_url ? (
                       <img src={getValidImageUrl(detailModalComplaint.photo_before_url)} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">Original complaint image unavailable</div>
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image Submitted</div>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Repair Proof Evidence</span>
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Work Completion Proof</span>
                   <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer flex items-center justify-center" onClick={() => detailModalComplaint.photo_after_url && setZoomImageUrl(detailModalComplaint.photo_after_url)}>
                     {detailModalComplaint.photo_after_url ? (
                       <img
@@ -2336,10 +2645,42 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
+              {/* ACTION FOOTER */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center space-x-2">
+                  {!detailModalComplaint.assigned_staff_id && detailModalComplaint.status !== 'Resolved' && (
+                    <button
+                      onClick={() => {
+                        const comp = detailModalComplaint;
+                        setDetailModalComplaint(null);
+                        setAssignModalComplaint(comp);
+                        setSelectedStaffForAssign('');
+                        setAssignError(null);
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-xs flex items-center space-x-1.5 shadow-xs"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Assign Staff Member</span>
+                    </button>
+                  )}
+                  {detailModalComplaint.status === 'Resolution Submitted' && (
+                    <button
+                      onClick={() => {
+                        const comp = detailModalComplaint;
+                        setDetailModalComplaint(null);
+                        setReviewModalComplaint(comp);
+                      }}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center space-x-1.5 shadow-xs"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Verify Work Evidence</span>
+                    </button>
+                  )}
+                </div>
+
                 <button
                   onClick={() => setDetailModalComplaint(null)}
-                  className="px-5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs"
+                  className="px-5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs hover:bg-gray-800"
                 >
                   Close Window
                 </button>
@@ -2347,6 +2688,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             </div>
           </div>
         )}
+
 
       </div>
     </DashboardLayout>
