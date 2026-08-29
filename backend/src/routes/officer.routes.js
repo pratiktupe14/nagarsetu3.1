@@ -24,9 +24,25 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
     `;
     const params = [];
 
-    if (department_id) {
+    let targetDeptId = department_id;
+
+    if (req.user.role === 'department_head') {
+      if (req.user.department_id) {
+        targetDeptId = req.user.department_id;
+      } else {
+        const dhRes = await query(
+          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
+          [req.user.id, (req.user.email || '').toLowerCase()]
+        );
+        if (dhRes.rows && dhRes.rows.length > 0) {
+          targetDeptId = dhRes.rows[0].department_id;
+        }
+      }
+    }
+
+    if (targetDeptId) {
       sql += ` AND c.department_id = ?`;
-      params.push(department_id);
+      params.push(targetDeptId);
     }
     if (priority) {
       sql += ` AND c.priority = ?`;
@@ -50,6 +66,7 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
     return res.status(500).json({ error: 'Failed to fetch dashboard complaints' });
   }
 });
+
 
 // Get available field staff for assignment
 router.get('/staff-list', async (req, res) => {

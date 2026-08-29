@@ -92,23 +92,25 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     // Default department mapping if not provided
     let finalDeptId = department_id;
     if (!finalDeptId) {
-      let searchToken = category ? category.split(' ')[0] : 'Public Works';
-      if (category.includes('Pothole') || category.includes('Road')) searchToken = 'Public Works';
-      else if (category.includes('Garbage') || category.includes('Waste')) searchToken = 'Sanitation';
-      else if (category.includes('Water')) searchToken = 'Water';
-      else if (category.includes('Drainage') || category.includes('Sewage')) searchToken = 'Drainage';
-      else if (category.includes('Streetlight') || category.includes('Electrical')) searchToken = 'Electric';
-      else if (category.includes('Traffic')) searchToken = 'Traffic';
-      else if (category.includes('Infrastructure') || category.includes('Maintenance') || category.includes('Other')) searchToken = 'Maintenance';
+      let deptCode = 'PWD';
+      const catLower = (category || '').toLowerCase();
+      if (catLower.includes('water') || catLower.includes('pipeline')) deptCode = 'WTR';
+      else if (catLower.includes('garbage') || catLower.includes('waste') || catLower.includes('sanitation')) deptCode = 'SAN';
+      else if (catLower.includes('drain') || catLower.includes('sewag') || catLower.includes('sewer')) deptCode = 'DRN';
+      else if (catLower.includes('street') || catLower.includes('electric') || catLower.includes('light')) deptCode = 'ELE';
+      else if (catLower.includes('traffic') || catLower.includes('signal')) deptCode = 'TRF';
+      else if (catLower.includes('infrastructure') || catLower.includes('maintenance') || catLower.includes('other')) deptCode = 'MNT';
+      else if (catLower.includes('pothole') || catLower.includes('road')) deptCode = 'PWD';
 
-      const deptSql = `SELECT id FROM departments WHERE name LIKE ? LIMIT 1`;
-      const deptRes = await query(deptSql, [`%${searchToken}%`]);
+      const deptRes = await query(`SELECT id FROM departments WHERE code = ? OR id = ? LIMIT 1`, [deptCode, deptCode]);
       if (deptRes.rows && deptRes.rows.length > 0) {
         finalDeptId = deptRes.rows[0].id;
       } else {
-        finalDeptId = 1; // Default to PWD
+        const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
+        finalDeptId = fallbackRes.rows?.[0]?.id || 1;
       }
     }
+
 
 
     const insertSql = `
