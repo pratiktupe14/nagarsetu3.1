@@ -16,6 +16,7 @@ import {
 import { formatSlaRemainingTime, logActivity } from '../../services/adminService';
 import { NotificationItem, NotificationType, Complaint, ComplaintStatus } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Bell, Check, CheckCheck, Clock, ShieldCheck, AlertTriangle, FileText,
   Wrench, CheckCircle2, RotateCcw, Zap, ExternalLink, Filter, Search,
@@ -39,56 +40,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, { icon: React.ReactNode; colo
 };
 
 // SEED NOTIFICATIONS FOR SERVICE STAFF WORKUPDATES IF FEW EXIST
-const SEED_STAFF_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'staff-notif-1',
-    user_id: 'staff-101',
-    role: 'service_staff',
-    complaint_id: 'comp-101',
-    complaint_number: 'NS-2026-100234',
-    type: 'staff_assigned',
-    title: 'New Civic Task Assigned to You',
-    message: 'Complaint NS-2026-100234 (Road Pothole on Station Road) has been assigned to you.',
-    is_read: false,
-    created_at: new Date(Date.now() - 3600000 * 1.5).toISOString()
-  },
-  {
-    id: 'staff-notif-2',
-    user_id: 'staff-101',
-    role: 'service_staff',
-    complaint_id: 'comp-103',
-    complaint_number: 'NS-2026-000189',
-    type: 'sla_warning',
-    title: 'SLA Due Soon Alert',
-    message: 'Complaint NS-2026-000189 is due in 1 hour. Please prioritize field completion.',
-    is_read: false,
-    created_at: new Date(Date.now() - 3600000 * 3.5).toISOString()
-  },
-  {
-    id: 'staff-notif-3',
-    user_id: 'staff-101',
-    role: 'service_staff',
-    complaint_id: 'comp-104',
-    complaint_number: 'NS-2026-000210',
-    type: 'sla_breached',
-    title: 'Task Overdue SLA Alert',
-    message: 'Complaint NS-2026-000210 has exceeded its SLA deadline.',
-    is_read: false,
-    created_at: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: 'staff-notif-4',
-    user_id: 'staff-101',
-    role: 'service_staff',
-    complaint_id: 'comp-102',
-    complaint_number: 'NS-2026-100567',
-    type: 'resolved',
-    title: 'Work Verified & Approved',
-    message: 'Your completed repair work for NS-2026-100567 has been verified by City Administration.',
-    is_read: true,
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-  }
-];
+const SEED_STAFF_NOTIFICATIONS: NotificationItem[] = [];
 
 export const StaffNotificationsPage: React.FC = () => {
   const { user } = useAuth();
@@ -689,7 +641,12 @@ export const StaffNotificationsPage: React.FC = () => {
                   <div>
                     <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report - Locked)</span>
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
-                      <img src={detailModalTask.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                      <img
+                        src={getValidImageUrl(detailModalTask.photo_before_url)}
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                      />
                     </div>
                   </div>
 
@@ -697,7 +654,12 @@ export const StaffNotificationsPage: React.FC = () => {
                     <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
                     {detailModalTask.photo_after_url || photoAfterPreview ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
-                        <img src={detailModalTask.photo_after_url || photoAfterPreview} alt="Proof" className="w-full h-full object-cover" />
+                        <img
+                          src={getValidImageUrl(detailModalTask.photo_after_url || photoAfterPreview)}
+                          alt="Proof"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                         {detailModalTask.status !== 'Resolved' && (
                           <button
                             type="button"

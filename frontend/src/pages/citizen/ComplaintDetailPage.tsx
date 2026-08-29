@@ -7,9 +7,10 @@ import { LocationMapPicker } from '../../components/LocationMapPicker';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { RelatedIssuesSection } from '../../components/RelatedIssuesSection';
 import { getComplaintById, getAllComplaints, submitComplaintFeedback, reopenComplaint } from '../../services/complaintService';
-import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, ShieldCheck } from 'lucide-react';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 
 export const ComplaintDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -204,12 +205,14 @@ export const ComplaintDetailPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <span className="text-xs font-bold text-gray-700 block">BEFORE (Reported Condition)</span>
+
                 <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 h-60">
                   {complaint.photo_before_url ? (
                     <img
-                      src={complaint.photo_before_url}
+                      src={getValidImageUrl(complaint.photo_before_url)}
                       alt="Before repair"
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-2">
@@ -225,9 +228,10 @@ export const ComplaintDetailPage: React.FC = () => {
                   <span className="text-xs font-bold font-outfit text-emerald-700 block">AFTER (Resolution Proof)</span>
                   <div className="rounded-xl overflow-hidden border-2 border-emerald-400 bg-emerald-50/30 h-60">
                     <img
-                      src={complaint.photo_after_url}
+                      src={getValidImageUrl(complaint.photo_after_url)}
                       alt="After repair proof"
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                     />
                   </div>
                 </div>

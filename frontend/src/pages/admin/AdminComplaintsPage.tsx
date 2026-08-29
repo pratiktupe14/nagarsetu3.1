@@ -13,6 +13,7 @@ import {
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint, PriorityLevel, AdminKPIStats } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Search, Download, ArrowUpDown, RefreshCw, CheckCircle2, AlertTriangle,
   Building2, Users, MapPin, X, Sparkles, Layers, Maximize2, ExternalLink
@@ -588,9 +589,10 @@ export const AdminComplaintsPage: React.FC = () => {
 
                   <div className="rounded-xl overflow-hidden border border-gray-200 aspect-4/3 bg-gray-100">
                     <img
-                      src={selectedComplaint.photo_before_url}
+                      src={getValidImageUrl(selectedComplaint.photo_before_url)}
                       alt="Reported Civic Issue"
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                     />
                   </div>
                 </div>
@@ -679,12 +681,12 @@ export const AdminComplaintsPage: React.FC = () => {
 
                   <div className="text-xs space-y-1">
                     <p className="font-bold">⚠ Similar complaint found nearby (82m away)</p>
-                    <p className="text-[11px] text-amber-900">Master Complaint: <strong>NS-2026-100234</strong> (4 related reports linked)</p>
+                    <p className="text-[11px] text-amber-900">Master Complaint: <strong>{selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}</strong></p>
                   </div>
 
                   <div className="flex items-center space-x-2 pt-1">
-                    <button type="button" onClick={() => alert('Viewing existing master complaint NS-2026-100234')} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
-                    <button type="button" onClick={() => alert('Complaint linked to master NS-2026-100234')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
+                    <button type="button" onClick={() => alert(`Viewing existing master complaint ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
+                    <button type="button" onClick={() => alert(`Complaint linked to master ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
                     <button type="button" onClick={() => alert('Marked as separate complaint')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Keep Separate</button>
                   </div>
                 </div>

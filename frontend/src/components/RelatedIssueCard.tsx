@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { RelatedIssueItem } from '../services/locationService';
 import { supportDuplicateComplaint } from '../services/complaintService';
 import { StatusBadge } from './StatusBadge';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../lib/supabase';
 import { MapPin, ThumbsUp, ArrowRight, Building2, Calendar, ShieldCheck } from 'lucide-react';
 
 interface RelatedIssueCardProps {
@@ -56,10 +57,11 @@ export const RelatedIssueCard: React.FC<RelatedIssueCardProps> = ({ item, onSupp
         <div className="relative rounded-xl overflow-hidden h-32 bg-gray-100 border border-gray-200">
           {complaint.photo_before_url ? (
             <img
-              src={complaint.photo_before_url}
+              src={getValidImageUrl(complaint.photo_before_url)}
               alt={complaint.title}
               className="w-full h-full object-cover"
               loading="lazy"
+              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">

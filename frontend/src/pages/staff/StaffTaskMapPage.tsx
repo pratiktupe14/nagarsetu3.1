@@ -13,6 +13,7 @@ import {
 import { formatSlaRemainingTime, logActivity } from '../../services/adminService';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Map, MapPin, Search, RefreshCw, Navigation, Eye, UserCheck, CheckCircle2,
   AlertTriangle, Clock, Building2, User, Lock, Crosshair, Compass, Wrench, X,
@@ -892,7 +893,12 @@ export const StaffTaskMapPage: React.FC = () => {
                   <div>
                     <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report - Locked)</span>
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
-                      <img src={detailModalTask.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                      <img
+                        src={getValidImageUrl(detailModalTask.photo_before_url)}
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                      />
                     </div>
                   </div>
 
@@ -900,7 +906,12 @@ export const StaffTaskMapPage: React.FC = () => {
                     <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
                     {detailModalTask.photo_after_url || photoAfterPreview ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
-                        <img src={detailModalTask.photo_after_url || photoAfterPreview} alt="Proof" className="w-full h-full object-cover" />
+                        <img
+                          src={getValidImageUrl(detailModalTask.photo_after_url || photoAfterPreview)}
+                          alt="Proof"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                         {detailModalTask.status !== 'Resolved' && (
                           <button
                             type="button"

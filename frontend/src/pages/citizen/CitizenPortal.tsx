@@ -11,6 +11,8 @@ import { Complaint, OfficialAnnouncement, MaintenanceWork } from '../../types/da
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { PlusCircle, Clock, ArrowRight, ShieldCheck, WifiOff, FileText, Zap, AlertTriangle, RefreshCw, Megaphone, HardHat } from 'lucide-react';
 
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+
 function getMaintenanceBadge(status: MaintenanceWork['status']) {
   switch (status) {
     case 'Planned': return 'bg-blue-50 text-blue-800 border-blue-200';
@@ -281,9 +283,12 @@ export const CitizenPortal: React.FC = () => {
                     <div className="relative rounded-xl overflow-hidden h-40 bg-gray-100 border border-gray-200">
                       {comp.photo_before_url ? (
                         <img
-                          src={comp.photo_before_url}
+                          src={getValidImageUrl(comp.photo_before_url)}
                           alt={comp.title}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">

@@ -23,6 +23,7 @@ import {
 } from '../../services/notificationService';
 import { Complaint, ComplaintStatus, UserProfile, NotificationItem } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
@@ -2319,7 +2320,12 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Repair Proof Evidence</span>
                   <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer flex items-center justify-center" onClick={() => detailModalComplaint.photo_after_url && setZoomImageUrl(detailModalComplaint.photo_after_url)}>
                     {detailModalComplaint.photo_after_url ? (
-                      <img src={detailModalComplaint.photo_after_url} alt="After" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                      <img
+                        src={getValidImageUrl(detailModalComplaint.photo_after_url)}
+                        alt="After"
+                        className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                      />
                     ) : (
                       <div className="text-center p-4 space-y-1">
                         <Camera className="w-6 h-6 text-gray-400 mx-auto" />

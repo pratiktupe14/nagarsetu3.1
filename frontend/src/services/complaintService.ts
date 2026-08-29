@@ -1,5 +1,5 @@
 import { Complaint, ComplaintStatus, PriorityLevel, StaffPerformanceMetrics } from '../types/database.types';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isValidUuid } from '../lib/supabase';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { getApiUrl } from '../config/apiConfig';
@@ -74,8 +74,8 @@ export function saveStoredComplaints(complaints: Complaint[]) {
   localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(clean));
 }
 
-// Upload image to Supabase storage bucket
-export async function uploadComplaintImage(file: File, bucketName: string = 'complaint-images'): Promise<string> {
+// Upload image to Supabase storage bucket ('issues')
+export async function uploadComplaintImage(file: File, bucketName: string = 'issues'): Promise<string> {
   if (isSupabaseConfigured()) {
     try {
       const fileExt = file.name.split('.').pop() || 'jpg';
@@ -141,7 +141,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
 export async function getCitizenComplaints(citizenId: string): Promise<Complaint[]> {
   if (!citizenId || citizenId.trim() === '') return [];
 
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && isValidUuid(citizenId)) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -166,7 +166,7 @@ export async function getStaffTasks(staffId?: string, departmentName?: string): 
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('complaints').select('*');
-      if (staffId) {
+      if (staffId && isValidUuid(staffId)) {
         query = query.eq('assigned_staff_id', staffId);
       } else if (departmentName && departmentName !== 'All') {
         const cleanDept = departmentName.split('(')[0].trim();
@@ -204,7 +204,7 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('complaints').select('*');
-      if (departmentId) {
+      if (departmentId && isValidUuid(departmentId)) {
         query = query.eq('department_id', departmentId);
       } else if (departmentName && departmentName !== 'All') {
         const cleanDept = departmentName.split('(')[0].trim();
@@ -254,11 +254,12 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
   // 2. Try Supabase if configured
   if (!comp && isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase
-        .from('complaints')
-        .select('*')
-        .or(`id.eq.${idOrNumber},complaint_number.eq.${idOrNumber}`)
-        .single();
+      const isUuid = isValidUuid(idOrNumber);
+      const query = isUuid
+        ? supabase.from('complaints').select('*').or(`id.eq.${idOrNumber},complaint_number.eq.${idOrNumber}`).maybeSingle()
+        : supabase.from('complaints').select('*').eq('complaint_number', idOrNumber).maybeSingle();
+
+      const { data, error } = await query;
 
       if (!error && data) {
         comp = data as Complaint;
@@ -300,9 +301,8 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
   if (isSupabaseConfigured()) {
     try {
-      const dbPayload = {
+      const dbPayload: Record<string, any> = {
         complaint_number: newComplaint.complaint_number,
-        citizen_id: newComplaint.citizen_id,
         photo_before_url: newComplaint.photo_before_url,
         category: newComplaint.category,
         title: newComplaint.title,
@@ -314,6 +314,10 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
         location_source: newComplaint.location_source,
         location_address: newComplaint.location_address
       };
+
+      if (isValidUuid(newComplaint.citizen_id)) {
+        dbPayload.citizen_id = newComplaint.citizen_id;
+      }
 
       const { data, error } = await supabase
         .from('complaints')

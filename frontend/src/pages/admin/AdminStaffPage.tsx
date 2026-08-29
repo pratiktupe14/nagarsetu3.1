@@ -1204,37 +1204,8 @@ export const AdminStaffPage: React.FC = () => {
                       Recent Task Resolution History
                     </h3>
 
-                    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3 text-xs">
-                      <div className="relative border-l-2 border-emerald-600 ml-3 space-y-3 pl-4 py-1">
-                        
-                        <div className="relative">
-                          <div className="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-emerald-800">NS-2026-100234 • Road Pothole Repair</span>
-                            <span className="font-mono text-gray-500">20 Aug 2026</span>
-                          </div>
-                          <p className="text-gray-600 text-[11px]">Cold asphalt patch executed at Ward 12. Resolution verified by Admin.</p>
-                        </div>
-
-                        <div className="relative">
-                          <div className="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-emerald-800">NS-2026-000119 • Streetlight Luminaire Repair</span>
-                            <span className="font-mono text-gray-500">19 Aug 2026</span>
-                          </div>
-                          <p className="text-gray-600 text-[11px]">LED driver replacement completed at Ward 09.</p>
-                        </div>
-
-                        <div className="relative">
-                          <div className="absolute -left-[23px] top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white" />
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-emerald-800">NS-2026-000108 • Water Main Leakage Seal</span>
-                            <span className="font-mono text-gray-500">18 Aug 2026</span>
-                          </div>
-                          <p className="text-gray-600 text-[11px]">Subsurface pipe clamp installed at CIDCO Ward 04.</p>
-                        </div>
-
-                      </div>
+                    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 text-xs text-center text-gray-500 font-medium">
+                      No past task resolution history recorded yet for this staff member.
                     </div>
                   </div>
                 )}

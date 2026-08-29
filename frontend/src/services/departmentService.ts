@@ -280,17 +280,19 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-// Non-persisted isolated auth client so Admin session is not overwritten during user creation
-const tempAuthClient = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  }
-}) : null;
+function getTempAuthClient() {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'nagarsetu_temp_auth_storage'
+    }
+  });
+}
 
 /**
  * Add or Replace Department Head atomically in Express API & Supabase
@@ -301,7 +303,7 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
   // 1. Call Local Express Backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token');
-    const response = await fetch('${getApiUrl()}/api/admin/department-heads', {
+    const response = await fetch(`${getApiUrl()}/api/admin/department-heads`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -365,22 +367,25 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
         if (!payload.password) {
           throw new Error('Password is required when creating a new department head account.');
         }
-        const { data: signUpData, error: signUpErr } = await tempAuthClient.auth.signUp({
-          email: cleanEmail,
-          password: payload.password,
-          options: {
-            data: {
-              full_name: payload.fullName,
-              role: 'department_head',
-              department_id: targetDeptId
+        const tempAuth = getTempAuthClient();
+        if (tempAuth) {
+          const { data: signUpData, error: signUpErr } = await tempAuth.auth.signUp({
+            email: cleanEmail,
+            password: payload.password,
+            options: {
+              data: {
+                full_name: payload.fullName,
+                role: 'department_head',
+                department_id: targetDeptId
+              }
             }
-          }
-        });
+          });
 
-        if (signUpData?.user?.id) {
-          userId = signUpData.user.id;
-        } else if (signUpErr) {
-          console.warn('Supabase Auth signUp note:', signUpErr.message);
+          if (signUpData?.user?.id) {
+            userId = signUpData.user.id;
+          } else if (signUpErr) {
+            console.warn('Supabase Auth signUp note:', signUpErr.message);
+          }
         }
       } catch (authEx) {
         console.warn('Auth sync exception note:', authEx);

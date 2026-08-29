@@ -46,79 +46,7 @@ export const AdminNotificationsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Ensure seed notifications if empty
       let list = getNotificationsForRole(user?.id, 'city_admin');
-      
-      // Inject extra realistic municipal admin notifications if list is small
-      if (list.length <= 3) {
-        const enrichedSeed: NotificationItem[] = [
-          ...list,
-          {
-            id: 'notif-adm-101',
-            user_id: 'admin-group',
-            role: 'city_admin',
-            complaint_id: 'comp-101',
-            complaint_number: 'NS-2026-100234',
-            type: 'sla_breached',
-            title: 'SLA Breach Warning: Sewage Overflow in Ward 12',
-            message: 'Complaint NS-2026-100234 has exceeded its 24-hour resolution deadline by 3.5 hours.',
-            is_read: false,
-            created_at: new Date(Date.now() - 3600000 * 1).toISOString()
-          },
-          {
-            id: 'notif-adm-102',
-            user_id: 'admin-group',
-            role: 'city_admin',
-            complaint_id: 'comp-102',
-            complaint_number: 'NS-2026-100567',
-            type: 'critical',
-            title: 'CRITICAL Hazard Reported: Exposed High-Voltage Line',
-            message: 'Public safety hazard reported at MG Road Junction. Electrical Dept dispatched urgently.',
-            is_read: false,
-            created_at: new Date(Date.now() - 3600000 * 3).toISOString()
-          },
-          {
-            id: 'notif-adm-103',
-            user_id: 'admin-group',
-            role: 'city_admin',
-            complaint_id: 'comp-104',
-            complaint_number: 'NS-2026-000210',
-            type: 'resolution_submitted',
-            title: 'Resolution Proof Uploaded for Review',
-            message: 'Field Staff Ramesh Kumar submitted after-work photos for Road Pothole repair NS-2026-000210.',
-            is_read: false,
-            created_at: new Date(Date.now() - 3600000 * 6).toISOString()
-          },
-          {
-            id: 'notif-adm-104',
-            user_id: 'admin-group',
-            role: 'city_admin',
-            complaint_id: 'comp-105',
-            complaint_number: 'NS-2026-000234',
-            type: 'resolved',
-            title: 'Complaint Resolved & Citizen Feedback Received',
-            message: 'Citizen rated 5 Stars (★ ★ ★ ★ ★): "Prompt repair of water leakage on College Road!"',
-            is_read: true,
-            created_at: new Date(Date.now() - 86400000 * 1).toISOString()
-          },
-          {
-            id: 'notif-adm-105',
-            user_id: 'admin-group',
-            role: 'city_admin',
-            complaint_id: 'comp-106',
-            complaint_number: 'NS-2026-000258',
-            type: 'sla_warning',
-            title: 'SLA Deadline Approaching (45m Remaining)',
-            message: 'Streetlight outage NS-2026-000258 is approaching its SLA target in Ward 8.',
-            is_read: true,
-            created_at: new Date(Date.now() - 86400000 * 2).toISOString()
-          }
-        ];
-        
-        saveStoredNotifications(enrichedSeed);
-        list = getNotificationsForRole(user?.id, 'city_admin');
-      }
-
       setNotifications(list);
     } catch (e) {
       console.error(e);

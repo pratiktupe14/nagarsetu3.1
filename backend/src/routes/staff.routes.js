@@ -57,11 +57,11 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 // Resolve Task with "After" Photo Proof
 router.post('/task/:id/resolve', validateInput(resolveTaskParamsSchema), uploadSingleImage('photo_after'), async (req, res) => {
   try {
-    if (!req.file || (!req.file.filename && !req.file.buffer)) {
+    if (!req.file || (!req.file.filename && !req.file.buffer && !req.file.publicUrl)) {
       return res.status(400).json({ error: 'Resolution photo proof ("after" photo) is required' });
     }
 
-    const photoAfterUrl = req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-after.jpg';
+    const photoAfterUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-after.jpg');
 
     const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [req.params.id]);
     if (!compRes.rows || compRes.rows.length === 0) {

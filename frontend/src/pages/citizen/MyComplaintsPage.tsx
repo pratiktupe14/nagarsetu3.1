@@ -11,6 +11,7 @@ import { formatSlaRemainingTime } from '../../services/adminService';
 import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   PlusCircle, Search, Filter, Clock, ArrowRight, ShieldCheck, FileText,
   AlertTriangle, CheckCircle2, RotateCcw, Star, Calendar, Building2, MapPin, RefreshCw, Navigation, Compass
@@ -483,10 +484,11 @@ export const MyComplaintsPage: React.FC = () => {
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
                       {c.photo_before_url ? (
                         <img
-                          src={c.photo_before_url}
+                          src={getValidImageUrl(c.photo_before_url)}
                           alt={c.title}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">

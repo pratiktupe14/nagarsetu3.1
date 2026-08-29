@@ -9,6 +9,7 @@ import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { getApiUrl } from '../../config/apiConfig';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { LiveGoogleMap } from '../../components/LiveGoogleMap';
 import {
   Clock, Search, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Zap,
@@ -420,11 +421,21 @@ export const TrackComplaintPage: React.FC = () => {
                       </span>
                       <div className="flex space-x-2">
                         <div className="w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
-                          <img src={activeComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                          <img
+                            src={getValidImageUrl(activeComplaint.photo_before_url)}
+                            alt="Before"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                          />
                         </div>
                         {activeComplaint.photo_after_url && (
                           <div className="w-20 h-16 rounded-xl overflow-hidden border-2 border-emerald-400 shrink-0 bg-emerald-50">
-                            <img src={activeComplaint.photo_after_url} alt="After" className="w-full h-full object-cover" />
+                            <img
+                              src={getValidImageUrl(activeComplaint.photo_after_url)}
+                              alt="After"
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                            />
                           </div>
                         )}
                       </div>

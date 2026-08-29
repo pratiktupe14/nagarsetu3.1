@@ -11,6 +11,7 @@ import {
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Search, Download, ArrowUpDown, RefreshCw, AlertTriangle,
   Building2, Users, MapPin, Sparkles, Maximize2, ExternalLink, Clock, Wrench
@@ -476,9 +477,10 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                   </span>
                   <div className="rounded-xl overflow-hidden border border-gray-200 aspect-4/3 bg-gray-100">
                     <img
-                      src={selectedComplaint.photo_before_url}
+                      src={getValidImageUrl(selectedComplaint.photo_before_url)}
                       alt="Reported Civic Issue"
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                     />
                   </div>
                 </div>

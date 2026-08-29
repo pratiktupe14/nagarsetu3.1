@@ -12,6 +12,7 @@ import {
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Search, Download, RefreshCw, AlertTriangle, MapPin, Clock,
   ArrowUpDown, ChevronLeft, ChevronRight, X, Maximize2, Building2,
@@ -1075,13 +1076,18 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                     <span className="text-xs font-bold text-gray-700 block font-outfit">BEFORE — Reported Issue</span>
                     <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
                       {selectedComplaint.photo_before_url ? (
-                        <img src={selectedComplaint.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                        <img
+                          src={getValidImageUrl(selectedComplaint.photo_before_url)}
+                          alt="Before"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                       ) : (
                         <div className="flex items-center justify-center h-full text-xs text-gray-400 font-mono">No Image</div>
                       )}
                       {selectedComplaint.photo_before_url && (
                         <button
-                          onClick={() => setShowFullImageModal(selectedComplaint.photo_before_url)}
+                          onClick={() => setShowFullImageModal(getValidImageUrl(selectedComplaint.photo_before_url))}
                           className="absolute bottom-2 right-2 p-1 bg-black/60 text-white rounded hover:bg-black"
                         >
                           <Maximize2 className="w-3.5 h-3.5" />
@@ -1096,9 +1102,10 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                     <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
                       {selectedComplaint.photo_after_url || selectedComplaint.photo_before_work_url ? (
                         <img
-                          src={selectedComplaint.photo_after_url || selectedComplaint.photo_before_work_url}
+                          src={getValidImageUrl(selectedComplaint.photo_after_url || selectedComplaint.photo_before_work_url)}
                           alt="Progress Proof"
                           className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                         />
                       ) : (
                         <div className="flex items-center justify-center h-full text-xs text-gray-400 font-mono">

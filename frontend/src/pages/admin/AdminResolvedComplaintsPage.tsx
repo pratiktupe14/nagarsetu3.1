@@ -8,6 +8,7 @@ import { formatSlaRemainingTime } from '../../services/adminService';
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Search, Download, RefreshCw, Star, MapPin, Clock,
   CheckCircle2, AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight,
@@ -972,9 +973,10 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
                         <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200 group">
                           {selectedComplaint.photo_before_url ? (
                             <img
-                              src={selectedComplaint.photo_before_url}
-                              alt="Reported Issue Before"
+                              src={getValidImageUrl(selectedComplaint.photo_before_url)}
+                              alt="Original Defect Before"
                               className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                             />
                           ) : (
                             <div className="flex items-center justify-center h-full text-xs text-gray-400 font-mono">
@@ -982,7 +984,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
                             </div>
                           )}
                           <button
-                            onClick={() => setShowFullImageModal(selectedComplaint.photo_before_url)}
+                            onClick={() => setShowFullImageModal(getValidImageUrl(selectedComplaint.photo_before_url))}
                             className="absolute bottom-2 right-2 p-1.5 bg-black/60 text-white rounded-md hover:bg-black transition-colors"
                           >
                             <Maximize2 className="w-3.5 h-3.5" />
@@ -1006,9 +1008,10 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
                         <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200 group">
                           {selectedComplaint.photo_after_url ? (
                             <img
-                              src={selectedComplaint.photo_after_url}
+                              src={getValidImageUrl(selectedComplaint.photo_after_url)}
                               alt="Resolved Condition After"
                               className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                             />
                           ) : (
                             <div className="flex items-center justify-center h-full text-xs text-gray-400 font-mono">

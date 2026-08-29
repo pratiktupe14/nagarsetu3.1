@@ -17,8 +17,8 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
       return res.status(400).json({ error: 'No photo file provided' });
     }
 
-    const photoUrl = req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-photo.jpg';
-    const fullPath = req.file.path || req.file;
+    const photoUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-photo.jpg');
+    const fileInput = req.file.buffer || req.file.path || req.file;
 
     const liveLat = req.body.liveLat ? parseFloat(req.body.liveLat) : null;
     const liveLng = req.body.liveLng ? parseFloat(req.body.liveLng) : null;
@@ -26,7 +26,7 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
     const manualLng = req.body.manualLng ? parseFloat(req.body.manualLng) : null;
 
     // Resolve location according to exact priority specification
-    const locationRes = await resolveLocation(fullPath, liveLat, liveLng, manualLat, manualLng);
+    const locationRes = await resolveLocation(fileInput, liveLat, liveLng, manualLat, manualLng);
 
     // If client needs to make a decision due to 500m+ conflict between EXIF and Live GPS
     if (locationRes.requiresUserChoice) {
@@ -47,7 +47,7 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
     }
 
     // Run AI Vision Analysis
-    const aiAnalysis = await analyzeComplaintPhoto(fullPath);
+    const aiAnalysis = await analyzeComplaintPhoto(fileInput);
 
     // Check potential duplicate complaints within 100m radius
     const duplicates = await checkForDuplicates(locationRes.latitude, locationRes.longitude, aiAnalysis.category, 100);

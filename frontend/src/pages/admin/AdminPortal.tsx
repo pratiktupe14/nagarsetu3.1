@@ -18,6 +18,7 @@ import {
 } from '../../services/analyticsService';
 import { Complaint, PriorityLevel, AdminKPIStats } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Building2, Users, CheckCircle2, AlertTriangle, Clock, MapPin,
   TrendingUp, BarChart3, Filter, Search, ShieldCheck, CheckSquare, XSquare, Eye,
@@ -450,11 +451,21 @@ export const AdminPortal: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report)</span>
-                        <img src={c.photo_before_url} alt="Before" className="w-full h-36 rounded-xl object-cover border border-gray-200" />
+                        <img
+                          src={getValidImageUrl(c.photo_before_url)}
+                          alt="Before"
+                          className="w-full h-36 rounded-xl object-cover border border-gray-200"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                       </div>
                       <div>
                         <span className="font-bold text-emerald-800 block mb-1">AFTER (Staff Proof)</span>
-                        <img src={c.photo_after_url} alt="After Proof" className="w-full h-36 rounded-xl object-cover border border-emerald-300" />
+                        <img
+                          src={getValidImageUrl(c.photo_after_url)}
+                          alt="After Proof"
+                          className="w-full h-36 rounded-xl object-cover border border-emerald-300"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                       </div>
                     </div>
 

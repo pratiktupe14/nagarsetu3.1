@@ -85,12 +85,14 @@ function validateUploadedImageMagicBytes(req, res, next) {
   next();
 }
 
+const { uploadBufferToSupabase } = require('../config/supabaseStorage');
+
 /**
- * Middleware wrapper that performs Magic Byte verification & safe disk writing with random filename
+ * Middleware wrapper that performs Magic Byte verification & uploads directly to Supabase Storage (issues bucket)
  */
 function uploadSingleImage(fieldName) {
   return (req, res, next) => {
-    upload.single(fieldName)(req, res, (err) => {
+    upload.single(fieldName)(req, res, async (err) => {
       if (err) {
         return next(err);
       }
@@ -102,17 +104,37 @@ function uploadSingleImage(fieldName) {
           });
         }
 
-        const safeExt = ALLOWED_MIME_EXT_MAP[req.file.mimetype] || path.extname(req.file.originalname) || '.jpg';
+        const safeExt = ALLOWED_MIME_EXT_MAP[req.file.mimetype] || path.extname(req.file.originalname || '') || '.jpg';
         const randomFilename = `${crypto.randomUUID()}${safeExt}`;
-        const diskPath = path.join(UPLOADS_DIR, randomFilename);
 
         try {
-          fs.writeFileSync(diskPath, req.file.buffer);
+          // Attempt upload to Supabase Storage ('issues' bucket)
+          const result = await uploadBufferToSupabase(
+            req.file.buffer,
+            randomFilename,
+            req.file.mimetype || 'image/jpeg',
+            'issues'
+          );
+
           req.file.filename = randomFilename;
-          req.file.path = diskPath;
-        } catch (writeErr) {
-          console.error('[UPLOAD ERROR] Failed to write uploaded file to disk:', writeErr);
-          return res.status(500).json({ error: 'Failed to process file upload' });
+          req.file.publicUrl = result.publicUrl;
+          req.file.supabaseUrl = result.publicUrl;
+          req.file.path = result.publicUrl;
+        } catch (supabaseErr) {
+          console.warn('[UPLOAD WARN] Supabase upload failed, using local disk fallback:', supabaseErr.message);
+
+          // Local filesystem fallback
+          try {
+            const diskPath = path.join(UPLOADS_DIR, randomFilename);
+            fs.writeFileSync(diskPath, req.file.buffer);
+            req.file.filename = randomFilename;
+            req.file.path = diskPath;
+            req.file.publicUrl = `/uploads/${randomFilename}`;
+            req.file.supabaseUrl = `/uploads/${randomFilename}`;
+          } catch (writeErr) {
+            console.error('[UPLOAD ERROR] Failed to process file upload:', writeErr);
+            return res.status(500).json({ error: 'Failed to process file upload' });
+          }
         }
       }
 

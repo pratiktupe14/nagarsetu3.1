@@ -11,6 +11,7 @@ import { getAllComplaints, supportDuplicateComplaint } from '../../services/comp
 import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   MapPin, PlusCircle, Search, Compass, ShieldCheck, ThumbsUp, ArrowRight,
   AlertTriangle, CheckCircle2, RefreshCw, Layers, Building2, Calendar, Filter, X,
@@ -559,9 +560,10 @@ export const NearbyIssuesPage: React.FC = () => {
                           <div className="relative rounded-lg overflow-hidden h-24 border border-gray-200">
                             {complaint.photo_before_url ? (
                               <img
-                                src={complaint.photo_before_url}
+                                src={getValidImageUrl(complaint.photo_before_url)}
                                 alt={complaint.title}
                                 className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                               />
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">

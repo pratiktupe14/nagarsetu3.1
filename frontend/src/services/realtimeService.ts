@@ -54,11 +54,21 @@ export function broadcastComplaintChange(
 
   if (isSupabaseConfigured()) {
     try {
-      const channel = supabase.channel(REALTIME_CHANNEL_NAME);
-      channel.send({
-        type: 'broadcast',
-        event: 'complaint_status_change',
-        payload
+      const broadcastChanId = `broadcast_complaint_${Math.random().toString(36).substring(2, 9)}`;
+      const tempChannel = supabase.channel(broadcastChanId);
+      tempChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          tempChannel.send({
+            type: 'broadcast',
+            event: 'complaint_status_change',
+            payload
+          });
+          setTimeout(() => {
+            try {
+              supabase.removeChannel(tempChannel);
+            } catch (e) {}
+          }, 1000);
+        }
       });
     } catch (e) {
       console.warn('Supabase realtime broadcast note:', e);
@@ -92,8 +102,9 @@ export function subscribeToRealtimeComplaints(onUpdate: (payload: RealtimeCompla
 
   if (isSupabaseConfigured()) {
     try {
+      const subChannelId = `sub_complaints_${Math.random().toString(36).substring(2, 9)}`;
       supabaseChannel = supabase
-        .channel(REALTIME_CHANNEL_NAME)
+        .channel(subChannelId)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, (payload) => {
           const newData = payload.new as Record<string, any> | null;
           const oldData = payload.old as Record<string, any> | null;
@@ -123,7 +134,9 @@ export function subscribeToRealtimeComplaints(onUpdate: (payload: RealtimeCompla
       window.removeEventListener(CUSTOM_EVENT_NAME, handleCustomEvent);
     }
     if (supabaseChannel && isSupabaseConfigured()) {
-      supabase.removeChannel(supabaseChannel);
+      try {
+        supabase.removeChannel(supabaseChannel);
+      } catch (e) {}
     }
   };
 }

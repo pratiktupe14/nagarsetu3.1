@@ -16,6 +16,7 @@ import { formatSlaRemainingTime, logActivity, getComplaintActivityLogs } from '.
 import { getNotificationsForRole, markNotificationAsRead } from '../../services/notificationService';
 import { Complaint, ComplaintStatus, NotificationItem } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
   Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
   Camera, Check, Play, Navigation, Eye, UserCheck, ShieldCheck, Zap, X,
@@ -1173,7 +1174,12 @@ export const StaffPortal: React.FC = () => {
                   <div>
                     <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report - Locked)</span>
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
-                      <img src={selectedTask.photo_before_url} alt="Before" className="w-full h-full object-cover" />
+                      <img
+                        src={getValidImageUrl(selectedTask.photo_before_url)}
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                      />
                     </div>
                   </div>
 
@@ -1181,7 +1187,12 @@ export const StaffPortal: React.FC = () => {
                     <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
                     {selectedTask.photo_after_url || photoAfterPreview ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
-                        <img src={selectedTask.photo_after_url || photoAfterPreview} alt="Proof" className="w-full h-full object-cover" />
+                        <img
+                          src={getValidImageUrl(selectedTask.photo_after_url || photoAfterPreview)}
+                          alt="Proof"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                        />
                         {selectedTask.status !== 'Resolved' && (
                           <button
                             type="button"
