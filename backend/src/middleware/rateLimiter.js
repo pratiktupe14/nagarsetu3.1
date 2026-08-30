@@ -20,8 +20,8 @@ const getEnvInt = (key, fallback) => {
  */
 const authAttemptTracker = new Map();
 
-// Periodic cleanup of stale attempt records every 10 minutes
-setInterval(() => {
+// Periodic cleanup of stale attempt records (unref'd for serverless event-loop safety)
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of authAttemptTracker.entries()) {
     if (record.blockedUntil && record.blockedUntil < now && record.resetAt < now) {
@@ -29,6 +29,10 @@ setInterval(() => {
     }
   }
 }, 10 * 60 * 1000);
+
+if (cleanupTimer && typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 /**
  * Custom Exponential Backoff Auth Rate Limiter
