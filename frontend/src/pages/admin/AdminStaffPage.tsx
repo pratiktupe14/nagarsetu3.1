@@ -7,7 +7,7 @@ import { getAllComplaints } from '../../services/complaintService';
 import {
   getAllServiceStaffRecords, saveOrUpdateServiceStaffRecord,
   assignStaffToTask, formatSlaRemainingTime,
-  getMunicipalDepartments, ServiceStaffMemberRecord
+  getMunicipalDepartments, ServiceStaffMemberRecord, fetchDepartmentStaffApi
 } from '../../services/adminService';
 import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -79,8 +79,26 @@ export const AdminStaffPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const records = getAllServiceStaffRecords();
-      setStaffList(records);
+      const apiRes = await fetchDepartmentStaffApi({ status: 'all' });
+      if (apiRes.staff && apiRes.staff.length > 0) {
+        const mappedRecords: ServiceStaffMemberRecord[] = apiRes.staff.map((s) => ({
+          id: s.id,
+          name: s.name,
+          employee_id: s.employee_id,
+          department_name: s.department_name,
+          role: s.designation || 'Service Staff',
+          status: s.status === 'Active' ? 'Available' : 'Offline',
+          contact_number: s.contact_number || s.mobile || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.joined_date || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString()
+        }));
+        setStaffList(mappedRecords);
+      } else {
+        const records = getAllServiceStaffRecords();
+        setStaffList(records);
+      }
 
       const compList = await getAllComplaints();
       setComplaints(compList);

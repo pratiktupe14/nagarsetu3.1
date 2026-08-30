@@ -113,6 +113,77 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
 }
 
 /**
+ * Authoritative helper to match a complaint record to a target department (by DB UUID, Code, Name, or Category)
+ */
+export function matchComplaintToDepartment(
+  c: any,
+  targetDeptIdOrCode: string,
+  departmentsList?: MunicipalDepartment[]
+): boolean {
+  if (!c || !targetDeptIdOrCode || targetDeptIdOrCode === 'all' || targetDeptIdOrCode === 'ALL') {
+    return true;
+  }
+
+  const targetLower = targetDeptIdOrCode.trim().toLowerCase();
+
+  // Find department metadata if code or ID passed
+  const targetDeptMeta = (departmentsList || []).find(
+    (d) => d.id.toLowerCase() === targetLower || (d.code && d.code.toLowerCase() === targetLower)
+  );
+
+  const targetCode = (targetDeptMeta?.code || targetDeptIdOrCode).toLowerCase();
+
+  // 1. Match by department_id (UUID or string ID)
+  if (c.department_id) {
+    const compDeptId = String(c.department_id).toLowerCase();
+    if (compDeptId === targetLower) return true;
+    if (targetDeptMeta && compDeptId === targetDeptMeta.id.toLowerCase()) return true;
+  }
+
+  // 2. Match by department_name
+  if (c.department_name) {
+    const compDeptName = String(c.department_name).toLowerCase();
+    if (compDeptName.includes(targetCode)) return true;
+    if (targetDeptMeta && compDeptName.includes(targetDeptMeta.name.toLowerCase())) return true;
+  }
+
+  // 3. Fallback match by Category taxonomy
+  const cat = String(c.category || '').toLowerCase();
+  const title = String(c.title || '').toLowerCase();
+  const text = `${cat} ${title}`;
+
+  if (targetCode.includes('pwd') || targetLower.includes('pwd') || targetLower.includes('road')) {
+    return text.includes('road') || text.includes('pothole') || text.includes('asphalt') || text.includes('public works') || cat.includes('pothole') || cat.includes('road');
+  }
+
+  if (targetCode.includes('san') || targetLower.includes('san') || targetLower.includes('garbage')) {
+    return text.includes('garbage') || text.includes('sanitation') || text.includes('waste') || text.includes('dustbin') || text.includes('trash');
+  }
+
+  if (targetCode.includes('wtr') || targetLower.includes('wtr') || targetLower.includes('water')) {
+    return text.includes('water') || text.includes('pipeline') || text.includes('sewerage board') || text.includes('leakage');
+  }
+
+  if (targetCode.includes('drn') || targetLower.includes('drn') || targetLower.includes('drain')) {
+    return text.includes('drain') || text.includes('sewage') || text.includes('stormwater') || text.includes('culvert');
+  }
+
+  if (targetCode.includes('ele') || targetLower.includes('ele') || targetLower.includes('light')) {
+    return text.includes('street light') || text.includes('streetlight') || text.includes('electrical') || text.includes('pole') || text.includes('lighting');
+  }
+
+  if (targetCode.includes('trf') || targetLower.includes('trf') || targetLower.includes('traffic')) {
+    return text.includes('traffic') || text.includes('signal') || text.includes('signage') || text.includes('zebra');
+  }
+
+  if (targetCode.includes('mnt') || targetLower.includes('mnt') || targetLower.includes('maintenance')) {
+    return text.includes('maintenance') || text.includes('building') || text.includes('civic issue') || text.includes('infrastructure damage');
+  }
+
+  return false;
+}
+
+/**
  * Get active Department Head for a specific department
  */
 export async function getDepartmentHead(departmentId: string): Promise<DepartmentHeadRecord | null> {

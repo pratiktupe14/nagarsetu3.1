@@ -7,8 +7,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
-  getMunicipalDepartments, getAllServiceStaffRecords,
-  MunicipalDepartmentRecord, ServiceStaffMemberRecord
+  getAllServiceStaffRecords,
+  ServiceStaffMemberRecord
 } from '../../services/adminService';
 import { getStoredProfiles } from '../../services/profileService';
 import { Complaint, UserProfile } from '../../types/database.types';
@@ -22,7 +22,13 @@ import {
   CheckSquare, BarChart2, PieChart, ShieldAlert
 } from 'lucide-react';
 
-import { getDepartmentHeads, DepartmentLeadershipSummary } from '../../services/departmentService';
+import {
+  getDepartmentHeads,
+  getDepartments,
+  matchComplaintToDepartment,
+  DepartmentLeadershipSummary,
+  MunicipalDepartment
+} from '../../services/departmentService';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 // Fix standard Leaflet marker icon asset issue
@@ -67,14 +73,15 @@ const createCustomMapMarkerIcon = (priority: string) => {
   });
 };
 
-const SIX_MUNICIPAL_DEPARTMENTS = [
+const ALL_SEVEN_MUNICIPAL_DEPARTMENTS = [
   { id: 'all', name: 'All Municipal Departments', code: 'ALL', icon: Building2 },
   { id: 'dept-pwd-001', name: 'Roads & Public Works (PWD)', code: 'PWD', icon: Wrench },
   { id: 'dept-san-001', name: 'Sanitation & Waste Management', code: 'SAN', icon: Trash2 },
   { id: 'dept-wtr-001', name: 'Water Supply & Sewerage Board', code: 'WTR', icon: Droplets },
   { id: 'dept-drn-001', name: 'Drainage & Sewage Department', code: 'DRN', icon: Waves },
   { id: 'dept-ele-001', name: 'Electrical & Street Lighting Dept', code: 'ELE', icon: Zap },
-  { id: 'dept-trf-001', name: 'Traffic Management Dept', code: 'TRF', icon: Activity }
+  { id: 'dept-trf-001', name: 'Traffic Management Dept', code: 'TRF', icon: Activity },
+  { id: 'dept-mnt-001', name: 'Maintenance Department', code: 'MNT', icon: Wrench }
 ];
 
 export const AdminDepartmentDashboardPage: React.FC = () => {
@@ -86,7 +93,9 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
+  const [dbDepartments, setDbDepartments] = useState<MunicipalDepartment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Map layer filter & search
   const [mapLayerTab, setMapLayerTab] = useState<'All' | 'Active Tasks' | 'Overdue' | 'Critical' | 'Completed'>('All');
@@ -95,22 +104,26 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   // Load Real Database Data
   const loadData = useCallback(async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
-      const [compList, heads] = await Promise.all([
+      const [compList, heads, depts] = await Promise.all([
         getAllComplaints(),
-        getDepartmentHeads()
+        getDepartmentHeads(),
+        getDepartments()
       ]);
 
       setComplaints(compList);
       setHeadSummaries(heads);
+      setDbDepartments(depts);
 
       const staff = getAllServiceStaffRecords();
       setStaffMembers(staff);
 
       const profs = getStoredProfiles();
       setProfiles(profs);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('Error loading department dashboard data:', e);
+      setErrorMsg('Unable to load department dashboard data from database.');
     } finally {
       setLoading(false);
     }
@@ -131,6 +144,9 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'department_heads' }, () => {
         loadData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, () => {
+        loadData();
+      })
       .subscribe();
 
     return () => {
@@ -140,19 +156,11 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
 
   const now = new Date();
 
-  // Helper matching complaint to selected department
+  // Helper matching complaint to selected department (using authoritative matching layer)
   const isComplaintMatch = useCallback((c: Complaint, deptId: string) => {
     if (deptId === 'all') return true;
-    const targetDept = SIX_MUNICIPAL_DEPARTMENTS.find((d) => d.id === deptId);
-    if (!targetDept) return true;
-
-    if (c.department_id === targetDept.id) return true;
-    const cDept = (c.department_name || '').toLowerCase();
-    const tCode = targetDept.code.toLowerCase();
-    const tName = targetDept.name.split('(')[0].trim().toLowerCase();
-
-    return cDept.includes(tCode) || cDept.includes(tName);
-  }, []);
+    return matchComplaintToDepartment(c, deptId, dbDepartments);
+  }, [dbDepartments]);
 
   // Filtered Complaints for Selected Department
   const deptComplaints = useMemo(() => {
@@ -161,20 +169,34 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
 
   // Selected Department Meta Information
   const currentDeptMeta = useMemo(() => {
-    return SIX_MUNICIPAL_DEPARTMENTS.find((d) => d.id === selectedDeptId) || SIX_MUNICIPAL_DEPARTMENTS[0];
+    return ALL_SEVEN_MUNICIPAL_DEPARTMENTS.find((d) => d.id === selectedDeptId) || ALL_SEVEN_MUNICIPAL_DEPARTMENTS[0];
   }, [selectedDeptId]);
 
-  // Find Department Head Name dynamically from Supabase
+  // Active Staff Members Count for Selected Department
+  const deptStaffCount = useMemo(() => {
+    if (selectedDeptId === 'all') return staffMembers.filter((s) => s.status !== 'Offline' && s.status !== 'On Leave').length;
+    const currentCode = currentDeptMeta.code.toLowerCase();
+    return staffMembers.filter((s) => {
+      if (s.status === 'Offline' || s.status === 'On Leave') return false;
+      const sDeptName = (s.department_name || '').toLowerCase();
+      const sDeptId = String((s as any).department_id || '').toLowerCase();
+      return sDeptName.includes(currentCode) || sDeptId.includes(currentCode);
+    }).length;
+  }, [staffMembers, selectedDeptId, currentDeptMeta]);
+
+  // Find Department Head Name dynamically from Supabase / DB
   const currentDeptHeadName = useMemo(() => {
     if (selectedDeptId === 'all') return 'City Executive Leadership';
-    const match = headSummaries.find((s) => s.deptCode === currentDeptMeta.code || s.deptId === selectedDeptId);
+    const match = headSummaries.find(
+      (s) => s.deptCode.toLowerCase() === currentDeptMeta.code.toLowerCase() || s.deptId === selectedDeptId
+    );
     if (match && match.hasActiveHead) {
       return `${match.headName} (${match.headEmail})`;
     }
     return 'No Active Head';
   }, [headSummaries, selectedDeptId, currentDeptMeta]);
 
-  // Calculate Real Performance Metrics from Database Records
+  // Calculate Real Performance Metrics from Database Records (No fake 100% or fake 18.4 hrs)
   const metrics = useMemo(() => {
     const total = deptComplaints.length;
     const newComplaints = deptComplaints.filter((c) => c.status === 'Submitted' || c.status === 'Verified').length;
@@ -192,11 +214,32 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
     const resolved = deptComplaints.filter((c) => c.status === 'Resolved').length;
     const critical = deptComplaints.filter((c) => c.priority === 'Critical' && c.status !== 'Resolved' && c.status !== 'Rejected').length;
 
-    const resolutionRateNum = total > 0 ? (resolved / total) * 100 : 100;
+    if (total === 0) {
+      return {
+        total: 0,
+        newComplaints: 0,
+        pending: 0,
+        assigned: 0,
+        inProgress: 0,
+        pendingReview: 0,
+        overdue: 0,
+        completed: 0,
+        resolved: 0,
+        critical: 0,
+        resolutionRate: 'N/A',
+        resolutionRateNum: 0,
+        slaCompliance: 'N/A',
+        slaComplianceNum: 0,
+        overdueRate: '0.0%',
+        avgResolutionTime: 'N/A'
+      };
+    }
+
+    const resolutionRateNum = (resolved / total) * 100;
     const resolutionRate = `${resolutionRateNum.toFixed(1)}%`;
-    const slaComplianceNum = total > 0 ? ((total - overdue) / total) * 100 : 100;
+    const slaComplianceNum = ((total - overdue) / total) * 100;
     const slaCompliance = `${slaComplianceNum.toFixed(1)}%`;
-    const overdueRate = total > 0 ? `${((overdue / total) * 100).toFixed(1)}%` : '0.0%';
+    const overdueRate = `${((overdue / total) * 100).toFixed(1)}%`;
 
     // Average resolution time
     let totalHours = 0;
@@ -210,21 +253,38 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
         }
       }
     });
-    const avgResolutionTime = resolvedCount > 0 ? `${(totalHours / resolvedCount).toFixed(1)} hrs` : '18.4 hrs';
+    const avgResolutionTime = resolvedCount > 0 ? `${(totalHours / resolvedCount).toFixed(1)} hrs` : 'N/A';
 
-    return { total, newComplaints, pending, assigned, inProgress, pendingReview, overdue, completed, resolved, critical, resolutionRate, resolutionRateNum, slaCompliance, slaComplianceNum, overdueRate, avgResolutionTime };
+    return {
+      total,
+      newComplaints,
+      pending,
+      assigned,
+      inProgress,
+      pendingReview,
+      overdue,
+      completed,
+      resolved,
+      critical,
+      resolutionRate,
+      resolutionRateNum,
+      slaCompliance,
+      slaComplianceNum,
+      overdueRate,
+      avgResolutionTime
+    };
   }, [deptComplaints, now]);
 
-  // Six Department Comparison Cards (Real Data)
-  const sixDepartmentComparisonCards = useMemo(() => {
-    return SIX_MUNICIPAL_DEPARTMENTS.filter((d) => d.id !== 'all').map((dept) => {
+  // Seven Department Comparison Grid (Real Data)
+  const sevenDepartmentComparisonCards = useMemo(() => {
+    return ALL_SEVEN_MUNICIPAL_DEPARTMENTS.filter((d) => d.id !== 'all').map((dept) => {
       const list = complaints.filter((c) => isComplaintMatch(c, dept.id));
       const total = list.length;
       const inProgress = list.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned').length;
       const overdue = list.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < now).length;
       const resolved = list.filter((c) => c.status === 'Resolved').length;
-      const resolutionRate = total > 0 ? `${((resolved / total) * 100).toFixed(0)}%` : '100%';
-      const match = headSummaries.find((s) => s.deptCode === dept.code || s.deptId === dept.id);
+      const resolutionRate = total > 0 ? `${((resolved / total) * 100).toFixed(0)}%` : 'N/A';
+      const match = headSummaries.find((s) => s.deptCode.toLowerCase() === dept.code.toLowerCase() || s.deptId === dept.id);
       const headName = match && match.hasActiveHead ? match.headName : 'No Active Head';
 
       return {
@@ -246,7 +306,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   const mapPlottableComplaints = useMemo(() => {
     return deptComplaints.filter((c) => {
       if (typeof c.latitude !== 'number' || typeof c.longitude !== 'number' || isNaN(c.latitude) || isNaN(c.longitude) || c.latitude === 0 || c.longitude === 0) return false;
-      if (mapLayerTab === 'Active Tasks' && c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
+      if (mapLayerTab === 'Active Tasks' && c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way' && c.status !== 'Staff Assigned') return false;
       if (mapLayerTab === 'Overdue' && (c.status === 'Resolved' || !c.sla_deadline || new Date(c.sla_deadline) >= now)) return false;
       if (mapLayerTab === 'Critical' && c.priority !== 'Critical') return false;
       if (mapLayerTab === 'Completed' && c.status !== 'Resolved') return false;
@@ -265,18 +325,26 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
 
   // Real recent activity events from database records
   const recentActivityLogs = useMemo(() => {
+    if (deptComplaints.length === 0) return [];
     return deptComplaints.slice(0, 5).map((c, i) => {
       let eventTitle = `Complaint ${c.complaint_number} updated to ${c.status}`;
+      if (c.status === 'Submitted' || c.status === 'Verified') eventTitle = `New complaint received (${c.complaint_number})`;
       if (c.status === 'In Progress') eventTitle = `Work started on ${c.complaint_number} (${c.title})`;
-      if (c.status === 'Staff Assigned') eventTitle = `Task assigned to ${c.assigned_staff_name || 'Staff'}`;
+      if (c.status === 'Staff Assigned') eventTitle = `Task assigned to ${c.assigned_staff_name || 'Field Staff'}`;
       if (c.status === 'Resolution Submitted') eventTitle = `Work proof uploaded for ${c.complaint_number}`;
-      if (c.status === 'Resolved') eventTitle = `Resolution approved for ${c.complaint_number}`;
+      if (c.status === 'Resolved') eventTitle = `Resolution verified & closed for ${c.complaint_number}`;
+
+      const eventTime = c.updated_at
+        ? new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : c.created_at
+        ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'Recently';
 
       return {
         id: `act-${c.id}-${i}`,
         title: eventTitle,
         subtitle: `Location: ${c.location_address || 'Nashik'} • Priority: ${c.priority}`,
-        time: c.updated_at ? new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+        time: eventTime,
         compNum: c.complaint_number
       };
     });
@@ -286,6 +354,22 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
     <DashboardLayout title={t('departmentDashboard') || "Department Performance Dashboard"}>
       <div className="p-4 sm:p-5 space-y-5 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
+        {/* ERROR STATE ALERT */}
+        {errorMsg && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-rose-800 text-xs">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+            <button
+              onClick={loadData}
+              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-bold transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* ================================================== */}
         {/* 1. CLASSIC DEPARTMENT HEADER CARD */}
         {/* ================================================== */}
@@ -304,21 +388,21 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-0.5">
-                Department Head: <strong className="text-gray-900 font-outfit">{currentDeptHeadName}</strong> • Real-time operational oversight across Nashik.
+                Head: <strong className="text-gray-900 font-outfit">{currentDeptHeadName}</strong> • Staff: <strong className="text-gray-900 font-outfit">{deptStaffCount} Active Members</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 shrink-0">
-            {/* DEPARTMENT SELECTOR DROPDOWN */}
+            {/* DEPARTMENT SELECTOR DROPDOWN (ALL 7 DEPARTMENTS) */}
             <select
               value={selectedDeptId}
               onChange={(e) => setSelectedDeptId(e.target.value)}
               className="bg-white border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs text-gray-900 font-extrabold shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[38px] font-outfit cursor-pointer"
             >
-              {SIX_MUNICIPAL_DEPARTMENTS.map((d) => (
+              {ALL_SEVEN_MUNICIPAL_DEPARTMENTS.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.id === 'all' ? 'All Departments ▼' : `${d.name} (${d.code})`}
+                  {d.id === 'all' ? 'All Municipal Departments ▼' : `${d.name} (${d.code})`}
                 </option>
               ))}
             </select>
@@ -403,7 +487,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
                   Department Performance & SLA Compliance
                 </h3>
               </div>
-              <span className="font-mono text-[10px] text-gray-500 font-bold">REAL SUPABASE DATA</span>
+              <span className="font-mono text-[10px] text-gray-500 font-bold">REAL DATABASE METRICS</span>
             </div>
 
             <div className="space-y-3">
@@ -497,7 +581,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
               <div className="flex items-center space-x-2">
                 {/* MAP LAYER FILTERS */}
                 <div className="hidden sm:flex items-center space-x-1 text-[11px] font-bold font-outfit">
-                  {(['All', 'Active Tasks', 'Overdue', 'Critical'] as const).map((layer) => (
+                  {(['All', 'Active Tasks', 'Overdue', 'Critical', 'Completed'] as const).map((layer) => (
                     <button
                       key={layer}
                       onClick={() => setMapLayerTab(layer)}
@@ -526,7 +610,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-2xs bg-slate-100 h-[340px] z-10">
               <MapContainer
                 center={[20.0059, 73.7898]}
-                zoom={13}
+                zoom={12}
                 style={{ width: '100%', height: '100%' }}
                 scrollWheelZoom={true}
               >
@@ -589,7 +673,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             </div>
 
             {recentActivityLogs.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 font-medium">No recent activity logged.</div>
+              <div className="p-8 text-center text-gray-400 font-medium">No recent activity.</div>
             ) : (
               <div className="space-y-2.5">
                 {recentActivityLogs.map((log) => (
@@ -620,7 +704,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             </div>
 
             <Link
-              to="/admin/staff"
+              to={`/admin/staff${currentDeptMeta.code !== 'ALL' ? `?department=${currentDeptMeta.code}` : ''}`}
               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-colors inline-flex items-center space-x-1"
             >
               <span>View Staff Roster</span>
@@ -628,32 +712,38 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
             </Link>
           </div>
 
-          <div className="w-full overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
-                  <th className="p-3">Complaint ID</th>
-                  <th className="p-3">Issue Title</th>
-                  <th className="p-3">Location Address</th>
-                  <th className="p-3 text-center">Priority</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3">Assigned Field Staff</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {deptComplaints.slice(0, 6).map((comp) => (
-                  <tr key={comp.id} className="hover:bg-slate-50/80">
-                    <td className="p-3 font-mono text-emerald-800 font-bold">{comp.complaint_number}</td>
-                    <td className="p-3 font-bold text-gray-900">{comp.title}</td>
-                    <td className="p-3 text-gray-600">{comp.location_address || 'Nashik'}</td>
-                    <td className="p-3 text-center"><PriorityBadge priority={comp.priority} /></td>
-                    <td className="p-3 text-center"><StatusBadge status={comp.status} /></td>
-                    <td className="p-3 font-semibold text-gray-800">{comp.assigned_staff_name || 'Unassigned'}</td>
+          {deptComplaints.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 font-medium">
+              No active tasks or complaints found for this department.
+            </div>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
+                    <th className="p-3">Complaint ID</th>
+                    <th className="p-3">Issue Title</th>
+                    <th className="p-3">Location Address</th>
+                    <th className="p-3 text-center">Priority</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3">Assigned Field Staff</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {deptComplaints.slice(0, 6).map((comp) => (
+                    <tr key={comp.id} className="hover:bg-slate-50/80">
+                      <td className="p-3 font-mono text-emerald-800 font-bold">{comp.complaint_number}</td>
+                      <td className="p-3 font-bold text-gray-900">{comp.title}</td>
+                      <td className="p-3 text-gray-600">{comp.location_address || 'Nashik'}</td>
+                      <td className="p-3 text-center"><PriorityBadge priority={comp.priority} /></td>
+                      <td className="p-3 text-center"><StatusBadge status={comp.status} /></td>
+                      <td className="p-3 font-semibold text-gray-800">{comp.assigned_staff_name || 'Unassigned'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
       </div>

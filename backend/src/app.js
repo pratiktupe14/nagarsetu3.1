@@ -46,6 +46,7 @@ app.use('/api/officer', authedRateLimiter || authenticatedRateLimiter, officerRo
 app.use('/api/staff', authedRateLimiter || authenticatedRateLimiter, staffRoutes);
 app.use('/api/admin', authedRateLimiter || authenticatedRateLimiter, adminRoutes);
 app.use('/api/departments', authedRateLimiter || authenticatedRateLimiter, departmentRoutes);
+app.use('/api/department', authedRateLimiter || authenticatedRateLimiter, departmentRoutes);
 app.use('/api/notifications', authedRateLimiter || authenticatedRateLimiter, notificationRoutes);
 app.use('/api/announcements', authedRateLimiter || authenticatedRateLimiter, announcementRoutes);
 

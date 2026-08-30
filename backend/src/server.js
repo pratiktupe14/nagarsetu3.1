@@ -54,12 +54,14 @@ async function seedDefaultUsers() {
 }
 
 const seed7DemoDepartmentHeads = require('./scripts/seedDemoDepartmentHeads');
+const seedServiceStaff = require('./scripts/seedServiceStaff');
 
 // Start Server after DB Init
 initDatabase()
   .then(async () => {
     await seedDefaultUsers();
     await seed7DemoDepartmentHeads();
+    await seedServiceStaff();
     app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);

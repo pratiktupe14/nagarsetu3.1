@@ -188,16 +188,28 @@ export async function fetchDepartmentStaffApi(params?: {
     if (params?.search) qParams.append('search', params.search);
     if (params?.department_id) qParams.append('department_id', params.department_id);
 
-    const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
+    let res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
       headers: getAuthHeaders()
     });
+    if (!res.ok && (res.status === 404 || res.status === 502)) {
+      res = await fetch(`${getApiUrl()}/api/departments/staff?${qParams.toString()}`, {
+        headers: getAuthHeaders()
+      });
+    }
 
     if (res.ok) {
       const data = await res.json();
-      return {
-        staff: data.staff || [],
-        summary: data.summary || { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
-      };
+      if (data && Array.isArray(data.staff)) {
+        return {
+          staff: data.staff,
+          summary: data.summary || {
+            totalStaff: data.staff.length,
+            activeStaff: data.staff.filter((s: any) => (s.status || 'Active').toLowerCase() === 'active').length,
+            inactiveStaff: data.staff.filter((s: any) => (s.status || '').toLowerCase() === 'inactive').length,
+            activeTasks: data.staff.reduce((acc: number, s: any) => acc + (parseInt(s.active_tasks || 0, 10)), 0)
+          }
+        };
+      }
     }
   } catch (err) {
     console.warn('Failed to fetch staff from API:', err);
@@ -248,42 +260,42 @@ export async function updateServiceStaffApi(id: string, payload: Partial<Departm
   }
 }
 
-export async function deactivateServiceStaffApi(id: string): Promise<boolean> {
+export async function deactivateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {
-      method: 'POST',
+      method: 'PATCH',
       headers: getAuthHeaders()
     });
-    return res.ok;
-  } catch (err) {
-    console.error('Failed to deactivate staff:', err);
-    return false;
+    const data = await res.json();
+    return { success: res.ok && data.success, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Server error' };
   }
 }
 
-export async function activateServiceStaffApi(id: string): Promise<boolean> {
+export async function activateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {
-      method: 'POST',
+      method: 'PATCH',
       headers: getAuthHeaders()
     });
-    return res.ok;
-  } catch (err) {
-    console.error('Failed to activate staff:', err);
-    return false;
+    const data = await res.json();
+    return { success: res.ok && data.success, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Server error' };
   }
 }
 
-export async function removeServiceStaffApi(id: string): Promise<boolean> {
+export async function removeServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    return res.ok;
-  } catch (err) {
-    console.error('Failed to remove staff:', err);
-    return false;
+    const data = await res.json();
+    return { success: res.ok && data.success, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Server error' };
   }
 }
 
@@ -303,33 +315,112 @@ export interface ServiceStaffMemberRecord {
 
 export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
 
-const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [];
+const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [
+  // 1. PWD — 5 Staff
+  { id: 'stf-pwd-01', name: 'Amit Patil', employee_id: 'PWD-STF-001', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10001', email: 'amit.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 12)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-pwd-02', name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10002', email: 'sagar.jadhav@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 5)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-pwd-03', name: 'Nikhil Shinde', employee_id: 'PWD-STF-003', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10003', email: 'nikhil.shinde@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-pwd-04', name: 'Rohit More', employee_id: 'PWD-STF-004', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10004', email: 'rohit.more@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 18)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-pwd-05', name: 'Akash Pawar', employee_id: 'PWD-STF-005', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10005', email: 'akash.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 22)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 2. SAN — 5 Staff
+  { id: 'stf-san-01', name: 'Prashant Mane', employee_id: 'SAN-STF-001', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10006', email: 'prashant.mane@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 14)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-san-02', name: 'Ganesh Chavan', employee_id: 'SAN-STF-002', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10007', email: 'ganesh.chavan@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 2)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-san-03', name: 'Mahesh Kadam', employee_id: 'SAN-STF-003', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10008', email: 'mahesh.kadam@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 9)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-san-04', name: 'Swapnil Bhosale', employee_id: 'SAN-STF-004', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10009', email: 'swapnil.bhosale@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 19)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-san-05', name: 'Deepak Wagh', employee_id: 'SAN-STF-005', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10010', email: 'deepak.wagh@nagarsetu.gov.in', ward_area: 'Satpur (Ward 24)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 3. WTR — 5 Staff
+  { id: 'stf-wtr-01', name: 'Kiran Patil', employee_id: 'WTR-STF-001', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10011', email: 'kiran.patil@nagarsetu.gov.in', ward_area: 'Nashik Road (Ward 1)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-wtr-02', name: 'Manoj Shinde', employee_id: 'WTR-STF-002', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10012', email: 'manoj.shinde@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 11)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-wtr-03', name: 'Sachin More', employee_id: 'WTR-STF-003', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10013', email: 'sachin.more@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 7)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-wtr-04', name: 'Ajay Jadhav', employee_id: 'WTR-STF-004', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10014', email: 'ajay.jadhav@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 17)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-wtr-05', name: 'Vivek Pawar', employee_id: 'WTR-STF-005', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10015', email: 'vivek.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 21)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 4. DRN — 5 Staff
+  { id: 'stf-drn-01', name: 'Sunil Patil', employee_id: 'DRN-STF-001', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10016', email: 'sunil.patil@nagarsetu.gov.in', ward_area: 'Nashik Road (Ward 3)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-drn-02', name: 'Ramesh More', employee_id: 'DRN-STF-002', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10017', email: 'ramesh.more@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 15)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-drn-03', name: 'Santosh Jadhav', employee_id: 'DRN-STF-003', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10018', email: 'santosh.jadhav@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 10)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-drn-04', name: 'Dinesh Shinde', employee_id: 'DRN-STF-004', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10019', email: 'dinesh.shinde@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 20)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-drn-05', name: 'Pravin Pawar', employee_id: 'DRN-STF-005', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10020', email: 'pravin.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 25)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 5. ELE — 5 Staff
+  { id: 'stf-ele-01', name: 'Rahul Joshi', employee_id: 'ELE-STF-001', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10021', email: 'rahul.joshi@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 13)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-ele-02', name: 'Sameer Kulkarni', employee_id: 'ELE-STF-002', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10022', email: 'sameer.kulkarni@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 6)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-ele-03', name: 'Tejas Deshmukh', employee_id: 'ELE-STF-003', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10023', email: 'tejas.deshmukh@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-ele-04', name: 'Omkar Patil', employee_id: 'ELE-STF-004', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10024', email: 'omkar.patil@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 16)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-ele-05', name: 'Harshad More', employee_id: 'ELE-STF-005', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10025', email: 'harshad.more@nagarsetu.gov.in', ward_area: 'Satpur (Ward 23)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 6. TRF — 5 Staff
+  { id: 'stf-trf-01', name: 'Rohan Patil', employee_id: 'TRF-STF-001', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10026', email: 'rohan.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 11)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-trf-02', name: 'Vishal Jadhav', employee_id: 'TRF-STF-002', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10027', email: 'vishal.jadhav@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 4)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-trf-03', name: 'Tushar More', employee_id: 'TRF-STF-003', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10028', email: 'tushar.more@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 9)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-trf-04', name: 'Nitin Shinde', employee_id: 'TRF-STF-004', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10029', email: 'nitin.shinde@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 17)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-trf-05', name: 'Amol Pawar', employee_id: 'TRF-STF-005', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10030', email: 'amol.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 22)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+
+  // 7. MNT — 5 Staff
+  { id: 'stf-mnt-01', name: 'Kunal Patil', employee_id: 'MNT-STF-001', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10031', email: 'kunal.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 12)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-mnt-02', name: 'Ganesh More', employee_id: 'MNT-STF-002', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10032', email: 'ganesh.more@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 5)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-mnt-03', name: 'Mayur Jadhav', employee_id: 'MNT-STF-003', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10033', email: 'mayur.jadhav@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-mnt-04', name: 'Sachin Pawar', employee_id: 'MNT-STF-004', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10034', email: 'sachin.pawar@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 18)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+  { id: 'stf-mnt-05', name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10035', email: 'yogesh.shinde@nagarsetu.gov.in', ward_area: 'Satpur (Ward 24)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' }
+];
 
 export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
   const data = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length >= 35) {
         return parsed;
       }
     } catch (e) {}
   }
-  return [];
+  localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(DEFAULT_SERVICE_STAFF));
+  return DEFAULT_SERVICE_STAFF;
 }
 
 export async function getDepartmentServiceStaff(departmentId?: string, departmentName?: string): Promise<ServiceStaffMemberRecord[]> {
   if (!departmentId && !departmentName) {
     return [];
   }
+
+  // 1. Try Backend Express API first
+  try {
+    const apiRes = await fetchDepartmentStaffApi({ department_id: departmentId });
+    if (apiRes.staff && apiRes.staff.length > 0) {
+      return apiRes.staff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        employee_id: s.employee_id,
+        department_name: s.department_name || departmentName || 'Municipal Department',
+        role: s.designation || 'Service Staff',
+        status: s.status === 'Active' ? 'Available' : 'Offline',
+        contact_number: s.contact_number || s.mobile || '+91 98220 00000',
+        email: s.email,
+        ward_area: 'Nashik City',
+        joined_date: s.joined_date || new Date().toISOString(),
+        created_at: s.created_at || new Date().toISOString()
+      }));
+    }
+  } catch (e) {
+    console.warn('fetchDepartmentStaffApi failed in getDepartmentServiceStaff:', e);
+  }
+
+function isValidUuid(id?: string): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('profiles').select('*').eq('role', 'service_staff');
-      if (departmentId) {
+      if (departmentId && isValidUuid(departmentId)) {
         query = query.eq('department_id', departmentId);
       } else if (departmentName) {
         const cleanDept = departmentName.split('(')[0].trim();
-        query = query.ilike('department_name', `%${cleanDept}%`);
+        query = query.or(`department_name.ilike.%${cleanDept}%,employee_id.ilike.%${cleanDept}%`);
       }
       const { data, error } = await query;
       if (!error && data && Array.isArray(data) && data.length > 0) {
@@ -340,7 +431,7 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
           department_name: p.department_name || departmentName || 'Municipal Department',
           role: 'Service Staff',
           status: p.status || 'Available',
-          contact_number: p.phone_number || '+91 98220 00000',
+          contact_number: p.phone_number || p.mobile || '+91 98220 00000',
           email: p.email || 'staff@nagarsetu.gov.in',
           ward_area: p.ward_area || 'Nashik City',
           joined_date: p.created_at || new Date().toISOString(),
@@ -352,12 +443,14 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
     }
   }
 
+  // 3. Fallback to default roster filtered by department name
   const all = getAllServiceStaffRecords();
   const cleanHeadDept = (departmentName || '').split('(')[0].trim().toLowerCase();
-  return all.filter((s) => {
+  const filtered = all.filter((s) => {
     const sDept = (s.department_name || '').toLowerCase();
     return sDept.includes(cleanHeadDept) || cleanHeadDept.includes(sDept);
   });
+  return filtered.length > 0 ? filtered : all.slice(0, 5);
 }
 
 export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {
