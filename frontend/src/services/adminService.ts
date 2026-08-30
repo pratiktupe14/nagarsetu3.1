@@ -303,6 +303,7 @@ export interface ServiceStaffMemberRecord {
   id: string;
   name: string;
   employee_id: string;
+  department_id?: string | number;
   department_name: string;
   role: string;
   status: 'Available' | 'On Task' | 'Offline' | 'On Leave' | 'Busy';
@@ -443,14 +444,43 @@ function isValidUuid(id?: string): boolean {
     }
   }
 
-  // 3. Fallback to default roster filtered by department name
+  // 3. Fallback to default roster filtered by department ID, code, or name
   const all = getAllServiceStaffRecords();
-  const cleanHeadDept = (departmentName || '').split('(')[0].trim().toLowerCase();
+  const codeMap: Record<string, string> = { PWD: '1', SAN: '2', WTR: '3', ELE: '4', TRF: '5', MNT: '6', DRN: '7' };
+  const dNameLower = (departmentName || '').toLowerCase();
+  
   const filtered = all.filter((s) => {
+    if (departmentId && String(s.department_id || '') === String(departmentId)) return true;
+    
+    const empId = (s.employee_id || '').toUpperCase();
     const sDept = (s.department_name || '').toLowerCase();
-    return sDept.includes(cleanHeadDept) || cleanHeadDept.includes(sDept);
+
+    if (dNameLower.includes('sanitation') || dNameLower.includes('waste') || empId.startsWith('SAN')) {
+      return sDept.includes('sanitation') || sDept.includes('waste') || empId.startsWith('SAN');
+    }
+    if (dNameLower.includes('public works') || dNameLower.includes('pwd') || dNameLower.includes('road') || empId.startsWith('PWD')) {
+      return sDept.includes('public works') || sDept.includes('pwd') || sDept.includes('road') || empId.startsWith('PWD');
+    }
+    if (dNameLower.includes('water') || dNameLower.includes('sewerage') || empId.startsWith('WTR')) {
+      return sDept.includes('water') || sDept.includes('sewerage') || empId.startsWith('WTR');
+    }
+    if (dNameLower.includes('drainage') || dNameLower.includes('sewage') || empId.startsWith('DRN')) {
+      return sDept.includes('drainage') || sDept.includes('sewage') || empId.startsWith('DRN');
+    }
+    if (dNameLower.includes('electrical') || dNameLower.includes('lighting') || empId.startsWith('ELE')) {
+      return sDept.includes('electrical') || sDept.includes('lighting') || empId.startsWith('ELE');
+    }
+    if (dNameLower.includes('traffic') || empId.startsWith('TRF')) {
+      return sDept.includes('traffic') || empId.startsWith('TRF');
+    }
+    if (dNameLower.includes('maintenance') || empId.startsWith('MNT')) {
+      return sDept.includes('maintenance') || empId.startsWith('MNT');
+    }
+
+    return sDept.includes(dNameLower) || dNameLower.includes(sDept);
   });
-  return filtered.length > 0 ? filtered : all.slice(0, 5);
+
+  return filtered;
 }
 
 export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {

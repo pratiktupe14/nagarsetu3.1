@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Complaint } from '../types/database.types';
 import { pushNotification } from './notificationService';
 import { getApiUrl } from '../config/apiConfig';
+import { getAllServiceStaffRecords } from './adminService';
 
 export interface MunicipalDepartment {
   id: string;
@@ -29,6 +30,7 @@ export interface DepartmentLeadershipSummary {
   deptId: string;
   deptName: string;
   deptCode: string;
+  deptDescription?: string;
   headId?: string;
   userId?: string;
   headName: string;
@@ -39,11 +41,18 @@ export interface DepartmentLeadershipSummary {
   status: 'Active' | 'Inactive' | 'No Active Head';
   hasActiveHead: boolean;
   staffCount: number;
+  totalStaff?: number;
+  activeStaff?: number;
+  inactiveStaff?: number;
   openComplaints: number;
+  inProgressComplaints?: number;
+  pendingReviewComplaints?: number;
   activeTasks: number;
   completedTasks: number;
   overdueTasks: number;
+  criticalComplaints?: number;
   totalComplaints: number;
+  slaPerformance?: number;
   deptComplaints: Complaint[];
   assignedStaff: any[];
 }
@@ -184,6 +193,63 @@ export function matchComplaintToDepartment(
 }
 
 /**
+ * Authoritative helper to match a service staff record to a department (by numeric ID, UUID, Code, Employee ID prefix, or Name)
+ */
+export function isStaffInDepartment(s: any, deptId: string | number, deptCode: string, deptName: string): boolean {
+  if (!s) return false;
+
+  // 1. Direct department_id match
+  if (s.department_id !== undefined && s.department_id !== null) {
+    const sDeptId = String(s.department_id).toLowerCase();
+    const targetDeptId = String(deptId).toLowerCase();
+    if (sDeptId === targetDeptId) return true;
+
+    // Check mapped numeric ID for department codes
+    const codeIdMap: Record<string, string> = {
+      PWD: '1', SAN: '2', WTR: '3', ELE: '4', TRF: '5', MNT: '6', DRN: '7'
+    };
+    const mappedId = codeIdMap[(deptCode || '').toUpperCase()];
+    if (mappedId && sDeptId === mappedId) return true;
+  }
+
+  // 2. Employee ID prefix match (e.g. SAN-STF-001 -> SAN)
+  const empId = String(s.employee_id || '').toUpperCase();
+  const cleanCode = String(deptCode || '').toUpperCase().split('-')[0].trim();
+  if (empId && cleanCode && (empId.startsWith(cleanCode) || empId.includes(cleanCode))) {
+    return true;
+  }
+
+  // 3. Department Name / Taxonomy match
+  const sDeptName = String(s.department_name || '').toLowerCase();
+  const dName = String(deptName || '').toLowerCase();
+  const codeLower = cleanCode.toLowerCase();
+
+  if (codeLower === 'pwd' || dName.includes('works') || dName.includes('road')) {
+    return sDeptName.includes('works') || sDeptName.includes('road') || sDeptName.includes('pwd') || empId.includes('PWD');
+  }
+  if (codeLower === 'san' || dName.includes('sanitation') || dName.includes('waste')) {
+    return sDeptName.includes('sanitation') || sDeptName.includes('waste') || sDeptName.includes('san') || empId.includes('SAN');
+  }
+  if (codeLower === 'wtr' || dName.includes('water') || dName.includes('sewerage')) {
+    return sDeptName.includes('water') || sDeptName.includes('sewerage') || sDeptName.includes('wtr') || empId.includes('WTR');
+  }
+  if (codeLower === 'drn' || dName.includes('drainage') || dName.includes('sewage')) {
+    return sDeptName.includes('drainage') || sDeptName.includes('sewage') || sDeptName.includes('drn') || empId.includes('DRN');
+  }
+  if (codeLower === 'ele' || dName.includes('electrical') || dName.includes('lighting')) {
+    return sDeptName.includes('electrical') || sDeptName.includes('lighting') || sDeptName.includes('ele') || empId.includes('ELE');
+  }
+  if (codeLower === 'trf' || dName.includes('traffic')) {
+    return sDeptName.includes('traffic') || sDeptName.includes('trf') || empId.includes('TRF');
+  }
+  if (codeLower === 'mnt' || dName.includes('maintenance')) {
+    return sDeptName.includes('maintenance') || sDeptName.includes('mnt') || empId.includes('MNT');
+  }
+
+  return false;
+}
+
+/**
  * Get active Department Head for a specific department
  */
 export async function getDepartmentHead(departmentId: string): Promise<DepartmentHeadRecord | null> {
@@ -307,22 +373,35 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     const designation = activeHeadRow?.designation || 'Department Head';
     const status: 'Active' | 'Inactive' | 'No Active Head' = activeHeadRow ? (activeHeadRow.status === 'active' ? 'Active' : 'Inactive') : 'No Active Head';
 
-    // Calculate Real Staff Count for department from profiles
-    const deptStaff = profiles
-      .filter((p) => p.role === 'service_staff' && (String(p.department_id) === String(deptId) || (p.department_name && p.department_name.toLowerCase().includes(deptCode.toLowerCase()))))
+    // Calculate Real Staff Count for department from profiles or fallback staff records
+    const fallbackStaffRecords = getAllServiceStaffRecords();
+    const matchedFallbackStaff = fallbackStaffRecords.filter((s) => 
+      isStaffInDepartment(s, deptId, deptCode, deptName)
+    );
+
+    const profDeptStaff = profiles
+      .filter((p) => (p.role === 'service_staff' || p.role === 'staff') && isStaffInDepartment(p, deptId, deptCode, deptName))
       .map((p) => ({
         id: p.id,
-        name: p.full_name || 'Staff Member',
+        name: p.full_name || p.name || 'Staff Member',
         employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
         department_name: deptName,
         role: 'Service Staff',
         status: p.status || 'Available',
-        contact_number: p.mobile || '+91 98220 00000',
+        contact_number: p.mobile || p.contact_number || '+91 98220 00000',
         email: p.email || 'staff@nagarsetu.gov.in',
-        ward_area: p.address || 'Nashik',
+        ward_area: p.address || p.ward_area || 'Nashik',
         joined_date: p.created_at || new Date().toISOString(),
         created_at: p.created_at || new Date().toISOString()
       }));
+
+    const deptStaff = profDeptStaff.length > 0 ? profDeptStaff : matchedFallbackStaff;
+    const totalStaff = deptStaff.length;
+    const activeStaff = deptStaff.filter((s: any) => {
+      const st = String(s.status || '').toLowerCase();
+      return st === 'active' || st === 'available' || st === 'on task';
+    }).length;
+    const inactiveStaff = totalStaff - activeStaff;
 
     // Calculate Complaints Metrics for department
     const deptComplaints = complaints.filter((c) => {
@@ -334,18 +413,22 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     });
 
     const openComplaints = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
+    const inProgressComplaints = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned').length;
+    const pendingReviewComplaints = deptComplaints.filter((c) => (c.status as string) === 'Review' || c.status === 'Verified').length;
     const activeTasks = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned' || c.status === 'Department Assigned').length;
     const completedTasks = deptComplaints.filter((c) => c.status === 'Resolved').length;
     const overdueTasks = deptComplaints.filter((c) => {
       if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
       return new Date(c.sla_deadline) < now;
     }).length;
+    const criticalComplaints = deptComplaints.filter((c) => c.priority === 'Critical' || c.priority === 'High').length;
+    const slaPerformance = deptComplaints.length > 0 ? Math.round(((deptComplaints.length - overdueTasks) / deptComplaints.length) * 100) : 100;
 
     return {
       deptId: String(deptId),
       deptName,
       deptCode: String(deptCode),
-      deptDescription: deptObj.description || 'Municipal Infrastructure & Public Service Department',
+      deptDescription: deptObj.description || `${deptName} civic services and municipal infrastructure upkeep`,
       headId: activeHeadRow?.id ? String(activeHeadRow.id) : activeHeadRow?.user_id ? String(activeHeadRow.user_id) : undefined,
       headName,
       headEmail,
@@ -354,11 +437,18 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       designation,
       status,
       hasActiveHead,
-      staffCount: deptStaff.length || 4,
+      staffCount: activeStaff,
+      totalStaff,
+      activeStaff,
+      inactiveStaff,
       openComplaints,
+      inProgressComplaints,
+      pendingReviewComplaints,
       activeTasks,
       completedTasks,
       overdueTasks,
+      criticalComplaints,
+      slaPerformance,
       totalComplaints: deptComplaints.length,
       deptComplaints,
       assignedStaff: deptStaff

@@ -9,6 +9,7 @@ import {
   deleteDepartmentHead,
   DepartmentLeadershipSummary
 } from '../../services/departmentService';
+import { getDepartmentServiceStaff } from '../../services/adminService';
 import { pushNotification } from '../../services/notificationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
@@ -57,6 +58,28 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
   const [deleteModalHead, setDeleteModalHead] = useState<DepartmentLeadershipSummary | null>(null);
   const [deletingHead, setDeletingHead] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Sub-modals for Profile Summary -> Details Click-To-View Experience
+  const [viewDeptStaffModal, setViewDeptStaffModal] = useState<{
+    deptName: string;
+    deptCode: string;
+    headName: string;
+    deptId?: string;
+    staffFilter: 'All' | 'Active' | 'Inactive';
+    staffList: any[];
+    loading?: boolean;
+    error?: string | null;
+  } | null>(null);
+
+  const [viewStaffDetailsModal, setViewStaffDetailsModal] = useState<any | null>(null);
+
+  const [viewDeptComplaintsModal, setViewDeptComplaintsModal] = useState<{
+    title: string;
+    deptName: string;
+    deptCode?: string;
+    headName?: string;
+    complaints: any[];
+  } | null>(null);
 
   // Execute Delete Department Head
   const handleExecuteDeleteHead = async () => {
@@ -109,6 +132,17 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  const handleRetryFetchStaff = async (deptId?: string, deptName?: string) => {
+    if (!viewDeptStaffModal) return;
+    setViewDeptStaffModal((prev) => (prev ? { ...prev, loading: true, error: null } : null));
+    try {
+      const freshStaff = await getDepartmentServiceStaff(deptId, deptName);
+      setViewDeptStaffModal((prev) => (prev ? { ...prev, staffList: freshStaff, loading: false, error: null } : null));
+    } catch (err: any) {
+      setViewDeptStaffModal((prev) => (prev ? { ...prev, loading: false, error: err.message || 'Unable to load department staff.' } : null));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -812,6 +846,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 </button>
               </div>
 
+              {/* HEAD & DEPT HEADER BANNER */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
                   <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
@@ -819,107 +854,416 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   </div>
                   <div>
                     <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{viewHeadProfileModal.headName}</h2>
-                    <span className="text-xs text-emerald-700 font-bold block">{viewHeadProfileModal.deptName}</span>
+                    <span className="text-xs text-emerald-700 font-bold block">{viewHeadProfileModal.deptName} ({viewHeadProfileModal.deptCode})</span>
                     <span className="font-mono text-[11px] text-gray-500 block mt-0.5">{viewHeadProfileModal.headEmail} • {viewHeadProfileModal.headPhone}</span>
                   </div>
                 </div>
 
                 <div className="text-right font-mono text-xs space-y-1">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 block">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 inline-block">
                     {viewHeadProfileModal.status}
                   </span>
-                  <span className="text-gray-500 text-[10px] block">ID: {viewHeadProfileModal.employeeId}</span>
+                  <span className="text-gray-500 text-[10px] block">Head ID: {viewHeadProfileModal.employeeId}</span>
+                  <span className="text-gray-400 text-[9px] block">Dept ID: {viewHeadProfileModal.deptId}</span>
                 </div>
               </div>
 
-              {/* REAL METRICS GRID */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">
-                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                  <span className="text-[10px] text-gray-500 uppercase block font-bold font-outfit">Active Staff</span>
-                  <span className="text-xl font-extrabold text-gray-900 font-mono block">{viewHeadProfileModal.staffCount}</span>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                  <span className="text-[10px] text-gray-500 uppercase block font-bold font-outfit">Active Tasks</span>
-                  <span className="text-xl font-extrabold text-amber-700 font-mono block">{viewHeadProfileModal.activeTasks}</span>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                  <span className="text-[10px] text-gray-500 uppercase block font-bold font-outfit">Open Issues</span>
-                  <span className="text-xl font-extrabold text-blue-700 font-mono block">{viewHeadProfileModal.openComplaints}</span>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                  <span className="text-[10px] text-gray-500 uppercase block font-bold font-outfit">Completed</span>
-                  <span className="text-xl font-extrabold text-emerald-700 font-mono block">{viewHeadProfileModal.completedTasks}</span>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                  <span className="text-[10px] text-gray-500 uppercase block font-bold font-outfit">Overdue</span>
-                  <span className="text-xl font-extrabold text-rose-700 font-mono block">{viewHeadProfileModal.overdueTasks}</span>
-                </div>
+              {/* DEPARTMENT SCOPE BANNER */}
+              <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs space-y-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 font-mono">Department Operational Scope</span>
+                <p className="text-gray-700 text-xs font-medium">{viewHeadProfileModal.deptDescription || `${viewHeadProfileModal.deptName} municipal services and civic infrastructure`}</p>
               </div>
 
-              {/* ASSIGNED SERVICE STAFF LIST */}
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-gray-900 text-xs font-outfit flex items-center justify-between border-b border-gray-200 pb-1">
-                  <span>Assigned Field Staff ({viewHeadProfileModal.assignedStaff.length})</span>
-                </h4>
-                
-                {viewHeadProfileModal.assignedStaff.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic p-3 bg-slate-50 rounded-xl text-center">
-                    No service staff assigned to this department yet.
+              {/* ACTION BAR — VIEW STAFF BUTTON */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="font-extrabold text-gray-900 text-xs font-outfit">Department Staff & Field Execution</h4>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {viewHeadProfileModal.assignedStaff.length} Service Staff active in {viewHeadProfileModal.deptName}
                   </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1">
-                    {viewHeadProfileModal.assignedStaff.map((staff) => (
-                      <div key={staff.id} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
-                        <div>
-                          <span className="font-bold text-gray-900 block">{staff.name}</span>
-                          <span className="font-mono text-[10px] text-gray-500">{staff.employee_id} • {staff.contact_number}</span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          {staff.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                </div>
 
-              {/* RECENT DEPARTMENT COMPLAINTS */}
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-gray-900 text-xs font-outfit border-b border-gray-200 pb-1">
-                  Recent Department Complaints ({viewHeadProfileModal.deptComplaints.length})
-                </h4>
+                <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+                  <button
+                    onClick={() => setViewDeptStaffModal({ deptId: viewHeadProfileModal.deptId, deptName: viewHeadProfileModal.deptName, deptCode: viewHeadProfileModal.deptCode, headName: viewHeadProfileModal.headName, staffFilter: 'All', staffList: viewHeadProfileModal.assignedStaff, loading: false, error: null })}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>View Department Staff ({viewHeadProfileModal.assignedStaff.length}) →</span>
+                  </button>
 
-                {viewHeadProfileModal.deptComplaints.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic p-3 bg-slate-50 rounded-xl text-center">
-                    No complaints found for this department.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-44 overflow-y-auto p-1">
-                    {viewHeadProfileModal.deptComplaints.slice(0, 5).map((comp) => (
-                      <div key={comp.id} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
-                        <div>
-                          <span className="font-bold text-gray-900 block">{comp.title}</span>
-                          <span className="font-mono text-[10px] text-gray-500">{comp.complaint_number} • {comp.category}</span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
-                          {comp.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  <button
+                    onClick={() => setViewDeptComplaintsModal({ title: 'Department Complaints', deptName: viewHeadProfileModal.deptName, deptCode: viewHeadProfileModal.deptCode, headName: viewHeadProfileModal.headName, complaints: viewHeadProfileModal.deptComplaints })}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-xs transition-all"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>View Complaints →</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-3 border-t border-gray-200">
                 <button
                   onClick={() => setViewHeadProfileModal(null)}
-                  className="px-5 py-2 rounded-xl bg-gray-900 text-white font-bold text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs shadow-xs"
                 >
                   Close Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* SUB-MODAL 1: VIEW DEPARTMENT STAFF MODAL */}
+        {/* ================================================== */}
+        {viewDeptStaffModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[60] overflow-y-auto font-sans">
+            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] my-auto overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setViewDeptStaffModal(null)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-gray-700 font-extrabold rounded-xl text-xs flex items-center space-x-1.5 transition-all"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Back to Department Profile</span>
+                  </button>
+                </div>
+                <button onClick={() => setViewDeptStaffModal(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* STAFF HEADER BANNER */}
+              <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">Department Field Staff</h3>
+                    <p className="text-xs font-extrabold text-emerald-700 font-outfit">{viewDeptStaffModal.deptName} ({viewDeptStaffModal.deptCode})</p>
+                    <p className="text-[11px] text-gray-500 font-mono">Department Head: {viewDeptStaffModal.headName}</p>
+                  </div>
+                </div>
+
+                <div className="text-right font-mono text-xs">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold rounded-full inline-block">
+                    {viewDeptStaffModal.staffList.length} Active Service Staff
+                  </span>
+                </div>
+              </div>
+
+              {/* FILTER TABS */}
+              <div className="flex items-center space-x-2 text-xs font-bold border-b border-gray-100 pb-3">
+                {(['All', 'Active', 'Inactive'] as const).map((filter) => {
+                  const count = filter === 'All' 
+                    ? viewDeptStaffModal.staffList.length 
+                    : viewDeptStaffModal.staffList.filter(s => {
+                        const st = String(s.status || '').toLowerCase();
+                        return filter === 'Active' ? (st === 'active' || st === 'available' || st === 'on task') : (st === 'inactive' || st === 'offline');
+                      }).length;
+                  return (
+                    <button
+                      key={filter}
+                      onClick={() => setViewDeptStaffModal({ ...viewDeptStaffModal, staffFilter: filter })}
+                      className={`px-4 py-2 rounded-xl transition-all ${
+                        viewDeptStaffModal.staffFilter === filter 
+                          ? 'bg-emerald-600 text-white font-extrabold shadow-xs' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {filter} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* STAFF LIST / LOADING / ERROR */}
+              {viewDeptStaffModal.loading ? (
+                <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
+                  <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-xs text-gray-600 font-bold">Loading department staff records...</p>
+                </div>
+              ) : viewDeptStaffModal.error ? (
+                <div className="p-8 text-center bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
+                  <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+                  <p className="text-xs text-rose-800 font-extrabold">{viewDeptStaffModal.error}</p>
+                  <button
+                    onClick={() => handleRetryFetchStaff(viewDeptStaffModal.deptId, viewDeptStaffModal.deptName)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl inline-flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Retry</span>
+                  </button>
+                </div>
+              ) : viewDeptStaffModal.staffList.filter(s => {
+                if (viewDeptStaffModal.staffFilter === 'All') return true;
+                const st = String(s.status || '').toLowerCase();
+                return viewDeptStaffModal.staffFilter === 'Active' 
+                  ? (st === 'active' || st === 'available' || st === 'on task') 
+                  : (st === 'inactive' || st === 'offline');
+              }).length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
+                  <UserX className="w-10 h-10 text-gray-400 mx-auto" />
+                  <p className="text-xs text-gray-600 font-bold">No {viewDeptStaffModal.staffFilter.toLowerCase()} staff found for this department.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {viewDeptStaffModal.staffList.filter(s => {
+                    if (viewDeptStaffModal.staffFilter === 'All') return true;
+                    const st = String(s.status || '').toLowerCase();
+                    return viewDeptStaffModal.staffFilter === 'Active' 
+                      ? (st === 'active' || st === 'available' || st === 'on task') 
+                      : (st === 'inactive' || st === 'offline');
+                  }).map((staff) => (
+                    <div key={staff.id} className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-emerald-300 transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-extrabold text-gray-900 text-sm font-outfit">{staff.name}</span>
+                          <span className="font-mono text-[10px] text-gray-500 bg-white px-2 py-0.5 rounded-md border border-gray-200">{staff.employee_id}</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            (staff.status || 'Available').toLowerCase() === 'active' || (staff.status || '').toLowerCase() === 'available'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {staff.status || 'Available'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 font-mono">{staff.email} • {staff.contact_number || staff.mobile || '+91 98220 00000'}</p>
+                        <p className="text-[11px] text-gray-500 font-medium">{staff.role || staff.designation || 'Field Service Staff'}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-gray-200 pt-2 sm:pt-0">
+                        <div className="text-right font-mono text-[10px] text-gray-500">
+                          <span className="block">Active Tasks: <strong className="text-blue-700">{staff.active_tasks || 0}</strong></span>
+                          <span className="block">Completed: <strong className="text-emerald-700">{staff.completed_tasks || 0}</strong></span>
+                        </div>
+
+                        <button
+                          onClick={() => setViewStaffDetailsModal(staff)}
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1 shadow-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Details</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-3 border-t border-gray-100">
+                <button onClick={() => setViewDeptStaffModal(null)} className="px-5 py-2 bg-gray-900 text-white font-bold text-xs rounded-xl">
+                  Close Staff List
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* SUB-MODAL 2: VIEW STAFF DETAILS MODAL */}
+        {/* ================================================== */}
+        {viewStaffDetailsModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70] overflow-y-auto font-sans">
+            <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] my-auto overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
+                    {viewStaffDetailsModal.name ? viewStaffDetailsModal.name.charAt(0) : 'S'}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">{viewStaffDetailsModal.name || 'Not available'}</h3>
+                    <p className="text-xs text-gray-500 font-mono">Employee ID: {viewStaffDetailsModal.employee_id || 'Not available'}</p>
+                  </div>
+                </div>
+                <button onClick={() => setViewStaffDetailsModal(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Department</span>
+                  <span className="font-extrabold text-gray-900 block">{viewStaffDetailsModal.department_name || 'Not available'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Designation</span>
+                  <span className="font-extrabold text-gray-900 block">{viewStaffDetailsModal.role || viewStaffDetailsModal.designation || 'Field Service Staff'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Email Address</span>
+                  <span className="font-mono text-gray-900 block">{viewStaffDetailsModal.email || 'Not available'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Phone / Mobile</span>
+                  <span className="font-mono text-gray-900 block">{viewStaffDetailsModal.contact_number || viewStaffDetailsModal.mobile || 'Not available'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Account Status</span>
+                  <span className="font-bold text-emerald-800 block">{viewStaffDetailsModal.status || 'Active'}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Joined Date</span>
+                  <span className="font-mono text-gray-900 block">{viewStaffDetailsModal.joined_date ? new Date(viewStaffDetailsModal.joined_date).toLocaleDateString() : 'Not available'}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <span className="text-[9px] text-blue-700 font-bold block">Active Tasks</span>
+                  <span className="text-base font-extrabold text-blue-900 font-mono">{viewStaffDetailsModal.active_tasks ?? 0}</span>
+                </div>
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <span className="text-[9px] text-emerald-700 font-bold block">Completed Tasks</span>
+                  <span className="text-base font-extrabold text-emerald-900 font-mono">{viewStaffDetailsModal.completed_tasks ?? 0}</span>
+                </div>
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                  <span className="text-[9px] text-rose-700 font-bold block">Overdue Tasks</span>
+                  <span className="text-base font-extrabold text-rose-900 font-mono">{viewStaffDetailsModal.overdue_tasks ?? 0}</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-gray-500 font-mono block">Current Assignment / Last Activity</span>
+                <p className="text-gray-800 font-medium">
+                  {viewStaffDetailsModal.active_tasks && viewStaffDetailsModal.active_tasks > 0 
+                    ? 'Currently assigned to active municipal field service tasks.' 
+                    : 'No active field assignment currently.'}
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-3 border-t border-gray-100">
+                <button onClick={() => setViewStaffDetailsModal(null)} className="px-5 py-2 bg-gray-900 text-white font-bold text-xs rounded-xl">
+                  Close Staff Details
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* SUB-MODAL 3: VIEW DEPARTMENT COMPLAINTS MODAL */}
+        {/* ================================================== */}
+        {viewDeptComplaintsModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[60] overflow-y-auto font-sans">
+            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] my-auto overflow-y-auto">
+              
+              {/* TOP NAVIGATION & BACK BUTTON */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setViewDeptComplaintsModal(null)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-gray-700 font-extrabold rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Back to Department Profile</span>
+                  </button>
+                </div>
+
+                <button onClick={() => setViewDeptComplaintsModal(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* COMPLAINTS HEADER BANNER */}
+              <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">Department Complaints</h3>
+                    <p className="text-xs font-extrabold text-emerald-700 font-outfit">{viewDeptComplaintsModal.deptName} ({viewDeptComplaintsModal.deptCode || 'DEPT'})</p>
+                    {viewDeptComplaintsModal.headName && (
+                      <p className="text-[11px] text-gray-500 font-mono">Department Head: {viewDeptComplaintsModal.headName}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-right font-mono text-xs">
+                  <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 font-extrabold rounded-full inline-block">
+                    {viewDeptComplaintsModal.complaints.length} Total Complaints
+                  </span>
+                </div>
+              </div>
+
+              {/* COMPLAINT-ONLY LIST / TABLE (NO OPERATIONAL METRICS SUMMARY) */}
+              {viewDeptComplaintsModal.complaints.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                  <p className="text-xs text-gray-600 font-bold">No complaints found for this department.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {viewDeptComplaintsModal.complaints.map((comp) => (
+                    <div key={comp.id} className="p-4 bg-slate-50 border border-gray-200 rounded-2xl hover:border-blue-300 transition-all space-y-2">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</span>
+                          <span className="font-mono text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-md border border-gray-200">{comp.complaint_number || comp.id}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            comp.priority === 'Critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                            comp.priority === 'High' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                            'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}>
+                            {comp.priority || 'Normal'} Priority
+                          </span>
+
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            comp.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                            comp.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                            'bg-slate-200 text-slate-800'
+                          }`}>
+                            {comp.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-600 font-mono">
+                        <div>
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Category & Location</span>
+                          <span>{comp.category} • {comp.location_text || comp.ward_name || 'Nashik City'}</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Assigned Staff</span>
+                          <span className="font-bold text-gray-800">{comp.assigned_staff_name || comp.assigned_staff_id || 'Unassigned'}</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-gray-400 uppercase font-bold block">Reported & SLA Due</span>
+                          <span>
+                            {comp.created_at ? new Date(comp.created_at).toLocaleDateString() : 'Recent'} | Due: {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => setViewDeptComplaintsModal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-gray-700 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Department Profile</span>
+                </button>
+
+                <button onClick={() => setViewDeptComplaintsModal(null)} className="px-5 py-2 bg-gray-900 text-white font-bold text-xs rounded-xl">
+                  Close Records
                 </button>
               </div>
             </div>

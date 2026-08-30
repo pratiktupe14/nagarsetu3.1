@@ -92,8 +92,16 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       sql += ` AND u.department_id = $1`;
       params.push(userDeptId || -1);
     } else if (req.query.department_id) {
+      let deptFilterId = req.query.department_id;
+      const codeToIdMap = { PWD: 1, SAN: 2, WTR: 3, ELE: 4, TRF: 5, MNT: 6, DRN: 7 };
+      if (typeof deptFilterId === 'string') {
+        const cleanCode = deptFilterId.toUpperCase().split('-')[0].replace('DEPT', '').trim();
+        if (codeToIdMap[cleanCode]) {
+          deptFilterId = codeToIdMap[cleanCode];
+        }
+      }
       sql += ` AND u.department_id = $1`;
-      params.push(req.query.department_id);
+      params.push(deptFilterId);
     }
 
     if (filterStatus === 'active') {
