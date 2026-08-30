@@ -144,6 +144,21 @@ export const StaffPortal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'All' | 'New' | 'Accepted' | 'In Progress' | 'Due Soon' | 'Overdue' | 'Completed'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [slaFilter, setSlaFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All');
+  const [locationFilter, setLocationFilter] = useState('All');
+  const [metricFilter, setMetricFilter] = useState<'All' | 'High' | 'Critical' | 'DueToday'>('All');
+
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery('');
+    setPriorityFilter('All');
+    setCategoryFilter('All');
+    setSlaFilter('All');
+    setDateFilter('All');
+    setLocationFilter('All');
+    setMetricFilter('All');
+  }, []);
 
   // Selected Task Modal State
   const [selectedTask, setSelectedTask] = useState<Complaint | null>(null);
@@ -274,9 +289,42 @@ export const StaffPortal: React.FC = () => {
     return tasks.filter((t) => t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress').slice(0, 4);
   }, [tasks]);
 
-  // NEW ASSIGNMENTS FOR DASHBOARD
+  // NEW ASSIGNMENTS FOR DASHBOARD & METRICS
+  const newAssignmentsListAll = useMemo(() => {
+    return tasks.filter((t) => (t.status as string) === 'Department Assigned' || (t.status as string) === 'Staff Assigned' || (t.status as string) === 'ASSIGNED');
+  }, [tasks]);
+
   const newAssignmentsList = useMemo(() => {
-    return tasks.filter((t) => t.status === 'Department Assigned' || t.status === 'Staff Assigned').slice(0, 4);
+    return newAssignmentsListAll.slice(0, 4);
+  }, [newAssignmentsListAll]);
+
+  const newMetrics = useMemo(() => {
+    const totalNew = newAssignmentsListAll.length;
+    const highCount = newAssignmentsListAll.filter((t) => t.priority === 'High').length;
+    const criticalCount = newAssignmentsListAll.filter((t) => t.priority === 'Critical').length;
+    const dueTodayCount = newAssignmentsListAll.filter((t) => {
+      if (!t.sla_deadline) return false;
+      const d = new Date(t.sla_deadline);
+      const today = new Date();
+      return (
+        d.getDate() === today.getDate() &&
+        d.getMonth() === today.getMonth() &&
+        d.getFullYear() === today.getFullYear()
+      );
+    }).length;
+
+    return { totalNew, highCount, criticalCount, dueTodayCount };
+  }, [newAssignmentsListAll]);
+
+  // UNIQUE LOCATIONS FROM REAL RETURNED TASK DATA
+  const uniqueLocations = useMemo(() => {
+    const locSet = new Set<string>();
+    tasks.forEach((t) => {
+      if (t.location_address && t.location_address.trim()) {
+        locSet.add(t.location_address.trim());
+      }
+    });
+    return Array.from(locSet).sort();
   }, [tasks]);
 
   // TASKS WITH VALID GPS FOR MAP PREVIEW
@@ -296,45 +344,105 @@ export const StaffPortal: React.FC = () => {
   // FILTERED TASKS FOR LIST VIEW
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
-      // Route Specific Pre-filtering
-      if (isNewPage && !(t.status === 'Department Assigned' || t.status === 'Staff Assigned')) return false;
-      if (isInProgressPage && !(t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress')) return false;
-      if (isOverduePage && (t.status === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now)) return false;
-      if (isCompletedPage && !(t.status === 'Resolution Submitted' || t.status === 'Resolved')) return false;
+      const st = t.status as string;
 
-      // Tab Filter
+      // 1. Route Specific Pre-filtering
+      if (isNewPage && !(st === 'Department Assigned' || st === 'Staff Assigned' || st === 'ASSIGNED')) return false;
+      if (isInProgressPage && !(st === 'Accepted' || st === 'On the Way' || st === 'In Progress')) return false;
+      if (isOverduePage && (st === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now)) return false;
+      if (isCompletedPage && !(st === 'Resolution Submitted' || st === 'Resolved')) return false;
+
+      // 2. Interactive Metric Card Selection Filter (when user clicks summary cards on /staff/tasks/new)
+      if (isNewPage && metricFilter !== 'All') {
+        if (metricFilter === 'High' && t.priority !== 'High') return false;
+        if (metricFilter === 'Critical' && t.priority !== 'Critical') return false;
+        if (metricFilter === 'DueToday') {
+          if (!t.sla_deadline) return false;
+          const d = new Date(t.sla_deadline);
+          const today = new Date();
+          const isToday = (
+            d.getDate() === today.getDate() &&
+            d.getMonth() === today.getMonth() &&
+            d.getFullYear() === today.getFullYear()
+          );
+          if (!isToday) return false;
+        }
+      }
+
+      // 3. Tab Filter
       if (!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && !isDashboardView) {
-        if (activeTab === 'New' && !(t.status === 'Department Assigned' || t.status === 'Staff Assigned')) return false;
-        if (activeTab === 'Accepted' && t.status !== 'Accepted') return false;
-        if (activeTab === 'In Progress' && !(t.status === 'In Progress' || t.status === 'On the Way')) return false;
-        if (activeTab === 'Completed' && !(t.status === 'Resolution Submitted' || t.status === 'Resolved')) return false;
+        if (activeTab === 'New' && !(st === 'Department Assigned' || st === 'Staff Assigned' || st === 'ASSIGNED')) return false;
+        if (activeTab === 'Accepted' && st !== 'Accepted') return false;
+        if (activeTab === 'In Progress' && !(st === 'In Progress' || st === 'On the Way')) return false;
+        if (activeTab === 'Completed' && !(st === 'Resolution Submitted' || st === 'Resolved')) return false;
         
         if (activeTab === 'Due Soon') {
-          if (t.status === 'Resolved' || !t.sla_deadline) return false;
+          if (st === 'Resolved' || !t.sla_deadline) return false;
           const diffMs = new Date(t.sla_deadline).getTime() - now.getTime();
           if (diffMs <= 0 || diffMs > 2 * 3600000) return false;
         }
 
         if (activeTab === 'Overdue') {
-          if (t.status === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now) return false;
+          if (st === 'Resolved' || !t.sla_deadline || new Date(t.sla_deadline) >= now) return false;
         }
       }
 
-      // Priority Filter
+      // 4. Priority Filter
       if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
 
-      // Search Query
+      // 5. Category Filter
+      if (categoryFilter !== 'All') {
+        const catLower = (t.category || '').toLowerCase();
+        const filtLower = categoryFilter.toLowerCase();
+        if (!catLower.includes(filtLower) && !filtLower.includes(catLower)) return false;
+      }
+
+      // 6. SLA Filter
+      if (slaFilter !== 'All') {
+        if (!t.sla_deadline) return false;
+        const diffMs = new Date(t.sla_deadline).getTime() - now.getTime();
+        const d = new Date(t.sla_deadline);
+        const today = new Date();
+        const isToday = (
+          d.getDate() === today.getDate() &&
+          d.getMonth() === today.getMonth() &&
+          d.getFullYear() === today.getFullYear()
+        );
+
+        if (slaFilter === 'Due Today' && !isToday) return false;
+        if (slaFilter === 'Due Soon' && (diffMs <= 0 || diffMs > 2 * 3600000)) return false;
+        if (slaFilter === 'Within SLA' && diffMs <= 0) return false;
+        if (slaFilter === 'Overdue' && diffMs > 0) return false;
+      }
+
+      // 7. Date Filter
+      if (dateFilter !== 'All') {
+        const createdDate = new Date(t.created_at);
+        const diffDays = (now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24);
+        if (dateFilter === 'Today' && diffDays > 1) return false;
+        if (dateFilter === 'Last 7 Days' && diffDays > 7) return false;
+        if (dateFilter === 'Older' && diffDays <= 7) return false;
+      }
+
+      // 8. Location Filter
+      if (locationFilter !== 'All') {
+        if ((t.location_address || '').trim() !== locationFilter.trim()) return false;
+      }
+
+      // 9. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesNum = t.complaint_number.toLowerCase().includes(q);
-        const matchesTitle = t.title.toLowerCase().includes(q);
+        const matchesNum = (t.complaint_number || '').toLowerCase().includes(q);
+        const matchesTitle = (t.title || '').toLowerCase().includes(q);
+        const matchesCategory = (t.category || '').toLowerCase().includes(q);
         const matchesLoc = (t.location_address || '').toLowerCase().includes(q);
-        if (!matchesNum && !matchesTitle && !matchesLoc) return false;
+        const matchesDesc = (t.description || '').toLowerCase().includes(q);
+        if (!matchesNum && !matchesTitle && !matchesCategory && !matchesLoc && !matchesDesc) return false;
       }
 
       return true;
     });
-  }, [tasks, isNewPage, isInProgressPage, isOverduePage, isCompletedPage, isDashboardView, activeTab, priorityFilter, searchQuery, now]);
+  }, [tasks, isNewPage, isInProgressPage, isOverduePage, isCompletedPage, isDashboardView, activeTab, priorityFilter, categoryFilter, slaFilter, dateFilter, locationFilter, metricFilter, searchQuery, now]);
 
   // WORKFLOW TRANSITION HANDLERS
   const handleStatusTransition = async (taskId: string, newStatus: ComplaintStatus) => {
@@ -996,22 +1104,57 @@ export const StaffPortal: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {isNewPage ? (
                 <>
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">New Assignments</span>
-                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.newTasks}</span>
-                  </div>
-                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
-                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Critical</span>
-                    <span className="text-xl font-extrabold text-rose-900 font-mono block">{metrics.criticalCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Due Today</span>
-                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.dueSoon}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMetricFilter('All')}
+                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
+                      metricFilter === 'All'
+                        ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-500/20 shadow-xs'
+                        : 'bg-blue-50 border-blue-200 hover:bg-blue-100/60'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block font-outfit">NEW ASSIGNMENTS</span>
+                    <span className="text-xl font-extrabold text-blue-950 font-mono block">{newMetrics.totalNew}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMetricFilter('High')}
+                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
+                      metricFilter === 'High'
+                        ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-500/20 shadow-xs'
+                        : 'bg-purple-50 border-purple-200 hover:bg-purple-100/60'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider block font-outfit">HIGH PRIORITY</span>
+                    <span className="text-xl font-extrabold text-purple-950 font-mono block">{newMetrics.highCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMetricFilter('Critical')}
+                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
+                      metricFilter === 'Critical'
+                        ? 'bg-rose-100 border-rose-400 ring-2 ring-rose-500/20 shadow-xs'
+                        : 'bg-rose-50 border-rose-200 hover:bg-rose-100/60'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">CRITICAL</span>
+                    <span className="text-xl font-extrabold text-rose-950 font-mono block">{newMetrics.criticalCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMetricFilter('DueToday')}
+                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
+                      metricFilter === 'DueToday'
+                        ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/20 shadow-xs'
+                        : 'bg-amber-50 border-amber-200 hover:bg-amber-100/60'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-outfit">DUE TODAY</span>
+                    <span className="text-xl font-extrabold text-amber-950 font-mono block">{newMetrics.dueTodayCount}</span>
+                  </button>
                 </>
               ) : isInProgressPage ? (
                 <>
@@ -1100,12 +1243,12 @@ export const StaffPortal: React.FC = () => {
 
             {/* SEARCH & MULTI-FILTERS BAR */}
             <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   <input
                     type="text"
-                    placeholder="Search complaint ID, issue title or location..."
+                    placeholder="Search complaint ID, issue, location..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -1118,29 +1261,73 @@ export const StaffPortal: React.FC = () => {
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
                   >
-                    <option value="All">All Priorities</option>
-                    <option value="Critical">Critical Priority</option>
-                    <option value="High">High Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="Low">Low Priority</option>
+                    <option value="All">Priority: All</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
                   </select>
 
-                  {!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      {(['All', 'New', 'Accepted', 'In Progress', 'Due Soon', 'Overdue', 'Completed'] as const).map((tab) => (
-                        <button
-                          key={tab}
-                          onClick={() => setActiveTab(tab)}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold font-mono transition-colors ${
-                            activeTab === tab
-                              ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
-                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
-                          }`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="All">Category: All</option>
+                    <option value="Roads">Roads</option>
+                    <option value="Water">Water</option>
+                    <option value="Sanitation">Sanitation</option>
+                    <option value="Drainage">Drainage</option>
+                    <option value="Electrical">Electrical</option>
+                    <option value="Traffic">Traffic</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  <select
+                    value={slaFilter}
+                    onChange={(e) => setSlaFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="All">SLA: All</option>
+                    <option value="Due Today">Due Today</option>
+                    <option value="Due Soon">Due Soon</option>
+                    <option value="Within SLA">Within SLA</option>
+                    <option value="Overdue">Overdue</option>
+                  </select>
+
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="All">Date: All</option>
+                    <option value="Today">Today</option>
+                    <option value="Last 7 Days">Last 7 Days</option>
+                    <option value="Older">Older</option>
+                  </select>
+
+                  <select
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500 max-w-[160px] truncate"
+                  >
+                    <option value="All">Location: All</option>
+                    {uniqueLocations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All') && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-extrabold text-xs rounded-lg transition-colors min-h-[36px]"
+                    >
+                      CLEAR FILTERS
+                    </button>
                   )}
                 </div>
               </div>
@@ -1151,7 +1338,9 @@ export const StaffPortal: React.FC = () => {
               <div className="p-12 text-center bg-white border border-gray-200 rounded-xl space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
                 <h3 className="font-extrabold text-gray-900 text-sm font-outfit">
-                  {isNewPage
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All')
+                    ? 'No Assignments Match Your Filters'
+                    : isNewPage
                     ? 'No New Assignments'
                     : isInProgressPage
                     ? 'No Tasks In Progress'
@@ -1162,16 +1351,27 @@ export const StaffPortal: React.FC = () => {
                     : 'No Tasks Found'}
                 </h3>
                 <p className="text-xs text-gray-500 max-w-md mx-auto">
-                  {isNewPage
-                    ? 'New tasks assigned to you by your department manager will appear here.'
+                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All')
+                    ? 'Try adjusting or clearing your active search query and filter selections.'
+                    : isNewPage
+                    ? 'New tasks assigned to you will appear here.'
                     : isInProgressPage
                     ? 'You currently have no tasks marked as in progress.'
                     : isOverduePage
                     ? 'You currently have no overdue assignments. Keep up the great field execution!'
                     : isCompletedPage
                     ? 'Tasks completed by you will appear here along with verification status.'
-                    : 'No task records match your search or filter selection.'}
+                    : 'No task records match your selection.'}
                 </p>
+                {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All') && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1"
+                  >
+                    <span>Clear Filters</span>
+                  </button>
+                )}
               </div>
             ) : (
               <>
