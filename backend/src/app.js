@@ -21,6 +21,8 @@ const app = express();
 // Security Headers & Core Middleware
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
+  'https://nagarsetu3-1.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173'
@@ -28,7 +30,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       callback(null, true);
