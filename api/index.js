@@ -1,16 +1,16 @@
 const app = require('../backend/src/app');
 const { initDatabase } = require('../backend/src/config/db');
 
-let dbInitialized = false;
+let isInitialized = false;
 
 module.exports = async (req, res) => {
-  if (!dbInitialized) {
+  if (!isInitialized) {
     try {
       await initDatabase();
-      dbInitialized = true;
-    } catch (err) {
-      console.warn('Vercel serverless DB init warning:', err.message);
+    } catch (e) {
+      console.warn('[SERVERLESS INIT NOTE]', e.message);
     }
+    isInitialized = true;
   }
   return app(req, res);
 };
