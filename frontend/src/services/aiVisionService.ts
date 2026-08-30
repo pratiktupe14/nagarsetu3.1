@@ -144,23 +144,21 @@ export async function computeImageHash(file: File): Promise<string> {
  */
 export async function checkAiHealth(): Promise<{ configured: boolean; model: string; reachable: boolean; reply?: string; error?: string }> {
   try {
-    const res = await fetch('/api/ai/health');
+    const baseUrl = getApiUrl();
+    const endpoint = baseUrl ? `${baseUrl}/api/ai/health` : '/api/ai/health';
+    const res = await fetch(endpoint);
     if (res.ok) {
       return await res.json();
     } else {
       const errText = await res.text();
-      return { configured: true, model: 'gemini-2.5-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
+      return { configured: true, model: 'gemini-3.6-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
     }
   } catch (err: any) {
-    try {
-      const directRes = await fetch(`${getApiUrl()}/api/ai/health`);
-      if (directRes.ok) return await directRes.json();
-    } catch (e) {}
     return {
       configured: false,
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       reachable: false,
-      error: `Express Backend server on port 5000 is not reachable (${err.message}).`
+      error: `Express Backend server is not reachable (${err.message}).`
     };
   }
 }
@@ -414,9 +412,11 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
   const formData = new FormData();
   formData.append('photo', file, file.name);
 
-  // Try relative endpoint first (Vite proxy)
+  const baseUrl = getApiUrl();
+  const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';
+
   try {
-    const res = await fetch('/api/ai/analyze', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       body: formData
     });
@@ -443,39 +443,10 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
       throw err;
     }
 
-    // Direct localhost:5000 fallback
-    try {
-      const directRes = await fetch(`${getApiUrl()}/api/ai/analyze`, {
-        method: 'POST',
-        body: formData
-      });
-
-      const directJson = await directRes.json().catch(() => ({}));
-
-      if (directRes.ok && directJson.success && directJson.ai) {
-        return directJson.ai;
-      }
-
-      if (directJson.ai && directJson.ai.success !== false) {
-        return directJson.ai;
-      }
-
-      const errorCode = directJson.error || (directRes.status === 429 ? 'AI_QUOTA_EXCEEDED' : 'AI_SERVER_ERROR');
-      const errorMessage = directJson.message || `Express Backend API returned status ${directRes.status}`;
-      const errObj: any = new Error(errorMessage);
-      errObj.statusCode = directRes.status;
-      errObj.errorCode = errorCode;
-      errObj.backendJson = directJson;
-      throw errObj;
-    } catch (directErr: any) {
-      if (directErr.statusCode || (directErr.message && !directErr.message.includes('Failed to fetch'))) {
-        throw directErr;
-      }
-      const netErr: any = new Error('Backend server is offline or unreachable.');
-      netErr.statusCode = 503;
-      netErr.errorCode = 'AI_NETWORK_ERROR';
-      throw netErr;
-    }
+    const netErr: any = new Error('Backend server is offline or unreachable.');
+    netErr.statusCode = 503;
+    netErr.errorCode = 'AI_NETWORK_ERROR';
+    throw netErr;
   }
 }
 
