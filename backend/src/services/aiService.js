@@ -87,9 +87,14 @@ function mapDepartment(category) {
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+  const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
+
+  console.log(`[GEMINI] Request started`);
+  console.log(`[GEMINI] API key configured: ${Boolean(apiKey && apiKey.trim() !== '')}`);
+  console.log(`[GEMINI] Target Model: ${model}`);
 
   if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
+    console.error('[GEMINI ERROR] GEMINI_API_KEY is missing or unconfigured in environment.');
     const errObj = new Error('Gemini analysis failed: GEMINI_API_KEY is not configured in server environment.');
     errObj.statusCode = 503;
     errObj.errorCode = 'AI_SERVICE_UNCONFIGURED';
@@ -277,8 +282,8 @@ async function analyzeComplaintPhoto(fileInput) {
   } catch (err) {
     if (err.statusCode === 404 || err.errorCode === 'AI_MODEL_NOT_FOUND') {
       try {
-        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-1.5-flash...');
-        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-1.5-flash');
+        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-3.5-flash...');
+        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-3.5-flash');
         return fallbackResult;
       } catch (fbErr) {
         err = fbErr;
