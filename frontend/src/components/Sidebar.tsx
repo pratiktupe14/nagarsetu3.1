@@ -238,7 +238,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: t('cityMap'),
       items: [
-        { label: t('taskMap'), path: '/staff/map', icon: Map }
+        { label: t('taskMap'), path: '/staff/tasks/map', icon: Map }
       ]
     },
     {
@@ -413,7 +413,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path ||
-                  (item.path !== '/citizen/portal' && item.path !== '/admin/portal' && item.path !== '/staff/portal' && location.pathname.startsWith(item.path)) ||
+                  (
+                    item.path !== '/citizen/portal' &&
+                    item.path !== '/admin/portal' &&
+                    item.path !== '/staff/portal' &&
+                    item.path !== '/staff/tasks' &&
+                    item.path !== '/department-head/portal' &&
+                    location.pathname.startsWith(item.path)
+                  ) ||
                   (item.path === '/citizen/complaints' && location.pathname.startsWith('/citizen/complaint'));
 
                 return (

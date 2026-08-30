@@ -417,6 +417,14 @@ export default function App() {
               }
             />
             <Route
+              path="/staff/tasks/map"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffTaskMapPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/staff/notifications"
               element={
                 <ProtectedRoute allowedRoles={['service_staff']}>

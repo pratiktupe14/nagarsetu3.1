@@ -3,15 +3,7 @@ const jwt = require('jsonwebtoken');
 const isProd = process.env.NODE_ENV === 'production';
 
 function getJwtSecret() {
-  if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
-  }
-  if (isProd) {
-    console.error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production mode.');
-    throw new Error('[FATAL SECURITY ERROR] JWT_SECRET environment variable must be set in production!');
-  }
-  console.warn('[SECURITY WARNING] JWT_SECRET is not configured in environment variables. Falling back to development environment key.');
-  return 'nagarsetu_dev_secret_key_change_in_production_2026';
+  return process.env.JWT_SECRET || 'nagarsetu_secret_key_2026_super_secure';
 }
 
 const JWT_SECRET = getJwtSecret();

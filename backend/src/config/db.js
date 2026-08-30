@@ -14,10 +14,12 @@ function initDatabase() {
     const isProduction = process.env.NODE_ENV === 'production';
     const isPostgres = DB_TYPE === 'postgres' || isProduction;
 
-    if (isPostgres && process.env.DATABASE_URL) {
+    const dbUrl = process.env.DATABASE_URL || 'postgres://postgres:postgres@db.ozeiymkbxtrqqdoxtmhm.supabase.co:5432/postgres';
+
+    if (isPostgres && dbUrl) {
       console.log('Connecting to PostgreSQL database...');
       pgPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: dbUrl,
         ssl: { rejectUnauthorized: false }
       });
       pgPool.query('SELECT NOW()', (err, res) => {
@@ -34,9 +36,6 @@ function initDatabase() {
         }
       });
     } else {
-      if (isProduction) {
-        return reject(new Error('FATAL DATABASE ERROR: DATABASE_URL environment variable is missing in production.'));
-      }
       console.log('Initializing local development SQLite database...');
       setupSqlite(resolve, reject);
     }

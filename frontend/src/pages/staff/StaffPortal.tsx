@@ -171,7 +171,7 @@ export const StaffPortal: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getStaffTasks(user?.id, staffDepartmentFull);
+      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name);
       setTasks(list);
 
       const notifs = getNotificationsForRole(user?.id, 'service_staff');
@@ -990,87 +990,317 @@ export const StaffPortal: React.FC = () => {
           </div>
         ) : (
           /* DEDICATED TASK LIST VIEW FOR SUB-ROUTES (/staff/tasks, /staff/tasks/new, etc.) */
-          <div>
-            {/* SEARCH & FILTERS BAR */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3 mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-6">
+
+            {/* SUB-ROUTE SPECIFIC METRIC CARDS HEADER */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {isNewPage ? (
+                <>
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">New Assignments</span>
+                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.newTasks}</span>
+                  </div>
+                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
+                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Critical</span>
+                    <span className="text-xl font-extrabold text-rose-900 font-mono block">{metrics.criticalCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Due Today</span>
+                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.dueSoon}</span>
+                  </div>
+                </>
+              ) : isInProgressPage ? (
+                <>
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Total In Progress</span>
+                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.activeTasks}</span>
+                  </div>
+                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
+                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">Due Today</span>
+                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.dueSoon}</span>
+                  </div>
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">SLA Compliance</span>
+                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.slaCompliancePercent}%</span>
+                  </div>
+                </>
+              ) : isOverduePage ? (
+                <>
+                  <div className="p-3.5 bg-rose-100 border border-rose-300 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Total Overdue</span>
+                    <span className="text-xl font-extrabold text-rose-900 font-mono block">{metrics.overdueCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Critical</span>
+                    <span className="text-xl font-extrabold text-rose-800 font-mono block">{metrics.criticalCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
+                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
+                  </div>
+                  <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block font-outfit">SLA Breached</span>
+                    <span className="text-xl font-extrabold text-orange-900 font-mono block">{metrics.overdueCount}</span>
+                  </div>
+                </>
+              ) : isCompletedPage ? (
+                <>
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">Completed</span>
+                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.completed}</span>
+                  </div>
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Pending Verification</span>
+                    <span className="text-xl font-extrabold text-amber-900 font-mono block">
+                      {tasks.filter((t) => t.status === 'Resolution Submitted').length}
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">Verified</span>
+                    <span className="text-xl font-extrabold text-blue-900 font-mono block">
+                      {tasks.filter((t) => t.status === 'Resolved').length}
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Reopened</span>
+                    <span className="text-xl font-extrabold text-rose-900 font-mono block">
+                      {tasks.filter((t) => t.status === 'Reopened').length}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Assigned</span>
+                    <span className="text-xl font-extrabold text-gray-900 font-mono block">{metrics.total}</span>
+                  </div>
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">New</span>
+                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.newTasks}</span>
+                  </div>
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">In Progress</span>
+                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.activeTasks}</span>
+                  </div>
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">Completed</span>
+                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.completed}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* SEARCH & MULTI-FILTERS BAR */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                   <input
                     type="text"
-                    placeholder="Search complaint ID, issue or location..."
+                    placeholder="Search complaint ID, issue title or location..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
 
-                {!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {(['All', 'New', 'Accepted', 'In Progress', 'Due Soon', 'Overdue', 'Completed'] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold font-mono transition-colors ${
-                          activeTab === tab
-                            ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="All">All Priorities</option>
+                    <option value="Critical">Critical Priority</option>
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Priority</option>
+                  </select>
+
+                  {!isNewPage && !isInProgressPage && !isOverduePage && !isCompletedPage && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {(['All', 'New', 'Accepted', 'In Progress', 'Due Soon', 'Overdue', 'Completed'] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTab(tab)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold font-mono transition-colors ${
+                            activeTab === tab
+                              ? 'bg-white text-emerald-800 shadow-xs border border-gray-200'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* CLASSIC TABLE FOR TASK LIST VIEW */}
-            <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-extrabold text-gray-600 uppercase font-outfit">
-                    <th className="py-3 px-3">Complaint ID</th>
-                    <th className="py-3 px-3">Issue Title</th>
-                    <th className="py-3 px-3">Location / Address</th>
-                    <th className="py-3 px-3">Priority</th>
-                    <th className="py-3 px-3 font-mono">Assigned Date</th>
-                    <th className="py-3 px-3 font-mono">SLA Target</th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 font-medium">
+            {/* EMPTY STATES */}
+            {filteredTasks.length === 0 ? (
+              <div className="p-12 text-center bg-white border border-gray-200 rounded-xl space-y-3">
+                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
+                <h3 className="font-extrabold text-gray-900 text-sm font-outfit">
+                  {isNewPage
+                    ? 'No New Assignments'
+                    : isInProgressPage
+                    ? 'No Tasks In Progress'
+                    : isOverduePage
+                    ? 'All Tasks Within SLA — Great work!'
+                    : isCompletedPage
+                    ? 'No Completed Tasks'
+                    : 'No Tasks Found'}
+                </h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  {isNewPage
+                    ? 'New tasks assigned to you by your department manager will appear here.'
+                    : isInProgressPage
+                    ? 'You currently have no tasks marked as in progress.'
+                    : isOverduePage
+                    ? 'You currently have no overdue assignments. Keep up the great field execution!'
+                    : isCompletedPage
+                    ? 'Tasks completed by you will appear here along with verification status.'
+                    : 'No task records match your search or filter selection.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* DESKTOP TABLE VIEW */}
+                <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-extrabold text-gray-600 uppercase font-outfit">
+                        <th className="py-3 px-3">Complaint ID</th>
+                        <th className="py-3 px-3">Issue Title</th>
+                        <th className="py-3 px-3">Location / Address</th>
+                        <th className="py-3 px-3">Priority</th>
+                        <th className="py-3 px-3 font-mono">Assigned Date</th>
+                        <th className="py-3 px-3 font-mono">SLA Target</th>
+                        <th className="py-3 px-3">Status</th>
+                        <th className="py-3 px-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 font-medium">
+                      {filteredTasks.map((t) => {
+                        const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+                        const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+                        const isNew = t.status === 'Department Assigned' || t.status === 'Staff Assigned';
+
+                        return (
+                          <tr key={t.id} className={`hover:bg-slate-50 ${isOverdue ? 'bg-rose-50/40' : ''}`}>
+                            <td className="py-3 px-3 font-mono font-extrabold text-emerald-700">{t.complaint_number}</td>
+                            <td className="py-3 px-3 font-bold text-gray-900">{t.title}</td>
+                            <td className="py-3 px-3 text-gray-700">{t.location_address}</td>
+                            <td className="py-3 px-3"><PriorityBadge priority={t.priority} /></td>
+                            <td className="py-3 px-3 font-mono text-gray-600">{new Date(t.created_at).toLocaleDateString()}</td>
+                            <td className="py-3 px-3 font-mono">
+                              <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>{slaInfo.text}</span>
+                            </td>
+                            <td className="py-3 px-3"><StatusBadge status={t.status} /></td>
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() => setSelectedTask(t)}
+                                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-gray-600" />
+                                  <span>View Task</span>
+                                </button>
+
+                                {isNew && (
+                                  <button
+                                    onClick={() => handleStatusTransition(t.id, 'In Progress')}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
+                                  >
+                                    <Play className="w-3.5 h-3.5" />
+                                    <span>Start Task</span>
+                                  </button>
+                                )}
+
+                                {isInProgressPage && (
+                                  <button
+                                    onClick={() => setSelectedTask(t)}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
+                                  >
+                                    <Wrench className="w-3.5 h-3.5" />
+                                    <span>Complete Task</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* MOBILE CARD GRID VIEW */}
+                <div className="block md:hidden space-y-3">
                   {filteredTasks.map((t) => {
                     const slaInfo = formatSlaRemainingTime(t.sla_deadline);
                     const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+                    const isNew = t.status === 'Department Assigned' || t.status === 'Staff Assigned';
 
                     return (
-                      <tr key={t.id} className={`hover:bg-slate-50 ${isOverdue ? 'bg-rose-50/40' : ''}`}>
-                        <td className="py-3 px-3 font-mono font-extrabold text-emerald-700">{t.complaint_number}</td>
-                        <td className="py-3 px-3 font-bold text-gray-900">{t.title}</td>
-                        <td className="py-3 px-3 text-gray-700">{t.location_address}</td>
-                        <td className="py-3 px-3"><PriorityBadge priority={t.priority} /></td>
-                        <td className="py-3 px-3 font-mono text-gray-600">{new Date(t.created_at).toLocaleDateString()}</td>
-                        <td className="py-3 px-3 font-mono">
-                          <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>{slaInfo.text}</span>
-                        </td>
-                        <td className="py-3 px-3"><StatusBadge status={t.status} /></td>
-                        <td className="py-3 px-3 text-right">
+                      <div
+                        key={t.id}
+                        className={`p-4 rounded-xl border space-y-3 bg-white ${
+                          isOverdue ? 'border-rose-300 bg-rose-50/20' : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-extrabold text-emerald-700">{t.complaint_number}</span>
+                          <PriorityBadge priority={t.priority} />
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-xs">{t.title}</h4>
+                          <p className="text-[11px] text-gray-600 mt-0.5">{t.location_address}</p>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-100 font-mono">
+                          <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-600'}>
+                            {slaInfo.text}
+                          </span>
+                          <StatusBadge status={t.status} />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
                           <button
                             onClick={() => setSelectedTask(t)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1"
+                            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1 min-h-[40px]"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View Task</span>
                           </button>
-                        </td>
-                      </tr>
+
+                          {isNew && (
+                            <button
+                              onClick={() => handleStatusTransition(t.id, 'In Progress')}
+                              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1 min-h-[40px]"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span>Start Task</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -1204,27 +1434,53 @@ export const StaffPortal: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center space-y-2 bg-gray-50/50 h-44 flex flex-col items-center justify-center">
-                        <Camera className="w-6 h-6 text-gray-400" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          id="staff-dash-proof-input"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              setPhotoAfterFile(e.target.files[0]);
-                              setPhotoAfterPreview(URL.createObjectURL(e.target.files[0]));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor="staff-dash-proof-input"
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer min-h-[44px] inline-flex items-center space-x-1"
-                        >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Upload Repair Photo</span>
-                        </label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 text-center space-y-2 bg-gray-50/50 h-44 flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-gray-700 block">Capture or Select Evidence Photo</span>
+                        
+                        <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+                          {/* Option A: Take Photo with Camera */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            id="staff-dash-camera-input"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setPhotoAfterFile(e.target.files[0]);
+                                setPhotoAfterPreview(URL.createObjectURL(e.target.files[0]));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="staff-dash-camera-input"
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer min-h-[40px] flex items-center justify-center space-x-1 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Take Photo</span>
+                          </label>
+
+                          {/* Option B: Choose from Gallery / Files */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            id="staff-dash-gallery-input"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setPhotoAfterFile(e.target.files[0]);
+                                setPhotoAfterPreview(URL.createObjectURL(e.target.files[0]));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="staff-dash-gallery-input"
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer min-h-[40px] flex items-center justify-center space-x-1 shadow-xs"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>From Gallery</span>
+                          </label>
+                        </div>
                       </div>
                     )}
                   </div>

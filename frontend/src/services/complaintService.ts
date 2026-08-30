@@ -211,20 +211,30 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   );
 }
 
-// Fetch staff tasks from Supabase & LocalStorage
-export async function getStaffTasks(staffId?: string, departmentName?: string): Promise<Complaint[]> {
+// Fetch staff tasks from Supabase & LocalStorage with strict staff data isolation
+export async function getStaffTasks(
+  staffId?: string,
+  departmentName?: string,
+  userEmail?: string,
+  userName?: string
+): Promise<Complaint[]> {
+  const cleanStaffId = String(staffId || '').trim();
+  const cleanEmail = String(userEmail || '').trim().toLowerCase();
+  const cleanName = String(userName || '').trim().toLowerCase();
+
+  // 1. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
       let query = supabase.from('complaints').select('*');
-      if (staffId && isValidUuid(staffId)) {
-        query = query.eq('assigned_staff_id', staffId);
+      if (cleanStaffId && isValidUuid(cleanStaffId)) {
+        query = query.eq('assigned_staff_id', cleanStaffId);
       } else if (departmentName && departmentName !== 'All') {
         const cleanDept = departmentName.split('(')[0].trim();
         query = query.ilike('department_name', `%${cleanDept}%`);
       }
       const { data, error } = await query.order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return data as Complaint[];
       }
     } catch (err) {
@@ -232,16 +242,23 @@ export async function getStaffTasks(staffId?: string, departmentName?: string): 
     }
   }
 
+  // 2. Strict LocalStorage staff isolation
   const all = getStoredComplaints();
   return all.filter((c) => {
-    if (staffId) {
-      return c.assigned_staff_id === staffId;
+    // If specific staff identifiers are provided, strictly match against this staff member only
+    if (cleanStaffId || cleanEmail || cleanName) {
+      const matchId = cleanStaffId && String(c.assigned_staff_id || '').toLowerCase() === cleanStaffId.toLowerCase();
+      const matchEmail = cleanEmail && String(c.assigned_staff_email || '').toLowerCase() === cleanEmail;
+      const matchName = cleanName && String(c.assigned_staff_name || '').toLowerCase() === cleanName;
+      return Boolean(matchId || matchEmail || matchName);
     }
+
     if (departmentName && departmentName !== 'All') {
       const compDept = (c.department_name || '').toLowerCase();
       const targetDept = departmentName.split('(')[0].trim().toLowerCase();
       return compDept.includes(targetDept) || targetDept.includes(compDept);
     }
+
     return c.assigned_staff_id != null || c.status === 'Staff Assigned' || c.status === 'In Progress' || c.status === 'Accepted';
   });
 }

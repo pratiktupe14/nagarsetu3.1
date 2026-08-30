@@ -133,7 +133,7 @@ export const StaffTaskMapPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getStaffTasks(user?.id, staffDepartmentFull);
+      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name);
       setTasks(list);
     } catch (err) {
       console.error(err);

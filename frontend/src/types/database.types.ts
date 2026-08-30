@@ -148,6 +148,7 @@ export interface Complaint {
   support_count?: number;
   assigned_staff_id?: string;
   assigned_staff_name?: string;
+  assigned_staff_email?: string;
   assigned_by?: string;
   assigned_by_name?: string;
   department_head_id?: string;
