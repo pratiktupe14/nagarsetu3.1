@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -9,6 +9,118 @@ import {
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
   CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone
 } from 'lucide-react';
+
+export function getDepartmentHeadPortalLabel(
+  departmentIdOrCode?: string | number,
+  departmentName?: string,
+  userEmail?: string,
+  userName?: string
+): { mainTitle: string; subtitle: string; fullLabel: string } {
+  const dId = String(departmentIdOrCode || '').trim().toLowerCase();
+  const dName = String(departmentName || '').trim().toLowerCase();
+  const email = String(userEmail || '').trim().toLowerCase();
+  const name = String(userName || '').trim().toLowerCase();
+
+  const codeClean = dId.replace('dept-', '').replace('dept', '').split('-')[0].trim();
+
+  // 1. PWD (Public Works Department)
+  if (
+    codeClean === '1' || codeClean === 'pwd' ||
+    dName.includes('public works') || dName.includes('road') ||
+    email.includes('pwd') || email.includes('rahul.kumar') || name.includes('rahul kumar')
+  ) {
+    return {
+      mainTitle: 'PUBLIC WORKS DEPARTMENT',
+      subtitle: '(PWD) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'PUBLIC WORKS DEPARTMENT (PWD) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 2. SAN (Sanitation & Waste Management)
+  if (
+    codeClean === '2' || codeClean === 'san' ||
+    dName.includes('sanitation') || dName.includes('waste') ||
+    email.includes('sanitation') || email.includes('amit.sharma') || name.includes('amit sharma')
+  ) {
+    return {
+      mainTitle: 'SANITATION & WASTE MANAGEMENT',
+      subtitle: '(SAN) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'SANITATION & WASTE MANAGEMENT (SAN) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 3. WTR (Water Supply & Sewerage Board)
+  if (
+    codeClean === '3' || codeClean === 'wtr' ||
+    dName.includes('water') || dName.includes('sewerage') ||
+    email.includes('wtr') || email.includes('water') || email.includes('vikram.patil') || name.includes('vikram patil')
+  ) {
+    return {
+      mainTitle: 'WATER SUPPLY & SEWERAGE',
+      subtitle: '(WTR) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'WATER SUPPLY & SEWERAGE (WTR) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 4. ELE (Electrical & Street Lighting)
+  if (
+    codeClean === '4' || codeClean === 'ele' ||
+    dName.includes('electrical') || dName.includes('lighting') ||
+    email.includes('ele') || email.includes('electrical') || email.includes('aditya.joshi') || name.includes('aditya joshi')
+  ) {
+    return {
+      mainTitle: 'ELECTRICAL & STREET LIGHTING',
+      subtitle: '(ELE) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'ELECTRICAL & STREET LIGHTING (ELE) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 5. TRF (Traffic Management Department)
+  if (
+    codeClean === '5' || codeClean === 'trf' ||
+    dName.includes('traffic') ||
+    email.includes('trf') || email.includes('traffic') || email.includes('rohan.deshmukh') || name.includes('rohan deshmukh')
+  ) {
+    return {
+      mainTitle: 'TRAFFIC MANAGEMENT',
+      subtitle: '(TRF) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'TRAFFIC MANAGEMENT (TRF) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 6. MNT (Maintenance Department)
+  if (
+    codeClean === '6' || codeClean === 'mnt' ||
+    dName.includes('maintenance') ||
+    email.includes('mnt') || email.includes('maintenance') || email.includes('kunal.kulkarni') || name.includes('kunal kulkarni')
+  ) {
+    return {
+      mainTitle: 'MAINTENANCE',
+      subtitle: '(MNT) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'MAINTENANCE (MNT) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 7. DRN (Drainage & Sewage Department)
+  if (
+    codeClean === '7' || codeClean === 'drn' ||
+    dName.includes('drainage') || dName.includes('sewage') ||
+    email.includes('drn') || email.includes('drainage') || email.includes('sanjay.more') || name.includes('sanjay more')
+  ) {
+    return {
+      mainTitle: 'DRAINAGE & SEWAGE',
+      subtitle: '(DRN) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'DRAINAGE & SEWAGE (DRN) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // Fallback
+  return {
+    mainTitle: 'DEPARTMENT HEAD',
+    subtitle: 'PORTAL',
+    fullLabel: 'DEPARTMENT HEAD PORTAL'
+  };
+}
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -170,6 +282,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   ];
 
+  // Dynamic Department Head Portal Title Resolution
+  const [deptHeadLabel, setDeptHeadLabel] = useState<{ mainTitle: string; subtitle: string; fullLabel: string }>(() => {
+    return getDepartmentHeadPortalLabel(user?.department_id, user?.department_name, user?.email, user?.full_name);
+  });
+
+  useEffect(() => {
+    if (activeRole === 'department_head') {
+      const initial = getDepartmentHeadPortalLabel(user?.department_id, user?.department_name, user?.email, user?.full_name);
+      setDeptHeadLabel(initial);
+
+      // Async DB resolution if user.department_id / department_name is not populated
+      if (supabase && (!user?.department_name || !user?.department_id) && (user?.id || user?.email)) {
+        (async () => {
+          try {
+            const { data } = await supabase
+              .from('department_heads')
+              .select('department_id, name, email, departments(name, code)')
+              .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+              .eq('status', 'active')
+              .maybeSingle();
+
+            if (data) {
+              const res = getDepartmentHeadPortalLabel(
+                data.department_id || (data as any).departments?.code,
+                (data as any).departments?.name,
+                data.email || user.email,
+                data.name || user.full_name
+              );
+              setDeptHeadLabel(res);
+            }
+          } catch (e) {
+            // Ignore fallback errors
+          }
+        })();
+      }
+    }
+  }, [user, activeRole]);
+
   const navGroups = activeRole === 'city_admin' 
     ? adminNav 
     : activeRole === 'department_head'
@@ -237,9 +387,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </Link>
 
           {!isCollapsed && (
-            <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold tracking-wider font-mono uppercase text-center ${roleBadgeStyle}`}>
-              {roleLabel} PORTAL
-            </div>
+            activeRole === 'department_head' ? (
+              <div className="px-2 py-1.5 rounded-lg border bg-purple-50 text-purple-800 border-purple-200 text-[10px] font-extrabold tracking-wider font-mono uppercase text-center leading-tight flex flex-col items-center justify-center space-y-0.5 break-words">
+                <span className="block leading-tight">{deptHeadLabel.mainTitle}</span>
+                <span className="block leading-tight text-purple-900 font-black">{deptHeadLabel.subtitle}</span>
+              </div>
+            ) : (
+              <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold tracking-wider font-mono uppercase text-center ${roleBadgeStyle}`}>
+                {roleLabel} PORTAL
+              </div>
+            )
           )}
         </div>
 
