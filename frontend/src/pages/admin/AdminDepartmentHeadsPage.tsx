@@ -22,7 +22,7 @@ import {
   AlertTriangle, ChevronLeft, ChevronRight, X, Phone, Mail,
   Edit, Eye, Layers, Activity, Check, Clock, UserCheck, ShieldCheck,
   UserPlus, RotateCcw, AlertCircle, ShieldAlert, Sparkles, Sliders,
-  UserX, ArrowRight, Info, Shield, CheckCircle, Trash2
+  UserX, ArrowRight, Info, Shield, CheckCircle, Trash2, Filter
 } from 'lucide-react';
 
 
@@ -87,6 +87,139 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
   } | null>(null);
 
   const [viewComplaintDetailModal, setViewComplaintDetailModal] = useState<any | null>(null);
+
+  const [complaintFilters, setComplaintFilters] = useState<{
+    search: string;
+    status: string;
+    priority: string;
+    category: string;
+    staff: string;
+    datePreset: 'All' | 'Today' | '7Days' | '30Days' | 'Custom';
+    fromDate: string;
+    toDate: string;
+  }>({
+    search: '',
+    status: 'All',
+    priority: 'All',
+    category: 'All',
+    staff: 'All',
+    datePreset: 'All',
+    fromDate: '',
+    toDate: ''
+  });
+
+  const handleClearComplaintFilters = () => {
+    setComplaintFilters({
+      search: '',
+      status: 'All',
+      priority: 'All',
+      category: 'All',
+      staff: 'All',
+      datePreset: 'All',
+      fromDate: '',
+      toDate: ''
+    });
+  };
+
+  const availableCategories = useMemo(() => {
+    if (!viewDeptComplaintsModal?.complaints) return [];
+    const set = new Set<string>();
+    viewDeptComplaintsModal.complaints.forEach((c: any) => {
+      if (c.category) set.add(c.category);
+    });
+    return Array.from(set).sort();
+  }, [viewDeptComplaintsModal?.complaints]);
+
+  const availableStaffOptions = useMemo(() => {
+    const staffNames = new Set<string>();
+    if (viewHeadProfileModal?.assignedStaff) {
+      viewHeadProfileModal.assignedStaff.forEach((s: any) => {
+        const name = s.name || s.full_name;
+        if (name) staffNames.add(name);
+      });
+    }
+    if (viewDeptComplaintsModal?.complaints) {
+      viewDeptComplaintsModal.complaints.forEach((c: any) => {
+        if (c.assigned_staff_name) staffNames.add(c.assigned_staff_name);
+      });
+    }
+    return Array.from(staffNames).sort();
+  }, [viewHeadProfileModal?.assignedStaff, viewDeptComplaintsModal?.complaints]);
+
+  const filteredDeptComplaints = useMemo(() => {
+    if (!viewDeptComplaintsModal?.complaints) return [];
+
+    return viewDeptComplaintsModal.complaints.filter((c: any) => {
+      // 1. Search Query (ID, title, category, location, assigned staff)
+      if (complaintFilters.search.trim()) {
+        const q = complaintFilters.search.trim().toLowerCase();
+        const matchId = String(c.id || '').toLowerCase().includes(q) || String(c.complaint_number || '').toLowerCase().includes(q);
+        const matchTitle = String(c.title || '').toLowerCase().includes(q);
+        const matchCat = String(c.category || '').toLowerCase().includes(q);
+        const matchLoc = String(c.location_address || c.location_text || c.ward_name || '').toLowerCase().includes(q);
+        const matchStaff = String(c.assigned_staff_name || c.assigned_staff_id || '').toLowerCase().includes(q);
+
+        if (!matchId && !matchTitle && !matchCat && !matchLoc && !matchStaff) {
+          return false;
+        }
+      }
+
+      // 2. Status Filter
+      if (complaintFilters.status !== 'All') {
+        const cStatus = String(c.status || '').toLowerCase();
+        const fStatus = complaintFilters.status.toLowerCase();
+        if (cStatus !== fStatus) return false;
+      }
+
+      // 3. Priority Filter
+      if (complaintFilters.priority !== 'All') {
+        const cPriority = String(c.priority || '').toLowerCase();
+        const fPriority = complaintFilters.priority.toLowerCase();
+        if (cPriority !== fPriority) return false;
+      }
+
+      // 4. Category Filter
+      if (complaintFilters.category !== 'All') {
+        if (String(c.category || '') !== complaintFilters.category) return false;
+      }
+
+      // 5. Staff Filter
+      if (complaintFilters.staff !== 'All') {
+        const cStaff = String(c.assigned_staff_name || c.assigned_staff_id || '');
+        if (cStaff !== complaintFilters.staff && !cStaff.includes(complaintFilters.staff)) return false;
+      }
+
+      // 6. Date Range Filter
+      if (c.created_at) {
+        const compDate = new Date(c.created_at);
+
+        if (complaintFilters.datePreset === 'Today') {
+          const today = new Date();
+          if (compDate.toDateString() !== today.toDateString()) return false;
+        } else if (complaintFilters.datePreset === '7Days') {
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 7);
+          if (compDate < cutoff) return false;
+        } else if (complaintFilters.datePreset === '30Days') {
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
+          if (compDate < cutoff) return false;
+        } else if (complaintFilters.datePreset === 'Custom') {
+          if (complaintFilters.fromDate) {
+            const from = new Date(complaintFilters.fromDate);
+            if (compDate < from) return false;
+          }
+          if (complaintFilters.toDate) {
+            const to = new Date(complaintFilters.toDate);
+            to.setHours(23, 59, 59, 999);
+            if (compDate > to) return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  }, [viewDeptComplaintsModal?.complaints, complaintFilters]);
 
   // Execute Delete Department Head
   const handleExecuteDeleteHead = async () => {
@@ -1211,12 +1344,152 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                 <div className="text-right font-mono text-xs">
                   <span className="px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 font-extrabold rounded-full inline-block">
-                    {viewDeptComplaintsModal.complaints.length} Total Complaints
+                    Showing {filteredDeptComplaints.length} of {viewDeptComplaintsModal.complaints.length} complaints
                   </span>
                 </div>
               </div>
 
-              {/* COMPLAINTS LIST / LOADING / ERROR */}
+              {/* FILTER & SEARCH PANEL */}
+              <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl space-y-3 font-sans">
+                {/* SEARCH INPUT */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search complaints by ID, title, category, location, or assigned staff..."
+                    value={complaintFilters.search}
+                    onChange={(e) => setComplaintFilters((prev) => ({ ...prev, search: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-hidden focus:border-blue-500 shadow-2xs"
+                  />
+                  {complaintFilters.search && (
+                    <button
+                      onClick={() => setComplaintFilters((prev) => ({ ...prev, search: '' }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* DROPDOWNS ROW */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                  {/* STATUS FILTER */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Status</label>
+                    <select
+                      value={complaintFilters.status}
+                      onChange={(e) => setComplaintFilters((prev) => ({ ...prev, status: e.target.value }))}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Submitted">Submitted</option>
+                      <option value="Verified">Verified</option>
+                      <option value="Pending Assignment">Pending Assignment</option>
+                      <option value="Assigned">Assigned</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Pending Review">Pending Review</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Closed">Closed</option>
+                      <option value="Reopened">Reopened</option>
+                      <option value="Overdue">Overdue</option>
+                    </select>
+                  </div>
+
+                  {/* PRIORITY FILTER */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Priority</label>
+                    <select
+                      value={complaintFilters.priority}
+                      onChange={(e) => setComplaintFilters((prev) => ({ ...prev, priority: e.target.value }))}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="All">All Priorities</option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+
+                  {/* CATEGORY FILTER */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Category</label>
+                    <select
+                      value={complaintFilters.category}
+                      onChange={(e) => setComplaintFilters((prev) => ({ ...prev, category: e.target.value }))}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="All">All Categories</option>
+                      {availableCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* ASSIGNED STAFF FILTER */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Assigned Staff</label>
+                    <select
+                      value={complaintFilters.staff}
+                      onChange={(e) => setComplaintFilters((prev) => ({ ...prev, staff: e.target.value }))}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="All">All Staff ({availableStaffOptions.length})</option>
+                      {availableStaffOptions.map((stf) => (
+                        <option key={stf} value={stf}>{stf}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* DATE RANGE PRESETS & CLEAR FILTERS */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-gray-200/60 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase font-mono mr-1">Date:</span>
+                    {(['All', 'Today', '7Days', '30Days', 'Custom'] as const).map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => setComplaintFilters((prev) => ({ ...prev, datePreset: preset }))}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          complaintFilters.datePreset === preset
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                      >
+                        {preset === 'All' ? 'All Time' : preset === '7Days' ? 'Last 7 Days' : preset === '30Days' ? 'Last 30 Days' : preset}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* CUSTOM DATE INPUTS IF CUSTOM SELECTED */}
+                  {complaintFilters.datePreset === 'Custom' && (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="date"
+                        value={complaintFilters.fromDate}
+                        onChange={(e) => setComplaintFilters((prev) => ({ ...prev, fromDate: e.target.value }))}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono"
+                      />
+                      <span className="text-gray-400 text-xs font-bold">to</span>
+                      <input
+                        type="date"
+                        value={complaintFilters.toDate}
+                        onChange={(e) => setComplaintFilters((prev) => ({ ...prev, toDate: e.target.value }))}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleClearComplaintFilters}
+                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-gray-800 font-extrabold text-xs rounded-xl transition-all cursor-pointer shrink-0"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* COMPLAINTS LIST / LOADING / ERROR / FILTERED EMPTY */}
               {viewDeptComplaintsModal.loading ? (
                 <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
                   <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -1239,9 +1512,21 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                   <p className="text-xs text-gray-600 font-bold">No complaints found for this department.</p>
                 </div>
+              ) : filteredDeptComplaints.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-3">
+                  <Filter className="w-10 h-10 text-gray-400 mx-auto" />
+                  <p className="text-xs text-gray-600 font-bold">No complaints match your filters.</p>
+                  <button
+                    onClick={handleClearComplaintFilters}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl inline-flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Clear Filters</span>
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                  {viewDeptComplaintsModal.complaints.map((comp) => (
+                  {filteredDeptComplaints.map((comp) => (
                     <div key={comp.id} className="p-4 bg-slate-50 border border-gray-200 rounded-2xl hover:border-blue-300 transition-all space-y-3">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
                         <div className="flex items-center space-x-2">
