@@ -45,20 +45,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const citizenNav: NavGroup[] = [
     {
-      title: 'MAIN',
+      title: t('mainMenu'),
       items: [
         { label: t('dashboard'), path: '/citizen/portal', icon: Home },
         { label: t('myComplaints'), path: '/citizen/complaints', icon: FileText },
-        { label: 'Track Complaint', path: '/citizen/track', icon: Activity },
+        { label: t('trackComplaint'), path: '/citizen/track', icon: Activity },
         { label: t('reportComplaint'), path: '/citizen/report', icon: PlusCircle },
         { label: t('nearbyIssues'), path: '/citizen/nearby', icon: MapPin },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell }
       ]
     },
     {
-      title: 'ACCOUNT',
+      title: t('accountMenu'),
       items: [
-        { label: 'Announcements', path: '/citizen/announcements', icon: Megaphone },
+        { label: t('announcements'), path: '/citizen/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell },
         { label: t('profile'), path: '/citizen/profile', icon: User },
         { label: t('settings'), path: '/citizen/settings', icon: Settings }
@@ -68,13 +68,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const adminNav: NavGroup[] = [
     {
-      title: 'OVERVIEW',
+      title: t('overviewMenu'),
       items: [
         { label: t('dashboard'), path: '/admin/portal', icon: Home }
       ]
     },
     {
-      title: 'COMPLAINT MANAGEMENT',
+      title: t('complaintManagementMenu'),
       items: [
         { label: t('allComplaints'), path: '/admin/complaints', icon: FileText },
         { label: t('newComplaints'), path: '/admin/complaints/new', icon: PlusCircle },
@@ -85,24 +85,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'OPERATIONS',
+      title: t('departmentControlMenu'),
       items: [
         { label: t('departments'), path: '/admin/departments', icon: Building2 },
-        { label: t('departmentHeads') || 'Department Heads', path: '/admin/department-heads', icon: UserCheck },
-        { label: t('departmentDashboard') || 'Department Dashboard', path: '/admin/departments/dashboard', icon: LayoutDashboard },
+        { label: t('departmentHeads'), path: '/admin/department-heads', icon: UserCheck },
+        { label: t('departmentDashboard'), path: '/admin/departments/dashboard', icon: LayoutDashboard },
         { label: t('serviceStaff'), path: '/admin/staff', icon: Users },
         { label: t('cityMap'), path: '/admin/map', icon: Map }
       ]
     },
     {
-      title: 'ANALYTICS',
+      title: t('analytics'),
       items: [
         { label: t('analytics'), path: '/admin/analytics', icon: FileText },
         { label: t('reports'), path: '/admin/reports', icon: FileText }
       ]
     },
     {
-      title: 'SYSTEM',
+      title: t('administrationMenu'),
       items: [
         { label: t('announcements'), path: '/admin/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/admin/notifications', icon: Bell },
@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const staffNav: NavGroup[] = [
     {
-      title: 'WORK',
+      title: t('mainMenu'),
       items: [
         { label: t('dashboard'), path: '/staff/portal', icon: Home },
         { label: t('myTasks'), path: '/staff/tasks', icon: FileText },
@@ -124,15 +124,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'LOCATION',
+      title: t('cityMap'),
       items: [
         { label: t('taskMap'), path: '/staff/map', icon: Map }
       ]
     },
     {
-      title: 'ACCOUNT',
+      title: t('accountMenu'),
       items: [
-        { label: 'Announcements', path: '/staff/announcements', icon: Megaphone },
+        { label: t('announcements'), path: '/staff/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/staff/notifications', icon: Bell },
         { label: t('profile'), path: '/staff/profile', icon: User },
         { label: t('settings'), path: '/staff/settings', icon: Settings }
@@ -142,13 +142,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const departmentHeadNav: NavGroup[] = [
     {
-      title: 'OVERVIEW',
+      title: t('overviewMenu'),
       items: [
         { label: t('dashboard'), path: '/department-head/portal', icon: Home }
       ]
     },
     {
-      title: 'MY DEPARTMENT',
+      title: t('departmentControlMenu'),
       items: [
         { label: t('allComplaints'), path: '/department-head/complaints', icon: FileText },
         { label: t('staff'), path: '/department-head/staff', icon: Users },
@@ -160,9 +160,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'COMMUNICATION',
+      title: t('accountMenu'),
       items: [
-        { label: 'Announcements', path: '/department-head/announcements', icon: Megaphone },
+        { label: t('announcements'), path: '/department-head/announcements', icon: Megaphone },
         { label: t('notifications'), path: '/department-head/notifications', icon: Bell },
         { label: t('profile'), path: '/department-head/profile', icon: User },
         { label: t('settings'), path: '/department-head/settings', icon: Settings }

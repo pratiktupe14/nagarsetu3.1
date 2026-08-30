@@ -390,7 +390,21 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // AI Analyzer
     aiLargePothole: "Large Road Pothole",
     aiAnalysisComplete: "AI Analysis Complete",
-    aiHighConfidence: "High Confidence Issue Detected"
+    aiHighConfidence: "High Confidence Issue Detected",
+
+    // Navigation & Footer Keys
+    trackComplaint: "Track Complaint",
+    mainMenu: "MAIN",
+    accountMenu: "ACCOUNT",
+    overviewMenu: "OVERVIEW",
+    complaintManagementMenu: "COMPLAINT MANAGEMENT",
+    departmentControlMenu: "DEPARTMENT CONTROL",
+    administrationMenu: "ADMINISTRATION",
+    privacyPolicy: "Privacy Policy",
+    termsOfService: "Terms of Service",
+    municipalHelpdesk: "Municipal Helpdesk",
+    allRightsReserved: "All rights reserved.",
+    governancePlatform: "AI-Powered Municipal Governance Platform"
   },
 
   hi: {
@@ -770,7 +784,21 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // AI Analyzer
     aiLargePothole: "सड़क पर बड़ा गड्ढा",
     aiAnalysisComplete: "एआई विश्लेषण पूर्ण",
-    aiHighConfidence: "उच्च विश्वास के साथ समस्या की पहचान"
+    aiHighConfidence: "उच्च विश्वास के साथ समस्या की पहचान",
+
+    // Navigation & Footer Keys
+    trackComplaint: "शिकायत ट्रैक करें",
+    mainMenu: "मुख्य मेनू",
+    accountMenu: "खाता",
+    overviewMenu: "अवलोकन",
+    complaintManagementMenu: "शिकायत प्रबंधन",
+    departmentControlMenu: "विभाग नियंत्रण",
+    administrationMenu: "प्रशासन",
+    privacyPolicy: "गोपनीयता नीति",
+    termsOfService: "सेवा की शर्तें",
+    municipalHelpdesk: "नगर निगम हेल्पडेस्क",
+    allRightsReserved: "सर्वाधिकार सुरक्षित।",
+    governancePlatform: "एआई-संचालित नगर निगम प्रशासन मंच"
   },
 
   mr: {
@@ -1148,7 +1176,21 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     // AI Analyzer
     aiLargePothole: "रस्त्यावर मोठा खड्डा",
     aiAnalysisComplete: "एआय विश्लेषण पूर्ण",
-    aiHighConfidence: "उच्च आत्मविश्वासाने समस्या आढळली"
+    aiHighConfidence: "उच्च आत्मविश्वासाने समस्या आढळली",
+
+    // Navigation & Footer Keys
+    trackComplaint: "तक्रार ट्रॅक करा",
+    mainMenu: "मुख्य मेनू",
+    accountMenu: "खाते",
+    overviewMenu: "आढावा",
+    complaintManagementMenu: "तक्रार व्यवस्थापन",
+    departmentControlMenu: "विभाग नियंत्रण",
+    administrationMenu: "प्रशासन",
+    privacyPolicy: "गोपनीयता धोरण",
+    termsOfService: "सेवा अटी",
+    municipalHelpdesk: "महापालिका हेल्पडेस्क",
+    allRightsReserved: "सर्व हक्क राखीव.",
+    governancePlatform: "एआय-आधारित महापालिका प्रशासन व्यासपीठ"
   }
 };
 
