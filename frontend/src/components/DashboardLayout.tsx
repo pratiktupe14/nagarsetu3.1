@@ -11,6 +11,10 @@ interface DashboardLayoutProps {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, title = 'Dashboard' }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = `NAGARSETU — ${title}`;
+  }, [title]);
+
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     const saved = localStorage.getItem('nagarsetu_sidebar_collapsed');
     return saved === 'true';

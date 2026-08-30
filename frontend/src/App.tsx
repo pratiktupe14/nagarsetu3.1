@@ -24,7 +24,6 @@ import { MaintenanceDetailPage } from './pages/citizen/MaintenanceDetailPage';
 import { TrackComplaintPage } from './pages/citizen/TrackComplaintPage';
 
 import { AdminPortal } from './pages/admin/AdminPortal';
-import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
 import { AdminComplaintsPage } from './pages/admin/AdminComplaintsPage';
 import { AdminNewComplaintsPage } from './pages/admin/AdminNewComplaintsPage';
 import { AdminPendingComplaintsPage } from './pages/admin/AdminPendingComplaintsPage';
@@ -34,7 +33,6 @@ import { AdminOverdueComplaintsPage } from './pages/admin/AdminOverdueComplaints
 import { AdminDepartmentsPage } from './pages/admin/AdminDepartmentsPage';
 import { AdminDepartmentHeadsPage } from './pages/admin/AdminDepartmentHeadsPage';
 import { AdminDepartmentDashboardPage } from './pages/admin/AdminDepartmentDashboardPage';
-import { AdminStaffPage } from './pages/admin/AdminStaffPage';
 import { AdminCityMapPage } from './pages/admin/AdminCityMapPage';
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { AdminReportsPage } from './pages/admin/AdminReportsPage';
@@ -216,7 +214,7 @@ export default function App() {
               path="/admin/announcements"
               element={
                 <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminAnnouncementsPage />
+                  <AnnouncementsWorkspacePage />
                 </ProtectedRoute>
               }
             />

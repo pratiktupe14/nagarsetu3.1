@@ -22,12 +22,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
-            return 'vendor-react';
-          }
-          if (id.includes('node_modules/leaflet') || id.includes('node_modules/react-leaflet')) {
-            return 'vendor-leaflet';
-          }
           if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs-2')) {
             return 'vendor-charts';
           }
