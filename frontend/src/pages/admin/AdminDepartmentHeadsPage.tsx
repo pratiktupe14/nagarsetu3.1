@@ -7,9 +7,11 @@ import {
   deactivateDepartmentHead,
   reactivateDepartmentHead,
   deleteDepartmentHead,
+  matchComplaintToDepartment,
   DepartmentLeadershipSummary
 } from '../../services/departmentService';
 import { getDepartmentServiceStaff } from '../../services/adminService';
+import { getStoredComplaints } from '../../services/complaintService';
 import { pushNotification } from '../../services/notificationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
@@ -75,11 +77,16 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
   const [viewDeptComplaintsModal, setViewDeptComplaintsModal] = useState<{
     title: string;
+    deptId?: string;
     deptName: string;
     deptCode?: string;
     headName?: string;
     complaints: any[];
+    loading?: boolean;
+    error?: string | null;
   } | null>(null);
+
+  const [viewComplaintDetailModal, setViewComplaintDetailModal] = useState<any | null>(null);
 
   // Execute Delete Department Head
   const handleExecuteDeleteHead = async () => {
@@ -141,6 +148,20 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setViewDeptStaffModal((prev) => (prev ? { ...prev, staffList: freshStaff, loading: false, error: null } : null));
     } catch (err: any) {
       setViewDeptStaffModal((prev) => (prev ? { ...prev, loading: false, error: err.message || 'Unable to load department staff.' } : null));
+    }
+  };
+
+  const handleRetryFetchComplaints = async (deptId?: string, deptCode?: string, deptName?: string) => {
+    if (!viewDeptComplaintsModal) return;
+    setViewDeptComplaintsModal((prev) => (prev ? { ...prev, loading: true, error: null } : null));
+    try {
+      const allComplaints = await getStoredComplaints();
+      const targetQuery = deptId || deptCode || deptName || '';
+      const filtered = allComplaints.filter((c) => matchComplaintToDepartment(c, targetQuery, undefined, deptName));
+      setViewDeptComplaintsModal((prev) => (prev ? { ...prev, complaints: filtered, loading: false, error: null } : null));
+    } catch (err: any) {
+      console.error('Failed to fetch department complaints:', err);
+      setViewDeptComplaintsModal((prev) => (prev ? { ...prev, loading: false, error: err.message || 'Unable to load department complaints.' } : null));
     }
   };
 
@@ -893,8 +914,8 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setViewDeptComplaintsModal({ title: 'Department Complaints', deptName: viewHeadProfileModal.deptName, deptCode: viewHeadProfileModal.deptCode, headName: viewHeadProfileModal.headName, complaints: viewHeadProfileModal.deptComplaints })}
-                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-xs transition-all"
+                    onClick={() => setViewDeptComplaintsModal({ title: 'Department Complaints', deptId: viewHeadProfileModal.deptId, deptName: viewHeadProfileModal.deptName, deptCode: viewHeadProfileModal.deptCode, headName: viewHeadProfileModal.headName, complaints: viewHeadProfileModal.deptComplaints || [], loading: false, error: null })}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer"
                   >
                     <FileText className="w-4 h-4" />
                     <span>View Complaints →</span>
@@ -1195,8 +1216,25 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* COMPLAINT-ONLY LIST / TABLE (NO OPERATIONAL METRICS SUMMARY) */}
-              {viewDeptComplaintsModal.complaints.length === 0 ? (
+              {/* COMPLAINTS LIST / LOADING / ERROR */}
+              {viewDeptComplaintsModal.loading ? (
+                <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
+                  <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-xs text-gray-600 font-bold">Loading department complaints...</p>
+                </div>
+              ) : viewDeptComplaintsModal.error ? (
+                <div className="p-8 text-center bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
+                  <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+                  <p className="text-xs text-rose-800 font-extrabold">{viewDeptComplaintsModal.error}</p>
+                  <button
+                    onClick={() => handleRetryFetchComplaints(viewDeptComplaintsModal.deptId, viewDeptComplaintsModal.deptCode, viewDeptComplaintsModal.deptName)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl inline-flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Retry</span>
+                  </button>
+                </div>
+              ) : viewDeptComplaintsModal.complaints.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-2xl space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                   <p className="text-xs text-gray-600 font-bold">No complaints found for this department.</p>
@@ -1204,11 +1242,11 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                   {viewDeptComplaintsModal.complaints.map((comp) => (
-                    <div key={comp.id} className="p-4 bg-slate-50 border border-gray-200 rounded-2xl hover:border-blue-300 transition-all space-y-2">
+                    <div key={comp.id} className="p-4 bg-slate-50 border border-gray-200 rounded-2xl hover:border-blue-300 transition-all space-y-3">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
                         <div className="flex items-center space-x-2">
                           <span className="font-extrabold text-gray-900 text-sm font-outfit">{comp.title}</span>
-                          <span className="font-mono text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-md border border-gray-200">{comp.complaint_number || comp.id}</span>
+                          <span className="font-mono text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-md border border-gray-200">{comp.complaint_number || `NS-${comp.id}`}</span>
                         </div>
 
                         <div className="flex items-center space-x-2">
@@ -1233,7 +1271,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-600 font-mono">
                         <div>
                           <span className="text-[10px] text-gray-400 uppercase font-bold block">Category & Location</span>
-                          <span>{comp.category} • {comp.location_text || comp.ward_name || 'Nashik City'}</span>
+                          <span>{comp.category} • {comp.location_address || comp.location_text || comp.ward_name || 'Nashik City'}</span>
                         </div>
 
                         <div>
@@ -1247,6 +1285,16 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                             {comp.created_at ? new Date(comp.created_at).toLocaleDateString() : 'Recent'} | Due: {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleDateString() : 'N/A'}
                           </span>
                         </div>
+                      </div>
+
+                      <div className="flex items-center justify-end border-t border-gray-200/60 pt-2">
+                        <button
+                          onClick={() => setViewComplaintDetailModal(comp)}
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl inline-flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Details</span>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1266,6 +1314,101 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   Close Records
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* SUB-MODAL 4: VIEW COMPLAINT DETAIL MODAL */}
+        {/* ================================================== */}
+        {viewComplaintDetailModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70] overflow-y-auto font-sans">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 border border-gray-200 shadow-2xl max-h-[90vh] my-auto overflow-y-auto">
+              
+              {/* TOP HEADER */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">{viewComplaintDetailModal.title}</h3>
+                    <p className="text-xs text-gray-500 font-mono">Complaint ID: {viewComplaintDetailModal.complaint_number || `NS-${viewComplaintDetailModal.id}`}</p>
+                  </div>
+                </div>
+                <button onClick={() => setViewComplaintDetailModal(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* BADGES & PRIORITY */}
+              <div className="flex items-center space-x-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  viewComplaintDetailModal.priority === 'Critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                  viewComplaintDetailModal.priority === 'High' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                  'bg-amber-100 text-amber-800 border border-amber-200'
+                }`}>
+                  {viewComplaintDetailModal.priority || 'Normal'} Priority
+                </span>
+
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  viewComplaintDetailModal.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                  viewComplaintDetailModal.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                  'bg-slate-200 text-slate-800'
+                }`}>
+                  Status: {viewComplaintDetailModal.status}
+                </span>
+              </div>
+
+              {/* DESCRIPTION & CATEGORY */}
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Issue Description</span>
+                  <p className="text-gray-900 font-medium mt-0.5">{viewComplaintDetailModal.description || viewComplaintDetailModal.title || 'Civic infrastructure complaint'}</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Category</span>
+                    <span className="font-extrabold text-gray-900 block">{viewComplaintDetailModal.category}</span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Assigned Staff</span>
+                    <span className="font-bold text-gray-900 block">{viewComplaintDetailModal.assigned_staff_name || viewComplaintDetailModal.assigned_staff_id || 'Unassigned'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold block">Location Address & Coordinates</span>
+                  <p className="font-medium text-gray-900 block">{viewComplaintDetailModal.location_address || viewComplaintDetailModal.location_text || viewComplaintDetailModal.ward_name || 'Nashik Municipal Corporation Ward Area'}</p>
+                  {viewComplaintDetailModal.latitude && viewComplaintDetailModal.longitude && (
+                    <span className="text-[10px] text-gray-500 font-mono block mt-1">
+                      GPS: {viewComplaintDetailModal.latitude.toFixed(4)}, {viewComplaintDetailModal.longitude.toFixed(4)} ({viewComplaintDetailModal.location_source || 'live_gps'})
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* PHOTOS / EVIDENCE */}
+              {viewComplaintDetailModal.photo_before_url && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase text-gray-500 font-mono block">Evidence Photo</span>
+                  <img
+                    src={viewComplaintDetailModal.photo_before_url}
+                    alt="Complaint photo"
+                    className="w-full max-h-48 object-cover rounded-xl border border-gray-200"
+                  />
+                </div>
+              )}
+
+              {/* FOOTER */}
+              <div className="flex justify-end pt-3 border-t border-gray-100">
+                <button onClick={() => setViewComplaintDetailModal(null)} className="px-5 py-2 bg-gray-900 text-white font-bold text-xs rounded-xl">
+                  Close Complaint Details
+                </button>
+              </div>
+
             </div>
           </div>
         )}

@@ -126,67 +126,79 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
  */
 export function matchComplaintToDepartment(
   c: any,
-  targetDeptIdOrCode: string,
-  departmentsList?: MunicipalDepartment[]
+  targetDeptIdOrCode: string | number,
+  departmentsList?: MunicipalDepartment[],
+  targetDeptName?: string
 ): boolean {
-  if (!c || !targetDeptIdOrCode || targetDeptIdOrCode === 'all' || targetDeptIdOrCode === 'ALL') {
+  if (!c) return false;
+  if (!targetDeptIdOrCode || targetDeptIdOrCode === 'all' || targetDeptIdOrCode === 'ALL') {
     return true;
   }
 
-  const targetLower = targetDeptIdOrCode.trim().toLowerCase();
+  const targetStr = String(targetDeptIdOrCode).trim().toLowerCase();
+  const deptNameLower = String(targetDeptName || '').trim().toLowerCase();
 
-  // Find department metadata if code or ID passed
+  // Mapping from department codes/slugs to DB numeric ID
+  const codeIdMap: Record<string, string> = {
+    PWD: '1', SAN: '2', WTR: '3', ELE: '4', TRF: '5', MNT: '6', DRN: '7'
+  };
+
+  // Find department metadata if available
   const targetDeptMeta = (departmentsList || []).find(
-    (d) => d.id.toLowerCase() === targetLower || (d.code && d.code.toLowerCase() === targetLower)
+    (d) => d.id.toLowerCase() === targetStr || (d.code && d.code.toLowerCase() === targetStr)
   );
 
-  const targetCode = (targetDeptMeta?.code || targetDeptIdOrCode).toLowerCase();
+  const targetCode = (targetDeptMeta?.code || targetStr).replace('dept-', '').replace('dept', '').split('-')[0].trim().toLowerCase();
 
-  // 1. Match by department_id (UUID or string ID)
-  if (c.department_id) {
-    const compDeptId = String(c.department_id).toLowerCase();
-    if (compDeptId === targetLower) return true;
+  // 1. Direct department_id match (numeric or string)
+  if (c.department_id !== undefined && c.department_id !== null) {
+    const compDeptId = String(c.department_id).trim().toLowerCase();
+    if (compDeptId === targetStr || compDeptId === targetCode) return true;
     if (targetDeptMeta && compDeptId === targetDeptMeta.id.toLowerCase()) return true;
+
+    const mappedNumericId = codeIdMap[targetCode.toUpperCase()];
+    if (mappedNumericId && compDeptId === mappedNumericId) return true;
   }
 
-  // 2. Match by department_name
+  // 2. Direct department_name match
   if (c.department_name) {
     const compDeptName = String(c.department_name).toLowerCase();
-    if (compDeptName.includes(targetCode)) return true;
+    if (compDeptName.includes(targetCode) || (deptNameLower && compDeptName.includes(deptNameLower))) return true;
     if (targetDeptMeta && compDeptName.includes(targetDeptMeta.name.toLowerCase())) return true;
   }
 
-  // 3. Fallback match by Category taxonomy
+  // 3. Fallback match by Category & Title taxonomy (AI Routing)
   const cat = String(c.category || '').toLowerCase();
   const title = String(c.title || '').toLowerCase();
-  const text = `${cat} ${title}`;
+  const desc = String(c.description || '').toLowerCase();
+  const text = `${cat} ${title} ${desc}`;
 
-  if (targetCode.includes('pwd') || targetLower.includes('pwd') || targetLower.includes('road')) {
-    return text.includes('road') || text.includes('pothole') || text.includes('asphalt') || text.includes('public works') || cat.includes('pothole') || cat.includes('road');
+  if (targetCode === '1' || targetCode.includes('pwd') || targetStr.includes('pwd') || targetStr.includes('road') || deptNameLower.includes('works') || deptNameLower.includes('road')) {
+    return text.includes('road') || text.includes('pothole') || text.includes('asphalt') || text.includes('footpath') || text.includes('public works') || cat.includes('pothole') || cat.includes('road');
   }
 
-  if (targetCode.includes('san') || targetLower.includes('san') || targetLower.includes('garbage')) {
-    return text.includes('garbage') || text.includes('sanitation') || text.includes('waste') || text.includes('dustbin') || text.includes('trash');
+  if (targetCode === '2' || targetCode.includes('san') || targetStr.includes('san') || targetStr.includes('garbage') || deptNameLower.includes('sanitation') || deptNameLower.includes('waste')) {
+    return text.includes('garbage') || text.includes('sanitation') || text.includes('waste') || text.includes('dustbin') || text.includes('trash') || cat.includes('garbage') || cat.includes('sanitation');
   }
 
-  if (targetCode.includes('wtr') || targetLower.includes('wtr') || targetLower.includes('water')) {
-    return text.includes('water') || text.includes('pipeline') || text.includes('sewerage board') || text.includes('leakage');
+  if (targetCode === '3' || targetCode.includes('wtr') || targetStr.includes('wtr') || targetStr.includes('water') || deptNameLower.includes('water') || deptNameLower.includes('sewerage')) {
+    return text.includes('water') || text.includes('pipeline') || text.includes('sewerage board') || text.includes('leakage') || cat.includes('water');
   }
 
-  if (targetCode.includes('drn') || targetLower.includes('drn') || targetLower.includes('drain')) {
-    return text.includes('drain') || text.includes('sewage') || text.includes('stormwater') || text.includes('culvert');
+  if (targetCode === '7' || targetCode.includes('drn') || targetStr.includes('drn') || targetStr.includes('drain') || deptNameLower.includes('drainage') || deptNameLower.includes('sewage')) {
+    return text.includes('drain') || text.includes('sewage') || text.includes('stormwater') || text.includes('culvert') || cat.includes('drain');
   }
 
-  if (targetCode.includes('ele') || targetLower.includes('ele') || targetLower.includes('light')) {
-    return text.includes('street light') || text.includes('streetlight') || text.includes('electrical') || text.includes('pole') || text.includes('lighting');
+  if (targetCode === '4' || targetCode.includes('ele') || targetStr.includes('ele') || targetStr.includes('light') || deptNameLower.includes('electrical') || deptNameLower.includes('lighting')) {
+    return text.includes('street light') || text.includes('streetlight') || text.includes('electrical') || text.includes('pole') || text.includes('lighting') || cat.includes('light') || cat.includes('electric');
   }
 
-  if (targetCode.includes('trf') || targetLower.includes('trf') || targetLower.includes('traffic')) {
-    return text.includes('traffic') || text.includes('signal') || text.includes('signage') || text.includes('zebra');
+  if (targetCode === '5' || targetCode.includes('trf') || targetStr.includes('trf') || targetStr.includes('traffic') || deptNameLower.includes('traffic')) {
+    return text.includes('traffic') || text.includes('signal') || text.includes('signage') || text.includes('zebra') || cat.includes('traffic');
   }
 
-  if (targetCode.includes('mnt') || targetLower.includes('mnt') || targetLower.includes('maintenance')) {
-    return text.includes('maintenance') || text.includes('building') || text.includes('civic issue') || text.includes('infrastructure damage');
+  if (targetCode === '6' || targetCode.includes('mnt') || targetStr.includes('mnt') || targetStr.includes('maintenance') || deptNameLower.includes('maintenance')) {
+    return text.includes('maintenance') || text.includes('building') || text.includes('civic issue') || text.includes('infrastructure damage') || cat.includes('maintenance');
   }
 
   return false;
@@ -403,14 +415,10 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     }).length;
     const inactiveStaff = totalStaff - activeStaff;
 
-    // Calculate Complaints Metrics for department
-    const deptComplaints = complaints.filter((c) => {
-      if (String(c.department_id) === String(deptId)) return true;
-      const dName = (c.department_name || '').toLowerCase();
-      const cCat = (c.category || '').toLowerCase();
-      const tCode = (deptCode || '').toLowerCase();
-      return tCode && (dName.includes(tCode) || cCat.includes(tCode));
-    });
+    // Calculate Complaints Metrics for department using matchComplaintToDepartment
+    const deptComplaints = complaints.filter((c) => 
+      matchComplaintToDepartment(c, deptId, undefined, deptName)
+    );
 
     const openComplaints = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
     const inProgressComplaints = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned').length;
