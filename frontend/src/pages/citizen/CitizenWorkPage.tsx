@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
+import { useLanguage } from '../../context/LanguageContext';
 import { getMaintenanceWorks } from '../../services/announcementService';
 import { MaintenanceWork } from '../../types/database.types';
 import {
@@ -20,6 +21,7 @@ function getMaintenanceBadge(status: MaintenanceWork['status']) {
 }
 
 export const CitizenWorkPage: React.FC = () => {
+  const { t, translateDepartment } = useLanguage();
   const [works, setWorks] = useState<MaintenanceWork[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,7 +49,7 @@ export const CitizenWorkPage: React.FC = () => {
   });
 
   return (
-    <DashboardLayout title="Ongoing Municipal Work">
+    <DashboardLayout title={t('civicWorks')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 font-sans">
         
         {/* HEADER */}

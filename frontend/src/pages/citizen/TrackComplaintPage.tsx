@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -71,6 +72,7 @@ const TIMELINE_STEPS: TimelineStep[] = [
 export const TrackComplaintPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { t, translateCategory, translateStatus } = useLanguage();
   const navigate = useNavigate();
 
   const [searchInput, setSearchInput] = useState('');

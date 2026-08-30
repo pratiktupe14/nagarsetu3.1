@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -73,6 +74,7 @@ function MapController({
 
 export const NearbyIssuesPage: React.FC = () => {
   const { user } = useAuth();
+  const { t, translateCategory, translateStatus, translatePriority } = useLanguage();
   const navigate = useNavigate();
 
   const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
@@ -260,7 +262,7 @@ export const NearbyIssuesPage: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title="Nearby Issues">
+    <DashboardLayout title={t('nearbyIssues')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 font-sans">
         
         {/* PAGE HEADER */}
