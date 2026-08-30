@@ -1,7 +1,18 @@
 const { Pool } = require('pg');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+
+let sqlite3 = null;
+function getSqlite3() {
+  if (!sqlite3) {
+    try {
+      sqlite3 = require('sqlite3').verbose();
+    } catch (e) {
+      console.warn('[SQLITE NOTE] sqlite3 native module not loaded:', e.message);
+    }
+  }
+  return sqlite3;
+}
 
 let pgPool = null;
 let sqliteDb = null;
@@ -213,11 +224,16 @@ async function createTablesPostgres() {
 
 function setupSqlite(resolve, reject) {
   useSqlite = true;
+  const sqliteMod = getSqlite3();
+  if (!sqliteMod) {
+    console.warn('[SQLITE NOTE] Cannot initialize SQLite without native module.');
+    return resolve ? resolve() : null;
+  }
   const dbPath = path.join(__dirname, '../../nagarsetu.sqlite');
-  sqliteDb = new sqlite3.Database(dbPath, (err) => {
+  sqliteDb = new sqliteMod.Database(dbPath, (err) => {
     if (err) {
       console.error('Error connecting to SQLite DB:', err);
-      return reject(err);
+      return reject ? reject(err) : null;
     }
     console.log('Using SQLite local database at:', dbPath);
     createTablesSqlite().then(resolve).catch(reject);
