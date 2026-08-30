@@ -121,19 +121,19 @@ function uploadSingleImage(fieldName) {
           req.file.supabaseUrl = result.publicUrl;
           req.file.path = result.publicUrl;
         } catch (supabaseErr) {
-          console.warn('[UPLOAD WARN] Supabase upload failed, using local disk fallback:', supabaseErr.message);
+          console.warn('[UPLOAD WARN] Supabase upload failed:', supabaseErr.message);
 
-          // Local filesystem fallback
+          req.file.filename = randomFilename;
+          req.file.publicUrl = `/uploads/${randomFilename}`;
+          req.file.supabaseUrl = `/uploads/${randomFilename}`;
+
+          // Local filesystem fallback (gracefully catch read-only filesystem on Vercel serverless)
           try {
             const diskPath = path.join(UPLOADS_DIR, randomFilename);
             fs.writeFileSync(diskPath, req.file.buffer);
-            req.file.filename = randomFilename;
             req.file.path = diskPath;
-            req.file.publicUrl = `/uploads/${randomFilename}`;
-            req.file.supabaseUrl = `/uploads/${randomFilename}`;
           } catch (writeErr) {
-            console.error('[UPLOAD ERROR] Failed to process file upload:', writeErr);
-            return res.status(500).json({ error: 'Failed to process file upload' });
+            console.warn('[UPLOAD WARN] Serverless read-only filesystem (in-memory buffer preserved for AI analysis):', writeErr.message);
           }
         }
       }
