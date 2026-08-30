@@ -36,19 +36,19 @@ function initDatabase() {
         });
         pgPool.query('SELECT NOW()', (err, res) => {
           if (err) {
-            console.warn('[DATABASE NOTE] PostgreSQL connection check:', err.message);
-            resolve();
+            console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback SQLite):', err.message);
+            setupSqlite(resolve, resolve);
           } else {
             console.log('PostgreSQL connected successfully.');
             createTablesPostgres().then(resolve).catch(e => {
               console.warn('[DATABASE TABLE INIT NOTE]', e.message);
-              resolve();
+              setupSqlite(resolve, resolve);
             });
           }
         });
       } catch (e) {
         console.warn('[DATABASE POOL INIT NOTE]', e.message);
-        resolve();
+        setupSqlite(resolve, resolve);
       }
     } else {
       console.log('Initializing local development SQLite database...');
@@ -229,13 +229,14 @@ function setupSqlite(resolve, reject) {
     console.warn('[SQLITE NOTE] Cannot initialize SQLite without native module.');
     return resolve ? resolve() : null;
   }
-  const dbPath = path.join(__dirname, '../../nagarsetu.sqlite');
+  const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const dbPath = isVercel ? path.join('/tmp', 'nagarsetu.sqlite') : path.join(__dirname, '../../nagarsetu.sqlite');
   sqliteDb = new sqliteMod.Database(dbPath, (err) => {
     if (err) {
       console.error('Error connecting to SQLite DB:', err);
       return reject ? reject(err) : null;
     }
-    console.log('Using SQLite local database at:', dbPath);
+    console.log('Using SQLite database at:', dbPath);
     createTablesSqlite().then(resolve).catch(reject);
   });
 }
@@ -457,16 +458,25 @@ async function query(sql, params = []) {
       }
     });
   } else {
-    let pgSql = sql;
-    let paramIndex = 1;
-    pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+    try {
+      let pgSql = sql;
+      let paramIndex = 1;
+      pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
 
-    const trimmed = pgSql.trim();
-    if (trimmed.toUpperCase().startsWith('INSERT') && !trimmed.toUpperCase().includes('RETURNING')) {
-      pgSql += ' RETURNING id';
+      const trimmed = pgSql.trim();
+      if (trimmed.toUpperCase().startsWith('INSERT') && !trimmed.toUpperCase().includes('RETURNING')) {
+        pgSql += ' RETURNING id';
+      }
+
+      return await pgPool.query(pgSql, params);
+    } catch (err) {
+      console.warn('[DATABASE QUERY WARN] PostgreSQL query failed, activating SQLite fallback:', err.message);
+      if (!sqliteDb) {
+        await new Promise(r => setupSqlite(r, r));
+      }
+      useSqlite = true;
+      return query(sql, params);
     }
-
-    return pgPool.query(pgSql, params);
   }
 }
 
