@@ -3,6 +3,7 @@ import { UserProfile, UserRole } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getApiUrl } from '../config/apiConfig';
 import { resolveDepartmentInfo } from '../services/departmentService';
+import { getAllServiceStaffRecords } from '../services/adminService';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 interface AuthContextType {
@@ -17,6 +18,107 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function findServiceStaffByIdentifier(identifier: string): UserProfile | null {
+  if (!identifier) return null;
+  const clean = identifier.trim().toLowerCase();
+  if (!clean) return null;
+
+  try {
+    const allStaff = getAllServiceStaffRecords();
+
+    // 1. Exact match on email, employee_id, id, or contact_number
+    const exact = allStaff.find((s) => {
+      const sEmail = (s.email || '').toLowerCase();
+      const sEmpId = (s.employee_id || '').toLowerCase();
+      const sId = (s.id || '').toLowerCase();
+      const sPhone = (s.contact_number || '').replace(/\D/g, '');
+      const cleanPhone = clean.replace(/\D/g, '');
+
+      return (
+        sEmail === clean ||
+        sEmpId === clean ||
+        sId === clean ||
+        (cleanPhone.length >= 7 && sPhone.endsWith(cleanPhone))
+      );
+    });
+
+    if (exact) {
+      const resDept = resolveDepartmentInfo(undefined, exact.department_name);
+      return {
+        id: exact.id,
+        full_name: exact.name,
+        email: exact.email || clean,
+        mobile: exact.contact_number || '',
+        role: 'service_staff',
+        department_id: resDept.id,
+        department_name: resDept.fullName || resDept.name,
+        employee_id: exact.employee_id,
+        language_pref: 'en'
+      };
+    }
+
+    // 2. Partial match on email, employee_id, or name
+    const partial = allStaff.find((s) => {
+      const sEmail = (s.email || '').toLowerCase();
+      const sEmpId = (s.employee_id || '').toLowerCase();
+      const sName = (s.name || '').toLowerCase();
+      return (
+        (sEmail && sEmail.includes(clean)) ||
+        (sEmpId && sEmpId.includes(clean)) ||
+        (sName && sName.includes(clean))
+      );
+    });
+
+    if (partial) {
+      const resDept = resolveDepartmentInfo(undefined, partial.department_name);
+      return {
+        id: partial.id,
+        full_name: partial.name,
+        email: partial.email || clean,
+        mobile: partial.contact_number || '',
+        role: 'service_staff',
+        department_id: resDept.id,
+        department_name: resDept.fullName || resDept.name,
+        employee_id: partial.employee_id,
+        language_pref: 'en'
+      };
+    }
+
+    // 3. Keyword-based department match from identifier (e.g. ele.staff@nagarsetu.gov.in, ELE-001)
+    if (
+      clean.includes('ele') || clean.includes('electric') || clean.includes('light') ||
+      clean.includes('san') || clean.includes('waste') || clean.includes('garbage') ||
+      clean.includes('wtr') || clean.includes('water') || clean.includes('pipe') ||
+      clean.includes('drn') || clean.includes('drain') || clean.includes('sewage') ||
+      clean.includes('trf') || clean.includes('traffic') || clean.includes('signal') ||
+      clean.includes('mnt') || clean.includes('mainten') ||
+      clean.includes('pwd') || clean.includes('road') || clean.includes('pothole')
+    ) {
+      const resDept = resolveDepartmentInfo(undefined, undefined, clean);
+      const matchedDeptStaff = allStaff.find((s) => {
+        const dInfo = resolveDepartmentInfo(undefined, s.department_name);
+        return dInfo.code === resDept.code;
+      });
+
+      return {
+        id: matchedDeptStaff?.id || `stf-${resDept.code.toLowerCase()}-01`,
+        full_name: matchedDeptStaff?.name || `${resDept.name} Field Officer`,
+        email: matchedDeptStaff?.email || (clean.includes('@') ? clean : `${clean}@nagarsetu.gov.in`),
+        mobile: matchedDeptStaff?.contact_number || '',
+        role: 'service_staff',
+        department_id: resDept.id,
+        department_name: resDept.fullName || resDept.name,
+        employee_id: matchedDeptStaff?.employee_id || `${resDept.code}-STF-001`,
+        language_pref: 'en'
+      };
+    }
+  } catch (e) {
+    console.warn('findServiceStaffByIdentifier error:', e);
+  }
+
+  return null;
+}
 
 export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   citizen: {
@@ -35,11 +137,14 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
     language_pref: 'en'
   },
   service_staff: {
-    id: 'demo-staff-id-303',
-    full_name: 'Rahul Patil',
-    mobile: '9823044101',
+    id: 'stf-pwd-01',
+    full_name: 'Amit Patil',
+    mobile: '+91 98220 10001',
     email: 'staff@nagarsetu.gov.in',
     role: 'service_staff',
+    department_id: '1',
+    department_name: 'Public Works Department (PWD)',
+    employee_id: 'PWD-STF-001',
     language_pref: 'en'
   },
   department_head: {
@@ -68,7 +173,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.role) return parsed;
+        if (parsed && parsed.role) {
+          if (parsed.role === 'service_staff' && (!parsed.department_id || !parsed.department_name)) {
+            const resolved = findServiceStaffByIdentifier(parsed.email || parsed.employee_id || parsed.id || '');
+            if (resolved) {
+              localStorage.setItem('nagarsetu_user', JSON.stringify(resolved));
+              return resolved;
+            }
+          }
+          return parsed;
+        }
       } catch (e) {}
     }
     return DEFAULT_ROLE_USERS.citizen;
@@ -120,10 +234,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               deptName = deptHead.departments?.name || deptName;
             }
 
+            if (role === 'service_staff' && (!deptId || !deptName)) {
+              const staffMatch = findServiceStaffByIdentifier(userEmail || authUser.id);
+              if (staffMatch) {
+                deptId = staffMatch.department_id;
+                deptName = staffMatch.department_name;
+              }
+            }
+
             if (deptId || deptName) {
               const resDept = resolveDepartmentInfo(deptId, deptName);
               deptId = deptId ? String(deptId) : resDept.id;
-              deptName = resDept.name;
+              deptName = resDept.fullName || resDept.name;
             }
 
             const fetchedUser: UserProfile = {
@@ -191,10 +313,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             deptName = deptHead.departments?.name || deptName;
           }
 
+          if (role === 'service_staff' && (!deptId || !deptName)) {
+            const staffMatch = findServiceStaffByIdentifier(userEmail || authUser.id);
+            if (staffMatch) {
+              deptId = staffMatch.department_id;
+              deptName = staffMatch.department_name;
+            }
+          }
+
           if (deptId || deptName) {
             const resDept = resolveDepartmentInfo(deptId, deptName);
             deptId = deptId ? String(deptId) : resDept.id;
-            deptName = resDept.name;
+            deptName = resDept.fullName || resDept.name;
           }
 
           const updatedUser: UserProfile = {
@@ -241,7 +371,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const switchRole = (newRole: UserRole) => {
-    const roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
+    let roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
+    if (newRole === 'service_staff' && user && user.email) {
+      const resolved = findServiceStaffByIdentifier(user.email);
+      if (resolved) roleUser = resolved;
+    }
     setUser(roleUser);
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
   };
@@ -261,16 +395,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const data = await response.json();
           if (data.token && data.user) {
             const mappedRole: UserRole = data.user.role === 'admin' ? 'city_admin' : (data.user.role as UserRole);
-            const resDept = resolveDepartmentInfo(data.user.department_id, data.user.department_name);
+            const staffMatch = mappedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanIdentifier) : null;
+            const resDept = resolveDepartmentInfo(
+              data.user.department_id || staffMatch?.department_id,
+              data.user.department_name || staffMatch?.department_name
+            );
             const authenticatedUser: UserProfile = {
-              id: String(data.user.id),
-              full_name: data.user.name || 'Municipal User',
+              id: String(data.user.id || staffMatch?.id || 'staff-101'),
+              full_name: data.user.name || staffMatch?.full_name || 'Municipal User',
               email: data.user.email || cleanIdentifier,
-              mobile: data.user.mobile || '',
+              mobile: data.user.mobile || staffMatch?.mobile || '',
               role: mappedRole,
               department_id: data.user.department_id ? String(data.user.department_id) : resDept.id,
-              department_name: data.user.department_name || resDept.name,
-              employee_id: data.user.employee_id || undefined,
+              department_name: data.user.department_name || staffMatch?.department_name || resDept.fullName || resDept.name,
+              employee_id: data.user.employee_id || staffMatch?.employee_id || undefined,
               language_pref: data.user.language_pref || 'en'
             };
             setUser(authenticatedUser);
@@ -321,19 +459,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = profRes.data;
           const deptHead = headRes.data;
           const resolvedRole: UserRole = deptHead ? 'department_head' : (roleRes.data?.role as UserRole) || targetRole;
-          let rawDeptId = deptHead?.department_id || profile?.department_id;
-          let rawDeptName = deptHead?.departments?.name || profile?.department_name;
+          const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
+          let rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
+          let rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
           const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName);
 
           const fetchedUser: UserProfile = {
-            id: authUser.id,
-            full_name: deptHead?.name || profile?.full_name || authUser.email?.split('@')[0] || 'Authenticated User',
+            id: authUser.id || staffMatch?.id || 'staff-101',
+            full_name: deptHead?.name || profile?.full_name || staffMatch?.full_name || authUser.email?.split('@')[0] || 'Authenticated User',
             email: authUser.email || cleanEmail,
-            mobile: deptHead?.phone || profile?.mobile || '',
+            mobile: deptHead?.phone || profile?.mobile || staffMatch?.mobile || '',
             role: resolvedRole,
             department_id: rawDeptId ? String(rawDeptId) : resDept.id,
-            department_name: rawDeptName || resDept.name,
-            employee_id: deptHead?.employee_id || profile?.employee_id,
+            department_name: rawDeptName || resDept.fullName || resDept.name,
+            employee_id: deptHead?.employee_id || profile?.employee_id || staffMatch?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };
           setUser(fetchedUser);
@@ -358,6 +497,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             password === demoStaffPass
           ) {
             console.info('Supabase auth failed for demo account, using demo session fallback.');
+            if (targetRole === 'service_staff') {
+              const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
+              setUser(staffUser);
+              localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+              return true;
+            }
             switchRole(targetRole || 'city_admin');
             return true;
           }
@@ -390,6 +535,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
           return true;
         }
+      }
+
+      if (targetRole === 'service_staff') {
+        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
+        setUser(staffUser);
+        localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+        return true;
       }
 
       switchRole(targetRole);
@@ -483,6 +635,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {
       console.warn('Logout signOut error:', e);
     }
+    localStorage.removeItem('nagarsetu_user');
+    localStorage.removeItem('nagarsetu_token');
     switchRole('citizen');
   };
 

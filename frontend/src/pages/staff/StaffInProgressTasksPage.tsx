@@ -270,16 +270,17 @@ export const StaffInProgressTasksPage: React.FC = () => {
 
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTask || !photoAfterPreview) {
+    if (!selectedTask || (!photoAfterPreview && !photoAfterFile)) {
       alert('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
     setSubmittingResolution(true);
     try {
+      const photoToSubmit = photoAfterFile || photoAfterPreview;
       await submitStaffResolution(
         selectedTask.id,
-        photoAfterPreview,
+        photoToSubmit,
         workNotes || 'Field maintenance work completed.',
         materialsUsed || 'Standard repair materials & asphalt'
       );
@@ -290,9 +291,10 @@ export const StaffInProgressTasksPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadData();
-    } catch (err) {
-      console.error(err);
-      alert('Error submitting resolution proof.');
+      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+    } catch (err: any) {
+      console.error('Task resolution submission error:', err);
+      alert(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }

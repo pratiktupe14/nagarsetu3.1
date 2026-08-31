@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
   markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications
@@ -46,11 +47,16 @@ export const StaffNotificationsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Staff Identity
+  // Staff Identity & Department
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = 'STF-0012';
-  const staffDepartment = 'Roads / PWD';
-  const staffDepartmentFull = 'Roads & Public Works (PWD)';
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+
+  const resolvedDept = useMemo(
+    () => resolveDepartmentInfo(user?.department_id, user?.department_name),
+    [user?.department_id, user?.department_name]
+  );
+  const staffDepartmentFull = resolvedDept.fullName;
+  const staffDepartment = resolvedDept.name;
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,16 +247,17 @@ export const StaffNotificationsPage: React.FC = () => {
 
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!detailModalTask || !photoAfterPreview) {
+    if (!detailModalTask || (!photoAfterPreview && !photoAfterFile)) {
       alert('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
     setSubmittingResolution(true);
     try {
+      const photoToSubmit = photoAfterFile || photoAfterPreview;
       await submitStaffResolution(
         detailModalTask.id,
-        photoAfterPreview,
+        photoToSubmit,
         workNotes || 'Field maintenance work completed.',
         materialsUsed || 'Standard repair materials & asphalt'
       );
@@ -261,9 +268,10 @@ export const StaffNotificationsPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       loadNotifications();
-    } catch (err) {
-      console.error(err);
-      alert('Error submitting resolution proof.');
+      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+    } catch (err: any) {
+      console.error('Task resolution submission error:', err);
+      alert(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }

@@ -7,10 +7,7 @@ export const getApiUrl = (): string => {
   if (envUrl && envUrl.trim() !== '') {
     return envUrl.trim().replace(/\/$/, '');
   }
-  if (import.meta.env.PROD) {
-    return typeof window !== 'undefined' ? window.location.origin : '';
-  }
-  return 'http://localhost:5000';
+  return 'https://backend-zeta-two-60.vercel.app';
 };
 
 export const getAiServiceUrl = (): string => {
@@ -19,5 +16,5 @@ export const getAiServiceUrl = (): string => {
     return envAiUrl.trim().replace(/\/$/, '');
   }
   const mainApi = getApiUrl();
-  return mainApi ? `${mainApi}/api/ai` : 'http://localhost:5000/api/ai';
+  return mainApi ? `${mainApi}/api/ai` : 'https://backend-zeta-two-60.vercel.app/api/ai';
 };

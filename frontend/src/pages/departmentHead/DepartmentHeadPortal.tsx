@@ -382,6 +382,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [reviewing, setReviewing] = useState(false);
 
   const [detailModalComplaint, setDetailModalComplaint] = useState<Complaint | null>(null);
+  const [inProgressSection, setInProgressSection] = useState<'all' | 'verification' | 'active_working'>('all');
 
   // Single Staff Detail Record State
   const [selectedStaffProfile, setSelectedStaffProfile] = useState<ServiceStaffMemberRecord | null>(null);
@@ -945,7 +946,13 @@ export const DepartmentHeadPortal: React.FC = () => {
         if (reviewStatusTab === 'Rework Required' && c.status !== 'Reopened') return false;
         if (reviewStatusTab === 'Resolved' && c.status !== 'Resolved') return false;
       } else if (isInProgress) {
-        if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way') return false;
+        if (inProgressSection === 'verification') {
+          if (c.status !== 'Resolution Submitted' && (c.status as string) !== 'Completed — Pending Verification') return false;
+        } else if (inProgressSection === 'active_working') {
+          if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way' && c.status !== 'Staff Assigned') return false;
+        } else {
+          if (c.status !== 'In Progress' && c.status !== 'Accepted' && c.status !== 'On the Way' && c.status !== 'Staff Assigned' && c.status !== 'Resolution Submitted' && (c.status as string) !== 'Completed — Pending Verification') return false;
+        }
       } else if (isAssignWorkspace) {
         if (assignmentTab === 'Unassigned' && (c.assigned_staff_id || c.status === 'Resolved')) return false;
         if (assignmentTab === 'Assigned' && (!c.assigned_staff_id || (c.status !== 'Staff Assigned' && c.status !== 'Department Assigned'))) return false;
@@ -1233,15 +1240,33 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Confirm Approval of Completed Work Proof
   const handleApproveResolution = async (complaintId: string) => {
+    const compToApprove = reviewModalComplaint || detailModalComplaint;
+    if (!compToApprove) return;
+
+    // Security Department Isolation Check
+    const normDept = (d: string) => (d || '').split('(')[0].trim().toLowerCase();
+    const cDept = normDept(compToApprove.department_name || compToApprove.category);
+    const hDept = normDept(headDepartmentFull);
+
+    if (cDept && hDept && !cDept.includes(hDept) && !hDept.includes(cDept)) {
+      alert(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
+      return;
+    }
+
     setReviewing(true);
     try {
-      await approveResolutionDepartmentHead(complaintId, headName);
+      const ok = await approveResolutionDepartmentHead(complaintId, headName, headId, headDeptId);
+      if (!ok) {
+        throw new Error('Verification failed: The database update could not be completed.');
+      }
       setReviewModalComplaint(null);
+      setDetailModalComplaint(null);
       setConfirmApproveModal(null);
       await loadData();
-    } catch (err) {
+      alert(`Complaint ${compToApprove.complaint_number || complaintId} has been successfully verified, approved, and officially resolved!`);
+    } catch (err: any) {
       console.error(err);
-      alert('Error approving resolution.');
+      alert(err.message || 'Error approving resolution.');
     } finally {
       setReviewing(false);
     }
@@ -1338,7 +1363,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   : isOverdue
                   ? "Tasks that have exceeded their SLA target and require immediate attention."
                   : isInProgress
-                  ? "Monitor all civic tasks currently being executed across your department."
+                  ? "Monitor active field work and review completed work awaiting verification."
                   : isCompleted
                   ? "Review civic work completed by your department and track resolution verification."
                   : isAssignWorkspace
@@ -2634,395 +2659,629 @@ export const DepartmentHeadPortal: React.FC = () => {
 
           </div>
         ) : isInProgress ? (
-          /* F. DEPARTMENT HEAD → IN PROGRESS WORKSPACE */
+          /* F. DEPARTMENT HEAD → IN PROGRESS WORKSPACE (LIGHT THEME) */
           <div className="space-y-6">
             
-            {/* 1. TOP OPERATIONAL METRIC CARDS (6 REAL DATABASE CARDS) */}
+            {/* 1. TWO MAIN PROMINENT CLICKABLE WORK SECTION CARDS */}
             {(() => {
-              const activeTasks = departmentComplaints.filter((c) =>
+              const verificationTasks = departmentComplaints.filter((c) =>
+                c.status === 'Resolution Submitted' ||
+                (c.status as string) === 'Completed — Pending Verification' ||
+                (c.status as string) === 'Pending Verification' ||
+                (c.status as string) === 'Completed'
+              );
+              const activeWorkingTasks = departmentComplaints.filter((c) =>
                 c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned'
               );
-              const totalCount = activeTasks.length;
-              const highPriorityCount = activeTasks.filter((c) => c.priority === 'High').length;
-              const criticalCount = activeTasks.filter((c) => c.priority === 'Critical').length;
-              const dueTodayCount = activeTasks.filter((c) => c.sla_deadline && new Date(c.sla_deadline).toDateString() === now.toDateString()).length;
-              const overdueRiskCount = activeTasks.filter((c) => c.sla_deadline && new Date(c.sla_deadline) < now).length;
-              const activeStaffCount = new Set(activeTasks.map((c) => c.assigned_staff_id).filter(Boolean)).size;
 
               return (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
-                    <button onClick={() => handleClearFilters()} className="p-3.5 text-center space-y-1 hover:bg-slate-50 transition-colors">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">TOTAL IN PROGRESS</span>
-                      <span className="text-2xl font-extrabold text-amber-700 font-mono block">{totalCount}</span>
-                    </button>
-
-                    <button onClick={() => setPriorityFilter('High')} className="p-3.5 text-center space-y-1 hover:bg-orange-50/40 transition-colors">
-                      <span className="text-[10px] font-bold text-orange-800 uppercase tracking-wider block font-outfit">HIGH PRIORITY</span>
-                      <span className="text-2xl font-extrabold text-orange-700 font-mono block">{highPriorityCount}</span>
-                    </button>
-
-                    <button onClick={() => setPriorityFilter('Critical')} className="p-3.5 text-center space-y-1 bg-red-50/40 hover:bg-red-100/50 transition-colors">
-                      <span className="text-[10px] font-bold text-red-800 uppercase tracking-wider block font-outfit">CRITICAL</span>
-                      <span className="text-2xl font-extrabold text-red-700 font-mono block">{criticalCount}</span>
-                    </button>
-
-                    <button onClick={() => setSlaFilter('Due Today')} className="p-3.5 text-center space-y-1 hover:bg-blue-50/50 transition-colors">
-                      <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block font-outfit">DUE TODAY</span>
-                      <span className="text-2xl font-extrabold text-blue-700 font-mono block">{dueTodayCount}</span>
-                    </button>
-
-                    <button onClick={() => setSlaFilter('Overdue')} className="p-3.5 text-center space-y-1 bg-rose-50/50 hover:bg-rose-100/50 transition-colors">
-                      <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">OVERDUE RISK</span>
-                      <span className="text-2xl font-extrabold text-rose-900 font-mono block">{overdueRiskCount}</span>
-                    </button>
-
-                    <div className="p-3.5 text-center space-y-1 bg-emerald-50/40">
-                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block font-outfit">ACTIVE STAFF</span>
-                      <span className="text-2xl font-extrabold text-emerald-700 font-mono block">{activeStaffCount}</span>
-                    </div>
-                  </div>
-
-                  {/* 2. DYNAMIC SLA HEALTH BANNER */}
-                  {overdueRiskCount > 0 ? (
-                    <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center justify-between shadow-xs">
-                      <div className="flex items-center space-x-3 text-rose-900">
-                        <AlertTriangle className="w-5 h-5 text-rose-600 animate-pulse shrink-0" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
+                  {/* CARD 1: STAFF CURRENTLY WORKING */}
+                  <div
+                    onClick={() => setInProgressSection(inProgressSection === 'active_working' ? 'all' : 'active_working')}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                      inProgressSection === 'active_working'
+                        ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-500/20'
+                        : 'bg-white hover:bg-blue-50/40 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2.5 rounded-xl bg-blue-100 text-blue-700 shrink-0">
+                          <Activity className="w-6 h-6 animate-pulse" />
+                        </div>
                         <div>
-                          <h4 className="font-extrabold font-outfit text-sm">Urgent: {overdueRiskCount} Department Tasks Have Exceeded or Are Approaching SLA Deadline</h4>
-                          <p className="text-xs text-rose-800 font-medium">Reassign or contact assigned field service officers to accelerate resolution.</p>
+                          <h3 className="font-extrabold font-outfit text-sm tracking-wide text-slate-900 uppercase">
+                            STAFF CURRENTLY WORKING
+                          </h3>
+                          <p className="text-xs text-slate-600 font-medium mt-0.5">
+                            Active complaints being handled by field staff
+                          </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setSlaFilter('Overdue')}
-                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors shrink-0"
-                      >
-                        View At-Risk Tasks
-                      </button>
-                    </div>
-                  ) : dueTodayCount > 0 ? (
-                    <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between shadow-xs">
-                      <div className="flex items-center space-x-3 text-amber-900">
-                        <Clock className="w-5 h-5 text-amber-600 shrink-0" />
-                        <div>
-                          <h4 className="font-extrabold font-outfit text-sm">Attention: {dueTodayCount} Department Tasks Are Scheduled Due Today</h4>
-                          <p className="text-xs text-amber-800 font-medium">Monitor officer progress to ensure completion prior to SLA breach.</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setSlaFilter('Due Today')}
-                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors shrink-0"
-                      >
-                        Filter Due Today
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center space-x-3 text-emerald-900 shadow-xs">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <div>
-                        <h4 className="font-extrabold font-outfit text-sm">Healthy: All Department Tasks Are Currently Executing Within SLA Limits</h4>
-                        <p className="text-xs text-emerald-800 font-medium">{deptInfo.fullName} field officers are performing within scheduled resolution targets.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. MAIN IN-PROGRESS WORK TABLE */}
-                  <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
-                      <div>
-                        <h3 className="font-extrabold text-gray-900 font-outfit text-base">Department In-Progress Work</h3>
-                        <p className="text-xs text-gray-500 font-medium">All active complaints currently under field execution across {deptInfo.fullName}.</p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200">
-                        Showing {paginatedComplaints.length} of {filteredComplaints.length} Active Tasks
+                      <span className="px-3.5 py-1.5 rounded-xl font-mono font-extrabold text-sm shadow-2xs border bg-blue-100 text-blue-900 border-blue-200">
+                        {activeWorkingTasks.length} {activeWorkingTasks.length === 1 ? 'Task' : 'Active Tasks'}
                       </span>
                     </div>
 
-                    {/* SEARCH & FILTERS TOOLBAR */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                      {/* SEARCH INPUT */}
-                      <div className="lg:col-span-2 relative">
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search complaint ID, issue, location or staff..."
-                          className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-emerald-600 shadow-2xs"
-                        />
-                        {searchQuery && (
-                          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
+                      <span className="text-slate-600">Accepted, On the Way & In Progress field operations</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInProgressSection(inProgressSection === 'active_working' ? 'all' : 'active_working');
+                        }}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1 shadow-xs transition-colors"
+                      >
+                        <span>{inProgressSection === 'active_working' ? 'Viewing Work' : 'View Work'}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
-                      {/* STATUS FILTER */}
-                      <div>
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
-                        >
-                          <option value="All">Status: All Active</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Accepted">Accepted</option>
-                          <option value="On the Way">On the Way</option>
-                          <option value="Staff Assigned">Staff Assigned</option>
-                        </select>
+                  {/* CARD 2: WORK COMPLETED — WAITING FOR VERIFICATION */}
+                  <div
+                    onClick={() => setInProgressSection(inProgressSection === 'verification' ? 'all' : 'verification')}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-xs hover:shadow-md relative overflow-hidden ${
+                      inProgressSection === 'verification'
+                        ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-500/20'
+                        : 'bg-white hover:bg-amber-50/40 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold font-outfit text-sm tracking-wide text-slate-900 uppercase">
+                            WORK COMPLETED — WAITING FOR VERIFICATION
+                          </h3>
+                          <p className="text-xs text-slate-600 font-medium mt-0.5">
+                            Completed complaints awaiting Department Head confirmation
+                          </p>
+                        </div>
                       </div>
-
-                      {/* PRIORITY FILTER */}
-                      <div>
-                        <select
-                          value={priorityFilter}
-                          onChange={(e) => setPriorityFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
-                        >
-                          <option value="All">Priority: All</option>
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                          <option value="Critical">Critical</option>
-                        </select>
-                      </div>
-
-                      {/* STAFF FILTER */}
-                      <div>
-                        <select
-                          value={staffFilter}
-                          onChange={(e) => setStaffFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
-                        >
-                          <option value="All">Staff: All Staff</option>
-                          {departmentStaff.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* SLA FILTER */}
-                      <div>
-                        <select
-                          value={slaFilter}
-                          onChange={(e) => setSlaFilter(e.target.value)}
-                          className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
-                        >
-                          <option value="All">SLA: All</option>
-                          <option value="Within SLA">Within SLA</option>
-                          <option value="Due Today">Due Today</option>
-                          <option value="Overdue">Overdue / Breached</option>
-                        </select>
-                      </div>
+                      <span className="px-3.5 py-1.5 rounded-xl font-mono font-extrabold text-sm shadow-2xs border bg-amber-100 text-amber-900 border-amber-200">
+                        {verificationTasks.length} {verificationTasks.length === 1 ? 'Task' : 'Tasks'}
+                      </span>
                     </div>
 
-                    {/* TABLE (DESKTOP) */}
-                    {paginatedComplaints.length === 0 ? (
-                      <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300 space-y-2">
-                        <Activity className="w-8 h-8 text-gray-400 mx-auto" />
-                        <h4 className="font-bold text-gray-800 text-sm font-outfit">No In-Progress Tasks Found</h4>
-                        <p className="text-xs text-gray-500">There are currently no active civic tasks being executed in your department matching the selected filters.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="hidden md:block overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 border-y border-gray-200 font-outfit uppercase text-[10px] font-extrabold text-gray-600 tracking-wider">
-                              <tr>
-                                <th className="py-3 px-4">Complaint ID</th>
-                                <th className="py-3 px-4">Issue</th>
-                                <th className="py-3 px-4">Category</th>
-                                <th className="py-3 px-4">Location</th>
-                                <th className="py-3 px-4">Priority</th>
-                                <th className="py-3 px-4">Assigned Staff</th>
-                                <th className="py-3 px-4">Status</th>
-                                <th className="py-3 px-4">SLA Target</th>
-                                <th className="py-3 px-4">Time Remaining</th>
-                                <th className="py-3 px-4 text-right">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 text-gray-800 font-medium">
-                              {paginatedComplaints.map((comp) => {
-                                const isOver = comp.sla_deadline && new Date(comp.sla_deadline) < now;
-                                const assignedStaffName = comp.assigned_staff_name || 'Unassigned';
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
+                      <span className="text-slate-600">Completed complaints awaiting confirmation</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInProgressSection(inProgressSection === 'verification' ? 'all' : 'verification');
+                        }}
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-xl text-xs flex items-center space-x-1 shadow-xs transition-colors"
+                      >
+                        <span>{inProgressSection === 'verification' ? 'Reviewing Work' : 'Review Work'}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
-                                // Calculate SLA countdown
-                                let slaText = 'No Target';
-                                let slaBadge = 'bg-gray-50 text-gray-600 border-gray-200';
+            {/* DETAILED SECTION 1: WORK COMPLETED — WAITING FOR VERIFICATION */}
+            {inProgressSection === 'verification' && (
+              <div className="space-y-5 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-xs font-sans">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setInProgressSection('all')}
+                      className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 font-extrabold rounded-xl border border-slate-300 shadow-2xs transition-colors text-xs flex items-center space-x-1.5"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>← Back to In Progress</span>
+                    </button>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 font-outfit text-base">
+                        Work Completed — Waiting for Verification
+                      </h3>
+                      <p className="text-xs text-slate-600 font-medium">
+                        Completed complaints awaiting Department Head confirmation & proof review.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-amber-500 text-white font-mono font-extrabold text-xs rounded-xl shadow-2xs self-start sm:self-auto">
+                    Showing {paginatedComplaints.length} of {filteredComplaints.length} Verifications
+                  </span>
+                </div>
 
-                                if (comp.sla_deadline) {
-                                  const diffMs = new Date(comp.sla_deadline).getTime() - now.getTime();
-                                  if (diffMs < 0) {
-                                    const overMs = Math.abs(diffMs);
-                                    const hrs = Math.floor(overMs / (1000 * 3600));
-                                    const mins = Math.floor((overMs % (1000 * 3600)) / (1000 * 60));
-                                    slaText = `${hrs > 0 ? `${hrs}h ` : ''}${mins}m overdue`;
-                                    slaBadge = 'bg-rose-100 text-rose-900 border-rose-400 font-extrabold animate-pulse';
-                                  } else {
-                                    const hrsTotal = Math.floor(diffMs / (1000 * 3600));
-                                    const days = Math.floor(hrsTotal / 24);
-                                    const mins = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+                {paginatedComplaints.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-amber-500 mx-auto" />
+                    <h4 className="font-bold text-slate-900 text-sm font-outfit">No Pending Resolution Reviews</h4>
+                    <p className="text-xs text-slate-600">There are currently no completed complaints awaiting Department Head confirmation.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {paginatedComplaints.map((comp) => {
+                      const assignedStaffName = comp.assigned_staff_name || 'Field Officer';
+                      const staffEmpId = (comp as any).assigned_staff_employee_id || comp.assigned_staff_id || 'STF-001';
 
-                                    if (days >= 1) {
-                                      slaText = `${days}d ${hrsTotal % 24}h remaining`;
-                                      slaBadge = 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold';
-                                    } else if (hrsTotal >= 1) {
-                                      slaText = `${hrsTotal}h ${mins}m remaining`;
-                                      slaBadge = hrsTotal < 4 ? 'bg-amber-50 text-amber-900 border-amber-300 font-extrabold' : 'bg-blue-50 text-blue-800 border-blue-200 font-bold';
-                                    } else {
-                                      slaText = `${mins}m remaining`;
-                                      slaBadge = 'bg-orange-100 text-orange-900 border-orange-300 font-extrabold';
-                                    }
-                                  }
-                                }
+                      return (
+                        <div key={comp.id} className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4 hover:shadow-md transition-shadow">
+                          {/* HEADER ROW */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg text-xs border border-blue-200">
+                                {comp.complaint_number}
+                              </span>
+                              <PriorityBadge priority={comp.priority} />
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                                Resolution Status: Pending Verification
+                              </span>
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                Evidence Status: BEFORE & AFTER Photos Attached
+                              </span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-slate-500">
+                              Completion Date: {comp.updated_at ? new Date(comp.updated_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                            </span>
+                          </div>
 
-                                return (
-                                  <tr key={comp.id} className="hover:bg-slate-50/70 transition-colors">
-                                    <td className="py-3 px-4 font-mono font-extrabold text-emerald-800">
-                                      {comp.complaint_number}
-                                    </td>
-                                    <td className="py-3 px-4">
-                                      <span className="font-bold text-gray-900 block line-clamp-1">{comp.title}</span>
-                                    </td>
-                                    <td className="py-3 px-4 font-semibold text-gray-700">{comp.category}</td>
-                                    <td className="py-3 px-4 text-gray-600 max-w-[150px] truncate">{comp.location_address || 'Nashik'}</td>
-                                    <td className="py-3 px-4">
-                                      <PriorityBadge priority={comp.priority} />
-                                    </td>
-                                    <td className="py-3 px-4 font-bold text-gray-800">
-                                      <span className="flex items-center space-x-1 text-emerald-800">
-                                        <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                                        <span>{assignedStaffName}</span>
-                                      </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                      <StatusBadge status={comp.status} />
-                                    </td>
-                                    <td className="py-3 px-4 font-mono text-[11px] text-gray-600">
-                                      {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                    </td>
-                                    <td className="py-3 px-4">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${slaBadge}`}>
-                                        {slaText}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-right">
-                                      <div className="flex items-center justify-end space-x-2">
-                                        <button
-                                          onClick={() => setDetailModalComplaint(comp)}
-                                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-gray-700 font-bold rounded-lg text-xs transition-colors"
-                                        >
-                                          View Details
-                                        </button>
+                          {/* 3-COLUMN METADATA GRID */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            {/* ISSUE & LOCATION */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                              <h4 className="font-extrabold text-slate-800 font-outfit uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">
+                                Complaint Information
+                              </h4>
+                              <div className="space-y-1">
+                                <span className="font-bold text-slate-900 block font-outfit text-sm">{comp.title}</span>
+                                <div className="pt-1 text-[11px] text-slate-600 space-y-0.5 font-medium">
+                                  <div>📍 Location: <strong className="text-slate-900">{comp.location_address || 'Nashik City'}</strong></div>
+                                  <div>Category: <strong className="text-slate-900">{comp.category}</strong> ({deptInfo.fullName})</div>
+                                </div>
+                              </div>
+                            </div>
 
-                                        <button
-                                          onClick={() => {
-                                            setAssignModalComplaint(comp);
-                                            setSelectedStaffForAssign(comp.assigned_staff_id || '');
-                                          }}
-                                          className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-extrabold rounded-lg text-xs transition-colors"
-                                        >
-                                          Reassign
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                            {/* STAFF INFORMATION */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                              <h4 className="font-extrabold text-slate-800 font-outfit uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">
+                                Assigned Staff Details
+                              </h4>
+                              <div className="space-y-1 text-[11px] text-slate-700">
+                                <div className="font-bold text-slate-900 text-xs">👤 {assignedStaffName}</div>
+                                <div>Employee ID: <strong className="font-mono text-blue-900">{staffEmpId}</strong></div>
+                                <div>Department: <strong className="text-slate-900">{deptInfo.fullName}</strong></div>
+                              </div>
+                            </div>
+
+                            {/* RESOLUTION & EVIDENCE SUMMARY */}
+                            <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200 space-y-1.5">
+                              <h4 className="font-extrabold text-amber-900 font-outfit uppercase tracking-wider text-[10px] border-b border-amber-200 pb-1">
+                                Work Completion Summary
+                              </h4>
+                              <div className="space-y-1 text-[11px] text-slate-700">
+                                <div>Work Performed: <strong className="text-slate-900 block text-xs">{comp.work_performed || (comp as any).work_notes || 'Field repair completed on site.'}</strong></div>
+                                {comp.materials_used && (
+                                  <div>Materials Used: <strong className="font-mono text-amber-950">{comp.materials_used}</strong></div>
+                                )}
+                                <div>Completion Date: <strong className="text-slate-900">{comp.updated_at ? new Date(comp.updated_at).toLocaleString([], { month: 'short', day: 'numeric' }) : 'N/A'}</strong></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* FOOTER ACTIONS */}
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                            <div className="flex items-center space-x-3 w-full sm:w-auto">
+                              <div
+                                onClick={() => comp.photo_before_url && setZoomImageUrl(comp.photo_before_url)}
+                                className="flex items-center space-x-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors"
+                              >
+                                <img src={getValidImageUrl(comp.photo_before_url)} alt="Before" className="w-10 h-10 rounded-lg object-cover" />
+                                <span className="text-[10px] font-extrabold text-slate-600 font-mono pr-1">BEFORE PHOTO</span>
+                              </div>
+
+                              <div
+                                onClick={() => comp.photo_after_url && setZoomImageUrl(comp.photo_after_url)}
+                                className="flex items-center space-x-2 p-1.5 bg-emerald-50 rounded-xl border border-emerald-300 cursor-pointer hover:bg-emerald-100 transition-colors"
+                              >
+                                {comp.photo_after_url ? (
+                                  <img src={getValidImageUrl(comp.photo_after_url)} alt="After" className="w-10 h-10 rounded-lg object-cover" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-[9px] font-bold text-emerald-800">NO PHOTO</div>
+                                )}
+                                <span className="text-[10px] font-extrabold text-emerald-900 font-mono pr-1">AFTER PHOTO</span>
+                              </div>
+                            </div>
+
+                            {/* PRIMARY ACTION BUTTON */}
+                            <button
+                              onClick={() => setReviewModalComplaint(comp)}
+                              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs shadow-xs transition-colors flex items-center space-x-2 w-full sm:w-auto justify-center"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>View & Verify</span>
+                            </button>
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
-                        {/* MOBILE STACKED CARDS (`md:hidden`) */}
-                        <div className="md:hidden space-y-3">
+            {/* DETAILED SECTION 2: STAFF CURRENTLY WORKING ON COMPLAINTS */}
+            {inProgressSection === 'active_working' && (
+              <div className="space-y-5 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-xs font-sans">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setInProgressSection('all')}
+                      className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 font-extrabold rounded-xl border border-slate-300 shadow-2xs transition-colors text-xs flex items-center space-x-1.5"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>← Back to In Progress</span>
+                    </button>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 font-outfit text-base">
+                        Staff Currently Working on Complaints
+                      </h3>
+                      <p className="text-xs text-slate-600 font-medium">
+                        Active complaints being handled by field staff.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-blue-600 text-white font-mono font-extrabold text-xs rounded-xl shadow-2xs self-start sm:self-auto">
+                    Showing {paginatedComplaints.length} of {filteredComplaints.length} Active Tasks
+                  </span>
+                </div>
+
+                {paginatedComplaints.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 space-y-2">
+                    <Activity className="w-8 h-8 text-blue-500 mx-auto" />
+                    <h4 className="font-bold text-slate-900 text-sm font-outfit">No Active Field Tasks</h4>
+                    <p className="text-xs text-slate-600">There are currently no complaints in Accepted, On the Way, or In Progress status.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {paginatedComplaints.map((comp) => {
+                      const assignedStaffName = comp.assigned_staff_name || 'Field Officer';
+                      const staffEmpId = (comp as any).assigned_staff_employee_id || comp.assigned_staff_id || 'STF-001';
+
+                      let slaText = 'No Target';
+                      let slaBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+                      if (comp.sla_deadline) {
+                        const diffMs = new Date(comp.sla_deadline).getTime() - now.getTime();
+                        if (diffMs < 0) {
+                          slaText = 'Overdue';
+                          slaBadge = 'bg-rose-100 text-rose-900 border-rose-300 font-extrabold';
+                        } else {
+                          const hrsTotal = Math.floor(diffMs / (1000 * 3600));
+                          slaText = `${hrsTotal}h remaining`;
+                          slaBadge = 'bg-blue-50 text-blue-900 border-blue-200 font-bold';
+                        }
+                      }
+
+                      return (
+                        <div key={comp.id} className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4 hover:shadow-md transition-shadow">
+                          {/* HEADER ROW */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg text-xs border border-blue-200">
+                                {comp.complaint_number}
+                              </span>
+                              <PriorityBadge priority={comp.priority} />
+                              <StatusBadge status={comp.status} />
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${slaBadge}`}>
+                              ⏱ SLA: {slaText}
+                            </span>
+                          </div>
+
+                          {/* 3-COLUMN METADATA GRID */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            {/* ISSUE & LOCATION */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                              <h4 className="font-extrabold text-slate-800 font-outfit uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">
+                                Issue & Location
+                              </h4>
+                              <div className="space-y-1">
+                                <span className="font-bold text-slate-900 block font-outfit text-sm">{comp.title}</span>
+                                <p className="text-slate-600 text-xs line-clamp-2">{comp.description || 'No detailed description.'}</p>
+                                <div className="pt-1 text-[11px] text-slate-600 space-y-0.5 font-medium">
+                                  <div>📍 Location: <strong className="text-slate-900">{comp.location_address || 'Nashik City'}</strong></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* STAFF INFORMATION */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                              <h4 className="font-extrabold text-slate-800 font-outfit uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">
+                                Field Staff Information
+                              </h4>
+                              <div className="space-y-1 text-[11px] text-slate-700">
+                                <div className="font-bold text-slate-900 text-xs flex items-center space-x-1">
+                                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>{assignedStaffName}</span>
+                                </div>
+                                <div>Employee ID: <strong className="font-mono text-blue-900">{staffEmpId}</strong></div>
+                                <div>Department: <strong className="text-slate-900">{deptInfo.fullName}</strong></div>
+                              </div>
+                            </div>
+
+                            {/* CURRENT STATUS & SLA */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                              <h4 className="font-extrabold text-slate-800 font-outfit uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">
+                                Execution & SLA Progress
+                              </h4>
+                              <div className="space-y-1 text-[11px] text-slate-700">
+                                <div>Current Status: <strong className="text-blue-900 font-bold">{comp.status}</strong></div>
+                                <div>SLA Target: <strong className="text-slate-900">{comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</strong></div>
+                                <div>Time Remaining: <strong className={comp.sla_deadline && new Date(comp.sla_deadline) < now ? 'text-rose-600 font-bold' : 'text-slate-900 font-bold'}>{slaText}</strong></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* FOOTER ACTION BUTTON */}
+                          <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                            <button
+                              onClick={() => setDetailModalComplaint(comp)}
+                              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs shadow-xs transition-colors flex items-center space-x-1.5"
+                            >
+                              <span>View Details</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* OVERVIEW MODE (METRICS + TABLE) */}
+            {inProgressSection === 'all' && (
+              <>
+                {/* 3. MAIN IN-PROGRESS WORK TABLE */}
+              <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
+                  <div>
+                    <h3 className="font-extrabold text-gray-900 font-outfit text-base">Department In-Progress Work</h3>
+                    <p className="text-xs text-gray-500 font-medium">All active complaints currently under field execution across {deptInfo.fullName}.</p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200">
+                    Showing {paginatedComplaints.length} of {filteredComplaints.length} Active Tasks
+                  </span>
+                </div>
+
+                {/* SEARCH & FILTERS TOOLBAR */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                  {/* SEARCH INPUT */}
+                  <div className="lg:col-span-2 relative">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search complaint ID, issue, location or staff..."
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-xl text-xs text-gray-900 focus:outline-none focus:border-emerald-600 shadow-2xs"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* STATUS FILTER */}
+                  <div>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
+                    >
+                      <option value="All">Status: All Active</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="On the Way">On the Way</option>
+                      <option value="Staff Assigned">Staff Assigned</option>
+                    </select>
+                  </div>
+
+                  {/* PRIORITY FILTER */}
+                  <div>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
+                    >
+                      <option value="All">Priority: All</option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+
+                  {/* STAFF FILTER */}
+                  <div>
+                    <select
+                      value={staffFilter}
+                      onChange={(e) => setStaffFilter(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
+                    >
+                      <option value="All">Staff: All Staff</option>
+                      {departmentStaff.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* SLA FILTER */}
+                  <div>
+                    <select
+                      value={slaFilter}
+                      onChange={(e) => setSlaFilter(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
+                    >
+                      <option value="All">SLA: All</option>
+                      <option value="Within SLA">Within SLA</option>
+                      <option value="Due Today">Due Today</option>
+                      <option value="Overdue">Overdue / Breached</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* TABLE (DESKTOP) */}
+                {paginatedComplaints.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300 space-y-2">
+                    <Activity className="w-8 h-8 text-gray-400 mx-auto" />
+                    <h4 className="font-bold text-gray-800 text-sm font-outfit">No In-Progress Tasks Found</h4>
+                    <p className="text-xs text-gray-500">There are currently no active civic tasks being executed in your department matching the selected filters.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-y border-gray-200 font-outfit uppercase text-[10px] font-extrabold text-gray-600 tracking-wider">
+                          <tr>
+                            <th className="py-3 px-4">Complaint ID</th>
+                            <th className="py-3 px-4">Issue</th>
+                            <th className="py-3 px-4">Category</th>
+                            <th className="py-3 px-4">Location</th>
+                            <th className="py-3 px-4">Priority</th>
+                            <th className="py-3 px-4">Assigned Staff</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">SLA Target</th>
+                            <th className="py-3 px-4">Time Remaining</th>
+                            <th className="py-3 px-4 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-gray-800 font-medium">
                           {paginatedComplaints.map((comp) => {
+                            const isOver = comp.sla_deadline && new Date(comp.sla_deadline) < now;
+                            const assignedStaffName = comp.assigned_staff_name || 'Unassigned';
+
                             let slaText = 'No Target';
+                            let slaBadge = 'bg-gray-50 text-gray-600 border-gray-200';
+
                             if (comp.sla_deadline) {
                               const diffMs = new Date(comp.sla_deadline).getTime() - now.getTime();
                               if (diffMs < 0) {
-                                slaText = 'Overdue';
+                                const overMs = Math.abs(diffMs);
+                                const hrs = Math.floor(overMs / (1000 * 3600));
+                                const mins = Math.floor((overMs % (1000 * 3600)) / (1000 * 60));
+                                slaText = `${hrs > 0 ? `${hrs}h ` : ''}${mins}m overdue`;
+                                slaBadge = 'bg-rose-100 text-rose-900 border-rose-400 font-extrabold animate-pulse';
                               } else {
                                 const hrsTotal = Math.floor(diffMs / (1000 * 3600));
-                                slaText = `${hrsTotal}h remaining`;
+                                const days = Math.floor(hrsTotal / 24);
+                                const mins = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+
+                                if (days >= 1) {
+                                  slaText = `${days}d ${hrsTotal % 24}h remaining`;
+                                  slaBadge = 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold';
+                                } else if (hrsTotal >= 1) {
+                                  slaText = `${hrsTotal}h ${mins}m remaining`;
+                                  slaBadge = hrsTotal < 4 ? 'bg-amber-50 text-amber-900 border-amber-300 font-extrabold' : 'bg-blue-50 text-blue-800 border-blue-200 font-bold';
+                                } else {
+                                  slaText = `${mins}m remaining`;
+                                  slaBadge = 'bg-orange-100 text-orange-900 border-orange-300 font-extrabold';
+                                }
                               }
                             }
 
                             return (
-                              <div key={comp.id} className="p-4 bg-slate-50 border border-gray-200 rounded-xl space-y-3 text-xs">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-mono font-extrabold text-emerald-800">{comp.complaint_number}</span>
+                              <tr
+                                key={comp.id}
+                                onClick={() => comp.status === 'Resolution Submitted' || (comp.status as string) === 'Completed — Pending Verification' ? setReviewModalComplaint(comp) : setDetailModalComplaint(comp)}
+                                className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                              >
+                                <td className="py-3 px-4 font-mono font-extrabold text-emerald-800">
+                                  {comp.complaint_number}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="font-bold text-gray-900 block line-clamp-1">{comp.title}</span>
+                                </td>
+                                <td className="py-3 px-4 font-semibold text-gray-700">{comp.category}</td>
+                                <td className="py-3 px-4 text-gray-600 max-w-[150px] truncate">{comp.location_address || 'Nashik'}</td>
+                                <td className="py-3 px-4">
                                   <PriorityBadge priority={comp.priority} />
-                                </div>
+                                </td>
+                                <td className="py-3 px-4 font-bold text-gray-800">
+                                  <span className="flex items-center space-x-1 text-emerald-800">
+                                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>{assignedStaffName}</span>
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <StatusBadge status={comp.status} />
+                                </td>
+                                <td className="py-3 px-4 font-mono text-[11px] text-gray-600">
+                                  {comp.sla_deadline ? new Date(comp.sla_deadline).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${slaBadge}`}>
+                                    {slaText}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end space-x-2">
+                                    {(comp.status === 'Resolution Submitted' || (comp.status as string) === 'Completed — Pending Verification') ? (
+                                      <button
+                                        onClick={() => setReviewModalComplaint(comp)}
+                                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-xs transition-colors shadow-2xs flex items-center space-x-1"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Verify Work Evidence</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => setDetailModalComplaint(comp)}
+                                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-gray-700 font-bold rounded-lg text-xs transition-colors"
+                                      >
+                                        View Details
+                                      </button>
+                                    )}
 
-                                <h4 className="font-extrabold text-gray-900 font-outfit text-sm">{comp.title}</h4>
-                                <p className="text-gray-600 text-[11px] line-clamp-1">📍 {comp.location_address || 'Nashik City'}</p>
-
-                                <div className="p-2.5 bg-white rounded-lg border border-gray-200 space-y-1 text-[11px]">
-                                  <div className="flex items-center justify-between font-bold">
-                                    <span className="text-gray-600">Assigned Officer:</span>
-                                    <span className="text-emerald-800 font-outfit">👤 {comp.assigned_staff_name || 'Unassigned'}</span>
+                                    <button
+                                      onClick={() => {
+                                        setAssignModalComplaint(comp);
+                                        setSelectedStaffForAssign(comp.assigned_staff_id || '');
+                                      }}
+                                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-extrabold rounded-lg text-xs transition-colors"
+                                    >
+                                      Reassign
+                                    </button>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-gray-500">Status / SLA:</span>
-                                    <span className="font-mono font-bold text-amber-700">{comp.status} ({slaText})</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-end space-x-2 pt-1">
-                                  <button
-                                    onClick={() => setDetailModalComplaint(comp)}
-                                    className="px-3 py-1.5 bg-white border border-gray-300 text-gray-800 font-bold rounded-lg"
-                                  >
-                                    View Details
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setAssignModalComplaint(comp);
-                                      setSelectedStaffForAssign(comp.assigned_staff_id || '');
-                                    }}
-                                    className="px-3 py-1.5 bg-blue-600 text-white font-extrabold rounded-lg shadow-xs"
-                                  >
-                                    Reassign
-                                  </button>
-                                </div>
-                              </div>
+                                </td>
+                              </tr>
                             );
                           })}
+                            </tbody>
+                          </table>
                         </div>
                       </>
                     )}
                   </div>
                 </>
-              );
-            })()}
+              )}
 
-          </div>
-        ) : isStaffDetailView && selectedStaffProfile ? (
-          /* G. STAFF PROFILE DETAIL VIEW */
-          <div className="space-y-6">
-            <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
-                  {selectedStaffProfile.name.charAt(0)}
-                </div>
-                <div>
-                  <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{selectedStaffProfile.name}</h2>
-                </div>
-              </div>
+            </div>
+          ) : isStaffDetailView && selectedStaffProfile ? (
+      /* G. STAFF PROFILE DETAIL VIEW */
+      <div className="space-y-6">
+        <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-2xl flex items-center justify-center font-outfit border-2 border-emerald-500 shrink-0">
+              {selectedStaffProfile.name.charAt(0)}
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-gray-900 font-outfit">{selectedStaffProfile.name}</h2>
             </div>
           </div>
-        ) : isStaffView ? (
-          /* H. DEPARTMENT HEAD → STAFF ROSTER PAGE */
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
-              <div className="p-3.5 text-center space-y-1">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Staff</span>
-                <span className="text-xl font-extrabold text-gray-900 font-mono block">{staffMetrics.totalStaff}</span>
-              </div>
-            </div>
-          </div>
-        ) : isAssignWorkspace ? (
-          /* I. DEPARTMENT HEAD → TASK ASSIGNMENT WORKSPACE */
+        </div>
+      </div>
+    ) : isStaffView ? (
           <div className="space-y-6">
             
             {/* 1. TOP DEPARTMENT SUMMARY METRICS (8 REAL DATABASE DERIVED CARDS) */}
@@ -4634,31 +4893,60 @@ export const DepartmentHeadPortal: React.FC = () => {
                 </button>
               </div>
 
+              {/* COMPLAINT & STAFF DETAILS HEADER */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="text-gray-900 text-sm font-outfit">{reviewModalComplaint.title}</span>
+                  <PriorityBadge priority={reviewModalComplaint.priority} />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600 font-medium">
+                  <div>Category: <strong className="text-gray-900">{reviewModalComplaint.category}</strong></div>
+                  <div>Department: <strong className="text-gray-900">{deptInfo.fullName}</strong></div>
+                  <div>Location: <strong className="text-gray-900">{reviewModalComplaint.location_address || 'Nashik City'}</strong></div>
+                  <div>Assigned Officer: <strong className="text-gray-900">{reviewModalComplaint.assigned_staff_name || 'Field Officer'}</strong></div>
+                </div>
+              </div>
+
+              {/* BEFORE VS AFTER EVIDENCE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo</span>
-                  <div className="aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo (Before)</span>
+                  <div
+                    className="aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => reviewModalComplaint.photo_before_url && setZoomImageUrl(reviewModalComplaint.photo_before_url)}
+                  >
                     <img src={getValidImageUrl(reviewModalComplaint.photo_before_url)} alt="Before" className="w-full h-full object-cover" />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-purple-700 block">Repair Evidence Photo</span>
-                  <div className="aspect-4/3 rounded-xl overflow-hidden border border-purple-300 bg-purple-50">
+                  <span className="text-[10px] font-extrabold font-mono uppercase text-purple-700 block">Repair Evidence Photo (After)</span>
+                  <div
+                    className="aspect-4/3 rounded-xl overflow-hidden border border-purple-300 bg-purple-50 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => reviewModalComplaint.photo_after_url && setZoomImageUrl(reviewModalComplaint.photo_after_url)}
+                  >
                     {reviewModalComplaint.photo_after_url ? (
                       <img src={getValidImageUrl(reviewModalComplaint.photo_after_url)} alt="After" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Photo Uploaded</div>
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 font-bold">No Photo Uploaded</div>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-1 text-xs">
-                <span className="font-bold text-gray-900 block">{reviewModalComplaint.title}</span>
-                <p className="text-gray-600 text-[11px] font-medium">{reviewModalComplaint.work_performed || 'Maintenance work completed on site.'}</p>
+              {/* WORK NOTES & MATERIALS USED */}
+              <div className="p-3.5 bg-purple-50/60 border border-purple-200 rounded-xl space-y-1.5 text-xs">
+                <span className="font-extrabold text-purple-900 font-outfit uppercase tracking-wider block text-[10px]">Staff Field Execution Notes</span>
+                <p className="text-gray-800 text-xs font-medium leading-relaxed">
+                  {reviewModalComplaint.work_performed || (reviewModalComplaint as any).work_notes || 'Maintenance work successfully completed on site.'}
+                </p>
+                {reviewModalComplaint.materials_used && (
+                  <div className="text-[11px] text-purple-800 font-mono pt-1">
+                    Materials Used: <strong>{reviewModalComplaint.materials_used}</strong>
+                  </div>
+                )}
                 {reviewModalComplaint.assigned_staff_name && (
-                  <div className="text-[11px] text-gray-500 font-mono pt-1">
+                  <div className="text-[11px] text-gray-500 font-mono pt-0.5">
                     Submitted by: <strong>{reviewModalComplaint.assigned_staff_name}</strong>
                   </div>
                 )}
@@ -4672,7 +4960,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                     onChange={(e) => setReworkReason(e.target.value)}
                     placeholder="Explain specifically what needs to be fixed or re-inspected..."
                     rows={3}
-                    className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs text-gray-900 focus:outline-none focus:border-rose-600"
+                    className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs text-gray-900 focus:outline-none focus:border-rose-600 font-medium"
                   />
                 </div>
               )}
@@ -4699,17 +4987,17 @@ export const DepartmentHeadPortal: React.FC = () => {
                       onClick={() => setShowReworkInput(true)}
                       className="px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-xs border border-rose-300"
                     >
-                      Request Rework
+                      ↻ Send Back for Rework
                     </button>
                   )}
 
                   <button
                     onClick={() => handleApproveResolution(reviewModalComplaint.id)}
                     disabled={reviewing}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs disabled:opacity-50 min-h-[40px] flex items-center space-x-1"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs disabled:opacity-50 min-h-[40px] flex items-center space-x-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{reviewing ? 'Approving...' : 'Approve & Close Complaint'}</span>
+                    <span>{reviewing ? 'Approving...' : '✓ Verify & Approve Resolution'}</span>
                   </button>
                 </div>
               </div>

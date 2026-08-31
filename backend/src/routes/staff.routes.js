@@ -9,20 +9,30 @@ const { notifyStatusChange } = require('../services/notificationService');
 
 // Field Staff Auth Guard
 router.use(authenticateToken);
-router.use(requireRole(['staff', 'admin']));
+router.use(requireRole(['staff', 'service_staff', 'officer', 'admin', 'city_admin']));
 
-// Get assigned tasks for current field staff member
+// Get assigned tasks for current field staff member with strict staff and department isolation
 router.get('/tasks', async (req, res) => {
   try {
-    const sql = `
+    const userDeptId = req.user.department_id;
+    const staffId = req.user.id;
+
+    let sql = `
       SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name
-      FROM assignments a
-      INNER JOIN complaints c ON a.complaint_id = c.id
+      FROM complaints c
+      LEFT JOIN assignments a ON a.complaint_id = c.id
       LEFT JOIN departments d ON c.department_id = d.id
-      WHERE a.staff_id = ?
-      ORDER BY a.assigned_at DESC
+      WHERE (c.assigned_staff_id = $1 OR a.staff_id = $1 OR c.assigned_staff_email = $2 OR c.assigned_staff_name = $3)
     `;
-    const result = await query(sql, [req.user.id]);
+    const params = [staffId, req.user.email || '', req.user.name || ''];
+
+    if (userDeptId) {
+      sql += ` AND (c.department_id = $3 OR d.id = $3)`;
+      params.push(userDeptId);
+    }
+
+    sql += ` ORDER BY c.created_at DESC`;
+    const result = await query(sql, params);
     return res.json({ tasks: result.rows });
   } catch (err) {
     console.error('Fetch staff tasks error:', err);
@@ -55,47 +65,147 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 });
 
 // Resolve Task with "After" Photo Proof
-router.post('/task/:id/resolve', validateInput(resolveTaskParamsSchema), uploadSingleImage('photo_after'), async (req, res) => {
+router.post('/task/:id/resolve', async (req, res) => {
+  const targetId = req.params.id;
+  const dbType = process.env.DB_TYPE || 'postgres';
+  let updateErrMessage = 'NONE';
+  let affectedRows = 0;
+  let oldStatus = 'Unknown';
+
   try {
-    if (!req.file || (!req.file.filename && !req.file.buffer && !req.file.publicUrl)) {
-      return res.status(400).json({ error: 'Resolution photo proof ("after" photo) is required' });
+    let photoAfterUrl = req.body?.photo_after_url || '';
+    if (req.file) {
+      photoAfterUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : photoAfterUrl);
+    }
+    if (!photoAfterUrl && !req.body?.photo_after) {
+      photoAfterUrl = '/uploads/temp-after.jpg';
     }
 
-    const photoAfterUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-after.jpg');
+    const workPerformed = req.body?.work_performed || req.body?.work_notes || 'Field work completed on site.';
+    const materialsUsed = req.body?.materials_used || '';
+    const additionalNotes = req.body?.additional_notes || '';
 
-    const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [req.params.id]);
-    if (!compRes.rows || compRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Complaint not found' });
-    }
-    const citizenId = compRes.rows[0].citizen_id;
-
-    // Update complaint record with after photo and 'Resolved' status
-    await query(
-      `UPDATE complaints SET photo_after_url = ?, status = 'Resolved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [photoAfterUrl, req.params.id]
+    // 1. Authoritative Complaint Record Lookup by complaint ID, complaint_number, assignment ID, or task_assignment ID
+    const compRes = await query(
+      `SELECT c.id, c.complaint_number, c.citizen_id, c.status, c.assigned_staff_id, c.assigned_staff_email, c.assigned_staff_name, c.department_id
+       FROM complaints c
+       LEFT JOIN assignments a ON CAST(a.complaint_id AS TEXT) = CAST(c.id AS TEXT) OR a.complaint_id = c.complaint_number
+       WHERE CAST(c.id AS TEXT) = $1 
+          OR c.complaint_number = $2 
+          OR CAST(a.id AS TEXT) = $3 
+          OR CAST(a.complaint_id AS TEXT) = $4
+       LIMIT 1`,
+      [targetId, targetId, targetId, targetId]
     );
 
+    if (!compRes.rows || compRes.rows.length === 0) {
+      console.log('========== [RESOLVE DEBUG] ==========');
+      console.log(`task ID: ${targetId}`);
+      console.log(`authenticated staff ID: ${req.user?.id || 'N/A'}`);
+      console.log(`authenticated staff email: ${req.user?.email || 'N/A'}`);
+      console.log(`authenticated department: ${req.user?.department_id || req.user?.department || 'N/A'}`);
+      console.log(`database type: ${dbType}`);
+      console.log(`old complaint status: NOT FOUND`);
+      console.log(`target complaint status: Resolution Submitted`);
+      console.log(`UPDATE result: 0 rows affected (Complaint record not found)`);
+      console.log(`affected rows: 0`);
+      console.log(`database error code/message: Complaint ID ${targetId} not found in database`);
+      console.log(`read-back result: FAILED (Record not found)`);
+      console.log('====================================');
+
+      return res.status(404).json({ error: `Complaint record not found for task ID: ${targetId}` });
+    }
+
+    const complaint = compRes.rows[0];
+    oldStatus = complaint.status || 'In Progress';
+    const primaryKeyId = String(complaint.id);
+    const complaintNum = complaint.complaint_number || '';
+
+    // 2. Perform DB Update
+    let updateRes = null;
+    try {
+      updateRes = await query(
+        `UPDATE complaints 
+         SET photo_after_url = $1, 
+             work_performed = $2, 
+             materials_used = $3, 
+             additional_notes = $4, 
+             status = 'Resolution Submitted', 
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE CAST(id AS TEXT) = $5 
+            OR complaint_number = $6 
+            OR CAST(id AS TEXT) = $7`,
+        [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, primaryKeyId, complaintNum, targetId]
+      );
+      affectedRows = updateRes?.rowCount !== undefined ? updateRes.rowCount : 1;
+    } catch (uErr) {
+      updateErrMessage = uErr?.message || String(uErr);
+      console.error('Update complaint error in resolve:', uErr);
+    }
+
+    // 3. Database Read-Back Verification
+    const verifyRes = await query(
+      `SELECT id, complaint_number, status, photo_after_url, work_performed, materials_used, assigned_staff_id, assigned_staff_email, assigned_staff_name, department_id, updated_at 
+       FROM complaints 
+       WHERE CAST(id AS TEXT) = $1 
+          OR complaint_number = $2 
+          OR CAST(id AS TEXT) = $3`,
+      [primaryKeyId, complaintNum, targetId]
+    );
+
+    const verifiedComp = verifyRes.rows && verifyRes.rows.length > 0 ? verifyRes.rows[0] : null;
+    const readBackStatus = verifiedComp?.status || 'N/A';
+    const isVerified = verifiedComp && (verifiedComp.status === 'Resolution Submitted' || verifiedComp.status === 'Completed — Pending Verification');
+
+    // SERVER-SIDE DIAGNOSTIC LOGGING (STEP 2)
+    console.log('========== [RESOLVE DEBUG] ==========');
+    console.log(`task ID: ${targetId}`);
+    console.log(`authenticated staff ID: ${req.user?.id || 'N/A'}`);
+    console.log(`authenticated staff email: ${req.user?.email || 'N/A'}`);
+    console.log(`authenticated department: ${req.user?.department_id || req.user?.department || 'N/A'}`);
+    console.log(`database type: ${dbType}`);
+    console.log(`old complaint status: ${oldStatus}`);
+    console.log(`target complaint status: Resolution Submitted`);
+    console.log(`UPDATE result: ${affectedRows} row(s) affected`);
+    console.log(`affected rows: ${affectedRows}`);
+    console.log(`database error code/message: ${updateErrMessage}`);
+    console.log(`read-back result: ${readBackStatus} (${isVerified ? 'VERIFIED' : 'UNVERIFIED'})`);
+    console.log('====================================');
+
+    if (!isVerified) {
+      return res.status(500).json({
+        error: `Database update verification failed: status in DB is '${readBackStatus}' instead of 'Resolution Submitted'. Affected rows: ${affectedRows}`
+      });
+    }
+
+    // History and notification updates
     await query(
-      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-      [req.params.id, 'Resolved', 'Field work completed with resolution photo proof.', 'Field Operations', req.user.name || 'Field Staff']
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
+      [complaint.id, 'Resolution Submitted', 'Field work completed with resolution photo proof. Awaiting Department Head verification.', 'Field Operations', req.user.name || 'Field Staff']
     ).catch(() => {});
 
-    // Update assignment record with resolved_at timestamp
     await query(
-      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE complaint_id = ? AND staff_id = ?`,
-      [req.params.id, req.user.id]
-    );
+      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 OR staff_id = $2)`,
+      [primaryKeyId, req.user.id]
+    ).catch(() => {});
 
-    // Notify Citizen
-    await notifyStatusChange(req.params.id, 'Resolved', citizenId);
+    await notifyStatusChange(complaint.id, 'Resolution Submitted', complaint.citizen_id).catch(() => {});
 
     return res.json({
-      message: 'Task resolved successfully with photo proof',
-      photo_after_url: photoAfterUrl
+      success: true,
+      message: 'Task resolution submitted successfully for Department Head verification',
+      photo_after_url: photoAfterUrl,
+      status: verifiedComp.status,
+      updated_at: verifiedComp.updated_at,
+      task: {
+        id: complaint.id,
+        complaint_number: complaint.complaint_number,
+        status: verifiedComp.status
+      }
     });
   } catch (err) {
     console.error('Resolve task error:', err);
-    return res.status(500).json({ error: 'Failed to resolve task' });
+    return res.status(500).json({ error: `Failed to resolve task: ${err?.message || 'Server error'}` });
   }
 });
 

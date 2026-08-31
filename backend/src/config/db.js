@@ -512,14 +512,15 @@ async function query(sql, params = []) {
       return runMemQuery(sql, params);
     }
     return new Promise((resolve, reject) => {
-      const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
+      let sqliteSql = sql.replace(/\$\d+/g, '?');
+      const isSelect = sqliteSql.trim().toUpperCase().startsWith('SELECT');
       if (isSelect) {
-        sqliteDb.all(sql, params, (err, rows) => {
+        sqliteDb.all(sqliteSql, params, (err, rows) => {
           if (err) return reject(err);
           resolve({ rows });
         });
       } else {
-        sqliteDb.run(sql, params, function (err) {
+        sqliteDb.run(sqliteSql, params, function (err) {
           if (err) return reject(err);
           resolve({ rows: [{ id: this.lastID }], rowCount: this.changes });
         });

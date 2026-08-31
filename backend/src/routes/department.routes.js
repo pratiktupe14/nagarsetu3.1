@@ -500,8 +500,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       }
     }
 
-    // 5. Update Complaint in Database
-    await query(
+    // 5. Update Complaint in Database with affected row verification
+    const updateRes = await query(
       `UPDATE complaints
        SET assigned_staff_id = $1,
            assigned_staff_name = $2,
@@ -510,18 +510,40 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            assigned_by_name = $5,
            status = 'Staff Assigned',
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6`,
+       WHERE id = $6 OR complaint_number = $6`,
       [staff.id, staff.name, staff.email || '', req.user.id, req.user.name || 'Department Head', complaint.id]
     );
 
-    // 6. Record Assignment History
+    if (updateRes && updateRes.rowCount !== undefined && updateRes.rowCount === 0) {
+      return res.status(500).json({ error: 'Assignment failed: Database UPDATE affected 0 rows.' });
+    }
+
+    // 6. Database Read-back Verification
+    const verifyRes = await query(
+      `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1`,
+      [complaint.id]
+    );
+
+    if (!verifyRes.rows || verifyRes.rows.length === 0 || verifyRes.rows[0].status !== 'Staff Assigned') {
+      return res.status(500).json({ error: 'Assignment failed: Database read-back verification failed.' });
+    }
+
+    const verifiedRecord = verifyRes.rows[0];
+
+    // 7. Record Assignment History (into assignments & task_assignments tables)
     await query(
       `INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
       [complaint.id, staff.id, req.user.id]
     ).catch(() => {});
 
-    // 7. Record Status History
+    await query(
+      `INSERT INTO task_assignments (complaint_id, staff_id, assigned_by, created_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+      [complaint.id, staff.id, req.user.id]
+    ).catch(() => {});
+
+    // 8. Record Status History
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -531,13 +553,66 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     return res.json({
       success: true,
       message: `Task successfully assigned to ${staff.name}`,
-      complaint_id: complaint.id,
+      complaint_id: verifiedRecord.id,
+      complaint_number: verifiedRecord.complaint_number,
       staff_id: staff.id,
-      staff_name: staff.name
+      staff_name: staff.name,
+      staff_email: staff.email,
+      status: verifiedRecord.status,
+      updated_at: verifiedRecord.updated_at
     });
   } catch (err) {
     console.error('Error assigning staff in department route:', err);
     return res.status(500).json({ error: 'Server error assigning staff to task.' });
+  }
+});
+
+/**
+ * POST /api/department/verify
+ * Department Head verifies & approves completion -> status = 'Resolved'
+ */
+router.post('/verify', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+  try {
+    const { complaint_id, verified_by, verified_by_name, status } = req.body;
+    const targetStatus = status || 'Resolved';
+
+    if (!complaint_id) {
+      return res.status(400).json({ error: 'Complaint ID is required' });
+    }
+
+    await query(
+      `UPDATE complaints 
+       SET status = $1, 
+           verified_by = $2, 
+           verified_by_name = $3, 
+           verified_at = CURRENT_TIMESTAMP, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE CAST(id AS TEXT) = $4 OR complaint_number = $4`,
+      [targetStatus, verified_by || req.user.id, verified_by_name || req.user.name || 'Department Head', complaint_id]
+    );
+
+    const verifyRes = await query(
+      `SELECT id, complaint_number, status, verified_by_name, updated_at FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [complaint_id]
+    );
+
+    if (!verifyRes.rows || verifyRes.rows.length === 0 || verifyRes.rows[0].status !== targetStatus) {
+      return res.status(500).json({ error: 'Verification failed: Database read-back failed' });
+    }
+
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
+      [complaint_id, targetStatus, `Department Head verified repair proof and resolved ticket.`, 'Department Operations', req.user.name || 'Department Head']
+    ).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Complaint verified and updated to ${targetStatus}`,
+      complaint: verifyRes.rows[0]
+    });
+  } catch (err) {
+    console.error('Verify complaint error:', err);
+    return res.status(500).json({ error: 'Failed to verify complaint' });
   }
 });
 

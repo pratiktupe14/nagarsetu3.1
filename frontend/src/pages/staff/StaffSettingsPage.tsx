@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LanguageSelector } from '../../components/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   User, Bell, Clock, Globe, ShieldCheck, LogOut, CheckCircle2,
   AlertTriangle, Save, RefreshCw, Building2, Key, Sliders, Smartphone, Mail,
@@ -18,10 +19,14 @@ export const StaffSettingsPage: React.FC = () => {
     'profile' | 'notifications' | 'alerts' | 'language' | 'security' | 'account'
   >('profile');
 
-  // Locked Staff Identity
-  const staffEmployeeId = 'STF-0012';
-  const staffDepartment = 'Roads / PWD';
-  const staffDepartmentFull = 'Roads & Public Works (PWD)';
+  // Dynamic Staff Identity & Department
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const resolvedDept = useMemo(
+    () => resolveDepartmentInfo(user?.department_id, user?.department_name),
+    [user?.department_id, user?.department_name]
+  );
+  const staffDepartmentFull = resolvedDept.fullName;
+  const staffDepartment = resolvedDept.name;
   const staffRole = 'Field Service Technician';
 
   const [fullName, setFullName] = useState(user?.full_name || '');
