@@ -381,7 +381,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   NAGARSETU
                 </span>
                 <span className="text-[9px] uppercase tracking-wider text-emerald-700 font-bold font-mono">
-                  Civic Platform 3.0
+                  Civic Platform
                 </span>
               </div>
             )}

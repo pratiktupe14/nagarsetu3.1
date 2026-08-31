@@ -976,7 +976,7 @@ export const AdminReportsPage: React.FC = () => {
               </div>
               <div className="text-right">
                 <span className="block font-sans font-bold text-gray-900">City Administration Desk</span>
-                <span className="text-[10px]">NAGARSETU Civic Operations Portal v3.0</span>
+                <span className="text-[10px]">NAGARSETU Civic Operations Portal</span>
               </div>
             </div>
 

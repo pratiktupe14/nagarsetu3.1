@@ -1803,7 +1803,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             {/* DANGER ZONE / ACCOUNT ACTIONS */}
             <div className="p-6 bg-rose-50/50 border border-rose-200 rounded-2xl space-y-3 text-xs">
               <h3 className="font-extrabold text-rose-900 font-outfit text-sm uppercase tracking-wider">Account Actions</h3>
-              <p className="text-gray-600 font-medium">Log out of your NAGARSETU 3.0 Department Head session.</p>
+              <p className="text-gray-600 font-medium">Log out of your NAGARSETU Department Head session.</p>
 
               <div className="pt-2">
                 <button

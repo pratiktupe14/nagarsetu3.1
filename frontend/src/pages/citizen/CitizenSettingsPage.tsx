@@ -509,7 +509,7 @@ export const CitizenSettingsPage: React.FC = () => {
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4 text-xs">
                 <div className="flex items-center space-x-2 border-b border-gray-100 pb-3">
                   <Info className="w-5 h-5 text-emerald-600" />
-                  <h2 className="text-lg font-extrabold text-gray-900 font-outfit">About NAGARSETU 3.0</h2>
+                  <h2 className="text-lg font-extrabold text-gray-900 font-outfit">About NAGARSETU</h2>
                 </div>
 
                 <p className="text-gray-600 leading-relaxed">
@@ -518,7 +518,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between font-mono text-[11px]">
                   <span>System Version:</span>
-                  <span className="font-bold text-emerald-800">NAGARSETU v3.0.0</span>
+                  <span className="font-bold text-emerald-800">NAGARSETU</span>
                 </div>
               </div>
             )}

@@ -148,7 +148,7 @@ export async function reverseGeocodeCoordinates(
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'NagarSetu-CivicApp/3.0'
+        'User-Agent': 'NagarSetu-CivicApp'
       }
     });
     if (res.ok) {
@@ -314,7 +314,7 @@ export async function geocodeNashikAddress(
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryAddress)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'NagarSetu-CivicApp/3.0'
+        'User-Agent': 'NagarSetu-CivicApp'
       }
     });
 

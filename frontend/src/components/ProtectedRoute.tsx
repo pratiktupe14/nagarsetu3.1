@@ -23,7 +23,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
             <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin absolute -bottom-1 -right-1" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU 3.0</h3>
+            <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU</h3>
             <p className="text-xs text-slate-400 font-medium">Verifying secure session & profile permissions...</p>
           </div>
         </div>

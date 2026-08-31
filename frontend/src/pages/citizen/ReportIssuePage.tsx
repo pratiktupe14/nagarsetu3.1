@@ -294,7 +294,7 @@ export const ReportIssuePage: React.FC = () => {
         } : undefined,
         category,
         title: title || `${category} Issue Reported`,
-        description: description || `Civic issue reported via NAGARSETU 3.0 at ${locationAddress}`,
+        description: description || `Civic issue reported via NAGARSETU at ${locationAddress}`,
         priority,
         status: 'Submitted' as const,
         department_name: department,

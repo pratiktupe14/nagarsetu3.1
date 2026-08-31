@@ -667,7 +667,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         </div>
         <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 font-mono">
           <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-          <span>NAGARSETU 3.0 — Loading workspace...</span>
+          <span>NAGARSETU — Loading workspace...</span>
         </div>
         <button
           onClick={() => setLoading(false)}

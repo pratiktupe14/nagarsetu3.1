@@ -93,7 +93,7 @@ export const LoginPage: React.FC = () => {
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
               <Shield className="w-4 h-4 text-emerald-600" />
-              <span>NAGARSETU 3.0 — {t('tagline')}</span>
+              <span>NAGARSETU — {t('tagline')}</span>
             </div>
 
             <div className="space-y-3">

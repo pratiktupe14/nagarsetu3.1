@@ -15,6 +15,8 @@ export const Navbar: React.FC = () => {
 
   const activeRole = role || user?.role || 'citizen';
 
+  const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register';
+
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -42,64 +44,66 @@ export const Navbar: React.FC = () => {
                 NAGARSETU
               </span>
               <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold font-mono hidden sm:block">
-                Civic Platform 3.0
+                Civic Platform
               </span>
             </div>
           </Link>
 
           {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-6 text-xs font-semibold">
-            {activeRole === 'citizen' && (
-              <>
+          {!isPublicPage && (
+            <nav className="hidden md:flex items-center space-x-6 text-xs font-semibold">
+              {activeRole === 'citizen' && (
+                <>
+                  <Link
+                    to="/citizen/portal"
+                    className={`transition-colors ${
+                      location.pathname === '/citizen/portal'
+                        ? 'text-emerald-700 font-extrabold'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('dashboard')}
+                  </Link>
+                  <Link
+                    to="/citizen/report"
+                    className={`transition-colors ${
+                      location.pathname === '/citizen/report'
+                        ? 'text-emerald-700 font-extrabold'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('reportComplaint')}
+                  </Link>
+                </>
+              )}
+
+              {activeRole === 'city_admin' && (
                 <Link
-                  to="/citizen/portal"
+                  to="/admin/portal"
                   className={`transition-colors ${
-                    location.pathname === '/citizen/portal'
+                    location.pathname === '/admin/portal'
                       ? 'text-emerald-700 font-extrabold'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  {t('dashboard')}
+                  {t('officerDashboardTitle')}
                 </Link>
+              )}
+
+              {activeRole === 'service_staff' && (
                 <Link
-                  to="/citizen/report"
+                  to="/staff/portal"
                   className={`transition-colors ${
-                    location.pathname === '/citizen/report'
+                    location.pathname === '/staff/portal'
                       ? 'text-emerald-700 font-extrabold'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  {t('reportComplaint')}
+                  {t('serviceStaffPortal')}
                 </Link>
-              </>
-            )}
-
-            {activeRole === 'city_admin' && (
-              <Link
-                to="/admin/portal"
-                className={`transition-colors ${
-                  location.pathname === '/admin/portal'
-                    ? 'text-emerald-700 font-extrabold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {t('officerDashboardTitle')}
-              </Link>
-            )}
-
-            {activeRole === 'service_staff' && (
-              <Link
-                to="/staff/portal"
-                className={`transition-colors ${
-                  location.pathname === '/staff/portal'
-                    ? 'text-emerald-700 font-extrabold'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {t('serviceStaffPortal')}
-              </Link>
-            )}
-          </nav>
+              )}
+            </nav>
+          )}
 
           {/* Right Actions */}
           <div className="hidden md:flex items-center space-x-3">
@@ -108,43 +112,45 @@ export const Navbar: React.FC = () => {
             <LanguageSelector variant="compact" />
 
             {/* Demo Role Selector */}
-            <div className="relative group">
-              <button className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="capitalize">{activeRole ? activeRole.replace('_', ' ') : 'Switch Role'}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-              </button>
+            {!isPublicPage && (
+              <div className="relative group">
+                <button className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="capitalize">{activeRole ? activeRole.replace('_', ' ') : 'Switch Role'}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                </button>
 
-              <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
-                <button
-                  onClick={() => handleRoleSwitch('citizen')}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                >
-                  <User className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Citizen View</span>
-                </button>
-                <button
-                  onClick={() => handleRoleSwitch('city_admin')}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                >
-                  <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                  <span>City Administration View</span>
-                </button>
-                <button
-                  onClick={() => handleRoleSwitch('service_staff')}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                >
-                  <Wrench className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Field Staff View</span>
-                </button>
+                <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
+                  <button
+                    onClick={() => handleRoleSwitch('citizen')}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+                  >
+                    <User className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Citizen View</span>
+                  </button>
+                  <button
+                    onClick={() => handleRoleSwitch('city_admin')}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>City Administration View</span>
+                  </button>
+                  <button
+                    onClick={() => handleRoleSwitch('service_staff')}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+                  >
+                    <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Field Staff View</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* NOTIFICATION CENTER DROPDOWN */}
             <NotificationCenter />
 
             {/* User Profile / Logout */}
-            {user ? (
+            {user && !isPublicPage ? (
               <div className="flex items-center space-x-3 pl-2 border-l border-gray-200">
                 <div className="text-right">
                   <span className="text-xs font-bold text-gray-900 block leading-tight">{user.full_name}</span>

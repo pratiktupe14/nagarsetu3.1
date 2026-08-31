@@ -13,7 +13,7 @@ export const Footer: React.FC = () => {
           <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold">
             <Shield className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-gray-900 font-outfit">NAGARSETU 3.0</span>
+          <span className="font-extrabold text-gray-900 font-outfit">NAGARSETU</span>
           <span className="text-gray-400">•</span>
           <span>{t('governancePlatform')}</span>
         </div>
