@@ -337,6 +337,8 @@ function createTablesSqlite() {
       safeAddColumn('complaints', 'verified_by INTEGER');
       safeAddColumn('complaints', 'verified_by_name TEXT');
       safeAddColumn('complaints', 'verified_at DATETIME');
+      safeAddColumn('complaints', 'rework_reason TEXT');
+      safeAddColumn('complaints', 'admin_rejection_reason TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (

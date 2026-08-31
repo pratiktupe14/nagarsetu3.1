@@ -84,6 +84,8 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 // Resolve Task with "After" Photo Proof
 router.post('/task/:id/resolve', async (req, res) => {
   const targetId = req.params.id;
+  const bodyNum = req.body?.complaint_number || '';
+  const bodyId = req.body?.complaint_id || '';
   const dbType = process.env.DB_TYPE || 'postgres';
   let updateErrMessage = 'NONE';
   let affectedRows = 0;
@@ -102,7 +104,7 @@ router.post('/task/:id/resolve', async (req, res) => {
     const materialsUsed = req.body?.materials_used || '';
     const additionalNotes = req.body?.additional_notes || '';
 
-    // 1. Authoritative Complaint Record Lookup by complaint ID, complaint_number, assignment ID, or task_assignment ID
+    // 1. Authoritative Complaint Record Lookup by complaint ID, complaint_number, assignment ID, body complaint_number, or body complaint_id
     const compRes = await query(
       `SELECT c.id, c.complaint_number, c.citizen_id, c.status, c.assigned_staff_id, c.assigned_staff_email, c.assigned_staff_name, c.department_id
        FROM complaints c
@@ -111,8 +113,10 @@ router.post('/task/:id/resolve', async (req, res) => {
           OR c.complaint_number = $2 
           OR CAST(a.id AS TEXT) = $3 
           OR CAST(a.complaint_id AS TEXT) = $4
-       LIMIT 1`,
-      [targetId, targetId, targetId, targetId]
+          OR (c.complaint_number = $5 AND $5 != '')
+          OR (CAST(c.id AS TEXT) = $6 AND $6 != '')
+       ORDER BY c.id DESC LIMIT 1`,
+      [targetId, targetId, targetId, targetId, String(bodyNum), String(bodyId)]
     );
 
     if (!compRes.rows || compRes.rows.length === 0) {
@@ -138,7 +142,29 @@ router.post('/task/:id/resolve', async (req, res) => {
     const primaryKeyId = String(complaint.id);
     const complaintNum = complaint.complaint_number || '';
 
-    // 2. Perform DB Update
+    // 2. Staff Authorization & Department Guard
+    const userRole = req.user.role || 'service_staff';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    if (!isAdmin) {
+      let userDeptId = req.user.department_id;
+      if (!userDeptId) {
+        const fsCheck = await query('SELECT department_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
+        if (fsCheck.rows && fsCheck.rows.length > 0) userDeptId = fsCheck.rows[0].department_id;
+      }
+
+      const isSameDept = userDeptId && complaint.department_id && String(userDeptId) === String(complaint.department_id);
+      const isAssignedToUser = (
+        (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(req.user.id)) ||
+        (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
+      );
+
+      if (!isSameDept && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to complete tasks belonging to another department.' });
+      }
+    }
+
+    // 3. Perform DB Update
     let updateRes = null;
     try {
       updateRes = await query(
@@ -149,10 +175,10 @@ router.post('/task/:id/resolve', async (req, res) => {
              additional_notes = $4, 
              status = 'Resolution Submitted', 
              updated_at = CURRENT_TIMESTAMP 
-         WHERE CAST(id AS TEXT) = $5 
-            OR complaint_number = $6 
-            OR CAST(id AS TEXT) = $7`,
-        [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, primaryKeyId, complaintNum, targetId]
+         WHERE id = $5 
+            OR CAST(id AS TEXT) = $5 
+            OR complaint_number = $6`,
+        [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, primaryKeyId, complaintNum]
       );
       affectedRows = updateRes?.rowCount !== undefined ? updateRes.rowCount : 1;
     } catch (uErr) {
@@ -160,14 +186,14 @@ router.post('/task/:id/resolve', async (req, res) => {
       console.error('Update complaint error in resolve:', uErr);
     }
 
-    // 3. Database Read-Back Verification
+    // 4. Database Read-Back Verification
     const verifyRes = await query(
       `SELECT id, complaint_number, status, photo_after_url, work_performed, materials_used, assigned_staff_id, assigned_staff_email, assigned_staff_name, department_id, updated_at 
        FROM complaints 
-       WHERE CAST(id AS TEXT) = $1 
-          OR complaint_number = $2 
-          OR CAST(id AS TEXT) = $3`,
-      [primaryKeyId, complaintNum, targetId]
+       WHERE id = $1 
+          OR CAST(id AS TEXT) = $1 
+          OR complaint_number = $2`,
+      [primaryKeyId, complaintNum]
     );
 
     const verifiedComp = verifyRes.rows && verifyRes.rows.length > 0 ? verifyRes.rows[0] : null;
@@ -214,11 +240,7 @@ router.post('/task/:id/resolve', async (req, res) => {
       photo_after_url: photoAfterUrl,
       status: verifiedComp.status,
       updated_at: verifiedComp.updated_at,
-      task: {
-        id: complaint.id,
-        complaint_number: complaint.complaint_number,
-        status: verifiedComp.status
-      }
+      task: verifiedComp
     });
   } catch (err) {
     console.error('Resolve task error:', err);
