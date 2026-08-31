@@ -325,6 +325,18 @@ function createTablesSqlite() {
       safeAddColumn('field_staff', 'status TEXT DEFAULT "active"');
       safeAddColumn('complaints', 'location_address TEXT');
       safeAddColumn('complaints', 'complaint_number TEXT');
+      safeAddColumn('complaints', 'assigned_staff_id TEXT');
+      safeAddColumn('complaints', 'assigned_staff_name TEXT');
+      safeAddColumn('complaints', 'assigned_staff_email TEXT');
+      safeAddColumn('complaints', 'assigned_by INTEGER');
+      safeAddColumn('complaints', 'assigned_by_name TEXT');
+      safeAddColumn('complaints', 'sla_deadline DATETIME');
+      safeAddColumn('complaints', 'work_performed TEXT');
+      safeAddColumn('complaints', 'materials_used TEXT');
+      safeAddColumn('complaints', 'additional_notes TEXT');
+      safeAddColumn('complaints', 'verified_by INTEGER');
+      safeAddColumn('complaints', 'verified_by_name TEXT');
+      safeAddColumn('complaints', 'verified_at DATETIME');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (
@@ -347,6 +359,18 @@ function createTablesSqlite() {
           priority TEXT DEFAULT 'Medium',
           status TEXT DEFAULT 'Submitted',
           department_id INTEGER,
+          assigned_staff_id TEXT,
+          assigned_staff_name TEXT,
+          assigned_staff_email TEXT,
+          assigned_by INTEGER,
+          assigned_by_name TEXT,
+          sla_deadline DATETIME,
+          work_performed TEXT,
+          materials_used TEXT,
+          additional_notes TEXT,
+          verified_by INTEGER,
+          verified_by_name TEXT,
+          verified_at DATETIME,
           latitude REAL NOT NULL,
           longitude REAL NOT NULL,
           location_source TEXT NOT NULL,

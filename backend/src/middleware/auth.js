@@ -16,6 +16,9 @@ function generateToken(user) {
       mobile: user.mobile,
       email: user.email,
       role: user.role,
+      department_id: user.department_id,
+      department_name: user.department_name,
+      department_code: user.department_code,
       language_pref: user.language_pref
     },
     JWT_SECRET,

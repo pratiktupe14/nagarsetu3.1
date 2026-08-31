@@ -221,7 +221,13 @@ export async function fetchDepartmentStaffApi(params?: {
     console.warn('Failed to fetch staff from API:', err);
   }
 
-  const defaultStaff = getAllServiceStaffRecords().map((s) => ({
+  let rawRecords = getAllServiceStaffRecords();
+  if (params?.department_id) {
+    const targetDept = resolveDepartmentInfo(params.department_id);
+    rawRecords = rawRecords.filter((s) => isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name));
+  }
+
+  const defaultStaff = rawRecords.map((s) => ({
     id: s.id,
     name: s.name,
     email: s.email,
