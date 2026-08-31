@@ -10,6 +10,7 @@ import {
   getStaffTasks, acceptStaffTask, startStaffTravel, startStaffWork,
   submitStaffResolution
 } from '../../services/complaintService';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import { formatSlaRemainingTime, logActivity } from '../../services/adminService';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -94,8 +95,13 @@ export const StaffTaskMapPage: React.FC = () => {
   // Staff Identity & Department
   const staffName = user?.full_name || 'Field Officer';
   const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
-  const staffDepartmentFull = user?.department_name || 'Public Works Department (PWD)';
-  const staffDepartment = staffDepartmentFull.split('(')[0].trim() || 'Department';
+
+  const resolvedDept = useMemo(
+    () => resolveDepartmentInfo(user?.department_id, user?.department_name),
+    [user?.department_id, user?.department_name]
+  );
+  const staffDepartmentFull = resolvedDept.fullName;
+  const staffDepartment = resolvedDept.name;
 
   // Data State
   const [tasks, setTasks] = useState<Complaint[]>([]);
@@ -133,7 +139,7 @@ export const StaffTaskMapPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name);
+      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name, user?.employee_id);
       setTasks(list);
     } catch (err) {
       console.error(err);

@@ -117,7 +117,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     let departmentId = user.department_id || null;
     let departmentName = null;
 
-    if (user.role === 'department_head' || user.role === 'staff' || user.role === 'officer') {
+    if (user.role === 'department_head' || user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer') {
       const dhRes = await query(
         `SELECT dh.*, d.name as dept_name FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE (dh.user_id = ? OR LOWER(dh.email) = ?) AND dh.status = 'active' ORDER BY dh.id DESC LIMIT 1`,
         [user.id, cleanIdentifier]
@@ -125,8 +125,9 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       if (dhRes.rows && dhRes.rows.length > 0) {
         departmentId = dhRes.rows[0].department_id;
         departmentName = dhRes.rows[0].dept_name;
-      } else if (departmentId) {
-        const dRes = await query(`SELECT name FROM departments WHERE id = ?`, [departmentId]);
+      }
+      if (!departmentName && departmentId) {
+        const dRes = await query(`SELECT name FROM departments WHERE id = ? OR code = ?`, [departmentId, departmentId]);
         if (dRes.rows && dRes.rows.length > 0) {
           departmentName = dRes.rows[0].name;
         }

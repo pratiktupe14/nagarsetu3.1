@@ -93,7 +93,15 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       params.push(userDeptId || -1);
     } else if (req.query.department_id) {
       let deptFilterId = req.query.department_id;
-      const codeToIdMap = { PWD: 1, SAN: 2, WTR: 3, ELE: 4, TRF: 5, MNT: 6, DRN: 7 };
+      const codeToIdMap = {
+        PWD: 1, 'DEPT-1': 1,
+        SAN: 2, 'DEPT-2': 2,
+        WTR: 3, 'DEPT-3': 3,
+        DRN: 4, 'DEPT-4': 4,
+        ELE: 5, 'DEPT-5': 5,
+        TRF: 6, 'DEPT-6': 6,
+        MNT: 7, 'DEPT-7': 7
+      };
       if (typeof deptFilterId === 'string') {
         const cleanCode = deptFilterId.toUpperCase().split('-')[0].replace('DEPT', '').trim();
         if (codeToIdMap[cleanCode]) {
@@ -428,6 +436,108 @@ router.delete('/staff/:id', authenticateToken, requireRole(['department_head', '
   } catch (err) {
     console.error('Error removing staff:', err);
     return res.status(500).json({ error: 'Failed to remove staff member' });
+  }
+});
+
+/**
+ * POST /api/department/assign
+ * Assign complaint to active service staff member with department isolation authorization
+ */
+router.post('/assign', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), async (req, res) => {
+  try {
+    const { complaint_id, staff_id } = req.body;
+    if (!complaint_id || !staff_id) {
+      return res.status(400).json({ error: 'Complaint ID and Staff ID are required.' });
+    }
+
+    const { userDeptId } = await resolveUserDepartment(req);
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    // 1. Fetch Complaint by ID or Complaint Number
+    const compRes = await query(`SELECT * FROM complaints WHERE id = $1 OR complaint_number = $1`, [complaint_id]);
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint record not found.' });
+    }
+    const complaint = compRes.rows[0];
+
+    // 2. Fetch Selected Staff Member by ID, Employee ID or Email
+    const staffRes = await query(`SELECT id, name, email, mobile, department_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR email = $1) AND (role = 'service_staff' OR role = 'staff')`, [staff_id]);
+    if (!staffRes.rows || staffRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Selected service staff member not found.' });
+    }
+    const staff = staffRes.rows[0];
+
+    // 3. Status Check: Staff must be active
+    if ((staff.status || 'active').toLowerCase() !== 'active') {
+      return res.status(400).json({ error: `Cannot assign task: Staff member '${staff.name}' is currently inactive.` });
+    }
+
+    // Helper: Normalize department code/id for secure isolation check
+    const normDept = (d) => {
+      const s = String(d || '').trim().toLowerCase();
+      if (s === '1' || s.includes('pwd')) return 'PWD';
+      if (s === '2' || s.includes('san')) return 'SAN';
+      if (s === '3' || s.includes('wtr')) return 'WTR';
+      if (s === '4' || s.includes('ele')) return 'ELE';
+      if (s === '5' || s.includes('trf')) return 'TRF';
+      if (s === '6' || s.includes('mnt')) return 'MNT';
+      if (s === '7' || s.includes('drn')) return 'DRN';
+      return s.toUpperCase();
+    };
+
+    // 4. Department Isolation Security Check
+    if (!isAdmin) {
+      if (userDeptId && complaint.department_id && normDept(userDeptId) !== normDept(complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
+      }
+      if (userDeptId && staff.department_id && normDept(userDeptId) !== normDept(staff.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
+      }
+    } else {
+      if (complaint.department_id && staff.department_id && normDept(complaint.department_id) !== normDept(staff.department_id)) {
+        return res.status(400).json({ error: 'Invalid assignment: Selected staff member does not belong to the complaint department.' });
+      }
+    }
+
+    // 5. Update Complaint in Database
+    await query(
+      `UPDATE complaints
+       SET assigned_staff_id = $1,
+           assigned_staff_name = $2,
+           assigned_staff_email = $3,
+           assigned_by = $4,
+           assigned_by_name = $5,
+           status = 'Staff Assigned',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6`,
+      [staff.id, staff.name, staff.email || '', req.user.id, req.user.name || 'Department Head', complaint.id]
+    );
+
+    // 6. Record Assignment History
+    await query(
+      `INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+      [complaint.id, staff.id, req.user.id]
+    ).catch(() => {});
+
+    // 7. Record Status History
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [complaint.id, 'Staff Assigned', `Task assigned to field staff ${staff.name}.`, 'Department Operations', req.user.name || 'Department Head']
+    ).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Task successfully assigned to ${staff.name}`,
+      complaint_id: complaint.id,
+      staff_id: staff.id,
+      staff_name: staff.name
+    });
+  } catch (err) {
+    console.error('Error assigning staff in department route:', err);
+    return res.status(500).json({ error: 'Server error assigning staff to task.' });
   }
 });
 

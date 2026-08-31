@@ -552,30 +552,40 @@ export function getDepartmentStaffRoster(departmentName?: string, complaints: Co
       employee_id: s.employee_id,
       department_name: s.department_name,
       active_workload_count: activeTasks,
-      is_online: s.status === 'Available' || s.status === 'On Task'
+      is_online: s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' || (s.status as string) === 'Active'
     };
   });
 
-  if (!departmentName) return roster;
+  if (!departmentName || departmentName === 'All') return roster;
 
   const dLower = departmentName.toLowerCase();
   return roster.filter((s) => {
     const sLower = s.department_name.toLowerCase();
-    return (
-      sLower.includes(dLower) ||
-      dLower.includes(sLower) ||
-      (dLower.includes('pwd') && sLower.includes('pwd')) ||
-      (dLower.includes('road') && sLower.includes('road')) ||
-      (dLower.includes('sanitation') && sLower.includes('sanitation')) ||
-      (dLower.includes('water') && sLower.includes('water')) ||
-      (dLower.includes('drainage') && sLower.includes('drainage')) ||
-      (dLower.includes('electric') && sLower.includes('electric')) ||
-      (dLower.includes('traffic') && sLower.includes('traffic')) ||
-      (dLower.includes('park') && sLower.includes('park')) ||
-      (dLower.includes('waste') && sLower.includes('waste')) ||
-      (dLower.includes('health') && sLower.includes('health')) ||
-      (dLower.includes('emergency') && sLower.includes('emergency'))
-    );
+    if (sLower.includes(dLower) || dLower.includes(sLower)) return true;
+
+    // Department Codes & Names cross-mapping (DEPT-1 through DEPT-7)
+    if ((dLower.includes('pwd') || dLower.includes('public works') || dLower.includes('road') || dLower.includes('dept-1')) &&
+        (sLower.includes('pwd') || sLower.includes('public works') || sLower.includes('road'))) return true;
+
+    if ((dLower.includes('san') || dLower.includes('sanitation') || dLower.includes('waste') || dLower.includes('dept-2')) &&
+        (sLower.includes('san') || sLower.includes('sanitation') || sLower.includes('waste'))) return true;
+
+    if ((dLower.includes('wtr') || dLower.includes('water') || dLower.includes('dept-3')) &&
+        (sLower.includes('wtr') || sLower.includes('water'))) return true;
+
+    if ((dLower.includes('drn') || dLower.includes('drain') || dLower.includes('sewag') || dLower.includes('dept-4')) &&
+        (sLower.includes('drn') || sLower.includes('drain') || sLower.includes('sewag'))) return true;
+
+    if ((dLower.includes('ele') || dLower.includes('electric') || dLower.includes('light') || dLower.includes('dept-5')) &&
+        (sLower.includes('ele') || sLower.includes('electric') || sLower.includes('light'))) return true;
+
+    if ((dLower.includes('trf') || dLower.includes('traffic') || dLower.includes('transport') || dLower.includes('dept-6')) &&
+        (sLower.includes('trf') || sLower.includes('traffic') || sLower.includes('transport'))) return true;
+
+    if ((dLower.includes('mnt') || dLower.includes('maint') || dLower.includes('dept-7')) &&
+        (sLower.includes('mnt') || sLower.includes('maint'))) return true;
+
+    return false;
   });
 }
 
@@ -698,6 +708,43 @@ export async function assignStaffToTask(
   slaHours: number = 24,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
+  const slaDeadline = new Date(Date.now() + slaHours * 3600000).toISOString();
+
+  // 1. Try Backend API
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    await fetch(`${getApiUrl()}/api/officer/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        staff_id: staffId
+      })
+    });
+  } catch (e) {
+    console.warn('Backend assignStaffToTask error fallback:', e);
+  }
+
+  // 2. Try Supabase
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('complaints')
+        .update({
+          assigned_staff_id: staffId,
+          assigned_staff_name: staffName,
+          status: 'Staff Assigned',
+          sla_deadline: slaDeadline,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', complaintId);
+    } catch (e) {}
+  }
+
+  // 3. LocalStorage persistence
   const all = getStoredComplaints();
   const comp = all.find((c) => c.id === complaintId);
   if (comp) {
@@ -705,7 +752,7 @@ export async function assignStaffToTask(
     comp.assigned_staff_id = staffId;
     comp.assigned_staff_name = staffName;
     comp.status = 'Staff Assigned';
-    comp.sla_deadline = new Date(Date.now() + slaHours * 3600000).toISOString();
+    comp.sla_deadline = slaDeadline;
     comp.updated_at = new Date().toISOString();
     saveStoredComplaints(all);
 

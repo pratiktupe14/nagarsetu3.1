@@ -12,6 +12,7 @@ import {
   getStaffTasks, acceptStaffTask, startStaffTravel, startStaffWork,
   submitStaffResolution
 } from '../../services/complaintService';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import { formatSlaRemainingTime, logActivity, getComplaintActivityLogs } from '../../services/adminService';
 import { getNotificationsForRole, markNotificationAsRead } from '../../services/notificationService';
 import { Complaint, ComplaintStatus, NotificationItem } from '../../types/database.types';
@@ -129,8 +130,13 @@ export const StaffPortal: React.FC = () => {
   // Department-wise & Staff-specific identity
   const staffName = user?.full_name || 'Field Officer';
   const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
-  const staffDepartmentFull = user?.department_name || 'Public Works Department (PWD)';
-  const staffDepartment = staffDepartmentFull.split('(')[0].trim() || 'Department';
+
+  const resolvedDept = useMemo(
+    () => resolveDepartmentInfo(user?.department_id, user?.department_name),
+    [user?.department_id, user?.department_name]
+  );
+  const staffDepartmentFull = resolvedDept.fullName;
+  const staffDepartment = resolvedDept.name;
   const staffRole = 'Field Service Officer';
 
   const deptInfo = useMemo(() => getDepartmentInfo(staffDepartmentFull), [staffDepartmentFull]);
@@ -186,7 +192,7 @@ export const StaffPortal: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name);
+      const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name, user?.employee_id);
       setTasks(list);
 
       const notifs = getNotificationsForRole(user?.id, 'service_staff');
@@ -559,11 +565,7 @@ export const StaffPortal: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight font-outfit">
-                {isProfilePage
-                  ? 'Staff Profile'
-                  : isDashboardView
-                  ? `${greetingTime}, ${staffName.split(' ')[0]}`
-                  : 'My Tasks'}
+                {isProfilePage ? 'Staff Profile' : 'My Tasks'}
               </h1>
               <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-50 text-emerald-800 border border-emerald-300">
                 <deptInfo.icon className="w-3.5 h-3.5 text-emerald-700" />
@@ -573,9 +575,7 @@ export const StaffPortal: React.FC = () => {
             <p className="text-sm text-gray-600 font-medium">
               {isProfilePage
                 ? 'Your authenticated municipal staff identity and department credentials.'
-                : isDashboardView
-                ? 'Here is your field work overview and priority assignments for today.'
-                : 'Manage complaints assigned to you and complete field service work.'}
+                : 'Here is your field work overview and priority assignments for today.'}
             </p>
           </div>
 
@@ -842,10 +842,9 @@ export const StaffPortal: React.FC = () => {
         )}
 
         {/* ================================================== */}
-        {/* DASHBOARD TWO-COLUMN GRID (ONLY ON DASHBOARD ROUTE) */}
+        {/* DASHBOARD TWO-COLUMN GRID */}
         {/* ================================================== */}
-        {isDashboardView ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* LEFT COLUMN: ACTIVE TASKS + NEW ASSIGNMENTS + PERFORMANCE */}
             <div className="lg:col-span-7 space-y-6">
@@ -1096,413 +1095,6 @@ export const StaffPortal: React.FC = () => {
             </div>
 
           </div>
-        ) : (
-          /* DEDICATED TASK LIST VIEW FOR SUB-ROUTES (/staff/tasks, /staff/tasks/new, etc.) */
-          <div className="space-y-6">
-
-            {/* SUB-ROUTE SPECIFIC METRIC CARDS HEADER */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {isNewPage ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setMetricFilter('All')}
-                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
-                      metricFilter === 'All'
-                        ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'bg-blue-50 border-blue-200 hover:bg-blue-100/60'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block font-outfit">NEW ASSIGNMENTS</span>
-                    <span className="text-xl font-extrabold text-blue-950 font-mono block">{newMetrics.totalNew}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMetricFilter('High')}
-                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
-                      metricFilter === 'High'
-                        ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-500/20 shadow-xs'
-                        : 'bg-purple-50 border-purple-200 hover:bg-purple-100/60'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider block font-outfit">HIGH PRIORITY</span>
-                    <span className="text-xl font-extrabold text-purple-950 font-mono block">{newMetrics.highCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMetricFilter('Critical')}
-                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
-                      metricFilter === 'Critical'
-                        ? 'bg-rose-100 border-rose-400 ring-2 ring-rose-500/20 shadow-xs'
-                        : 'bg-rose-50 border-rose-200 hover:bg-rose-100/60'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">CRITICAL</span>
-                    <span className="text-xl font-extrabold text-rose-950 font-mono block">{newMetrics.criticalCount}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMetricFilter('DueToday')}
-                    className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
-                      metricFilter === 'DueToday'
-                        ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/20 shadow-xs'
-                        : 'bg-amber-50 border-amber-200 hover:bg-amber-100/60'
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block font-outfit">DUE TODAY</span>
-                    <span className="text-xl font-extrabold text-amber-950 font-mono block">{newMetrics.dueTodayCount}</span>
-                  </button>
-                </>
-              ) : isInProgressPage ? (
-                <>
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Total In Progress</span>
-                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.activeTasks}</span>
-                  </div>
-                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
-                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">Due Today</span>
-                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.dueSoon}</span>
-                  </div>
-                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">SLA Compliance</span>
-                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.slaCompliancePercent}%</span>
-                  </div>
-                </>
-              ) : isOverduePage ? (
-                <>
-                  <div className="p-3.5 bg-rose-100 border border-rose-300 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block font-outfit">Total Overdue</span>
-                    <span className="text-xl font-extrabold text-rose-900 font-mono block">{metrics.overdueCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Critical</span>
-                    <span className="text-xl font-extrabold text-rose-800 font-mono block">{metrics.criticalCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
-                    <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
-                  </div>
-                  <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block font-outfit">SLA Breached</span>
-                    <span className="text-xl font-extrabold text-orange-900 font-mono block">{metrics.overdueCount}</span>
-                  </div>
-                </>
-              ) : isCompletedPage ? (
-                <>
-                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">Completed</span>
-                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.completed}</span>
-                  </div>
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Pending Verification</span>
-                    <span className="text-xl font-extrabold text-amber-900 font-mono block">
-                      {tasks.filter((t) => t.status === 'Resolution Submitted').length}
-                    </span>
-                  </div>
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">Verified</span>
-                    <span className="text-xl font-extrabold text-blue-900 font-mono block">
-                      {tasks.filter((t) => t.status === 'Resolved').length}
-                    </span>
-                  </div>
-                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Reopened</span>
-                    <span className="text-xl font-extrabold text-rose-900 font-mono block">
-                      {tasks.filter((t) => t.status === 'Reopened').length}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Assigned</span>
-                    <span className="text-xl font-extrabold text-gray-900 font-mono block">{metrics.total}</span>
-                  </div>
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">New</span>
-                    <span className="text-xl font-extrabold text-blue-900 font-mono block">{metrics.newTasks}</span>
-                  </div>
-                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">In Progress</span>
-                    <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.activeTasks}</span>
-                  </div>
-                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block font-outfit">Completed</span>
-                    <span className="text-xl font-extrabold text-emerald-900 font-mono block">{metrics.completed}</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* SEARCH & MULTI-FILTERS BAR */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    placeholder="Search complaint ID, issue, location..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="All">Priority: All</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="All">Category: All</option>
-                    <option value="Roads">Roads</option>
-                    <option value="Water">Water</option>
-                    <option value="Sanitation">Sanitation</option>
-                    <option value="Drainage">Drainage</option>
-                    <option value="Electrical">Electrical</option>
-                    <option value="Traffic">Traffic</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Other">Other</option>
-                  </select>
-
-                  <select
-                    value={slaFilter}
-                    onChange={(e) => setSlaFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="All">SLA: All</option>
-                    <option value="Due Today">Due Today</option>
-                    <option value="Due Soon">Due Soon</option>
-                    <option value="Within SLA">Within SLA</option>
-                    <option value="Overdue">Overdue</option>
-                  </select>
-
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="All">Date: All</option>
-                    <option value="Today">Today</option>
-                    <option value="Last 7 Days">Last 7 Days</option>
-                    <option value="Older">Older</option>
-                  </select>
-
-                  <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500 max-w-[160px] truncate"
-                  >
-                    <option value="All">Location: All</option>
-                    {uniqueLocations.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </select>
-
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All') && (
-                    <button
-                      type="button"
-                      onClick={clearAllFilters}
-                      className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-extrabold text-xs rounded-lg transition-colors min-h-[36px]"
-                    >
-                      CLEAR FILTERS
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* EMPTY STATES */}
-            {filteredTasks.length === 0 ? (
-              <div className="p-12 text-center bg-white border border-gray-200 rounded-xl space-y-3">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                <h3 className="font-extrabold text-gray-900 text-sm font-outfit">
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All')
-                    ? 'No Assignments Match Your Filters'
-                    : isNewPage
-                    ? 'No New Assignments'
-                    : isInProgressPage
-                    ? 'No Tasks In Progress'
-                    : isOverduePage
-                    ? 'All Tasks Within SLA — Great work!'
-                    : isCompletedPage
-                    ? 'No Completed Tasks'
-                    : 'No Tasks Found'}
-                </h3>
-                <p className="text-xs text-gray-500 max-w-md mx-auto">
-                  {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All')
-                    ? 'Try adjusting or clearing your active search query and filter selections.'
-                    : isNewPage
-                    ? 'New tasks assigned to you will appear here.'
-                    : isInProgressPage
-                    ? 'You currently have no tasks marked as in progress.'
-                    : isOverduePage
-                    ? 'You currently have no overdue assignments. Keep up the great field execution!'
-                    : isCompletedPage
-                    ? 'Tasks completed by you will appear here along with verification status.'
-                    : 'No task records match your selection.'}
-                </p>
-                {(searchQuery || priorityFilter !== 'All' || categoryFilter !== 'All' || slaFilter !== 'All' || dateFilter !== 'All' || locationFilter !== 'All' || metricFilter !== 'All') && (
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1"
-                  >
-                    <span>Clear Filters</span>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <>
-                {/* DESKTOP TABLE VIEW */}
-                <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-extrabold text-gray-600 uppercase font-outfit">
-                        <th className="py-3 px-3">Complaint ID</th>
-                        <th className="py-3 px-3">Issue Title</th>
-                        <th className="py-3 px-3">Location / Address</th>
-                        <th className="py-3 px-3">Priority</th>
-                        <th className="py-3 px-3 font-mono">Assigned Date</th>
-                        <th className="py-3 px-3 font-mono">SLA Target</th>
-                        <th className="py-3 px-3">Status</th>
-                        <th className="py-3 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 font-medium">
-                      {filteredTasks.map((t) => {
-                        const slaInfo = formatSlaRemainingTime(t.sla_deadline);
-                        const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
-                        const isNew = t.status === 'Department Assigned' || t.status === 'Staff Assigned';
-
-                        return (
-                          <tr key={t.id} className={`hover:bg-slate-50 ${isOverdue ? 'bg-rose-50/40' : ''}`}>
-                            <td className="py-3 px-3 font-mono font-extrabold text-emerald-700">{t.complaint_number}</td>
-                            <td className="py-3 px-3 font-bold text-gray-900">{t.title}</td>
-                            <td className="py-3 px-3 text-gray-700">{t.location_address}</td>
-                            <td className="py-3 px-3"><PriorityBadge priority={t.priority} /></td>
-                            <td className="py-3 px-3 font-mono text-gray-600">{new Date(t.created_at).toLocaleDateString()}</td>
-                            <td className="py-3 px-3 font-mono">
-                              <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>{slaInfo.text}</span>
-                            </td>
-                            <td className="py-3 px-3"><StatusBadge status={t.status} /></td>
-                            <td className="py-3 px-3 text-right">
-                              <div className="flex items-center justify-end space-x-2">
-                                <button
-                                  onClick={() => setSelectedTask(t)}
-                                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-gray-600" />
-                                  <span>View Task</span>
-                                </button>
-
-                                {isNew && (
-                                  <button
-                                    onClick={() => handleStatusTransition(t.id, 'In Progress')}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
-                                  >
-                                    <Play className="w-3.5 h-3.5" />
-                                    <span>Start Task</span>
-                                  </button>
-                                )}
-
-                                {isInProgressPage && (
-                                  <button
-                                    onClick={() => setSelectedTask(t)}
-                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors inline-flex items-center space-x-1 min-h-[36px]"
-                                  >
-                                    <Wrench className="w-3.5 h-3.5" />
-                                    <span>Complete Task</span>
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* MOBILE CARD GRID VIEW */}
-                <div className="block md:hidden space-y-3">
-                  {filteredTasks.map((t) => {
-                    const slaInfo = formatSlaRemainingTime(t.sla_deadline);
-                    const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
-                    const isNew = t.status === 'Department Assigned' || t.status === 'Staff Assigned';
-
-                    return (
-                      <div
-                        key={t.id}
-                        className={`p-4 rounded-xl border space-y-3 bg-white ${
-                          isOverdue ? 'border-rose-300 bg-rose-50/20' : 'border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-extrabold text-emerald-700">{t.complaint_number}</span>
-                          <PriorityBadge priority={t.priority} />
-                        </div>
-
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-xs">{t.title}</h4>
-                          <p className="text-[11px] text-gray-600 mt-0.5">{t.location_address}</p>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-100 font-mono">
-                          <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-600'}>
-                            {slaInfo.text}
-                          </span>
-                          <StatusBadge status={t.status} />
-                        </div>
-
-                        <div className="flex gap-2 pt-2">
-                          <button
-                            onClick={() => setSelectedTask(t)}
-                            className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1 min-h-[40px]"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View Task</span>
-                          </button>
-
-                          {isNew && (
-                            <button
-                              onClick={() => handleStatusTransition(t.id, 'In Progress')}
-                              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1 min-h-[40px]"
-                            >
-                              <Play className="w-3.5 h-3.5" />
-                              <span>Start Task</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
         {/* ================================================== */}
         {/* TASK EXECUTION & DETAIL MODAL (REUSED) */}

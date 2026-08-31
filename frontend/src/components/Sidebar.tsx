@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types/database.types';
 import { supabase } from '../lib/supabase';
+import { resolveDepartmentInfo } from '../services/departmentService';
 import {
   Home, FileText, PlusCircle, MapPin, Bell, User, Settings, HelpCircle, Info,
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
@@ -264,9 +265,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: t('allComplaints'), path: '/department-head/complaints', icon: FileText },
         { label: t('staff'), path: '/department-head/staff', icon: Users },
-        { label: t('taskAssignment'), path: '/department-head/tasks/assign', icon: PlusCircle },
-        { label: t('inProgress'), path: '/department-head/tasks/in-progress', icon: Activity },
-        { label: t('completed'), path: '/department-head/tasks/completed', icon: CheckCircle2 },
+        { label: t('taskAssignment'), path: '/department/tasks', icon: PlusCircle },
+        { label: t('inProgress'), path: '/department/tasks/in-progress', icon: Activity },
+        { label: t('completedWork'), path: '/department-head/tasks/completed', icon: CheckCircle2 },
         { label: t('overdue'), path: '/department-head/tasks/overdue', icon: AlertTriangle },
         { label: t('departmentMap'), path: '/department-head/map', icon: Map }
       ]
@@ -392,6 +393,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="block leading-tight">{deptHeadLabel.mainTitle}</span>
                 <span className="block leading-tight text-purple-900 font-black">{deptHeadLabel.subtitle}</span>
               </div>
+            ) : activeRole === 'service_staff' ? (
+              <div className="px-2 py-1.5 rounded-lg border bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-extrabold tracking-wider font-mono uppercase text-center leading-tight flex flex-col items-center justify-center space-y-0.5 break-words">
+                <span className="block leading-tight">{staffDeptLabel.name.toUpperCase()}</span>
+                <span className="block leading-tight text-amber-900 font-black">({staffDeptLabel.code}) FIELD STAFF PORTAL</span>
+              </div>
             ) : (
               <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold tracking-wider font-mono uppercase text-center ${roleBadgeStyle}`}>
                 {roleLabel} PORTAL
@@ -412,16 +418,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path ||
-                  (
+                const isActive = (() => {
+                  if (location.pathname === item.path) return true;
+
+                  // Department Head route aliases & sub-routes
+                  if (item.path === '/department-head/portal') {
+                    return location.pathname === '/department/portal';
+                  }
+
+                  if (item.path === '/department/tasks') {
+                    return location.pathname.startsWith('/department-head/tasks/assign') ||
+                           location.pathname.startsWith('/department/tasks/assign');
+                  }
+
+                  if (item.path === '/department/tasks/in-progress') {
+                    return location.pathname.startsWith('/department-head/tasks/in-progress');
+                  }
+
+                  if (item.path === '/department-head/tasks/completed') {
+                    return location.pathname.startsWith('/department/tasks/completed');
+                  }
+
+                  if (item.path === '/department-head/tasks/overdue') {
+                    return location.pathname === '/department/tasks/overdue' ||
+                           location.pathname.startsWith('/department-head/tasks/overdue') ||
+                           location.pathname.startsWith('/department/tasks/overdue');
+                  }
+
+                  if (item.path === '/department-head/staff') {
+                    return location.pathname.startsWith('/department-head/staff/');
+                  }
+
+                  if (item.path === '/department-head/map') {
+                    return location.pathname === '/department/map' ||
+                           location.pathname.startsWith('/department-head/map') ||
+                           location.pathname.startsWith('/department/map');
+                  }
+
+                  // Citizen / Admin / Staff scoped sub-routes
+                  if (item.path === '/citizen/complaints') {
+                    return location.pathname.startsWith('/citizen/complaint');
+                  }
+
+                  if (
                     item.path !== '/citizen/portal' &&
                     item.path !== '/admin/portal' &&
                     item.path !== '/staff/portal' &&
                     item.path !== '/staff/tasks' &&
                     item.path !== '/department-head/portal' &&
-                    location.pathname.startsWith(item.path)
-                  ) ||
-                  (item.path === '/citizen/complaints' && location.pathname.startsWith('/citizen/complaint'));
+                    item.path !== '/department/tasks' &&
+                    location.pathname.startsWith(item.path + '/')
+                  ) {
+                    return true;
+                  }
+
+                  return false;
+                })();
 
                 return (
                   <Link
@@ -479,6 +531,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     </div>
   );
+
+  const staffDeptLabel = resolveDepartmentInfo(user?.department_id, user?.department_name);
 
   return (
     <>

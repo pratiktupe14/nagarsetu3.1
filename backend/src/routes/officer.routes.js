@@ -142,11 +142,38 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
   try {
     const { complaint_id, staff_id } = req.body;
 
-    const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [complaint_id]);
+    const compRes = await query(`SELECT citizen_id, department_id FROM complaints WHERE id = ?`, [complaint_id]);
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
-    const citizenId = compRes.rows[0].citizen_id;
+    const complaint = compRes.rows[0];
+
+    const staffRes = await query(`SELECT id, name, department_id, status FROM users WHERE id = ?`, [staff_id]);
+    if (!staffRes.rows || staffRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+    const staff = staffRes.rows[0];
+
+    if ((staff.status || 'active').toLowerCase() !== 'active') {
+      return res.status(400).json({ error: `Cannot assign task: Staff member '${staff.name}' is currently inactive.` });
+    }
+
+    // Department Authorization check
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    if (!isAdmin) {
+      let userDeptId = req.user.department_id;
+      if (userRole === 'department_head' && !userDeptId) {
+        const dhRes = await query(`SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`, [req.user.id, (req.user.email || '').toLowerCase()]);
+        if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
+      }
+      if (userDeptId && complaint.department_id && String(userDeptId) !== String(complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
+      }
+      if (userDeptId && staff.department_id && String(userDeptId) !== String(staff.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
+      }
+    }
 
     // Record assignment
     const assignSql = `
@@ -155,24 +182,31 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     `;
     await query(assignSql, [complaint_id, staff_id, req.user.id]);
 
-    // Update complaint status
-    let updateSql = `UPDATE complaints SET status = 'Assigned', updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-    await query(updateSql, [complaint_id]);
+    // Update complaint status & assigned staff fields
+    let updateSql = `
+      UPDATE complaints 
+      SET status = 'Staff Assigned',
+          assigned_staff_id = ?,
+          assigned_staff_name = ?,
+          assigned_by = ?,
+          assigned_by_name = ?,
+          updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `;
+    await query(updateSql, [staff.id, staff.name, req.user.id, req.user.name || 'Municipal Officer', complaint_id]);
 
     // Record status history
     try {
-      const staffRes = await query(`SELECT name FROM users WHERE id = ?`, [staff_id]);
-      const staffName = staffRes.rows?.[0]?.name || 'Field Officer';
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaint_id, 'Assigned', `Assigned to field staff ${staffName}.`, 'Department Operations', req.user.name || 'Municipal Officer']
+        [complaint_id, 'Staff Assigned', `Assigned to field staff ${staff.name}.`, 'Department Operations', req.user.name || 'Municipal Officer']
       );
     } catch (hErr) {}
 
     // Trigger Notification
-    await notifyStatusChange(complaint_id, 'Assigned', citizenId);
+    await notifyStatusChange(complaint_id, 'Staff Assigned', complaint.citizen_id);
 
-    return res.json({ message: 'Complaint assigned to field staff successfully' });
+    return res.json({ success: true, message: 'Complaint assigned to field staff successfully' });
   } catch (err) {
     console.error('Officer assign error:', err);
     return res.status(500).json({ error: 'Failed to assign complaint' });

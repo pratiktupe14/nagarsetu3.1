@@ -761,9 +761,13 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 min-h-[44px]"
                     >
                       <option value="">-- Select Staff Officer --</option>
-                      {getDepartmentStaffRoster(editDepartment).map((s) => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.employee_id})</option>
-                      ))}
+                      {getDepartmentStaffRoster(editDepartment)
+                        .filter((s) => s.is_online !== false)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.employee_id}) — Active Tasks: {s.active_workload_count}
+                          </option>
+                        ))}
                     </select>
                   </div>
 

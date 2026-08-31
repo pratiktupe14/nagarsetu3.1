@@ -1239,9 +1239,11 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                     className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
                   >
                     <option value="">Select Staff Officer</option>
-                    {getDepartmentStaffRoster(reassignDept).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.employee_id}) — {s.active_workload_count} active tasks</option>
-                    ))}
+                    {getDepartmentStaffRoster(reassignDept)
+                      .filter((s) => s.is_online !== false)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.employee_id}) — {s.active_workload_count} active tasks</option>
+                      ))}
                   </select>
                 </div>
 

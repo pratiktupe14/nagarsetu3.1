@@ -39,6 +39,10 @@ import { AdminReportsPage } from './pages/admin/AdminReportsPage';
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { StaffPortal } from './pages/staff/StaffPortal';
+import { StaffNewTasksPage } from './pages/staff/StaffNewTasksPage';
+import { StaffInProgressTasksPage } from './pages/staff/StaffInProgressTasksPage';
+import { StaffOverdueTasksPage } from './pages/staff/StaffOverdueTasksPage';
+import { StaffCompletedTasksPage } from './pages/staff/StaffCompletedTasksPage';
 import { StaffTaskMapPage } from './pages/staff/StaffTaskMapPage';
 import { StaffNotificationsPage } from './pages/staff/StaffNotificationsPage';
 import { StaffSettingsPage } from './pages/staff/StaffSettingsPage';
@@ -386,17 +390,8 @@ export default function App() {
               />
             ))}
 
-            {/* Service Staff Protected Portal Aliases */}
-            {[
-              '/staff/portal',
-              '/staff/dashboard',
-              '/staff/tasks',
-              '/staff/tasks/new',
-              '/staff/tasks/in-progress',
-              '/staff/tasks/overdue',
-              '/staff/tasks/completed',
-              '/staff/profile'
-            ].map((path) => (
+            {/* Service Staff Protected Routes */}
+            {['/staff/portal', '/staff/dashboard', '/staff/tasks', '/staff/profile'].map((path) => (
               <Route
                 key={path}
                 path={path}
@@ -407,6 +402,39 @@ export default function App() {
                 }
               />
             ))}
+
+            <Route
+              path="/staff/tasks/new"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffNewTasksPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/tasks/in-progress"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffInProgressTasksPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/tasks/overdue"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffOverdueTasksPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff/tasks/completed"
+              element={
+                <ProtectedRoute allowedRoles={['service_staff']}>
+                  <StaffCompletedTasksPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/staff/map"
@@ -454,13 +482,17 @@ export default function App() {
             {[
               '/department/portal',
               '/department-head/portal',
+              '/department/tasks',
+              '/department/tasks/in-progress',
               '/department-head/complaints',
               '/department-head/tasks/assign',
               '/department-head/tasks/in-progress',
               '/department-head/tasks/completed',
               '/department-head/tasks/overdue',
+              '/department/tasks/overdue',
               '/department-head/staff/:staffId',
               '/department-head/map',
+              '/department/map',
               '/department-head/notifications',
               '/department-head/profile',
               '/department-head/settings'

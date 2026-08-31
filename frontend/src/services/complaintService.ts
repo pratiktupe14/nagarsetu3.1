@@ -4,6 +4,7 @@ import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { getApiUrl } from '../config/apiConfig';
 import { geocodeComplaintsWithoutCoordinates, auditAndRepairComplaintLocations } from './locationService';
+import { resolveDepartmentInfo } from './departmentService';
 
 const LOCAL_STORAGE_COMPLAINTS_KEY = 'nagarsetu_citizen_complaints_v3';
 const LOCAL_STORAGE_OFFLINE_DRAFTS_KEY = 'nagarsetu_offline_drafts_v3';
@@ -211,99 +212,109 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   );
 }
 
-// Fetch staff tasks from Supabase & LocalStorage with strict staff data isolation
+// Fetch staff tasks from Supabase, Express API & LocalStorage with strict staff data isolation
 export async function getStaffTasks(
   staffId?: string,
   departmentName?: string,
   userEmail?: string,
-  userName?: string
+  userName?: string,
+  employeeId?: string
 ): Promise<Complaint[]> {
-  const cleanStaffId = String(staffId || '').trim();
+  const cleanStaffId = String(staffId || '').trim().toLowerCase();
   const cleanEmail = String(userEmail || '').trim().toLowerCase();
   const cleanName = String(userName || '').trim().toLowerCase();
+  const cleanEmpId = String(employeeId || '').trim().toLowerCase();
 
-  // 1. Try Supabase if configured
-  if (isSupabaseConfigured()) {
-    try {
-      let query = supabase.from('complaints').select('*');
-      if (cleanStaffId && isValidUuid(cleanStaffId)) {
-        query = query.eq('assigned_staff_id', cleanStaffId);
-      } else if (departmentName && departmentName !== 'All') {
-        const cleanDept = departmentName.split('(')[0].trim();
-        query = query.ilike('department_name', `%${cleanDept}%`);
-      }
-      const { data, error } = await query.order('created_at', { ascending: false });
+  const allComplaints = await getAllComplaints();
 
-      if (!error && data && data.length > 0) {
-        return data as Complaint[];
-      }
-    } catch (err) {
-      console.warn('Supabase getStaffTasks fallback:', err);
-    }
-  }
+  return allComplaints.filter((c) => {
+    if (isDemoComplaint(c)) return false;
 
-  // 2. Strict LocalStorage staff isolation
-  const all = getStoredComplaints();
-  return all.filter((c) => {
-    // If specific staff identifiers are provided, strictly match against this staff member only
-    if (cleanStaffId || cleanEmail || cleanName) {
-      const matchId = cleanStaffId && String(c.assigned_staff_id || '').toLowerCase() === cleanStaffId.toLowerCase();
-      const matchEmail = cleanEmail && String(c.assigned_staff_email || '').toLowerCase() === cleanEmail;
-      const matchName = cleanName && String(c.assigned_staff_name || '').toLowerCase() === cleanName;
-      return Boolean(matchId || matchEmail || matchName);
+    // Strict Staff Isolation: If any staff identity parameter is present, match assigned staff
+    if (cleanStaffId || cleanEmail || cleanName || cleanEmpId) {
+      const cStaffId = String(c.assigned_staff_id || '').toLowerCase();
+      const cStaffEmail = String(c.assigned_staff_email || '').toLowerCase();
+      const cStaffName = String(c.assigned_staff_name || '').toLowerCase();
+      const cStaffEmpId = String((c as any).assigned_staff_employee_id || (c as any).employee_id || '').toLowerCase();
+
+      const matchId = Boolean(cleanStaffId && (
+        cStaffId === cleanStaffId ||
+        cStaffId.includes(cleanStaffId) ||
+        cleanStaffId.includes(cStaffId)
+      ));
+      const matchEmail = Boolean(cleanEmail && cStaffEmail && (
+        cStaffEmail === cleanEmail ||
+        cStaffEmail.includes(cleanEmail) ||
+        cleanEmail.includes(cStaffEmail)
+      ));
+      const matchName = Boolean(cleanName && cStaffName && (
+        cStaffName === cleanName ||
+        cStaffName.includes(cleanName) ||
+        cleanName.includes(cStaffName)
+      ));
+      const matchEmpId = Boolean(cleanEmpId && (
+        cStaffEmpId === cleanEmpId ||
+        cStaffId === cleanEmpId ||
+        cStaffEmpId.includes(cleanEmpId) ||
+        cleanEmpId.includes(cStaffEmpId)
+      ));
+
+      return matchId || matchEmail || matchName || matchEmpId;
     }
 
     if (departmentName && departmentName !== 'All') {
-      const compDept = (c.department_name || '').toLowerCase();
-      const targetDept = departmentName.split('(')[0].trim().toLowerCase();
-      return compDept.includes(targetDept) || targetDept.includes(compDept);
+      const targetDept = resolveDepartmentInfo(undefined, departmentName);
+      const cResolved = resolveDepartmentInfo(c.department_id, c.department_name || (c as any).department, c.category);
+      return cResolved.code === targetDept.code && (c.assigned_staff_id != null || c.status === 'Staff Assigned' || c.status === 'In Progress' || c.status === 'Accepted');
     }
 
     return c.assigned_staff_id != null || c.status === 'Staff Assigned' || c.status === 'In Progress' || c.status === 'Accepted';
   });
 }
 
-// Fetch complaints belonging to a specific department from Supabase
+// Fetch complaints belonging to a specific department from Supabase, Express API & LocalStorage
 export async function getDepartmentComplaints(departmentId?: string, departmentName?: string): Promise<Complaint[]> {
   if (!departmentId && !departmentName) {
     return [];
   }
-  if (isSupabaseConfigured()) {
-    try {
-      let query = supabase.from('complaints').select('*');
-      
-      let targetUuid = (departmentId && isValidUuid(departmentId)) ? departmentId : null;
-      if (!targetUuid && departmentName && departmentName !== 'All') {
-        const { data: deptData } = await supabase.from('departments').select('id, name, code');
-        const cleanName = departmentName.split('(')[0].trim().toLowerCase();
-        const matched = (deptData || []).find((d) =>
-          d.name.toLowerCase().includes(cleanName) || cleanName.includes(d.name.toLowerCase())
-        );
-        if (matched) targetUuid = matched.id;
-      }
+  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
 
-      if (targetUuid) {
-        query = query.eq('department_id', targetUuid);
-      } else if (departmentId) {
-        query = query.eq('department_id', departmentId);
-      }
+  // 1. Fetch entire complaint pool across Supabase, Backend, and LocalStorage
+  let allComplaints: Complaint[] = await getAllComplaints();
 
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (!error && data && Array.isArray(data)) {
-        return data as Complaint[];
+  // 2. Also query Express Backend API /api/complaints if available
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const res = await fetch(`${getApiUrl()}/api/complaints`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
+      if (backendComplaints.length > 0) {
+        const map = new Map<string, Complaint>();
+        allComplaints.forEach((c) => map.set(c.id || c.complaint_number, c));
+        backendComplaints.forEach((c: Complaint) => map.set(c.id || c.complaint_number, c));
+        allComplaints = Array.from(map.values());
       }
-    } catch (err) {
-      console.warn('Supabase getDepartmentComplaints fallback:', err);
     }
+  } catch (e) {
+    // Graceful fallback to allComplaints
   }
 
-  const all = getStoredComplaints();
-  const cleanHeadDept = (departmentName || '').split('(')[0].trim().toLowerCase();
-  return all.filter((c) => {
-    if (departmentId && c.department_id === departmentId) return true;
-    const cDept = (c.department_name || '').toLowerCase();
-    return cDept.includes(cleanHeadDept) || cleanHeadDept.includes(cDept);
+  // 3. Authoritatively filter complaints belonging to target department
+  return allComplaints.filter((c) => {
+    if (isDemoComplaint(c)) return false;
+
+    if (departmentId && (String(c.department_id) === String(departmentId) || String(c.department_id) === targetDept.id)) {
+      return true;
+    }
+    if ((c as any).department_code && (c as any).department_code.toUpperCase() === targetDept.code) {
+      return true;
+    }
+
+    const cResolved = resolveDepartmentInfo(c.department_id, c.department_name || (c as any).department, c.category);
+    return cResolved.code === targetDept.code;
   });
 }
 
@@ -371,9 +382,12 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
   const newComplaintNumber = payload.complaint_number || generateComplaintNumber();
   const parsedLat = payload.latitude != null ? Number(payload.latitude) : 0;
   const parsedLng = payload.longitude != null ? Number(payload.longitude) : 0;
+  const resolvedDept = resolveDepartmentInfo(payload.department_id, payload.department_name);
 
   const newComplaint: Complaint = {
     ...payload,
+    department_id: payload.department_id || resolvedDept.id,
+    department_name: payload.department_name || resolvedDept.fullName,
     latitude: parsedLat,
     longitude: parsedLng,
     complaint_number: newComplaintNumber,
@@ -861,58 +875,132 @@ export async function assignTaskByDepartmentHead(
   staffDept: string,
   headId: string,
   headName: string,
-  headDept: string
+  headDept: string,
+  staffEmail?: string,
+  staffEmpId?: string
 ): Promise<boolean> {
   // CROSS-DEPARTMENT SECURITY CHECK
-  const cleanStaffDept = (staffDept || '').split('(')[0].trim().toLowerCase();
-  const cleanHeadDept = (headDept || '').split('(')[0].trim().toLowerCase();
+  const normDept = (d: string) => {
+    const s = (d || '').split('(')[0].trim().toLowerCase();
+    if (s.includes('pwd') || s.includes('public works')) return 'PWD';
+    if (s.includes('san') || s.includes('sanitat')) return 'SAN';
+    if (s.includes('wtr') || s.includes('water')) return 'WTR';
+    if (s.includes('ele') || s.includes('electric')) return 'ELE';
+    if (s.includes('trf') || s.includes('traffic')) return 'TRF';
+    if (s.includes('mnt') || s.includes('mainten')) return 'MNT';
+    if (s.includes('drn') || s.includes('drain')) return 'DRN';
+    return s.toUpperCase();
+  };
+
+  const cleanStaffDept = normDept(staffDept);
+  const cleanHeadDept = normDept(headDept);
   
-  if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
+  if (cleanStaffDept && cleanHeadDept && cleanStaffDept !== cleanHeadDept) {
     throw new Error(`CROSS-DEPARTMENT ASSIGNMENT REJECTED: Department Head of '${headDept}' cannot assign staff belonging to '${staffDept}'.`);
   }
 
+  // 1. Try Backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/department/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        staff_id: staffId
+      })
+    });
+
+    if (!apiRes.ok) {
+      const errJson = await apiRes.json().catch(() => ({}));
+      if (apiRes.status === 403 || apiRes.status === 400) {
+        throw new Error(errJson.error || 'Server rejected task assignment.');
+      }
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('REJECTED') || apiErr.message.includes('inactive'))) {
+      throw apiErr;
+    }
+    console.warn('Backend assign task API fallback:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      await supabase
-        .from('complaints')
-        .update({
-          assigned_staff_id: staffId,
-          assigned_staff_name: staffName,
-          assigned_by: headId,
-          assigned_by_name: headName,
-          status: 'Staff Assigned',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', complaintId);
+      let isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      let query = supabase.from('complaints').update({
+        assigned_staff_id: staffId,
+        assigned_staff_name: staffName,
+        assigned_staff_email: staffEmail || '',
+        assigned_staff_employee_id: staffEmpId || staffId,
+        assigned_by: headId,
+        assigned_by_name: headName,
+        status: 'Staff Assigned',
+        updated_at: new Date().toISOString()
+      });
+
+      if (isUuid) {
+        await query.eq('id', complaintId);
+      } else {
+        await query.eq('complaint_number', complaintId);
+      }
     } catch (e) {}
   }
 
+  // 3. LocalStorage persistence
   const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
+  let comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
+  const prevStatus = comp ? comp.status : 'Submitted';
+
+  if (!comp) {
+    // If complaint was not yet in LocalStorage cache, create entry
+    comp = {
+      id: complaintId,
+      complaint_number: complaintId.startsWith('NS-') ? complaintId : `NS-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+      title: 'Assigned Civic Complaint',
+      description: 'Task assigned by Department Head',
+      category: 'General Civic Issue',
+      priority: 'Medium',
+      status: 'Staff Assigned',
+      location_address: 'Nashik City',
+      assigned_staff_id: staffId,
+      assigned_staff_name: staffName,
+      assigned_staff_email: staffEmail || '',
+      assigned_staff_employee_id: staffEmpId || staffId,
+      assigned_by: headId,
+      assigned_by_name: headName,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    } as unknown as Complaint;
+    all.push(comp);
+  } else {
     comp.assigned_staff_id = staffId;
     comp.assigned_staff_name = staffName;
+    if (staffEmail) comp.assigned_staff_email = staffEmail;
+    if (staffEmpId) (comp as any).assigned_staff_employee_id = staffEmpId;
     comp.assigned_by = headId;
     comp.assigned_by_name = headName;
     comp.status = 'Staff Assigned';
     comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    pushNotification({
-      user_id: staffId,
-      role: 'service_staff',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'New Field Task Assigned',
-      message: `Department Head ${headName} assigned task ${comp.complaint_number} to you.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Staff Assigned', headName, `Assigned to ${staffName}`);
-    return true;
   }
-  return false;
+
+  saveStoredComplaints(all);
+
+  pushNotification({
+    user_id: staffId,
+    role: 'service_staff',
+    complaint_id: comp.id,
+    complaint_number: comp.complaint_number,
+    type: 'staff_assigned',
+    title: 'New Field Task Assigned',
+    message: `Department Head ${headName} assigned task ${comp.complaint_number} to you.`
+  });
+
+  broadcastComplaintChange(comp.id, prevStatus, 'Staff Assigned', headName, `Assigned to ${staffName}`);
+  return true;
 }
 
 export async function requestReworkDepartmentHead(

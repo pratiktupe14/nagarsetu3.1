@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { UserProfile, UserRole } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getApiUrl } from '../config/apiConfig';
+import { resolveDepartmentInfo } from '../services/departmentService';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 interface AuthContextType {
@@ -119,6 +120,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               deptName = deptHead.departments?.name || deptName;
             }
 
+            if (deptId || deptName) {
+              const resDept = resolveDepartmentInfo(deptId, deptName);
+              deptId = deptId ? String(deptId) : resDept.id;
+              deptName = resDept.name;
+            }
+
             const fetchedUser: UserProfile = {
               id: authUser.id,
               full_name: deptHead?.name || profile?.full_name || authUser.email?.split('@')[0] || 'User',
@@ -182,6 +189,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role = 'department_head';
             deptId = deptHead.department_id;
             deptName = deptHead.departments?.name || deptName;
+          }
+
+          if (deptId || deptName) {
+            const resDept = resolveDepartmentInfo(deptId, deptName);
+            deptId = deptId ? String(deptId) : resDept.id;
+            deptName = resDept.name;
           }
 
           const updatedUser: UserProfile = {
@@ -248,14 +261,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const data = await response.json();
           if (data.token && data.user) {
             const mappedRole: UserRole = data.user.role === 'admin' ? 'city_admin' : (data.user.role as UserRole);
+            const resDept = resolveDepartmentInfo(data.user.department_id, data.user.department_name);
             const authenticatedUser: UserProfile = {
               id: String(data.user.id),
               full_name: data.user.name || 'Municipal User',
               email: data.user.email || cleanIdentifier,
               mobile: data.user.mobile || '',
               role: mappedRole,
-              department_id: data.user.department_id || undefined,
-              department_name: data.user.department_name || undefined,
+              department_id: data.user.department_id ? String(data.user.department_id) : resDept.id,
+              department_name: data.user.department_name || resDept.name,
               employee_id: data.user.employee_id || undefined,
               language_pref: data.user.language_pref || 'en'
             };
@@ -307,6 +321,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = profRes.data;
           const deptHead = headRes.data;
           const resolvedRole: UserRole = deptHead ? 'department_head' : (roleRes.data?.role as UserRole) || targetRole;
+          let rawDeptId = deptHead?.department_id || profile?.department_id;
+          let rawDeptName = deptHead?.departments?.name || profile?.department_name;
+          const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName);
 
           const fetchedUser: UserProfile = {
             id: authUser.id,
@@ -314,8 +331,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             email: authUser.email || cleanEmail,
             mobile: deptHead?.phone || profile?.mobile || '',
             role: resolvedRole,
-            department_id: deptHead?.department_id || profile?.department_id,
-            department_name: deptHead?.departments?.name || profile?.department_name,
+            department_id: rawDeptId ? String(rawDeptId) : resDept.id,
+            department_name: rawDeptName || resDept.name,
             employee_id: deptHead?.employee_id || profile?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };

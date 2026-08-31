@@ -79,6 +79,128 @@ export const TARGET_MUNICIPAL_DEPARTMENTS = [
   { code: 'MNT', name: 'Maintenance Department' }
 ];
 
+export interface ResolvedDepartment {
+  id: string;
+  code: string;
+  name: string;
+  fullName: string;
+}
+
+export function resolveDepartmentInfo(
+  departmentId?: string | number,
+  departmentName?: string,
+  category?: string
+): ResolvedDepartment {
+  const dId = String(departmentId || '').trim().toLowerCase();
+  const dName = String(departmentName || '').trim().toLowerCase();
+  const dCat = String(category || '').trim().toLowerCase();
+
+  // 1. Electrical & Street Lighting (ELE) - ID 4
+  if (
+    dId === '4' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
+    dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
+    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light')
+  ) {
+    return {
+      id: '4',
+      code: 'ELE',
+      name: 'Electrical & Street Lighting',
+      fullName: 'Electrical & Street Lighting (ELE)'
+    };
+  }
+
+  // 2. Sanitation & Waste Management (SAN) - ID 2
+  if (
+    dId === '2' || dId === 'san' || dId === 'dept-san' || dId.includes('san') ||
+    dName.includes('sanitat') || dName.includes('waste') || dName.includes('san') ||
+    dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat')
+  ) {
+    return {
+      id: '2',
+      code: 'SAN',
+      name: 'Sanitation & Waste Management',
+      fullName: 'Sanitation & Waste Management (SAN)'
+    };
+  }
+
+  // 3. Water Supply & Sewerage Board (WTR) - ID 3
+  if (
+    dId === '3' || dId === 'wtr' || dId === 'wssb' || dId === 'dept-wtr' || dId.includes('wtr') ||
+    dName.includes('water') || dName.includes('sewerage board') || dName.includes('wtr') ||
+    dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage')
+  ) {
+    return {
+      id: '3',
+      code: 'WTR',
+      name: 'Water Supply & Sewerage Board',
+      fullName: 'Water Supply & Sewerage Board (WTR)'
+    };
+  }
+
+  // 4. Traffic Management Department (TRF) - ID 5
+  if (
+    dId === '5' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
+    dName.includes('traffic') || dName.includes('trf') ||
+    dCat.includes('traffic') || dCat.includes('signal')
+  ) {
+    return {
+      id: '5',
+      code: 'TRF',
+      name: 'Traffic Management Department',
+      fullName: 'Traffic Management Department (TRF)'
+    };
+  }
+
+  // 5. Maintenance Department (MNT) - ID 6
+  if (
+    dId === '6' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
+    dName.includes('mainten') || dName.includes('mnt') ||
+    dCat.includes('mainten') || dCat.includes('building')
+  ) {
+    return {
+      id: '6',
+      code: 'MNT',
+      name: 'Maintenance Department',
+      fullName: 'Maintenance Department (MNT)'
+    };
+  }
+
+  // 6. Drainage & Sewage Department (DRN) - ID 7
+  if (
+    dId === '7' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
+    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
+    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter')
+  ) {
+    return {
+      id: '7',
+      code: 'DRN',
+      name: 'Drainage & Sewage Department',
+      fullName: 'Drainage & Sewage Department (DRN)'
+    };
+  }
+
+  // 7. Public Works Department (PWD) - ID 1
+  if (
+    dId === '1' || dId === 'pwd' || dId === 'dept-pwd' || dId.includes('pwd') ||
+    dName.includes('public works') || dName.includes('road') || dName.includes('pwd') ||
+    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works')
+  ) {
+    return {
+      id: '1',
+      code: 'PWD',
+      name: 'Public Works Department',
+      fullName: 'Public Works Department (PWD)'
+    };
+  }
+
+  return {
+    id: '1',
+    code: 'PWD',
+    name: 'Public Works Department',
+    fullName: 'Public Works Department (PWD)'
+  };
+}
+
 
 
 /**
