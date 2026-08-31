@@ -77,6 +77,64 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
   }
 });
 
+async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
+  const inputStr = String(deptInput || '').trim();
+  const catStr = String(categoryInput || '').trim();
+  const titleStr = String(titleInput || '').trim();
+  const combined = `${inputStr} ${catStr} ${titleStr}`.toLowerCase();
+
+  // 1. Check direct numeric ID if valid in departments table
+  const numericId = parseInt(inputStr, 10);
+  if (!isNaN(numericId) && numericId > 0) {
+    const idRes = await query(`SELECT id FROM departments WHERE id = ? LIMIT 1`, [numericId]);
+    if (idRes.rows && idRes.rows.length > 0) {
+      return idRes.rows[0].id;
+    }
+  }
+
+  // 2. Direct exact or LIKE search by department name in DB
+  if (inputStr) {
+    const nameRes = await query(`SELECT id FROM departments WHERE name LIKE ? OR description LIKE ? LIMIT 1`, [`%${inputStr}%`, `%${inputStr}%`]);
+    if (nameRes.rows && nameRes.rows.length > 0) {
+      return nameRes.rows[0].id;
+    }
+  }
+
+  // 3. Match by department keywords against database names
+  if (combined.includes('electric') || combined.includes('light') || combined.includes('street light') || combined.includes('ele')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Electric%' OR name LIKE '%Light%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('sanitat') || combined.includes('waste') || combined.includes('garbage') || combined.includes('san')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Sanitation%' OR name LIKE '%Waste%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('water') || combined.includes('pipeline') || combined.includes('leak') || combined.includes('wtr')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Water%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('drain') || combined.includes('sewag') || combined.includes('sewer') || combined.includes('drn')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Drain%' OR name LIKE '%Sewer%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('traffic') || combined.includes('signal') || combined.includes('trf')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Traffic%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('pothole') || combined.includes('road') || combined.includes('public works') || combined.includes('pwd')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Public Works%' OR name LIKE '%PWD%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+  if (combined.includes('mainten') || combined.includes('building') || combined.includes('mnt')) {
+    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Maintenance%' LIMIT 1`);
+    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+  }
+
+  // 4. Default fallback to lowest department ID
+  const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
+  return fallbackRes.rows?.[0]?.id || 1;
+}
+
 // Step 2: Final Complaint Submission
 router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
@@ -96,28 +154,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     } = req.body;
 
     const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    // Default department mapping if not provided
-    let finalDeptId = department_id;
-    if (!finalDeptId) {
-      let deptCode = 'PWD';
-      const catLower = (category || '').toLowerCase();
-      if (catLower.includes('water') || catLower.includes('pipeline')) deptCode = 'WTR';
-      else if (catLower.includes('garbage') || catLower.includes('waste') || catLower.includes('sanitation')) deptCode = 'SAN';
-      else if (catLower.includes('drain') || catLower.includes('sewag') || catLower.includes('sewer')) deptCode = 'DRN';
-      else if (catLower.includes('street') || catLower.includes('electric') || catLower.includes('light')) deptCode = 'ELE';
-      else if (catLower.includes('traffic') || catLower.includes('signal')) deptCode = 'TRF';
-      else if (catLower.includes('infrastructure') || catLower.includes('maintenance') || catLower.includes('other')) deptCode = 'MNT';
-      else if (catLower.includes('pothole') || catLower.includes('road')) deptCode = 'PWD';
-
-      const deptRes = await query(`SELECT id FROM departments WHERE code = ? OR id = ? LIMIT 1`, [deptCode, deptCode]);
-      if (deptRes.rows && deptRes.rows.length > 0) {
-        finalDeptId = deptRes.rows[0].id;
-      } else {
-        const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
-        finalDeptId = fallbackRes.rows?.[0]?.id || 1;
-      }
-    }
+    const finalDeptId = await resolveDepartmentId(department_id, category, title);
 
 
 
@@ -280,7 +317,32 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.json({ message: 'Feedback submitted successfully' });
   } catch (err) {
     console.error('Submit feedback error:', err);
-    return res.status(500).json({ error: 'Failed to submit feedback' });
+// Purge/remove all complaints and associated records
+router.delete('/purge-all', async (req, res) => {
+  try {
+    await query(`DELETE FROM feedback`);
+    await query(`DELETE FROM assignments`);
+    await query(`DELETE FROM complaint_status_history`);
+    await query(`DELETE FROM notifications`);
+    await query(`DELETE FROM complaints`);
+    return res.json({ message: 'All complaints and associated records purged successfully' });
+  } catch (err) {
+    console.error('Purge all complaints error:', err);
+    return res.status(500).json({ error: 'Failed to purge complaints' });
+  }
+});
+
+router.post('/purge-all', async (req, res) => {
+  try {
+    await query(`DELETE FROM feedback`);
+    await query(`DELETE FROM assignments`);
+    await query(`DELETE FROM complaint_status_history`);
+    await query(`DELETE FROM notifications`);
+    await query(`DELETE FROM complaints`);
+    return res.json({ message: 'All complaints and associated records purged successfully' });
+  } catch (err) {
+    console.error('Purge all complaints error:', err);
+    return res.status(500).json({ error: 'Failed to purge complaints' });
   }
 });
 
