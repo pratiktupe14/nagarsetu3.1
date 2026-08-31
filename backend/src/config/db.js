@@ -101,6 +101,22 @@ async function createTablesPostgres() {
     `);
 
     await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS field_staff (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        department_id INTEGER NOT NULL REFERENCES departments(id),
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        phone TEXT,
+        employee_id TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'field_staff',
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pgPool.query(`
       CREATE TABLE IF NOT EXISTS complaints (
         id SERIAL PRIMARY KEY,
         complaint_number TEXT,
@@ -278,6 +294,24 @@ function createTablesSqlite() {
         );
       `);
 
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS field_staff (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          department_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          phone TEXT,
+          employee_id TEXT NOT NULL UNIQUE,
+          role TEXT DEFAULT 'field_staff',
+          status TEXT DEFAULT 'active',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (department_id) REFERENCES departments(id)
+        );
+      `);
+
       // Safe column additions for existing databases
       const safeAddColumn = (table, colDef) => {
         sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef};`, () => {});
@@ -286,6 +320,9 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
+      safeAddColumn('field_staff', 'user_id INTEGER');
+      safeAddColumn('field_staff', 'department_id INTEGER');
+      safeAddColumn('field_staff', 'status TEXT DEFAULT "active"');
       safeAddColumn('complaints', 'location_address TEXT');
       safeAddColumn('complaints', 'complaint_number TEXT');
 
@@ -408,6 +445,7 @@ function createTablesSqlite() {
       safeAddSqliteColumn('announcements', 'target_role TEXT');
       safeAddSqliteColumn('announcements', "created_by_role TEXT DEFAULT 'city_admin'");
       safeAddSqliteColumn('announcements', 'expires_at DATETIME');
+      safeAddSqliteColumn('departments', 'code TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS announcement_reads (
@@ -423,16 +461,24 @@ function createTablesSqlite() {
       // Seed initial default departments if empty
       sqliteDb.get("SELECT COUNT(*) as count FROM departments", (err, row) => {
         if (!err && row && row.count === 0) {
-          const stmt = sqliteDb.prepare("INSERT INTO departments (name, description) VALUES (?, ?)");
-          stmt.run("Public Works Department (PWD)", "Road repairs, potholes, and asphalt infrastructure");
-          stmt.run("Sanitation & Waste Management", "Garbage pickup, trash overflow, and public cleanliness");
-          stmt.run("Water Supply & Sewerage Board", "Pipeline leakages, drainage overflows, and water supply");
-          stmt.run("Drainage & Sewage Department", "Drainage blockage, sewage overflow, open drains, and culverts");
-          stmt.run("Electrical & Street Lighting", "Streetlight repair, electrical poles, and public lighting");
-          stmt.run("Traffic Management Department", "Traffic signal repairs, road signage, and junction issues");
-          stmt.run("Maintenance Department", "General civic facility repairs, building maintenance, and public asset upkeep");
+          const stmt = sqliteDb.prepare("INSERT INTO departments (id, name, code, description) VALUES (?, ?, ?, ?)");
+          stmt.run(1, "Public Works Department (PWD)", "PWD", "Road repairs, potholes, and asphalt infrastructure");
+          stmt.run(2, "Sanitation & Waste Management", "SAN", "Garbage pickup, trash overflow, and public cleanliness");
+          stmt.run(3, "Water Supply & Sewerage Board", "WTR", "Pipeline leakages, drainage overflows, and water supply");
+          stmt.run(4, "Drainage & Sewage Department", "DRN", "Drainage blockage, sewage overflow, open drains, and culverts");
+          stmt.run(5, "Electrical & Street Lighting", "ELE", "Streetlight repair, electrical poles, and public lighting");
+          stmt.run(6, "Traffic Management Department", "TRF", "Traffic signal repairs, road signage, and junction issues");
+          stmt.run(7, "Maintenance Department", "MNT", "General civic facility repairs, building maintenance, and public asset upkeep");
           stmt.finalize();
         }
+        
+        sqliteDb.run("UPDATE departments SET code = 'PWD' WHERE id = 1 OR name LIKE '%Public Works%'");
+        sqliteDb.run("UPDATE departments SET code = 'SAN' WHERE id = 2 OR name LIKE '%Sanitation%'");
+        sqliteDb.run("UPDATE departments SET code = 'WTR' WHERE id = 3 OR name LIKE '%Water%'");
+        sqliteDb.run("UPDATE departments SET code = 'DRN' WHERE id = 4 OR name LIKE '%Drainage%'");
+        sqliteDb.run("UPDATE departments SET code = 'ELE' WHERE id = 5 OR name LIKE '%Electrical%'");
+        sqliteDb.run("UPDATE departments SET code = 'TRF' WHERE id = 6 OR name LIKE '%Traffic%'");
+        sqliteDb.run("UPDATE departments SET code = 'MNT' WHERE id = 7 OR name LIKE '%Maintenance%'");
         resolve();
       });
 
@@ -452,6 +498,7 @@ const memStore = {
   ],
   users: [],
   department_heads: [],
+  field_staff: [],
   complaints: [],
   assignments: [],
   feedback: [],

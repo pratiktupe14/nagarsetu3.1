@@ -194,10 +194,10 @@ export function resolveDepartmentInfo(
   }
 
   return {
-    id: '1',
-    code: 'PWD',
-    name: 'Public Works Department',
-    fullName: 'Public Works Department (PWD)'
+    id: '',
+    code: 'UNASSIGNED',
+    name: 'Unassigned Department',
+    fullName: 'Unassigned Department'
   };
 }
 
@@ -340,7 +340,7 @@ export function isStaffInDepartment(s: any, deptId: string | number, deptCode: s
 
     // Check mapped numeric ID for department codes
     const codeIdMap: Record<string, string> = {
-      PWD: '1', SAN: '2', WTR: '3', ELE: '4', TRF: '5', MNT: '6', DRN: '7'
+      PWD: '1', SAN: '2', WTR: '3', DRN: '4', ELE: '5', TRF: '6', MNT: '7'
     };
     const mappedId = codeIdMap[(deptCode || '').toUpperCase()];
     if (mappedId && sDeptId === mappedId) return true;

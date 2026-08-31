@@ -116,20 +116,38 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     let departmentId = user.department_id || null;
     let departmentName = null;
+    let departmentCode = null;
 
-    if (user.role === 'department_head' || user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer') {
+    if (user.role === 'department_head') {
       const dhRes = await query(
-        `SELECT dh.*, d.name as dept_name FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE (dh.user_id = ? OR LOWER(dh.email) = ?) AND dh.status = 'active' ORDER BY dh.id DESC LIMIT 1`,
+        `SELECT dh.*, d.name as dept_name, d.code as dept_code FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE (dh.user_id = ? OR LOWER(dh.email) = ?) AND dh.status = 'active' ORDER BY dh.id DESC LIMIT 1`,
         [user.id, cleanIdentifier]
       );
       if (dhRes.rows && dhRes.rows.length > 0) {
         departmentId = dhRes.rows[0].department_id;
         departmentName = dhRes.rows[0].dept_name;
+        departmentCode = dhRes.rows[0].dept_code;
       }
+
+      if (!departmentId || !departmentName) {
+        return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
+      }
+    } else if (user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer') {
+      const fsRes = await query(
+        `SELECT fs.*, d.name as dept_name, d.code as dept_code FROM field_staff fs LEFT JOIN departments d ON d.id = fs.department_id WHERE (fs.user_id = ? OR LOWER(fs.email) = ? OR fs.employee_id = ?) AND LOWER(COALESCE(fs.status, 'active')) = 'active' ORDER BY fs.id DESC LIMIT 1`,
+        [user.id, cleanIdentifier, user.employee_id || '']
+      );
+      if (fsRes.rows && fsRes.rows.length > 0) {
+        departmentId = fsRes.rows[0].department_id;
+        departmentName = fsRes.rows[0].dept_name;
+        departmentCode = fsRes.rows[0].dept_code;
+      }
+
       if (!departmentName && departmentId) {
-        const dRes = await query(`SELECT name FROM departments WHERE id = ? OR code = ?`, [departmentId, departmentId]);
+        const dRes = await query(`SELECT name, code FROM departments WHERE id = ? OR code = ?`, [departmentId, departmentId]);
         if (dRes.rows && dRes.rows.length > 0) {
           departmentName = dRes.rows[0].name;
+          departmentCode = dRes.rows[0].code;
         }
       }
     }
@@ -144,6 +162,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       role: userRole,
       department_id: departmentId,
       department_name: departmentName,
+      department_code: departmentCode,
       employee_id: user.employee_id || null,
       status: user.status || 'active',
       language_pref: user.language_pref

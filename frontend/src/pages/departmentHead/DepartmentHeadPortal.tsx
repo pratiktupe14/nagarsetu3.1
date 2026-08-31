@@ -92,9 +92,13 @@ function DeptMapFlyToController({ center, zoom }: { center: [number, number] | n
   return null;
 }
 
-const getDepartmentInfo = (departmentName: string) => {
+const getDepartmentInfo = (departmentName?: string, departmentId?: string | number, departmentCode?: string) => {
   const nameLower = (departmentName || '').toLowerCase();
-  if (nameLower.includes('sanitation') || nameLower.includes('waste')) {
+  const idStr = String(departmentId || '').toLowerCase();
+  const codeStr = (departmentCode || '').toUpperCase();
+
+  // 1. Sanitation & Waste Management (SAN) - ID 2
+  if (idStr === '2' || codeStr === 'SAN' || nameLower.includes('sanitat') || nameLower.includes('waste') || nameLower.includes('san')) {
     return {
       fullName: 'Sanitation & Waste Management',
       shortName: 'Sanitation & Waste',
@@ -104,7 +108,9 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Garbage Collection', 'Dustbin Cleanup', 'Waste Removal']
     };
   }
-  if (nameLower.includes('water')) {
+
+  // 2. Water Supply & Sewerage Board (WTR) - ID 3
+  if (idStr === '3' || codeStr === 'WTR' || nameLower.includes('water') || nameLower.includes('sewerage board') || nameLower.includes('wtr')) {
     return {
       fullName: 'Water Supply & Sewerage Board',
       shortName: 'Water Supply & Sewerage',
@@ -114,19 +120,23 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Pipeline Repair', 'Water Leakage', 'Water Supply Issue']
     };
   }
-  if (nameLower.includes('drainage') || nameLower.includes('sewage')) {
+
+  // 3. Drainage & Sewage Department (DRN) - ID 4
+  if (idStr === '4' || codeStr === 'DRN' || nameLower.includes('drain') || nameLower.includes('sewage') || nameLower.includes('drn')) {
     return {
-      fullName: 'Drainage & Stormwater Dept',
-      shortName: 'Drainage & Stormwater',
+      fullName: 'Drainage & Sewage Department',
+      shortName: 'Drainage & Sewage',
       icon: Waves,
       badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-300',
       description: 'Monsoon stormwater channels, drain de-silting & urban flood mitigation.',
       taskTypes: ['Drain Blockage', 'Sewage Overflow', 'Drain Cleaning']
     };
   }
-  if (nameLower.includes('electric') || nameLower.includes('light')) {
+
+  // 4. Electrical & Street Lighting (ELE) - ID 5
+  if (idStr === '5' || codeStr === 'ELE' || nameLower.includes('electric') || nameLower.includes('light') || nameLower.includes('ele')) {
     return {
-      fullName: 'Electrical & Lighting Dept',
+      fullName: 'Electrical & Street Lighting',
       shortName: 'Electrical & Lighting',
       icon: Zap,
       badgeColor: 'bg-yellow-50 text-yellow-800 border-yellow-300',
@@ -134,9 +144,11 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Streetlight Repair', 'Electrical Maintenance', 'Cable Repair']
     };
   }
-  if (nameLower.includes('traffic')) {
+
+  // 5. Traffic Management Department (TRF) - ID 6
+  if (idStr === '6' || codeStr === 'TRF' || nameLower.includes('traffic') || nameLower.includes('trf')) {
     return {
-      fullName: 'Traffic Management Dept',
+      fullName: 'Traffic Management Department',
       shortName: 'Traffic Management',
       icon: Activity,
       badgeColor: 'bg-purple-50 text-purple-800 border-purple-300',
@@ -144,13 +156,38 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Traffic Signal Repair', 'Signage Maintenance', 'Traffic Infrastructure']
     };
   }
+
+  // 6. Maintenance Department (MNT) - ID 7
+  if (idStr === '7' || codeStr === 'MNT' || nameLower.includes('mainten') || nameLower.includes('mnt')) {
+    return {
+      fullName: 'Maintenance Department',
+      shortName: 'Maintenance Department',
+      icon: Building2,
+      badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-300',
+      description: 'Building maintenance, civic structure repairs & facility upkeep.',
+      taskTypes: ['Facility Maintenance', 'Building Repair', 'Civic Maintenance']
+    };
+  }
+
+  // 7. Public Works Department (PWD) - ID 1
+  if (idStr === '1' || codeStr === 'PWD' || nameLower.includes('public works') || nameLower.includes('road') || nameLower.includes('pwd')) {
+    return {
+      fullName: 'Public Works Department (PWD)',
+      shortName: 'Public Works (PWD)',
+      icon: Wrench,
+      badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+      description: 'Pothole Patching, Road Damage & Public Infrastructure Repairs.',
+      taskTypes: ['Pothole Repair', 'Road Maintenance', 'Infrastructure Repair']
+    };
+  }
+
   return {
-    fullName: 'Roads & Public Works (PWD)',
-    shortName: 'Public Works (PWD)',
-    icon: Wrench,
-    badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
-    description: 'Pothole Patching, Road Damage & Public Infrastructure Repairs.',
-    taskTypes: ['Pothole Repair', 'Road Maintenance', 'Infrastructure Repair']
+    fullName: 'Unassigned Department',
+    shortName: 'Unassigned',
+    icon: Building2,
+    badgeColor: 'bg-gray-50 text-gray-800 border-gray-300',
+    description: 'Unassigned municipal department.',
+    taskTypes: []
   };
 };
 
@@ -260,7 +297,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const headDeptId = activeHeadRecord?.department_id || user?.department_id || '';
   const headId = activeHeadRecord?.user_id || user?.id || '';
 
-  const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull), [headDepartmentFull]);
+  const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull, headDeptId, user?.department_code), [headDepartmentFull, headDeptId, user]);
   const isSanitationDept = useMemo(() => {
     const normDeptId = String(headDeptId == null ? '' : headDeptId).trim().toLowerCase();
     const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
@@ -433,7 +470,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       // Validate that department assignment exists
       if (!activeDeptId && !activeDeptFull) {
-        setError('Department assignment could not be verified. Please contact City Administration.');
+        setError('Department assignment could not be resolved. Please contact City Administration.');
         setDepartmentComplaints([]);
         setDepartmentStaff([]);
         setLoading(false);
@@ -1293,16 +1330,16 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
-  if (!isHeadActive || user?.status === 'Inactive' || user?.status === 'inactive') {
+  if (!isHeadActive || user?.status === 'Inactive' || user?.status === 'inactive' || error || (!loading && !headDeptId && !headDepartmentFull)) {
     return (
-      <DashboardLayout title="Leadership Account Inactive">
+      <DashboardLayout title="Department Assignment Required">
         <div className="p-8 max-w-md mx-auto my-16 bg-white border border-rose-200 rounded-2xl shadow-lg text-center space-y-4 font-sans">
           <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
             <ShieldAlert className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Department Leadership Inactive</h2>
+          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Department Assignment Required</h2>
           <p className="text-xs text-gray-600 leading-relaxed font-medium">
-            Your Department Head account status is currently <strong>Inactive</strong> or unassigned to an active municipal department. Department Head portal access has been revoked.
+            {error || "Department assignment could not be resolved. Please contact City Administration."}
           </p>
           <button
             onClick={async () => {
@@ -1319,7 +1356,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   }
 
   return (
-    <DashboardLayout title={isNotifView ? "Notifications" : isProfileView ? "Department Head Profile" : isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Work" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
+    <DashboardLayout title={isNotifView ? "Notifications" : isProfileView ? "Department Head Profile" : isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Work" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : deptInfo.fullName}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -1343,18 +1380,22 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ? "Completed Work"
                     : isAssignWorkspace
                     ? "Task Assignment"
-                    : isComplaints || (!isNotifView && !isProfileView && !isStaffView)
-                    ? (isPwdDept ? "All PWD Complaints" : `All ${deptInfo.shortName} Complaints`)
-                    : deptInfo.fullName}
+                    : isNotifView
+                    ? "Department Notifications"
+                    : isProfileView
+                    ? "Head Profile"
+                    : isStaffView
+                    ? `${deptInfo.shortName} Field Staff`
+                    : `${deptInfo.fullName} Complaints`}
                 </h1>
                 <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  {isMapView ? `${deptInfo.shortName} COMMAND • GEOGRAPHIC OPERATIONAL OVERVIEW` : isOverdue ? `${deptInfo.shortName} COMMAND • SLA BREACH MONITORING` : isInProgress ? `${deptInfo.shortName} COMMAND • IN-PROGRESS EXECUTION` : isCompleted ? `${deptInfo.shortName} COMMAND • COMPLETED WORK VERIFICATION` : isAssignWorkspace ? 'TASK ASSIGNMENT & WORKLOAD MANAGEMENT' : isComplaints ? 'ALL COMPLAINTS DIRECTORY' : isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : 'DEPARTMENT HEAD PORTAL'}
+                  {isMapView ? `${deptInfo.shortName} COMMAND • GEOGRAPHIC OPERATIONAL OVERVIEW` : isOverdue ? `${deptInfo.shortName} COMMAND • SLA BREACH MONITORING` : isInProgress ? `${deptInfo.shortName} COMMAND • IN-PROGRESS EXECUTION` : isCompleted ? `${deptInfo.shortName} COMMAND • COMPLETED WORK VERIFICATION` : isAssignWorkspace ? 'TASK ASSIGNMENT & WORKLOAD MANAGEMENT' : isComplaints ? `${deptInfo.shortName.toUpperCase()} COMPLAINTS DIRECTORY` : isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : `${deptInfo.shortName.toUpperCase()} PORTAL`}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
                   Department Head: {headName}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  {deptInfo.shortName} (ID: {headDeptId})
+                  Department ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">

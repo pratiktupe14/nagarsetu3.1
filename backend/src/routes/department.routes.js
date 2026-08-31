@@ -65,39 +65,40 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
     const searchQuery = (req.query.search || '').toLowerCase().trim();
 
     let sql = `
-      SELECT u.id, u.name, u.email, u.mobile, u.employee_id, u.role, u.department_id,
+      SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.employee_id, fs.role, fs.department_id,
              COALESCE(u.designation, 'Field Service Staff') as designation,
-             COALESCE(u.status, 'active') as status,
-             u.language_pref, u.created_at,
+             COALESCE(fs.status, 'active') as status,
+             u.language_pref, fs.created_at,
              d.name as department_name,
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
                  AND c.status IN ('Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified')
              ) as active_tasks,
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
                  AND c.status = 'Resolved'
              ) as completed_tasks,
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
                  AND (c.status = 'Overdue' OR (c.status NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
              ) as overdue_tasks
-      FROM users u
-      LEFT JOIN departments d ON u.department_id = d.id
-      WHERE (u.role = 'service_staff' OR u.role = 'staff')
+      FROM field_staff fs
+      LEFT JOIN departments d ON fs.department_id = d.id
+      LEFT JOIN users u ON fs.user_id = u.id
+      WHERE 1=1
     `;
 
     const params = [];
 
     // Department Isolation for Department Head
     if (!isAdmin) {
-      sql += ` AND u.department_id = $1`;
+      sql += ` AND fs.department_id = $1`;
       params.push(userDeptId || -1);
     } else if (req.query.department_id) {
       let deptFilterId = req.query.department_id;
@@ -118,30 +119,31 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
           deptFilterId = codeToIdMap[deptFilterId.toUpperCase()];
         }
       }
-      sql += ` AND u.department_id = $1`;
+      sql += ` AND fs.department_id = $1`;
       params.push(deptFilterId);
     }
 
     if (filterStatus === 'active') {
-      sql += ` AND LOWER(u.status) = 'active'`;
+      sql += ` AND LOWER(fs.status) = 'active'`;
     } else if (filterStatus === 'inactive') {
-      sql += ` AND LOWER(u.status) = 'inactive'`;
+      sql += ` AND LOWER(fs.status) = 'inactive'`;
     } else if (filterStatus !== 'all') {
-      sql += ` AND LOWER(u.status) != 'archived'`;
+      sql += ` AND LOWER(fs.status) != 'archived'`;
     }
 
     if (searchQuery) {
       const idx = params.length + 1;
-      sql += ` AND (LOWER(u.name) LIKE $${idx} OR LOWER(u.email) LIKE $${idx} OR LOWER(u.mobile) LIKE $${idx} OR LOWER(COALESCE(u.employee_id, '')) LIKE $${idx})`;
+      sql += ` AND (LOWER(fs.name) LIKE $${idx} OR LOWER(fs.email) LIKE $${idx} OR LOWER(fs.phone) LIKE $${idx} OR LOWER(COALESCE(fs.employee_id, '')) LIKE $${idx})`;
       params.push(`%${searchQuery}%`);
     }
 
-    sql += ` ORDER BY u.created_at DESC`;
+    sql += ` ORDER BY fs.created_at DESC`;
 
     const result = await query(sql, params);
 
     const staffList = result.rows.map((row) => ({
       id: String(row.id),
+      user_id: row.user_id ? String(row.user_id) : String(row.id),
       name: row.name,
       email: row.email || '',
       mobile: row.mobile || '',
@@ -159,8 +161,8 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       created_at: row.created_at
     }));
 
-    // Calculate Summary Stats from DB
-    let statsSql = `SELECT status, COUNT(*) as count FROM users WHERE (role = 'service_staff' OR role = 'staff')`;
+    // Calculate Summary Stats from DB field_staff table
+    let statsSql = `SELECT status, COUNT(*) as count FROM field_staff WHERE 1=1`;
     let statsParams = [];
     if (!isAdmin) {
       statsSql += ` AND department_id = $1`;
@@ -186,13 +188,12 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       SELECT COUNT(DISTINCT a.id) as active_tasks_count
       FROM assignments a
       JOIN complaints c ON c.id = a.complaint_id
-      JOIN users u ON u.id = a.staff_id
-      WHERE (u.role = 'service_staff' OR u.role = 'staff')
-        AND c.status IN ('Assigned', 'In Progress', 'Verified')
+      JOIN field_staff fs ON (a.staff_id = fs.id OR a.staff_id = fs.user_id)
+      WHERE c.status IN ('Assigned', 'In Progress', 'Verified')
     `;
     let taskParams = [];
     if (!isAdmin) {
-      taskSql += ` AND u.department_id = $1`;
+      taskSql += ` AND fs.department_id = $1`;
       taskParams.push(userDeptId || -1);
     }
     const taskRes = await query(taskSql, taskParams);
@@ -224,19 +225,19 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
     let sql = `
-      SELECT id, name, mobile, email, employee_id, department_id, designation
-      FROM users
-      WHERE (role = 'service_staff' OR role = 'staff')
-        AND LOWER(status) = 'active'
+      SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name
+      FROM field_staff fs
+      LEFT JOIN departments d ON fs.department_id = d.id
+      WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
     const params = [];
 
     if (!isAdmin) {
-      sql += ` AND department_id = $1`;
+      sql += ` AND fs.department_id = $1`;
       params.push(userDeptId || -1);
     }
 
-    sql += ` ORDER BY name ASC`;
+    sql += ` ORDER BY fs.name ASC`;
 
     const result = await query(sql, params);
     return res.json({ staff: result.rows });
@@ -262,7 +263,6 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
-    // SECURITY RULE: Department Head is strictly locked to their own department
     let targetDeptId = userDeptId;
     if (isAdmin && req.body.department_id) {
       targetDeptId = req.body.department_id;
@@ -272,8 +272,8 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
       return res.status(400).json({ error: 'Department assignment could not be resolved.' });
     }
 
-    // Check existing email or mobile
-    const checkSql = `SELECT id FROM users WHERE mobile = $1 OR (email IS NOT NULL AND email = $2)`;
+    // Check existing email or mobile in users & field_staff
+    const checkSql = `SELECT id FROM users WHERE mobile = $1 OR (email IS NOT NULL AND LOWER(email) = LOWER($2))`;
     const existing = await query(checkSql, [mobile, email || '']);
     if (existing.rows && existing.rows.length > 0) {
       return res.status(400).json({ error: 'A staff member or user with this mobile number or email already exists.' });
@@ -284,6 +284,7 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
     const empId = employee_id || `STF-${Date.now().toString().slice(-4)}`;
     const desig = designation || 'Field Service Staff';
     const lang = language || 'en';
+    const cleanEmail = email ? email.toLowerCase() : `${empId.toLowerCase()}@nagarsetu.gov.in`;
 
     const insertSql = `
       INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref)
@@ -291,14 +292,22 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
       RETURNING *
     `;
 
-    const result = await query(insertSql, [name, mobile, email || null, password_hash, targetDeptId, empId, desig, lang]);
+    const result = await query(insertSql, [name, mobile, cleanEmail, password_hash, targetDeptId, empId, desig, lang]);
     const created = result.rows[0];
+
+    // Also insert into field_staff table
+    await query(
+      `INSERT INTO field_staff (user_id, department_id, name, email, phone, employee_id, role, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'field_staff', 'active')`,
+      [created.id, targetDeptId, name, cleanEmail, mobile, empId]
+    ).catch(() => {});
 
     return res.status(201).json({
       success: true,
       message: 'Staff member created successfully',
       staff: {
         id: String(created.id),
+        user_id: String(created.id),
         name: created.name,
         email: created.email || '',
         mobile: created.mobile,
@@ -334,7 +343,7 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
 
     // SECURITY CHECK: Ensure staff member belongs to Department Head's department
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT department_id FROM field_staff WHERE id = $1 OR user_id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
@@ -344,13 +353,23 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
     }
 
     await query(
+      `UPDATE field_staff
+       SET name = COALESCE($1, name),
+           phone = COALESCE($2, phone),
+           employee_id = COALESCE($3, employee_id),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 OR user_id = $4`,
+      [name, mobile, employee_id, staffId]
+    );
+
+    await query(
       `UPDATE users
        SET name = COALESCE($1, name),
            mobile = COALESCE($2, mobile),
            designation = COALESCE($3, designation),
            language_pref = COALESCE($4, language_pref),
            employee_id = COALESCE($5, employee_id)
-       WHERE id = $6 AND (role = 'service_staff' OR role = 'staff')`,
+       WHERE id = $6 OR id IN (SELECT user_id FROM field_staff WHERE id = $6)`,
       [name, mobile, designation, language, employee_id, staffId]
     );
 
@@ -372,7 +391,7 @@ router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT department_id FROM field_staff WHERE id = $1 OR user_id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
@@ -381,7 +400,8 @@ router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department
       }
     }
 
-    await query("UPDATE users SET status = 'inactive' WHERE id = $1", [staffId]);
+    await query("UPDATE field_staff SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = $1 OR user_id = $1", [staffId]);
+    await query("UPDATE users SET status = 'inactive' WHERE id = $1 OR id IN (SELECT user_id FROM field_staff WHERE id = $1)", [staffId]);
 
     return res.json({ success: true, message: 'Staff member deactivated successfully' });
   } catch (err) {
@@ -401,7 +421,7 @@ router.post('/staff/:id/activate', authenticateToken, requireRole(['department_h
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT department_id FROM field_staff WHERE id = $1 OR user_id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
@@ -410,7 +430,8 @@ router.post('/staff/:id/activate', authenticateToken, requireRole(['department_h
       }
     }
 
-    await query("UPDATE users SET status = 'active' WHERE id = $1", [staffId]);
+    await query("UPDATE field_staff SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = $1 OR user_id = $1", [staffId]);
+    await query("UPDATE users SET status = 'active' WHERE id = $1 OR id IN (SELECT user_id FROM field_staff WHERE id = $1)", [staffId]);
 
     return res.json({ success: true, message: 'Staff member activated successfully' });
   } catch (err) {
@@ -430,7 +451,7 @@ router.delete('/staff/:id', authenticateToken, requireRole(['department_head', '
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT department_id FROM field_staff WHERE id = $1 OR user_id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
@@ -439,8 +460,8 @@ router.delete('/staff/:id', authenticateToken, requireRole(['department_head', '
       }
     }
 
-    // Soft delete -> Set status = 'archived'
-    await query("UPDATE users SET status = 'archived' WHERE id = $1", [staffId]);
+    await query("UPDATE field_staff SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE id = $1 OR user_id = $1", [staffId]);
+    await query("UPDATE users SET status = 'archived' WHERE id = $1 OR id IN (SELECT user_id FROM field_staff WHERE id = $1)", [staffId]);
 
     return res.json({ success: true, message: 'Staff member removed successfully (Historical records preserved)' });
   } catch (err) {
@@ -451,7 +472,7 @@ router.delete('/staff/:id', authenticateToken, requireRole(['department_head', '
 
 /**
  * POST /api/department/assign
- * Assign complaint to active service staff member with department isolation authorization
+ * Assign complaint to active field staff member with database verification
  */
 router.post('/assign', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), async (req, res) => {
   try {
@@ -471,12 +492,26 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     }
     const complaint = compRes.rows[0];
 
-    // 2. Fetch Selected Staff Member by ID, Employee ID or Email
-    const staffRes = await query(`SELECT id, name, email, mobile, department_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR email = $1) AND (role = 'service_staff' OR role = 'staff')`, [staff_id]);
-    if (!staffRes.rows || staffRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Selected service staff member not found.' });
+    // 2. Fetch Selected Staff Member from field_staff (or users fallback)
+    const staffRes = await query(
+      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
+       FROM field_staff fs 
+       WHERE fs.id = $1 OR fs.user_id = $1 OR fs.employee_id = $1 OR LOWER(fs.email) = LOWER($1)`,
+      [staff_id]
+    );
+
+    let staff = staffRes.rows && staffRes.rows.length > 0 ? staffRes.rows[0] : null;
+    if (!staff) {
+      const uRes = await query(
+        `SELECT id, name, email, mobile, department_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR LOWER(email) = LOWER($1)) AND (role = 'service_staff' OR role = 'staff')`,
+        [staff_id]
+      );
+      if (uRes.rows && uRes.rows.length > 0) staff = uRes.rows[0];
     }
-    const staff = staffRes.rows[0];
+
+    if (!staff) {
+      return res.status(404).json({ error: 'Selected field staff member not found in database.' });
+    }
 
     // 3. Status Check: Staff must be active
     if ((staff.status || 'active').toLowerCase() !== 'active') {
@@ -496,7 +531,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       return s.toUpperCase();
     };
 
-    // 4. Department Isolation Security Check
+    // 4. Department Isolation Security Check: Complaint and staff must belong to the same department
     if (!isAdmin) {
       if (userDeptId && complaint.department_id && normDept(userDeptId) !== normDept(complaint.department_id)) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
@@ -510,6 +545,10 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       }
     }
 
+    const assignedStaffId = String(staff.id || staff.user_id);
+    const assignedStaffName = staff.name;
+    const assignedStaffEmail = staff.email || '';
+
     // 5. Update Complaint in Database with affected row verification
     const updateRes = await query(
       `UPDATE complaints
@@ -521,7 +560,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            status = 'Staff Assigned',
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $6 OR complaint_number = $6`,
-      [staff.id, staff.name, staff.email || '', req.user.id, req.user.name || 'Department Head', complaint.id]
+      [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', complaint.id]
     );
 
     if (updateRes && updateRes.rowCount !== undefined && updateRes.rowCount === 0) {
@@ -544,13 +583,13 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     await query(
       `INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-      [complaint.id, staff.id, req.user.id]
+      [complaint.id, staff.user_id || staff.id, req.user.id]
     ).catch(() => {});
 
     await query(
       `INSERT INTO task_assignments (complaint_id, staff_id, assigned_by, created_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-      [complaint.id, staff.id, req.user.id]
+      [complaint.id, staff.user_id || staff.id, req.user.id]
     ).catch(() => {});
 
     // 8. Record Status History
@@ -565,9 +604,9 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       message: `Task successfully assigned to ${staff.name}`,
       complaint_id: verifiedRecord.id,
       complaint_number: verifiedRecord.complaint_number,
-      staff_id: staff.id,
-      staff_name: staff.name,
-      staff_email: staff.email,
+      staff_id: assignedStaffId,
+      staff_name: assignedStaffName,
+      staff_email: assignedStaffEmail,
       status: verifiedRecord.status,
       updated_at: verifiedRecord.updated_at
     });
