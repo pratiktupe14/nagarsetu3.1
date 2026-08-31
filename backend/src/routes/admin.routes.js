@@ -13,9 +13,15 @@ const {
 } = require('../schemas/admin.schemas');
 const { query } = require('../config/db');
 
-// Admin Auth Guard
+// Admin Auth Guard & No-Cache Middleware
 router.use(authenticateToken);
 router.use(requireRole(['admin', 'city_admin']));
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
 
 // Admin Analytics summary
 router.get('/analytics', async (req, res) => {
@@ -152,16 +158,18 @@ router.post('/departments', validateInput(createDepartmentSchema), async (req, r
 // DEPARTMENT HEADS MANAGEMENT ENDPOINTS
 // ==========================================
 
-// GET all Department Heads
 router.get('/department-heads', async (req, res) => {
   try {
+    const showAll = req.query.all === 'true';
+    const whereClause = showAll ? '' : "WHERE LOWER(dh.status) = 'active'";
     const sql = `
       SELECT dh.*, d.name as department_name, d.description as department_description,
              u.id as linked_user_id, u.role as user_role, u.status as user_status
       FROM department_heads dh
       LEFT JOIN departments d ON d.id = dh.department_id
-      LEFT JOIN users u ON u.id = dh.user_id OR u.email = dh.email
-      ORDER BY dh.id DESC
+      LEFT JOIN users u ON u.id = dh.user_id OR LOWER(u.email) = LOWER(dh.email)
+      ${whereClause}
+      ORDER BY COALESCE(dh.updated_at, dh.created_at) DESC, dh.id DESC
     `;
     const result = await query(sql);
     return res.json({ department_heads: result.rows });
@@ -266,7 +274,8 @@ router.post('/department-heads', async (req, res) => {
 
     // If status is active, deactivate previous active heads for this department
     if (status === 'active') {
-      await query(`UPDATE department_heads SET status = 'inactive' WHERE department_id = ? AND (user_id != ? AND LOWER(email) != ?)`, [cleanDeptId, userId, cleanEmail]);
+      await query(`UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE department_id = ? AND (user_id != ? AND LOWER(email) != ?)`, [cleanDeptId, userId, cleanEmail]);
+      await query(`UPDATE users SET status = 'inactive' WHERE department_id = ? AND role = 'department_head' AND id != ? AND LOWER(email) != ?`, [cleanDeptId, userId, cleanEmail]);
     }
 
     // Insert or Update department_heads record
@@ -283,8 +292,16 @@ router.post('/department-heads', async (req, res) => {
       );
     }
 
+    // Read-back updated department_head record from database
+    const readBackRes = await query(
+      `SELECT dh.*, d.name as department_name FROM department_heads dh LEFT JOIN departments d ON dh.department_id = d.id WHERE dh.user_id = ? OR dh.email = ?`,
+      [userId, cleanEmail]
+    );
+    const updatedHead = readBackRes.rows && readBackRes.rows.length > 0 ? readBackRes.rows[0] : null;
+
     return res.status(201).json({
       message: 'Department Head saved successfully',
+      department_head: updatedHead,
       user_id: userId,
       department_id: cleanDeptId,
       status
@@ -361,7 +378,17 @@ router.put('/department-heads/:id', async (req, res) => {
       );
     }
 
-    return res.json({ message: 'Department Head updated successfully' });
+    // Read-back updated department_head record
+    const readBackRes = await query(
+      `SELECT dh.*, d.name as department_name FROM department_heads dh LEFT JOIN departments d ON dh.department_id = d.id WHERE dh.user_id = ? OR dh.email = ?`,
+      [targetUserId, newEmail]
+    );
+    const updatedHead = readBackRes.rows && readBackRes.rows.length > 0 ? readBackRes.rows[0] : null;
+
+    return res.json({
+      message: 'Department Head updated successfully',
+      department_head: updatedHead
+    });
   } catch (err) {
     console.error('Error updating department head:', err);
     return res.status(500).json({ error: 'Failed to update Department Head. Please try again later.' });

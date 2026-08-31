@@ -2,6 +2,9 @@ const bcrypt = require('bcryptjs');
 const { query, initDatabase } = require('../config/db');
 
 const SERVICE_STAFF_DEFINITIONS = [
+  // 0. Primary Demo Staff — Ramesh Kumar (36th Staff)
+  { deptCode: 'PWD', search: 'Public Works', name: 'Ramesh Kumar', employee_id: 'STF-001', email: 'staff@nagarsetu.gov.in', mobile: '9876543212' },
+
   // 1. PWD — 5 Staff
   { deptCode: 'PWD', search: 'Public Works', name: 'Amit Patil', employee_id: 'PWD-STF-001', email: 'amit.patil@nagarsetu.gov.in', mobile: '9822010001' },
   { deptCode: 'PWD', search: 'Public Works', name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', email: 'sagar.jadhav@nagarsetu.gov.in', mobile: '9822010002' },

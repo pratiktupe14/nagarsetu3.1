@@ -18,3 +18,14 @@ export const getAiServiceUrl = (): string => {
   const mainApi = getApiUrl();
   return mainApi ? `${mainApi}/api/ai` : 'https://backend-zeta-two-60.vercel.app/api/ai';
 };
+
+export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+  return {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...additionalHeaders
+  };
+};

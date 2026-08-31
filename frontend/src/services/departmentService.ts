@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Complaint } from '../types/database.types';
 import { pushNotification } from './notificationService';
-import { getApiUrl } from '../config/apiConfig';
+import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
 import { getAllServiceStaffRecords } from './adminService';
 
 export interface MunicipalDepartment {
@@ -95,14 +95,14 @@ export function resolveDepartmentInfo(
   const dName = String(departmentName || '').trim().toLowerCase();
   const dCat = String(category || '').trim().toLowerCase();
 
-  // 1. Electrical & Street Lighting (ELE) - ID 4
+  // 1. Electrical & Street Lighting (ELE) - ID 5 (also accepts 4)
   if (
-    dId === '4' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
+    dId === '5' || dId === '4' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
     dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
     dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light')
   ) {
     return {
-      id: '4',
+      id: '5',
       code: 'ELE',
       name: 'Electrical & Street Lighting',
       fullName: 'Electrical & Street Lighting (ELE)'
@@ -137,45 +137,45 @@ export function resolveDepartmentInfo(
     };
   }
 
-  // 4. Traffic Management Department (TRF) - ID 5
+  // 4. Drainage & Sewage Department (DRN) - ID 4 (also accepts 7)
   if (
-    dId === '5' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
+    dId === '4' || dId === '7' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
+    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
+    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter')
+  ) {
+    return {
+      id: '4',
+      code: 'DRN',
+      name: 'Drainage & Sewage Department',
+      fullName: 'Drainage & Sewage Department (DRN)'
+    };
+  }
+
+  // 5. Traffic Management Department (TRF) - ID 6 (also accepts 5)
+  if (
+    dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
     dName.includes('traffic') || dName.includes('trf') ||
     dCat.includes('traffic') || dCat.includes('signal')
   ) {
     return {
-      id: '5',
+      id: '6',
       code: 'TRF',
       name: 'Traffic Management Department',
       fullName: 'Traffic Management Department (TRF)'
     };
   }
 
-  // 5. Maintenance Department (MNT) - ID 6
+  // 6. Maintenance Department (MNT) - ID 7 (also accepts 6)
   if (
-    dId === '6' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
+    dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
     dName.includes('mainten') || dName.includes('mnt') ||
     dCat.includes('mainten') || dCat.includes('building')
   ) {
     return {
-      id: '6',
+      id: '7',
       code: 'MNT',
       name: 'Maintenance Department',
       fullName: 'Maintenance Department (MNT)'
-    };
-  }
-
-  // 6. Drainage & Sewage Department (DRN) - ID 7
-  if (
-    dId === '7' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
-    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
-    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter')
-  ) {
-    return {
-      id: '7',
-      code: 'DRN',
-      name: 'Drainage & Sewage Department',
-      fullName: 'Drainage & Sewage Department (DRN)'
     };
   }
 
@@ -418,15 +418,13 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
   // 1. Try Express Backend API
   try {
-    const token = localStorage.getItem('nagarsetu_token');
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = getNoCacheHeaders();
 
     const [dhRes, deptRes, compRes] = await Promise.all([
       fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }),
       fetch(`${getApiUrl()}/api/admin/departments`, { headers }),
       fetch(`${getApiUrl()}/api/complaints`, { headers })
     ]);
-
 
     if (dhRes.ok) {
       const dhData = await dhRes.json();
@@ -440,6 +438,16 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       const compData = await compRes.json();
       if (compData.complaints) complaints = compData.complaints;
     }
+
+    console.log('[ADMIN DATA SYNC]', {
+      apiUrl: `${getApiUrl()}/api/admin/department-heads`,
+      fetchTime: new Date().toISOString(),
+      responseStatus: dhRes.status,
+      databaseRecordCount: deptHeads.length,
+      lastUpdatedRecord: deptHeads[0]?.created_at || 'N/A',
+      localCacheUsed: false,
+      finalRecordCount: deptHeads.length
+    });
   } catch (backendErr) {
     console.warn('Express API getDepartmentHeads note:', backendErr);
   }
@@ -469,49 +477,65 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     }
   }
 
-  const targets = departments.length > 0 ? departments : TARGET_MUNICIPAL_DEPARTMENTS.map((t) => ({ id: `dept-${t.code.toLowerCase()}`, name: t.name, code: t.code }));
+  const targets = departments.length > 0
+    ? departments
+    : TARGET_MUNICIPAL_DEPARTMENTS.map((t) => ({ id: `dept-${t.code.toLowerCase()}`, name: t.name, code: t.code }));
+
+  // Also attempt to fetch staff from Express API
+  let apiStaffRecords: any[] = [];
+  try {
+    const token = localStorage.getItem('nagarsetu_token');
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const apiStaffRes = await fetch(`${getApiUrl()}/api/department/staff`, { headers });
+    if (apiStaffRes.ok) {
+      const data = await apiStaffRes.json();
+      if (data && Array.isArray(data.staff)) {
+        apiStaffRecords = data.staff;
+      }
+    }
+  } catch (e) {}
 
   return targets.map((deptObj) => {
-    const deptId = deptObj.id;
-    const deptCode = deptObj.code || `DEPT-${deptId}`;
-    const deptName = deptObj.name || 'Municipal Department';
+    const rawDeptId = deptObj.id;
+    const resolvedTarget = resolveDepartmentInfo(rawDeptId, deptObj.name);
+    const deptId = resolvedTarget.id || rawDeptId;
+    const deptCode = resolvedTarget.code || deptObj.code || `DEPT-${deptId}`;
+    const deptName = resolvedTarget.name || deptObj.name || 'Municipal Department';
 
-    // Match active head record from department_heads
-    const activeHeadRow = deptHeads.find(
-      (h) => (String(h.department_id) === String(deptId) || h.email?.toLowerCase().includes((deptCode || '').toLowerCase())) && h.status === 'active'
-    ) || deptHeads.find(
-      (h) => String(h.department_id) === String(deptId)
-    );
+    // Match active head record from department_heads authoritatively (prioritizing most recently updated/created)
+    const matchingHeads = deptHeads.filter((h) => {
+      const hDept = resolveDepartmentInfo(h.department_id, h.department_name);
+      return hDept.code === deptCode || String(h.department_id) === String(deptId) || String(h.department_id) === String(rawDeptId);
+    });
 
-    const headProf = profiles.find(
-      (p) => p.role === 'department_head' && (String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id)
-    );
+    matchingHeads.sort((a, b) => {
+      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return Number(b.id || 0) - Number(a.id || 0);
+    });
 
-    const defaultMeta: Record<string, { name: string; email: string; phone: string }> = {
-      PWD: { name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001' },
-      SAN: { name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002' },
-      WTR: { name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003' },
-      DRN: { name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004' },
-      ELE: { name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005' },
-      TRF: { name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006' },
-      MNT: { name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007' }
-    };
-    const def = defaultMeta[(deptCode || '').toUpperCase()] || { name: 'Department Head', email: 'head@nagarsetu.gov.in', phone: '+91 98220 00000' };
+    const activeHeadRow = matchingHeads.find((h) => (h.status || '').toLowerCase() === 'active') || matchingHeads[0];
 
-    const hasActiveHead = Boolean(activeHeadRow && activeHeadRow.status === 'active');
-    const headName = activeHeadRow?.name || headProf?.full_name || (hasActiveHead ? def.name : def.name);
-    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? def.email : def.email);
-    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? def.phone : def.phone);
-    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || `EMP-${deptCode}-001`;
+    const headProf = profiles.find((p) => {
+      if (p.role !== 'department_head') return false;
+      const pDept = resolveDepartmentInfo(p.department_id, p.department_name);
+      return pDept.code === deptCode || String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id;
+    });
 
-    const designation = activeHeadRow?.designation || 'Department Head';
-    const status: 'Active' | 'Inactive' | 'No Active Head' = activeHeadRow ? (activeHeadRow.status === 'active' ? 'Active' : 'Inactive') : 'No Active Head';
+    const hasActiveHead = Boolean(activeHeadRow && (activeHeadRow.status || '').toLowerCase() === 'active') || Boolean(headProf);
+    const headName = activeHeadRow?.name || headProf?.full_name || headProf?.name || (hasActiveHead ? 'Department Head' : 'Unassigned');
+    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'N/A');
+    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? '+91 98220 00000' : 'N/A');
+    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
 
-    // Calculate Real Staff Count for department from profiles or fallback staff records
+    const designation = activeHeadRow?.designation || (hasActiveHead ? 'Department Head' : 'Unassigned');
+    const status: 'Active' | 'Inactive' | 'No Active Head' = hasActiveHead ? 'Active' : 'No Active Head';
+
+    // Calculate Real Staff Count for department from Express API, profiles, or fallback staff records
     const fallbackStaffRecords = getAllServiceStaffRecords();
-    const matchedFallbackStaff = fallbackStaffRecords.filter((s) => 
-      isStaffInDepartment(s, deptId, deptCode, deptName)
-    );
+    const matchedApiStaff = apiStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
+    const matchedFallbackStaff = fallbackStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
 
     const profDeptStaff = profiles
       .filter((p) => (p.role === 'service_staff' || p.role === 'staff') && isStaffInDepartment(p, deptId, deptCode, deptName))
@@ -529,7 +553,7 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
         created_at: p.created_at || new Date().toISOString()
       }));
 
-    const deptStaff = profDeptStaff.length > 0 ? profDeptStaff : matchedFallbackStaff;
+    const deptStaff = matchedApiStaff.length > 0 ? matchedApiStaff : (profDeptStaff.length > 0 ? profDeptStaff : matchedFallbackStaff);
     const totalStaff = deptStaff.length;
     const activeStaff = deptStaff.filter((s: any) => {
       const st = String(s.status || '').toLowerCase();
@@ -538,17 +562,21 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     const inactiveStaff = totalStaff - activeStaff;
 
     // Calculate Complaints Metrics for department using matchComplaintToDepartment
-    const deptComplaints = complaints.filter((c) => 
-      matchComplaintToDepartment(c, deptId, undefined, deptName)
-    );
+    const deptComplaints = complaints.filter((c) => matchComplaintToDepartment(c, deptId, undefined, deptName));
 
     const openComplaints = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
-    const inProgressComplaints = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned').length;
-    const pendingReviewComplaints = deptComplaints.filter((c) => (c.status as string) === 'Review' || c.status === 'Verified').length;
-    const activeTasks = deptComplaints.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned' || c.status === 'Department Assigned').length;
+    const inProgressComplaints = deptComplaints.filter((c) =>
+      c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned' || c.status === 'Department Assigned'
+    ).length;
+    const pendingReviewComplaints = deptComplaints.filter((c) =>
+      c.status === 'Resolution Submitted' || (c.status as string) === 'Review' || c.status === 'Verified' || (c.status as string) === 'Completed — Pending Verification'
+    ).length;
+    const activeTasks = inProgressComplaints;
     const completedTasks = deptComplaints.filter((c) => c.status === 'Resolved').length;
     const overdueTasks = deptComplaints.filter((c) => {
-      if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
+      if (c.status === 'Resolved' || c.status === 'Rejected') return false;
+      if ((c.status as string) === 'Overdue') return true;
+      if (!c.sla_deadline) return false;
       return new Date(c.sla_deadline) < now;
     }).length;
     const criticalComplaints = deptComplaints.filter((c) => c.priority === 'Critical' || c.priority === 'High').length;
@@ -613,10 +641,7 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
     const token = localStorage.getItem('nagarsetu_token');
     const response = await fetch(`${getApiUrl()}/api/admin/department-heads`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+      headers: getNoCacheHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     });
 
@@ -817,13 +842,9 @@ export async function changeDepartmentHead(payload: CreateDepartmentHeadPayload)
 export async function updateDepartmentHead(headId: string, payload: Partial<CreateDepartmentHeadPayload>): Promise<boolean> {
   // 1. Call Local Express Backend API
   try {
-    const token = localStorage.getItem('nagarsetu_token');
     const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
+      headers: getNoCacheHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     });
 
@@ -863,13 +884,9 @@ export async function updateDepartmentHead(headId: string, payload: Partial<Crea
  */
 export async function deactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
   try {
-    const token = localStorage.getItem('nagarsetu_token');
     await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/deactivate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      }
+      headers: getNoCacheHeaders({ 'Content-Type': 'application/json' })
     });
   } catch (e) {
     console.warn('Express API deactivate note:', e);
@@ -901,13 +918,9 @@ export async function deactivateDepartmentHead(headId: string, performedByUserId
  */
 export async function reactivateDepartmentHead(headId: string, performedByUserId?: string): Promise<boolean> {
   try {
-    const token = localStorage.getItem('nagarsetu_token');
     await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/reactivate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      }
+      headers: getNoCacheHeaders({ 'Content-Type': 'application/json' })
     });
   } catch (e) {
     console.warn('Express API reactivate note:', e);
@@ -949,13 +962,9 @@ export async function deleteDepartmentHead(headIdOrDeptId: string, performedByUs
 
   // 1. Call Local Express Backend API DELETE endpoint
   try {
-    const token = localStorage.getItem('nagarsetu_token');
     const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headIdOrDeptId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      }
+      headers: getNoCacheHeaders({ 'Content-Type': 'application/json' })
     });
 
     const data = await response.json();

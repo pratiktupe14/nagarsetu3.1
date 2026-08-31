@@ -120,35 +120,7 @@ async function seed7DemoDepartmentHeads() {
       deptIdMap[dMeta.code] = deptId;
     }
 
-    // 2. Unassign/Deactivate legacy active Department Heads not in OFFICIAL_EMAILS
-    const legacyHeadsRes = await query(`SELECT * FROM department_heads WHERE status = 'active'`);
-    if (legacyHeadsRes.rows && legacyHeadsRes.rows.length > 0) {
-      for (const legHead of legacyHeadsRes.rows) {
-        const legEmail = (legHead.email || '').toLowerCase();
-        if (!OFFICIAL_EMAILS.includes(legEmail)) {
-          // Deactivate department_heads row
-          await query(
-            `UPDATE department_heads SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [legHead.id]
-          );
-          // Detach role and department from user table
-          if (legHead.user_id) {
-            await query(
-              `UPDATE users SET role = 'citizen', department_id = NULL WHERE id = ? AND role = 'department_head'`,
-              [legHead.user_id]
-            );
-          } else if (legEmail) {
-            await query(
-              `UPDATE users SET role = 'citizen', department_id = NULL WHERE LOWER(email) = ? AND role = 'department_head'`,
-              [legEmail]
-            );
-          }
-          console.log(`Unassigned legacy Department Head: '${legHead.name}' (${legEmail})`);
-        }
-      }
-    }
-
-    // 3. Create or Update the 7 official active Department Heads idempotently
+    // 2. Seed 7 official active Department Heads idempotently (preserving existing user-created heads)
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, salt);
 
@@ -156,7 +128,19 @@ async function seed7DemoDepartmentHeads() {
       const cleanEmail = dMeta.email.toLowerCase();
       const targetDeptId = deptIdMap[dMeta.code];
 
-      // Check users table
+      // Check if an active department head ALREADY exists for targetDeptId in department_heads
+      const existingActiveHead = await query(
+        `SELECT id, name, email FROM department_heads WHERE department_id = ? AND status = 'active' LIMIT 1`,
+        [targetDeptId]
+      );
+
+      // If an active head already exists for this department in the DB, DO NOT OVERWRITE IT AT ALL!
+      if (existingActiveHead.rows && existingActiveHead.rows.length > 0) {
+        console.log(`✓ Preserved existing Active Head for ${dMeta.code} (${dMeta.name}) -> ${existingActiveHead.rows[0].name} (${existingActiveHead.rows[0].email})`);
+        continue;
+      }
+
+      // Check users table for default account
       const userCheck = await query(`SELECT id, email FROM users WHERE LOWER(email) = ? OR mobile = ?`, [cleanEmail, dMeta.mobile]);
       let userId = null;
 
@@ -174,13 +158,7 @@ async function seed7DemoDepartmentHeads() {
         userId = insUser.rows[0].id;
       }
 
-      // Deactivate any other heads for this department
-      await query(
-        `UPDATE department_heads SET status = 'inactive' WHERE department_id = ? AND (user_id != ? AND LOWER(email) != ?)`,
-        [targetDeptId, userId, cleanEmail]
-      );
-
-      // Upsert department_heads record
+      // Upsert department_heads record as active
       const dhCheck = await query(
         `SELECT id FROM department_heads WHERE user_id = ? OR LOWER(email) = ?`,
         [userId, cleanEmail]

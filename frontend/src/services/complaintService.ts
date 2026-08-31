@@ -2,7 +2,7 @@ import { Complaint, ComplaintStatus, PriorityLevel, StaffPerformanceMetrics } fr
 import { supabase, isSupabaseConfigured, isValidUuid } from '../lib/supabase';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
-import { getApiUrl } from '../config/apiConfig';
+import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
 import { geocodeComplaintsWithoutCoordinates, auditAndRepairComplaintLocations } from './locationService';
 import { resolveDepartmentInfo } from './departmentService';
 
@@ -113,58 +113,90 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
 // Fetch all complaints from Supabase with real geocoding fallback
 export async function getAllComplaints(): Promise<Complaint[]> {
   let list: Complaint[] = [];
-  if (isSupabaseConfigured()) {
+  let responseStatus = 0;
+  const startTime = new Date().toISOString();
+
+  // 1. Try Express Backend API first with no-cache headers
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints`, {
+      headers: getNoCacheHeaders()
+    });
+    responseStatus = res.status;
+    if (res.ok) {
+      const data = await res.json();
+      const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
+      if (backendComplaints.length >= 0) {
+        list = backendComplaints.filter((c: any) => !isDemoComplaint(c));
+      }
+    }
+  } catch (err) {
+    console.warn('Express backend getAllComplaints fallback:', err);
+  }
+
+  // 2. Try Supabase if configured and backend yielded no list
+  if (list.length === 0 && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('complaints')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (!error && data) {
         list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+        if (responseStatus === 0) responseStatus = 200;
       }
     } catch (err) {
       console.warn('Supabase getAllComplaints fallback:', err);
     }
   }
 
-  // Merge LocalStorage complaints with database list to preserve local assignments and offline drafts
+  // 3. Merge with LocalStorage cached complaints (DB state takes absolute precedence)
   const localAll = getStoredComplaints();
-  if (localAll.length > 0) {
-    const map = new Map<string, Complaint>();
-    list.forEach((c) => {
-      const key = c.complaint_number || String(c.id);
-      if (key) map.set(key, c);
-    });
+  const dbMap = new Map<string, Complaint>();
 
-    localAll.forEach((loc) => {
-      const key = loc.complaint_number || String(loc.id);
-      if (!key) return;
-      const existing = map.get(key);
-      if (!existing) {
-        map.set(key, loc);
-      } else {
-        // If DB has authoritative record, keep DB status & details, only supplement missing staff info if DB lacks it
-        if (loc.assigned_staff_id && !existing.assigned_staff_id) {
-          existing.assigned_staff_id = loc.assigned_staff_id;
-          existing.assigned_staff_name = loc.assigned_staff_name || existing.assigned_staff_name;
-          existing.assigned_staff_email = loc.assigned_staff_email || existing.assigned_staff_email;
-          if ((loc as any).assigned_staff_employee_id) {
-            (existing as any).assigned_staff_employee_id = (loc as any).assigned_staff_employee_id;
-          }
-          if (loc.status === 'Staff Assigned' && existing.status === 'Submitted') {
-            existing.status = 'Staff Assigned';
-          }
-        }
-      }
-    });
+  list.forEach((c) => {
+    const key = c.complaint_number || String(c.id);
+    if (key) dbMap.set(key, c);
+  });
 
-    list = Array.from(map.values());
-  }
+  localAll.forEach((loc) => {
+    const key = loc.complaint_number || String(loc.id);
+    if (!key) return;
+    const dbRecord = dbMap.get(key);
+    if (!dbRecord) {
+      // Local draft not yet synced to backend
+      dbMap.set(key, loc);
+    } else {
+      // DB Record exists: Keep DB status, staff assignment, and timestamps as authoritative truth
+      dbMap.set(key, {
+        ...loc,
+        ...dbRecord, // DB overrides local
+        // Preserve local photo preview URLs if DB doesn't have public URLs yet
+        photo_before_url: dbRecord.photo_before_url || loc.photo_before_url,
+        photo_after_url: dbRecord.photo_after_url || loc.photo_after_url
+      });
+    }
+  });
 
-  const { repairedComplaints } = await auditAndRepairComplaintLocations(list);
+  const mergedList = Array.from(dbMap.values()).sort(
+    (a, b) => new Date(b.updated_at || b.created_at || Date.now()).getTime() - new Date(a.updated_at || a.created_at || Date.now()).getTime()
+  );
+
+  const { repairedComplaints } = await auditAndRepairComplaintLocations(mergedList);
   const cleanList = repairedComplaints.filter((c) => !isDemoComplaint(c));
   saveStoredComplaints(cleanList);
+
+  // Development Diagnostic Logging
+  console.log('[ADMIN DATA SYNC]', {
+    apiUrl: `${getApiUrl()}/api/complaints`,
+    fetchTime: startTime,
+    responseStatus,
+    databaseRecordCount: list.length,
+    lastUpdatedRecord: cleanList[0]?.updated_at || cleanList[0]?.created_at || 'N/A',
+    localCacheUsed: localAll.length > 0,
+    finalRecordCount: cleanList.length
+  });
+
   return cleanList;
 }
 

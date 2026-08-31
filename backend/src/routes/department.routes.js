@@ -4,6 +4,14 @@ const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
+// No-cache middleware for dynamic department data
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 /**
  * Helper: Resolve department ID and Name for current user
  */
@@ -63,22 +71,22 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
              u.language_pref, u.created_at,
              d.name as department_name,
              (
-               SELECT COUNT(DISTINCT a.id)
-               FROM assignments a
-               JOIN complaints c ON c.id = a.complaint_id
-               WHERE a.staff_id = u.id AND c.status IN ('Assigned', 'In Progress', 'Verified')
+               SELECT COUNT(DISTINCT c.id)
+               FROM complaints c
+               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+                 AND c.status IN ('Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified')
              ) as active_tasks,
              (
-               SELECT COUNT(DISTINCT a.id)
-               FROM assignments a
-               JOIN complaints c ON c.id = a.complaint_id
-               WHERE a.staff_id = u.id AND c.status = 'Resolved'
+               SELECT COUNT(DISTINCT c.id)
+               FROM complaints c
+               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+                 AND c.status = 'Resolved'
              ) as completed_tasks,
              (
-               SELECT COUNT(DISTINCT a.id)
-               FROM assignments a
-               JOIN complaints c ON c.id = a.complaint_id
-               WHERE a.staff_id = u.id AND c.status = 'Overdue'
+               SELECT COUNT(DISTINCT c.id)
+               FROM complaints c
+               WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
+                 AND (c.status = 'Overdue' OR (c.status NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
              ) as overdue_tasks
       FROM users u
       LEFT JOIN departments d ON u.department_id = d.id
@@ -94,18 +102,20 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
     } else if (req.query.department_id) {
       let deptFilterId = req.query.department_id;
       const codeToIdMap = {
-        PWD: 1, 'DEPT-1': 1,
-        SAN: 2, 'DEPT-2': 2,
-        WTR: 3, 'DEPT-3': 3,
-        DRN: 4, 'DEPT-4': 4,
-        ELE: 5, 'DEPT-5': 5,
-        TRF: 6, 'DEPT-6': 6,
-        MNT: 7, 'DEPT-7': 7
+        PWD: 1, 'DEPT-1': 1, 'DEPT-PWD': 1,
+        SAN: 2, 'DEPT-2': 2, 'DEPT-SAN': 2,
+        WTR: 3, 'DEPT-3': 3, 'DEPT-WTR': 3,
+        DRN: 4, 'DEPT-4': 4, 'DEPT-DRN': 4,
+        ELE: 5, 'DEPT-5': 5, 'DEPT-ELE': 5,
+        TRF: 6, 'DEPT-6': 6, 'DEPT-TRF': 6,
+        MNT: 7, 'DEPT-7': 7, 'DEPT-MNT': 7
       };
       if (typeof deptFilterId === 'string') {
         const cleanCode = deptFilterId.toUpperCase().split('-')[0].replace('DEPT', '').trim();
         if (codeToIdMap[cleanCode]) {
           deptFilterId = codeToIdMap[cleanCode];
+        } else if (codeToIdMap[deptFilterId.toUpperCase()]) {
+          deptFilterId = codeToIdMap[deptFilterId.toUpperCase()];
         }
       }
       sql += ` AND u.department_id = $1`;
@@ -476,13 +486,13 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     // Helper: Normalize department code/id for secure isolation check
     const normDept = (d) => {
       const s = String(d || '').trim().toLowerCase();
-      if (s === '1' || s.includes('pwd')) return 'PWD';
-      if (s === '2' || s.includes('san')) return 'SAN';
-      if (s === '3' || s.includes('wtr')) return 'WTR';
-      if (s === '4' || s.includes('ele')) return 'ELE';
-      if (s === '5' || s.includes('trf')) return 'TRF';
-      if (s === '6' || s.includes('mnt')) return 'MNT';
-      if (s === '7' || s.includes('drn')) return 'DRN';
+      if (s === '1' || s.includes('pwd') || s.includes('road')) return 'PWD';
+      if (s === '2' || s.includes('san') || s.includes('waste')) return 'SAN';
+      if (s === '3' || s.includes('wtr') || s.includes('water')) return 'WTR';
+      if (s === '4' || s === '7' || s.includes('drn') || s.includes('drain')) return 'DRN';
+      if (s === '5' || s === '4' || s.includes('ele') || s.includes('electric')) return 'ELE';
+      if (s === '6' || s.includes('trf') || s.includes('traffic')) return 'TRF';
+      if (s === '7' || s === '6' || s.includes('mnt') || s.includes('maint')) return 'MNT';
       return s.toUpperCase();
     };
 

@@ -3,7 +3,8 @@ import { getStoredComplaints, saveStoredComplaints } from './complaintService';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { getApiUrl } from '../config/apiConfig';
+import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
+import { resolveDepartmentInfo, isStaffInDepartment } from './departmentService';
 
 const LOCAL_STORAGE_ACTIVITY_LOGS_KEY = 'nagarsetu_activity_logs_v5';
 
@@ -26,9 +27,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-PWD',
     name: 'Roads & Public Works (PWD)',
     code: 'PWD-01',
-    department_head: 'Er. Rajesh Sharma',
-    contact_number: '+91 98220 11201',
-    email: 'pwd.admin@nagarsetu.gov.in',
+    department_head: 'Rahul Kumar',
+    contact_number: '+91 98220 00001',
+    email: 'rahul.kumar@nagarsetu.gov.in',
     description: 'Asphalt road repairs, pothole filling, sidewalk paving, and structural civic infrastructure maintenance.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -37,9 +38,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-SAN',
     name: 'Sanitation & Waste Management',
     code: 'SAN-01',
-    department_head: 'Dr. Anjali Patil',
-    contact_number: '+91 98220 11202',
-    email: 'sanitation@nagarsetu.gov.in',
+    department_head: 'Amit Sharma',
+    contact_number: '+91 98220 00002',
+    email: 'amit.sharma@nagarsetu.gov.in',
     description: 'Solid waste collection, dumpster clearing, street sweeping, market sanitation, and public hygiene.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -48,9 +49,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-WTR',
     name: 'Water Supply & Sewerage Board',
     code: 'WTR-01',
-    department_head: 'Er. Vikram Deshmukh',
-    contact_number: '+91 98220 11203',
-    email: 'waterboard@nagarsetu.gov.in',
+    department_head: 'Vikram Patil',
+    contact_number: '+91 98220 00003',
+    email: 'vikram.patil@nagarsetu.gov.in',
     description: 'Potable water mains, underground pipeline leakage sealing, valve control, and sewage network maintenance.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -59,20 +60,20 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-ELE',
     name: 'Electrical & Lighting Dept',
     code: 'ELE-01',
-    department_head: 'Er. Sunita Pawar',
-    contact_number: '+91 98220 11204',
-    email: 'electrical@nagarsetu.gov.in',
+    department_head: 'Aditya Joshi',
+    contact_number: '+91 98220 00005',
+    email: 'aditya.joshi@nagarsetu.gov.in',
     description: 'LED streetlights, junction box repairs, feeder pillar cabinets, and municipal electrical grid maintenance.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
   },
   {
     id: 'dept-DRN',
-    name: 'Drainage & Stormwater Dept',
+    name: 'Drainage & Sewage Department',
     code: 'DRN-01',
-    department_head: 'Er. Manoj Kadam',
-    contact_number: '+91 98220 11205',
-    email: 'drainage@nagarsetu.gov.in',
+    department_head: 'Sanjay More',
+    contact_number: '+91 98220 00004',
+    email: 'sanjay.more@nagarsetu.gov.in',
     description: 'Monsoon stormwater channels, drain de-silting, culvert clearing, and urban flood mitigation.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -81,21 +82,21 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-TRF',
     name: 'Traffic Management Dept',
     code: 'TRF-01',
-    department_head: 'Insp. Ganesh More',
-    contact_number: '+91 98220 11206',
-    email: 'traffic@nagarsetu.gov.in',
+    department_head: 'Rohan Deshmukh',
+    contact_number: '+91 98220 00006',
+    email: 'rohan.deshmukh@nagarsetu.gov.in',
     description: 'Traffic light signals, road signage, speed breakers, zebra crossings, and junction traffic flow.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
   },
   {
-    id: 'dept-PRK',
-    name: 'Parks & Environmental Services',
-    code: 'PRK-01',
-    department_head: 'Kavita Kulkarni',
-    contact_number: '+91 98220 11207',
-    email: 'parks@nagarsetu.gov.in',
-    description: 'Municipal garden upkeep, public tree trimming, green belt maintenance, and urban forestry.',
+    id: 'dept-MNT',
+    name: 'Maintenance Department',
+    code: 'MNT-01',
+    department_head: 'Kunal Kulkarni',
+    contact_number: '+91 98220 00007',
+    email: 'kunal.kulkarni@nagarsetu.gov.in',
+    description: 'General civic facility repairs, building maintenance, public asset upkeep, and municipal asset management.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
   }
@@ -144,11 +145,7 @@ export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRe
 const LOCAL_STORAGE_STAFF_KEY = 'nagarsetu_service_staff_v3';
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('nagarsetu_token') || localStorage.getItem('token') || '';
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
+  return getNoCacheHeaders({ 'Content-Type': 'application/json' });
 }
 
 export interface DepartmentStaffApiItem {
@@ -200,6 +197,15 @@ export async function fetchDepartmentStaffApi(params?: {
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.staff)) {
+        console.log('[ADMIN DATA SYNC]', {
+          apiUrl: `${getApiUrl()}/api/department/staff`,
+          fetchTime: new Date().toISOString(),
+          responseStatus: res.status,
+          databaseRecordCount: data.staff.length,
+          lastUpdatedRecord: data.staff[0]?.created_at || 'N/A',
+          localCacheUsed: false,
+          finalRecordCount: data.staff.length
+        });
         return {
           staff: data.staff,
           summary: data.summary || {
@@ -214,9 +220,33 @@ export async function fetchDepartmentStaffApi(params?: {
   } catch (err) {
     console.warn('Failed to fetch staff from API:', err);
   }
+
+  const defaultStaff = getAllServiceStaffRecords().map((s) => ({
+    id: s.id,
+    name: s.name,
+    email: s.email,
+    mobile: s.contact_number,
+    contact_number: s.contact_number,
+    employee_id: s.employee_id,
+    designation: s.role || 'Field Service Staff',
+    department_name: s.department_name,
+    status: (s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0,
+    language: 'en',
+    joined_date: s.joined_date,
+    created_at: s.created_at
+  }));
+
   return {
-    staff: [],
-    summary: { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
+    staff: defaultStaff,
+    summary: {
+      totalStaff: defaultStaff.length,
+      activeStaff: defaultStaff.filter((s) => s.status === 'Active').length,
+      inactiveStaff: defaultStaff.filter((s) => s.status === 'Inactive').length,
+      activeTasks: 0
+    }
   };
 }
 
@@ -317,6 +347,9 @@ export interface ServiceStaffMemberRecord {
 export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
 
 const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [
+  // 0. Primary Demo Staff — Ramesh Kumar (36th Staff)
+  { id: 'stf-pwd-00', name: 'Ramesh Kumar', employee_id: 'STF-001', department_name: 'Roads & Public Works (PWD)', role: 'Field Maintenance Staff', status: 'Available', contact_number: '+91 98765 43212', email: 'staff@nagarsetu.gov.in', ward_area: 'Central Zone (Ward 1)', joined_date: '2026-01-01T00:00:00.000Z', created_at: '2026-01-01T00:00:00.000Z' },
+
   // 1. PWD — 5 Staff
   { id: 'stf-pwd-01', name: 'Amit Patil', employee_id: 'PWD-STF-001', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10001', email: 'amit.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 12)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
   { id: 'stf-pwd-02', name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10002', email: 'sagar.jadhav@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 5)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
@@ -372,7 +405,7 @@ export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length >= 35) {
+      if (Array.isArray(parsed) && parsed.length >= 36) {
         return parsed;
       }
     } catch (e) {}
@@ -446,38 +479,10 @@ function isValidUuid(id?: string): boolean {
 
   // 3. Fallback to default roster filtered by department ID, code, or name
   const all = getAllServiceStaffRecords();
-  const codeMap: Record<string, string> = { PWD: '1', SAN: '2', WTR: '3', ELE: '4', TRF: '5', MNT: '6', DRN: '7' };
-  const dNameLower = (departmentName || '').toLowerCase();
+  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
   
   const filtered = all.filter((s) => {
-    if (departmentId && String(s.department_id || '') === String(departmentId)) return true;
-    
-    const empId = (s.employee_id || '').toUpperCase();
-    const sDept = (s.department_name || '').toLowerCase();
-
-    if (dNameLower.includes('sanitation') || dNameLower.includes('waste') || empId.startsWith('SAN')) {
-      return sDept.includes('sanitation') || sDept.includes('waste') || empId.startsWith('SAN');
-    }
-    if (dNameLower.includes('public works') || dNameLower.includes('pwd') || dNameLower.includes('road') || empId.startsWith('PWD')) {
-      return sDept.includes('public works') || sDept.includes('pwd') || sDept.includes('road') || empId.startsWith('PWD');
-    }
-    if (dNameLower.includes('water') || dNameLower.includes('sewerage') || empId.startsWith('WTR')) {
-      return sDept.includes('water') || sDept.includes('sewerage') || empId.startsWith('WTR');
-    }
-    if (dNameLower.includes('drainage') || dNameLower.includes('sewage') || empId.startsWith('DRN')) {
-      return sDept.includes('drainage') || sDept.includes('sewage') || empId.startsWith('DRN');
-    }
-    if (dNameLower.includes('electrical') || dNameLower.includes('lighting') || empId.startsWith('ELE')) {
-      return sDept.includes('electrical') || sDept.includes('lighting') || empId.startsWith('ELE');
-    }
-    if (dNameLower.includes('traffic') || empId.startsWith('TRF')) {
-      return sDept.includes('traffic') || empId.startsWith('TRF');
-    }
-    if (dNameLower.includes('maintenance') || empId.startsWith('MNT')) {
-      return sDept.includes('maintenance') || empId.startsWith('MNT');
-    }
-
-    return sDept.includes(dNameLower) || dNameLower.includes(sDept);
+    return isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name);
   });
 
   return filtered;
@@ -710,20 +715,25 @@ export async function assignStaffToTask(
 ): Promise<boolean> {
   const slaDeadline = new Date(Date.now() + slaHours * 3600000).toISOString();
 
-  // 1. Try Backend API
+  // 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    await fetch(`${getApiUrl()}/api/officer/assign`, {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    let res = await fetch(`${getApiUrl()}/api/department/assign`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({
-        complaint_id: complaintId,
-        staff_id: staffId
-      })
+      headers,
+      body: JSON.stringify({ complaint_id: complaintId, staff_id: staffId })
     });
+    if (!res.ok) {
+      await fetch(`${getApiUrl()}/api/officer/assign`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ complaint_id: complaintId, staff_id: staffId })
+      });
+    }
   } catch (e) {
     console.warn('Backend assignStaffToTask error fallback:', e);
   }
@@ -740,7 +750,7 @@ export async function assignStaffToTask(
           sla_deadline: slaDeadline,
           updated_at: new Date().toISOString()
         })
-        .eq('id', complaintId);
+        .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
     } catch (e) {}
   }
 

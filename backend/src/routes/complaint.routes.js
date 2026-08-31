@@ -10,6 +10,14 @@ const { resolveLocation, checkForDuplicates } = require('../services/locationSer
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
+// No-cache middleware for dynamic complaint data
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
 router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
   try {
@@ -179,6 +187,24 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Fetch complaint status history error:', err);
     return res.status(500).json({ error: 'Failed to fetch status history' });
+  }
+});
+
+// Get all complaints for Admin / Portals
+router.get('/', async (req, res) => {
+  try {
+    const sql = `
+      SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
+      FROM complaints c
+      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN feedback f ON f.complaint_id = c.id
+      ORDER BY c.created_at DESC
+    `;
+    const result = await query(sql);
+    return res.json({ complaints: result.rows });
+  } catch (err) {
+    console.error('Fetch all complaints error:', err);
+    return res.status(500).json({ error: 'Failed to fetch complaints' });
   }
 });
 

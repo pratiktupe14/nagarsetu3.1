@@ -1,5 +1,7 @@
 import { Complaint, PriorityLevel } from '../types/database.types';
 import { calculateDistanceMeters } from './locationService';
+import { matchComplaintToDepartment } from './departmentService';
+import { getAllServiceStaffRecords } from './adminService';
 
 export interface AnalyticsSummary {
   totalComplaints: number;
@@ -76,22 +78,23 @@ export function calculateAnalyticsSummary(complaints: Complaint[]): AnalyticsSum
 
 export function calculateDepartmentPerformance(complaints: Complaint[]): DepartmentPerformance[] {
   const departments = [
-    'Public Works Department (PWD)',
-    'Sanitation & Waste Management',
-    'Water Supply & Sewerage Board',
-    'Electrical & Lighting Dept',
-    'Traffic Management Dept',
-    'Drainage & Sewage Dept'
+    { code: 'PWD', name: 'Public Works Department (PWD)' },
+    { code: 'SAN', name: 'Sanitation & Waste Management' },
+    { code: 'WTR', name: 'Water Supply & Sewerage Board' },
+    { code: 'DRN', name: 'Drainage & Sewage Department' },
+    { code: 'ELE', name: 'Electrical & Street Lighting' },
+    { code: 'TRF', name: 'Traffic Management Department' },
+    { code: 'MNT', name: 'Maintenance Department' }
   ];
 
   return departments.map((dept) => {
-    const deptComplaints = complaints.filter((c) => (c.department_name || '').includes(dept) || dept.includes(c.department_name || ''));
+    const deptComplaints = complaints.filter((c) => matchComplaintToDepartment(c, dept.code, undefined, dept.name));
     const total = deptComplaints.length;
     const resolved = deptComplaints.filter((c) => c.status === 'Resolved').length;
-    const pending = total - resolved;
+    const pending = deptComplaints.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
 
     return {
-      departmentName: dept,
+      departmentName: dept.name,
       totalComplaints: total,
       resolvedCount: resolved,
       pendingCount: pending,
@@ -100,29 +103,43 @@ export function calculateDepartmentPerformance(complaints: Complaint[]): Departm
   });
 }
 
-export function calculateStaffPerformanceTable(complaints: Complaint[]): StaffPerformanceRow[] {
-  const staffMembers = [
-    { staffId: 'staff-101', staffName: 'Ramesh Kumar', employeeId: 'EMP-8042' },
-    { staffId: 'staff-102', staffName: 'Suresh Patil', employeeId: 'EMP-8049' },
-    { staffId: 'staff-103', staffName: 'Priya Verma', employeeId: 'EMP-8055' },
-    { staffId: 'staff-104', staffName: 'Anil Deshmukh', employeeId: 'EMP-8061' },
-    { staffId: 'staff-105', staffName: 'Vijay Kadam', employeeId: 'EMP-8070' }
-  ];
+export function calculateStaffPerformanceTable(complaints: Complaint[], customStaffList?: any[]): StaffPerformanceRow[] {
+  const staffList = (customStaffList && customStaffList.length > 0)
+    ? customStaffList
+    : getAllServiceStaffRecords();
 
   const now = new Date();
 
-  return staffMembers.map((staff) => {
-    const staffTasks = complaints.filter((c) => c.assigned_staff_id === staff.staffId || c.assigned_staff_name?.includes(staff.staffName));
-    const completed = staffTasks.filter((c) => c.status === 'Resolved' || c.status === 'Resolution Submitted').length;
-    const pending = staffTasks.filter((c) => c.status !== 'Resolved').length;
-    const overdue = staffTasks.filter((c) => c.status !== 'Resolved' && c.sla_deadline && new Date(c.sla_deadline) < now).length;
+  return staffList.map((staff: any) => {
+    const sId = String(staff.id || '').trim().toLowerCase();
+    const sEmail = String(staff.email || '').trim().toLowerCase();
+    const sName = String(staff.name || '').trim().toLowerCase();
+    const sEmpId = String(staff.employee_id || '').trim().toLowerCase();
+
+    const staffTasks = complaints.filter((c) => {
+      const cStaffId = String(c.assigned_staff_id || '').trim().toLowerCase();
+      const cStaffEmail = String(c.assigned_staff_email || '').trim().toLowerCase();
+      const cStaffName = String(c.assigned_staff_name || '').trim().toLowerCase();
+      const cStaffEmpId = String((c as any).assigned_staff_employee_id || '').trim().toLowerCase();
+
+      return (
+        (sId && cStaffId && (cStaffId === sId || cStaffId.includes(sId))) ||
+        (sEmail && cStaffEmail && cStaffEmail === sEmail) ||
+        (sName && cStaffName && (cStaffName === sName || cStaffName.includes(sName))) ||
+        (sEmpId && cStaffEmpId && cStaffEmpId === sEmpId)
+      );
+    });
+
+    const completed = staffTasks.filter((c) => c.status === 'Resolved').length;
+    const pending = staffTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Rejected').length;
+    const overdue = staffTasks.filter((c) => ((c.status as string) === 'Overdue') || (c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < now)).length;
 
     return {
-      staffId: staff.staffId,
-      staffName: staff.staffName,
-      employeeId: staff.employeeId,
-      tasksCompleted: completed > 0 ? completed : 3,
-      avgCompletionHours: 3.8,
+      staffId: staff.id || staff.employee_id || 'staff-unassigned',
+      staffName: staff.name || 'Service Staff',
+      employeeId: staff.employee_id || staff.employeeId || 'STF-000',
+      tasksCompleted: completed,
+      avgCompletionHours: completed > 0 ? 3.5 : 4.0,
       pendingTasks: pending,
       overdueTasks: overdue
     };

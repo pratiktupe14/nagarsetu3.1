@@ -37,7 +37,7 @@ export const LoginPage: React.FC = () => {
       setIdentifier('admin@nagarsetu.gov.in');
       setPassword(demoAdminPass);
     } else if (role === 'department_head') {
-      setIdentifier('rahul.patil@nagarsetu.gov.in');
+      setIdentifier('rahul.kumar@nagarsetu.gov.in');
       setPassword(demoHeadPass);
     } else if (role === 'service_staff') {
       setIdentifier('staff@nagarsetu.gov.in');
