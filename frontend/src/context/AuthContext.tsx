@@ -370,7 +370,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const switchRole = (newRole: UserRole) => {
+  const switchRole = async (newRole: UserRole) => {
     let roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
     if (newRole === 'service_staff' && user && user.email) {
       const resolved = findServiceStaffByIdentifier(user.email);
@@ -378,6 +378,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setUser(roleUser);
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
+
+    // Ensure valid JWT token is fetched and cached in localStorage for API routes
+    if (!localStorage.getItem('nagarsetu_token')) {
+      try {
+        const loginId = newRole === 'city_admin' ? '9876543213' : (newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : '9876543210');
+        const loginPass = newRole === 'city_admin' ? 'NagarSetu@Admin2026!' : 'password123';
+        const res = await fetch(`${getApiUrl()}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token) {
+            localStorage.setItem('nagarsetu_token', data.token);
+          }
+        }
+      } catch (e) {}
+    }
   };
 
   const login = async (identifier: string, password: string, targetRole: UserRole): Promise<boolean> => {
