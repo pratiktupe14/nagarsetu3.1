@@ -53,6 +53,43 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/department/complaints
+ * Fetch complaints for authenticated Department Head (or all for Admin)
+ */
+router.get('/complaints', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+  try {
+    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    let sql = `
+      SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
+      FROM complaints c
+      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN feedback f ON f.complaint_id = c.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (!isAdmin) {
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(userDeptId || -1, String(userDeptId || -1));
+    } else if (req.query.department_id) {
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(req.query.department_id, String(req.query.department_id));
+    }
+
+    sql += ` ORDER BY c.created_at DESC`;
+
+    const result = await query(sql, params);
+    return res.json({ complaints: result.rows, department_id: userDeptId, department_name: userDeptName });
+  } catch (err) {
+    console.error('Fetch department complaints error:', err);
+    return res.status(500).json({ error: 'Failed to fetch department complaints' });
+  }
+});
+
+/**
  * GET /api/department/staff
  * Fetch service staff for authenticated Department Head (or all for Admin)
  */
