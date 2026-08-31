@@ -149,11 +149,11 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   },
   department_head: {
     id: 'demo-head-id-404',
-    full_name: 'Department Head',
-    email: 'dept.head@nagarsetu.gov.in',
+    full_name: 'Rahul Kumar',
+    email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
-    department_name: '',
-    department_id: '',
+    department_name: 'Public Works Department (PWD)',
+    department_id: '1',
     language_pref: 'en'
   }
 };

@@ -153,8 +153,12 @@ export const Navbar: React.FC = () => {
             {user && !isPublicPage ? (
               <div className="flex items-center space-x-3 pl-2 border-l border-gray-200">
                 <div className="text-right">
-                  <span className="text-xs font-bold text-gray-900 block leading-tight">{user.full_name}</span>
-                  <span className="text-[10px] text-gray-500 capitalize">{(activeRole || 'citizen').replace('_', ' ')}</span>
+                  <span className="text-xs font-bold text-gray-900 block leading-tight">
+                    {user.full_name && user.full_name !== 'Department Head' ? user.full_name : 'Rahul Kumar'}
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium block">
+                    {user.department_name ? user.department_name.split('(')[0].trim() : (activeRole || 'citizen').replace('_', ' ')}
+                  </span>
                 </div>
 
                 <button

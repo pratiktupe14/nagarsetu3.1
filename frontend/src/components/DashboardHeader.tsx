@@ -91,8 +91,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* USER PROFILE BADGE */}
         <div className="hidden sm:flex items-center space-x-2 pl-2 border-l border-gray-200 text-right">
           <div>
-            <span className="text-xs font-bold text-gray-900 block leading-tight">{user?.full_name || 'Demo Context'}</span>
-            <span className="text-[10px] text-gray-500 capitalize">{activeRole.replace('_', ' ')}</span>
+            <span className="text-xs font-bold text-gray-900 block leading-tight">
+              {user?.full_name && user.full_name !== 'Department Head' ? user.full_name : 'Rahul Kumar'}
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium block">
+              {user?.department_name ? user.department_name.split('(')[0].trim() : activeRole.replace('_', ' ')}
+            </span>
           </div>
         </div>
 
