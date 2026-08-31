@@ -19,6 +19,62 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const SEED_DEPARTMENT_HEADS = [
+  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', department_id: '1', department_name: 'Public Works Department (PWD)', department_code: 'PWD', employee_id: 'DH-PWD-001' },
+  { id: '2', name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', department_id: '2', department_name: 'Sanitation & Waste Management', department_code: 'SAN', employee_id: 'DH-SAN-001' },
+  { id: '3', name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', department_id: '3', department_name: 'Water Supply & Sewerage Board', department_code: 'WTR', employee_id: 'DH-WTR-001' },
+  { id: '4', name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', department_id: '4', department_name: 'Drainage & Sewage Department', department_code: 'DRN', employee_id: 'DH-DRN-001' },
+  { id: '5', name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', department_id: '5', department_name: 'Electrical & Street Lighting', department_code: 'ELE', employee_id: 'DH-ELE-001' },
+  { id: '6', name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', department_id: '6', department_name: 'Traffic Management Department', department_code: 'TRF', employee_id: 'DH-TRF-001' },
+  { id: '7', name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', department_id: '7', department_name: 'Maintenance Department', department_code: 'MNT', employee_id: 'DH-MNT-001' }
+];
+
+export function findDepartmentHeadByIdentifier(identifier: string): UserProfile | null {
+  if (!identifier) return null;
+  const clean = identifier.trim().toLowerCase();
+  if (!clean) return null;
+
+  const exact = SEED_DEPARTMENT_HEADS.find((dh) => {
+    const e = (dh.email || '').toLowerCase();
+    const emp = (dh.employee_id || '').toLowerCase();
+    const id = (dh.id || '').toLowerCase();
+    const name = (dh.name || '').toLowerCase();
+    return e === clean || emp === clean || id === clean || (name && name.includes(clean));
+  });
+
+  if (exact) {
+    return {
+      id: exact.id,
+      full_name: exact.name,
+      email: exact.email,
+      role: 'department_head',
+      department_id: exact.department_id,
+      department_name: exact.department_name,
+      department_code: exact.department_code,
+      employee_id: exact.employee_id,
+      language_pref: 'en'
+    };
+  }
+
+  const resDept = resolveDepartmentInfo(undefined, undefined, clean);
+  if (resDept && resDept.code !== 'UNASSIGNED') {
+    const seedMatch = SEED_DEPARTMENT_HEADS.find((dh) => dh.department_code === resDept.code);
+    return {
+      id: seedMatch?.id || `dh-${resDept.code.toLowerCase()}-01`,
+      full_name: seedMatch?.name || `${resDept.name} Head`,
+      email: seedMatch?.email || (clean.includes('@') ? clean : `${clean}@nagarsetu.gov.in`),
+      role: 'department_head',
+      department_id: resDept.id,
+      department_name: resDept.fullName || resDept.name,
+      department_code: resDept.code,
+      employee_id: seedMatch?.employee_id || `DH-${resDept.code}-001`,
+      language_pref: 'en'
+    };
+  }
+
+  return null;
+}
+
 export function findServiceStaffByIdentifier(identifier: string): UserProfile | null {
   if (!identifier) return null;
   const clean = identifier.trim().toLowerCase();
@@ -149,11 +205,13 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   },
   department_head: {
     id: 'demo-head-id-404',
-    full_name: 'Department Head',
-    email: 'dept.head@nagarsetu.gov.in',
+    full_name: 'Rahul Kumar',
+    email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
-    department_name: '',
-    department_id: '',
+    department_id: '1',
+    department_name: 'Public Works Department (PWD)',
+    department_code: 'PWD',
+    employee_id: 'DH-PWD-001',
     language_pref: 'en'
   }
 };
@@ -376,13 +434,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const resolved = findServiceStaffByIdentifier(user.email);
       if (resolved) roleUser = resolved;
     }
+    if (newRole === 'department_head' && user && user.email) {
+      const resolvedHead = findDepartmentHeadByIdentifier(user.email);
+      if (resolvedHead) roleUser = resolvedHead;
+    }
     setUser(roleUser);
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
 
     // Ensure valid JWT token is fetched and cached in localStorage for API routes
     if (!localStorage.getItem('nagarsetu_token')) {
       try {
-        const loginId = newRole === 'city_admin' ? '9876543213' : (newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : '9876543210');
+        const loginId = user?.email || (newRole === 'city_admin' ? '9876543213' : '9876543210');
         const loginPass = newRole === 'city_admin' ? 'NagarSetu@Admin2026!' : 'password123';
         const res = await fetch(`${getApiUrl()}/api/auth/login`, {
           method: 'POST',
@@ -417,8 +479,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const staffMatch = mappedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanIdentifier) : null;
             const resDept = resolveDepartmentInfo(
               data.user.department_id || staffMatch?.department_id,
-              data.user.department_name || staffMatch?.department_name
+              data.user.department_name || staffMatch?.department_name,
+              cleanIdentifier
             );
+
+            if (mappedRole === 'department_head' && (!resDept.id || resDept.code === 'UNASSIGNED')) {
+              throw new Error("Department assignment could not be resolved. Please contact City Administration.");
+            }
+
             const authenticatedUser: UserProfile = {
               id: String(data.user.id || staffMatch?.id || 'staff-101'),
               full_name: data.user.name || staffMatch?.full_name || 'Municipal User',
@@ -427,6 +495,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               role: mappedRole,
               department_id: data.user.department_id ? String(data.user.department_id) : resDept.id,
               department_name: data.user.department_name || staffMatch?.department_name || resDept.fullName || resDept.name,
+              department_code: data.user.department_code || resDept.code,
               employee_id: data.user.employee_id || staffMatch?.employee_id || undefined,
               language_pref: data.user.language_pref || 'en'
             };
@@ -436,7 +505,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return true;
           }
         }
-      } catch (backendErr) {
+      } catch (backendErr: any) {
+        if (backendErr && backendErr.message && backendErr.message.includes('Department assignment could not be resolved')) {
+          throw backendErr;
+        }
         console.warn('Backend API login note:', backendErr);
       }
 
@@ -459,7 +531,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .maybeSingle();
 
         if (inactiveHead && !activeHead) {
-          throw new Error("Your Department Head access has been deactivated. Please contact City Administration.");
+          throw new Error("Department assignment could not be resolved. Please contact City Administration.");
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -481,7 +553,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
           let rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
           let rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
-          const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName);
+          let rawDeptCode = deptHead?.departments?.code;
+          const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName, cleanEmail);
+
+          if (resolvedRole === 'department_head' && (!resDept.id || resDept.code === 'UNASSIGNED')) {
+            throw new Error("Department assignment could not be resolved. Please contact City Administration.");
+          }
 
           const fetchedUser: UserProfile = {
             id: authUser.id || staffMatch?.id || 'staff-101',
@@ -491,6 +568,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role: resolvedRole,
             department_id: rawDeptId ? String(rawDeptId) : resDept.id,
             department_name: rawDeptName || resDept.fullName || resDept.name,
+            department_code: rawDeptCode || resDept.code,
             employee_id: deptHead?.employee_id || profile?.employee_id || staffMatch?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };
@@ -522,6 +600,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
               return true;
             }
+            if (targetRole === 'department_head') {
+              const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
+              if (dhMatch) {
+                setUser(dhMatch);
+                localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
+                return true;
+              }
+              throw new Error("Department assignment could not be resolved. Please contact City Administration.");
+            }
             switchRole(targetRole || 'city_admin');
             return true;
           }
@@ -547,6 +634,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role: 'department_head',
             department_id: dhRow.department_id,
             department_name: dhRow.departments?.name || 'Municipal Department',
+            department_code: dhRow.departments?.code,
             employee_id: dhRow.employee_id,
             language_pref: 'en'
           };
@@ -554,6 +642,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
           return true;
         }
+      }
+
+      if (targetRole === 'department_head') {
+        const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
+        if (dhMatch) {
+          setUser(dhMatch);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
+          return true;
+        }
+        throw new Error("Department assignment could not be resolved. Please contact City Administration.");
       }
 
       if (targetRole === 'service_staff') {

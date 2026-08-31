@@ -83,6 +83,7 @@ export interface UserProfile {
   role: UserRole;
   department_id?: string;
   department_name?: string;
+  department_code?: string;
   employee_id?: string;
   avatar_url?: string;
   address?: string;

@@ -81,7 +81,9 @@ async function seedServiceStaff() {
     const cleanEmail = item.email.toLowerCase();
     const deptId = deptMap[item.deptCode] || null;
 
-    // Check if account already exists by email or employee_id
+    let userId = null;
+
+    // Check if user account already exists by email or employee_id
     const existing = await query(
       `SELECT id, department_id, status FROM users WHERE LOWER(email) = $1 OR employee_id = $2`,
       [cleanEmail, item.employee_id]
@@ -89,6 +91,7 @@ async function seedServiceStaff() {
 
     if (existing.rows && existing.rows.length > 0) {
       const existingUser = existing.rows[0];
+      userId = existingUser.id;
       // Update department, password, role, status to active
       await query(
         `UPDATE users
@@ -104,30 +107,67 @@ async function seedServiceStaff() {
         [item.name, item.mobile, passwordHash, deptId, item.employee_id, existingUser.id]
       );
       updatedCount++;
-      console.log(`Updated staff: ${item.name} (${item.employee_id}) -> Dept ${deptId}`);
+      console.log(`Updated users account: ${item.name} (${item.employee_id}) -> Dept ${deptId}`);
     } else {
       // Insert new user
-      await query(
+      const insUser = await query(
         `INSERT INTO users 
          (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref)
          VALUES ($1, $2, $3, $4, 'service_staff', $5, $6, 'Field Service Staff', 'active', 'en')`,
         [item.name, item.mobile, cleanEmail, passwordHash, deptId, item.employee_id]
       );
+      userId = insUser.rows?.[0]?.id || null;
+      if (!userId) {
+        const fetchU = await query(`SELECT id FROM users WHERE LOWER(email) = $1`, [cleanEmail]);
+        userId = fetchU.rows?.[0]?.id || null;
+      }
       createdCount++;
-      console.log(`Created staff: ${item.name} (${item.employee_id}) -> Dept ${deptId}`);
+      console.log(`Created users account: ${item.name} (${item.employee_id}) -> Dept ${deptId}`);
+    }
+
+    // Upsert into dedicated field_staff table
+    const existingFs = await query(
+      `SELECT id FROM field_staff WHERE LOWER(email) = $1 OR employee_id = $2 OR (user_id IS NOT NULL AND user_id = $3)`,
+      [cleanEmail, item.employee_id, userId || -1]
+    );
+
+    if (existingFs.rows && existingFs.rows.length > 0) {
+      await query(
+        `UPDATE field_staff
+         SET user_id = $1,
+             department_id = $2,
+             name = $3,
+             email = $4,
+             phone = $5,
+             employee_id = $6,
+             role = 'field_staff',
+             status = 'active',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7`,
+        [userId, deptId, item.name, cleanEmail, item.mobile, item.employee_id, existingFs.rows[0].id]
+      );
+      console.log(`Updated field_staff record: ${item.name} (${item.employee_id})`);
+    } else {
+      await query(
+        `INSERT INTO field_staff
+         (user_id, department_id, name, email, phone, employee_id, role, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'field_staff', 'active')`,
+        [userId, deptId, item.name, cleanEmail, item.mobile, item.employee_id]
+      );
+      console.log(`Inserted field_staff record: ${item.name} (${item.employee_id})`);
     }
   }
 
   // Summary per department verification
-  console.log('\n--- VERIFICATION OF SERVICE STAFF COUNTS PER DEPARTMENT ---');
+  console.log('\n--- VERIFICATION OF FIELD STAFF COUNTS PER DEPARTMENT ---');
   for (let d = 1; d <= 7; d++) {
     const res = await query(
-      `SELECT COUNT(*) as count FROM users WHERE (role = 'service_staff' OR role = 'staff') AND department_id = $1 AND LOWER(COALESCE(status, 'active')) = 'active'`,
+      `SELECT COUNT(*) as count FROM field_staff WHERE department_id = $1 AND LOWER(COALESCE(status, 'active')) = 'active'`,
       [d]
     );
     const deptNameRes = await query(`SELECT name FROM departments WHERE id = $1`, [d]);
     const deptName = deptNameRes.rows[0]?.name || `Dept ${d}`;
-    console.log(`Dept ${d} (${deptName}): ${res.rows[0].count} Active Staff`);
+    console.log(`Dept ${d} (${deptName}): ${res.rows[0].count} Active Field Staff`);
   }
 
   console.log(`\nSeeding completed cleanly! Created: ${createdCount}, Updated: ${updatedCount}`);

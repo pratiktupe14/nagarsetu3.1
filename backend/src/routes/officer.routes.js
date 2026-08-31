@@ -71,7 +71,12 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
 // Get available field staff for assignment (Only Active staff of user's department)
 router.get('/staff-list', async (req, res) => {
   try {
-    let sql = `SELECT id, name, mobile, email, employee_id, designation FROM users WHERE (role = 'service_staff' OR role = 'staff') AND LOWER(COALESCE(status, 'active')) = 'active'`;
+    let sql = `
+      SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name
+      FROM field_staff fs
+      LEFT JOIN departments d ON fs.department_id = d.id
+      WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
+    `;
     const params = [];
 
     if (req.user.role === 'department_head') {
@@ -86,12 +91,12 @@ router.get('/staff-list', async (req, res) => {
         }
       }
       if (targetDeptId) {
-        sql += ` AND department_id = ?`;
+        sql += ` AND fs.department_id = ?`;
         params.push(targetDeptId);
       }
     }
 
-    sql += ` ORDER BY name ASC`;
+    sql += ` ORDER BY fs.name ASC`;
 
     const result = await query(sql, params);
     return res.json({ staff: result.rows });
@@ -148,11 +153,21 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     }
     const complaint = compRes.rows[0];
 
-    const staffRes = await query(`SELECT id, name, department_id, status FROM users WHERE id = ?`, [staff_id]);
-    if (!staffRes.rows || staffRes.rows.length === 0) {
+    const staffRes = await query(
+      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
+       FROM field_staff fs 
+       WHERE fs.id = ? OR fs.user_id = ? OR fs.employee_id = ? OR LOWER(fs.email) = LOWER(?)`,
+      [staff_id, staff_id, staff_id, String(staff_id)]
+    );
+    let staff = staffRes.rows && staffRes.rows.length > 0 ? staffRes.rows[0] : null;
+    if (!staff) {
+      const uRes = await query(`SELECT id, name, email, mobile, department_id, status FROM users WHERE id = ?`, [staff_id]);
+      if (uRes.rows && uRes.rows.length > 0) staff = uRes.rows[0];
+    }
+
+    if (!staff) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
-    const staff = staffRes.rows[0];
 
     if ((staff.status || 'active').toLowerCase() !== 'active') {
       return res.status(400).json({ error: `Cannot assign task: Staff member '${staff.name}' is currently inactive.` });
@@ -175,12 +190,15 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
       }
     }
 
+    const assignedStaffId = String(staff.id || staff.user_id);
+    const assignedStaffEmail = staff.email || '';
+
     // Record assignment
     const assignSql = `
       INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
     `;
-    await query(assignSql, [complaint_id, staff_id, req.user.id]);
+    await query(assignSql, [complaint_id, staff.user_id || staff.id, req.user.id]);
 
     // Update complaint status & assigned staff fields
     let updateSql = `
@@ -188,12 +206,13 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
       SET status = 'Staff Assigned',
           assigned_staff_id = ?,
           assigned_staff_name = ?,
+          assigned_staff_email = ?,
           assigned_by = ?,
           assigned_by_name = ?,
           updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `;
-    await query(updateSql, [staff.id, staff.name, req.user.id, req.user.name || 'Municipal Officer', complaint_id]);
+    await query(updateSql, [assignedStaffId, staff.name, assignedStaffEmail, req.user.id, req.user.name || 'Municipal Officer', complaint_id]);
 
     // Record status history
     try {

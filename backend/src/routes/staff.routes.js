@@ -14,21 +14,38 @@ router.use(requireRole(['staff', 'service_staff', 'officer', 'admin', 'city_admi
 // Get assigned tasks for current field staff member with strict staff and department isolation
 router.get('/tasks', async (req, res) => {
   try {
-    const userDeptId = req.user.department_id;
-    const staffId = req.user.id;
+    const fsRes = await query(
+      `SELECT fs.*, d.name as dept_name 
+       FROM field_staff fs 
+       LEFT JOIN departments d ON d.id = fs.department_id 
+       WHERE fs.user_id = $1 OR LOWER(fs.email) = LOWER($2) OR fs.employee_id = $3
+       LIMIT 1`,
+      [req.user.id, req.user.email || '', req.user.employee_id || '']
+    );
+
+    let staff = fsRes.rows && fsRes.rows.length > 0 ? fsRes.rows[0] : null;
+    let staffDeptId = staff ? staff.department_id : req.user.department_id;
+    let staffEmail = staff ? staff.email : (req.user.email || '');
+    let staffUserId = staff ? staff.user_id : req.user.id;
+    let staffFsId = staff ? staff.id : req.user.id;
 
     let sql = `
       SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name
       FROM complaints c
       LEFT JOIN assignments a ON a.complaint_id = c.id
       LEFT JOIN departments d ON c.department_id = d.id
-      WHERE (c.assigned_staff_id = $1 OR a.staff_id = $1 OR c.assigned_staff_email = $2 OR c.assigned_staff_name = $3)
+      WHERE (
+        c.assigned_staff_id = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
+        OR a.staff_id = $1 OR a.staff_id = $2
+        OR (LOWER(c.assigned_staff_email) = LOWER($4) AND $4 != '')
+        OR c.assigned_staff_name = $5
+      )
     `;
-    const params = [staffId, req.user.email || '', req.user.name || ''];
+    const params = [String(staffFsId), String(staffUserId), String(req.user.id), staffEmail, req.user.name || ''];
 
-    if (userDeptId) {
-      sql += ` AND (c.department_id = $3 OR d.id = $3)`;
-      params.push(userDeptId);
+    if (staffDeptId) {
+      sql += ` AND (c.department_id = $6 OR d.id = $6)`;
+      params.push(staffDeptId);
     }
 
     sql += ` ORDER BY c.created_at DESC`;
