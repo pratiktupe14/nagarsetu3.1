@@ -13,8 +13,8 @@ export const LoginPage: React.FC = () => {
   const { t } = useLanguage();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('citizen');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState('8788562103');
+  const [password, setPassword] = useState('8788562103');
   const [showPassword, setShowPassword] = useState(false);
   const [useOtp, setUseOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -32,8 +32,8 @@ export const LoginPage: React.FC = () => {
     const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
 
     if (role === 'citizen') {
-      setIdentifier('');
-      setPassword('');
+      setIdentifier('8788562103');
+      setPassword('8788562103');
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
       setPassword(demoAdminPass);
@@ -261,13 +261,29 @@ export const LoginPage: React.FC = () => {
                 </button>
               </form>
 
-              {/* Citizen Registration Link */}
+              {/* Citizen Registration Link & Demo Account Badge */}
               {selectedRole === 'citizen' && (
-                <div className="text-center pt-2 border-t border-gray-100 text-xs text-gray-600">
-                  {t('dontHaveAccount')}{' '}
-                  <Link to="/register" className="text-emerald-700 font-bold hover:underline">
-                    {t('registerTitle')}
-                  </Link>
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-xs">
+                    <div className="flex items-center space-x-2 text-emerald-800 font-medium">
+                      <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Demo Account: <strong className="font-bold">8788562103</strong></span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setIdentifier('8788562103'); setPassword('8788562103'); setErrorMsg(''); }}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-all"
+                    >
+                      Auto-Fill
+                    </button>
+                  </div>
+
+                  <div className="text-center text-xs text-gray-600">
+                    {t('dontHaveAccount')}{' '}
+                    <Link to="/register" className="text-emerald-700 font-bold hover:underline">
+                      {t('registerTitle')}
+                    </Link>
+                  </div>
                 </div>
               )}
 

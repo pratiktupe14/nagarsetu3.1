@@ -53,6 +53,19 @@ async function seedDefaultUsers() {
         console.log('Municipal Admin user added.');
       }
     }
+
+    // Ensure Demo Citizen account (mobile: 8788562103) exists idempotently
+    const citizenCheck = await query(`SELECT * FROM users WHERE mobile = '8788562103'`);
+    if (!citizenCheck.rows || citizenCheck.rows.length === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const citizenPass = '8788562103';
+      const citizenHash = await bcrypt.hash(citizenPass, salt);
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'citizen', 'active', 'en')`,
+        ['Demo Citizen', '8788562103', 'citizen8788@nagarsetu.gov.in', citizenHash]
+      );
+      console.log('Demo Citizen account (8788562103) seeded successfully.');
+    }
   } catch (err) {
     console.error('Error seeding default users:', err);
   }
