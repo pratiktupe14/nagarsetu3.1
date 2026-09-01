@@ -726,7 +726,9 @@ function runMemQuery(sql, params = []) {
   }
 
   if (upper.startsWith('INSERT')) {
-    const newId = (memStore[targetTable] ? memStore[targetTable].length : 0) + 1;
+    const list = memStore[targetTable] || [];
+    const maxId = list.length > 0 ? Math.max(...list.map(i => Number(i.id) || 0)) : 0;
+    const newId = maxId + 1;
     const newObj = { id: newId, status: 'active', created_at: new Date().toISOString() };
     
     const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
@@ -769,12 +771,30 @@ function runMemQuery(sql, params = []) {
 
   if (upper.startsWith('UPDATE')) {
     const list = memStore[targetTable] || [];
-    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+(.+?)\s+WHERE/i);
+    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+(.+?)\s+WHERE\s+(.+)/i);
     if (setMatch && setMatch[1] && params.length > 0) {
       const setPairs = setMatch[1].split(',').map(p => p.trim());
-      const whereVal = params[params.length - 1];
-      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal) || String(item.complaint_number) === String(whereVal)));
-      if (target) {
+      const whereClause = setMatch[2];
+
+      const wherePMatches = [...whereClause.matchAll(/\$(\d+)/g)];
+      const wherePIndices = wherePMatches.map(m => parseInt(m[1], 10) - 1);
+      const whereVals = wherePIndices.length > 0
+        ? wherePIndices.map(idx => params[idx]).filter(v => v !== undefined && v !== null)
+        : [params[params.length - 1]];
+
+      const targets = list.filter(item => {
+        if (!item) return false;
+        const itemId = item.id !== undefined ? String(item.id).trim() : '';
+        const itemNum = item.complaint_number ? String(item.complaint_number).trim() : '';
+        const itemMobile = item.mobile ? String(item.mobile).trim() : '';
+        const itemEmail = item.email ? String(item.email).trim() : '';
+        return whereVals.some(v => {
+          const sv = String(v).trim();
+          return sv !== '' && (itemId === sv || itemNum === sv || itemMobile === sv || itemEmail === sv);
+        });
+      });
+
+      targets.forEach(target => {
         setPairs.forEach((pair) => {
           const parts = pair.split('=');
           const colName = parts[0].trim().toLowerCase();
@@ -791,7 +811,9 @@ function runMemQuery(sql, params = []) {
             target[colName] = valExpr.slice(1, -1);
           }
         });
-      }
+      });
+
+      return Promise.resolve({ rows: [], rowCount: targets.length || 1 });
     }
     return Promise.resolve({ rows: [], rowCount: 1 });
   }
