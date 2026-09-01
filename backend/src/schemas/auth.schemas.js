@@ -10,7 +10,7 @@ const registerSchema = {
     }),
     email: Joi.string().email().max(150).allow('', null).optional(),
     password: Joi.string().min(6).max(128).required(),
-    role: Joi.string().valid('citizen', 'officer', 'staff', 'admin', 'department_head').default('citizen'),
+    role: Joi.string().valid('citizen', 'officer', 'staff', 'service_staff', 'admin', 'city_admin', 'department_head').default('citizen'),
     language_pref: Joi.string().valid('en', 'hi', 'mr').default('en')
   })
 };

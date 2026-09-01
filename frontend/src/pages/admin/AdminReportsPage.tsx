@@ -377,6 +377,16 @@ export const AdminReportsPage: React.FC = () => {
     }, 600);
   };
 
+  // Handle PDF Export Action
+  const handleDownloadPdf = () => {
+    const originalTitle = document.title;
+    document.title = `${selectedReportType.replace(/\s+/g, '_')}_${generatedReportMeta.id}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  };
+
   // Handle Print Action
   const handlePrintReport = () => {
     window.print();
@@ -662,7 +672,7 @@ export const AdminReportsPage: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={handlePrintReport}
+                  onClick={handleDownloadPdf}
                   className="px-3.5 py-1.5 bg-white border border-gray-300 text-gray-800 font-bold rounded-lg text-xs hover:bg-gray-50 transition-colors flex items-center space-x-1.5 shadow-xs"
                 >
                   <FileText className="w-3.5 h-3.5 text-rose-600" />
