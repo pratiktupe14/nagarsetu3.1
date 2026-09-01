@@ -320,6 +320,7 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
+      safeAddColumn('users', 'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
       safeAddColumn('field_staff', 'user_id INTEGER');
       safeAddColumn('field_staff', 'department_id INTEGER');
       safeAddColumn('field_staff', 'status TEXT DEFAULT "active"');
@@ -585,15 +586,26 @@ async function query(sql, params = []) {
       return runMemQuery(sql, params);
     }
     return new Promise((resolve, reject) => {
-      let sqliteSql = sql.replace(/\$\d+/g, '?');
+      let sqliteSql = sql;
+      let sqliteParams = [];
+      if (/\$\d+/.test(sql)) {
+        sqliteParams = [];
+        sqliteSql = sql.replace(/\$(\d+)/g, (_, num) => {
+          const idx = parseInt(num, 10) - 1;
+          sqliteParams.push(params[idx]);
+          return '?';
+        });
+      } else {
+        sqliteParams = params;
+      }
       const isSelect = sqliteSql.trim().toUpperCase().startsWith('SELECT');
       if (isSelect) {
-        sqliteDb.all(sqliteSql, params, (err, rows) => {
+        sqliteDb.all(sqliteSql, sqliteParams, (err, rows) => {
           if (err) return reject(err);
           resolve({ rows });
         });
       } else {
-        sqliteDb.run(sqliteSql, params, function (err) {
+        sqliteDb.run(sqliteSql, sqliteParams, function (err) {
           if (err) return reject(err);
           resolve({ rows: [{ id: this.lastID }], rowCount: this.changes });
         });

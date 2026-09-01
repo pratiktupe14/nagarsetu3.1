@@ -32,11 +32,11 @@ router.get('/tasks', async (req, res) => {
     let sql = `
       SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name
       FROM complaints c
-      LEFT JOIN assignments a ON a.complaint_id = c.id
-      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN assignments a ON (a.complaint_id = c.id OR CAST(a.complaint_id AS TEXT) = CAST(c.id AS TEXT))
+      LEFT JOIN departments d ON (c.department_id = d.id OR CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT))
       WHERE (
-        c.assigned_staff_id = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
-        OR a.staff_id = $1 OR a.staff_id = $2
+        c.assigned_staff_id = $1 OR CAST(c.assigned_staff_id AS TEXT) = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
+        OR a.staff_id = $1 OR CAST(a.staff_id AS TEXT) = $1 OR a.staff_id = $2 OR CAST(a.staff_id AS TEXT) = $2 OR a.staff_id = $3 OR CAST(a.staff_id AS TEXT) = $3
         OR (LOWER(c.assigned_staff_email) = LOWER($4) AND $4 != '')
         OR c.assigned_staff_name = $5
       )
@@ -44,8 +44,8 @@ router.get('/tasks', async (req, res) => {
     const params = [String(staffFsId), String(staffUserId), String(req.user.id), staffEmail, req.user.name || ''];
 
     if (staffDeptId) {
-      sql += ` AND (c.department_id = $6 OR d.id = $6)`;
-      params.push(staffDeptId);
+      sql += ` AND (c.department_id = $6 OR CAST(c.department_id AS TEXT) = $6 OR d.id = $6 OR CAST(d.id AS TEXT) = $6)`;
+      params.push(String(staffDeptId));
     }
 
     sql += ` ORDER BY c.created_at DESC`;

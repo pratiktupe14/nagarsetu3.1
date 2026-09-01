@@ -55,11 +55,11 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
-    // Fallback: If user not found in users table, check department_heads table
+    // Fallback: If user not found in users table, check department_heads or field_staff table
     if (!user) {
       const dhFallback = await query(
-        `SELECT dh.*, d.name as dept_name FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE LOWER(dh.email) = ? ORDER BY dh.id DESC LIMIT 1`,
-        [cleanIdentifier]
+        `SELECT dh.*, d.name as dept_name, d.code as dept_code FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE LOWER(dh.email) = ? OR dh.phone = ? ORDER BY dh.id DESC LIMIT 1`,
+        [cleanIdentifier, mobileOrEmail.trim()]
       );
       if (dhFallback.rows && dhFallback.rows.length > 0) {
         const dh = dhFallback.rows[0];
@@ -82,6 +82,33 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
           status: dh.status || 'active',
           language_pref: 'en'
         };
+      } else {
+        const fsFallback = await query(
+          `SELECT fs.*, d.name as dept_name, d.code as dept_code FROM field_staff fs LEFT JOIN departments d ON d.id = fs.department_id WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.employee_id = ? ORDER BY fs.id DESC LIMIT 1`,
+          [cleanIdentifier, mobileOrEmail.trim(), cleanIdentifier]
+        );
+        if (fsFallback.rows && fsFallback.rows.length > 0) {
+          const fs = fsFallback.rows[0];
+          const salt = await bcrypt.genSalt(10);
+          const newHash = await bcrypt.hash(password, salt);
+          const insUser = await query(
+            `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'service_staff', ?, ?, ?)`,
+            [fs.name, fs.phone || '', cleanIdentifier, newHash, fs.department_id, fs.employee_id || '', fs.status || 'active']
+          );
+          const newUserId = insUser.rows[0].id;
+          user = {
+            id: newUserId,
+            name: fs.name,
+            mobile: fs.phone || '',
+            email: cleanIdentifier,
+            password_hash: newHash,
+            role: 'service_staff',
+            department_id: fs.department_id,
+            employee_id: fs.employee_id || '',
+            status: fs.status || 'active',
+            language_pref: 'en'
+          };
+        }
       }
     }
 
@@ -109,7 +136,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
     }
 
-
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
@@ -132,7 +158,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       if (!departmentId || !departmentName) {
         return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
       }
-    } else if (user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer') {
+    } else if (user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer' || user.role === 'field_staff') {
       const fsRes = await query(
         `SELECT fs.*, d.name as dept_name, d.code as dept_code FROM field_staff fs LEFT JOIN departments d ON d.id = fs.department_id WHERE (fs.user_id = ? OR LOWER(fs.email) = ? OR fs.employee_id = ?) AND LOWER(COALESCE(fs.status, 'active')) = 'active' ORDER BY fs.id DESC LIMIT 1`,
         [user.id, cleanIdentifier, user.employee_id || '']
@@ -150,6 +176,14 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
           departmentCode = dRes.rows[0].code;
         }
       }
+
+      if (!departmentId || !departmentName) {
+        return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
+      }
+    }
+
+    if (departmentId && user.id && !user.department_id) {
+      await query(`UPDATE users SET department_id = ? WHERE id = ?`, [departmentId, user.id]).catch(() => {});
     }
 
     const userRole = user.role === 'admin' ? 'city_admin' : user.role;

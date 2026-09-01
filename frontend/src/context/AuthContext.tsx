@@ -483,7 +483,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               cleanIdentifier
             );
 
-            if (mappedRole === 'department_head' && (!resDept.id || resDept.code === 'UNASSIGNED')) {
+            if ((mappedRole === 'department_head' || mappedRole === 'service_staff') && (!resDept.id || resDept.code === 'UNASSIGNED')) {
               throw new Error("Department assignment could not be resolved. Please contact City Administration.");
             }
 
@@ -504,9 +504,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
             return true;
           }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          if (errData.error) {
+            throw new Error(errData.error);
+          }
         }
       } catch (backendErr: any) {
-        if (backendErr && backendErr.message && backendErr.message.includes('Department assignment could not be resolved')) {
+        if (backendErr && backendErr.message) {
+          if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
+            throw new Error("Unable to connect to NagarSetu backend service. Please verify the backend API server is running on http://localhost:5000.");
+          }
           throw backendErr;
         }
         console.warn('Backend API login note:', backendErr);

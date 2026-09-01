@@ -255,8 +255,11 @@ router.get('/', async (req, res) => {
     `;
     const params = [];
 
-    // Server-side Department Isolation for Department Head
-    if (authUser && authUser.role === 'department_head') {
+    // Server-side Data Isolation based on Role
+    if (authUser && authUser.role === 'citizen') {
+      sql += ` AND (c.citizen_id = $1 OR CAST(c.citizen_id AS TEXT) = $2)`;
+      params.push(authUser.id, String(authUser.id));
+    } else if (authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
         const uRes = await query('SELECT department_id FROM users WHERE id = $1 OR email = $2', [authUser.id, authUser.email || '']);
@@ -291,10 +294,10 @@ router.get('/my', authenticateToken, async (req, res) => {
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.citizen_id = ?
+      WHERE c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [req.user.id]);
+    const result = await query(sql, [req.user.id, String(req.user.id)]);
     return res.json({ complaints: result.rows });
   } catch (err) {
     console.error('Fetch my complaints error:', err);

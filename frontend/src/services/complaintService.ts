@@ -243,13 +243,8 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   const localAll = getStoredComplaints();
   const filteredLocal = localAll.filter((c) => {
     if (isDemoComplaint(c)) return false;
-    if (!citizenId || citizenId.trim() === '') return true;
-    return (
-      !c.citizen_id ||
-      String(c.citizen_id) === String(citizenId) ||
-      c.citizen_id === 'demo-citizen-id' ||
-      c.citizen_id === ''
-    );
+    if (!citizenId || citizenId.trim() === '') return false;
+    return String(c.citizen_id) === String(citizenId);
   });
 
   const map = new Map<string, Complaint>();
