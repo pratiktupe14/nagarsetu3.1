@@ -130,11 +130,13 @@ export const AdminPendingComplaintsPage: React.FC = () => {
   // Filter Logic
   const filteredComplaints = pendingComplaintsList.filter((c) => {
     const stage = getPendingStage(c);
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      (c.complaint_number || '').toLowerCase().includes(q) ||
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.category || '').toLowerCase().includes(q) ||
+      (c.location_address && c.location_address.toLowerCase().includes(q));
     const matchesStage = stageFilter === 'All' || stage === stageFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
     const matchesDepartment = departmentFilter === 'All' || (c.department_name && c.department_name.includes(departmentFilter));

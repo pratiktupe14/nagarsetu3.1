@@ -160,13 +160,16 @@ export const AdminPortal: React.FC = () => {
   const resolutionReviewsList = complaints.filter((c) => c.status === 'Resolution Submitted');
 
   const filteredComplaints = complaints.filter((c) => {
+    if (!c) return false;
     if (activeTab === 'Resolution Reviews') {
       return c.status === 'Resolution Submitted';
     }
-    const matchesSearch = c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = (searchQuery || '').toLowerCase();
+    const matchesSearch = !q ||
+                          (c.complaint_number || '').toLowerCase().includes(q) ||
+                          (c.title || '').toLowerCase().includes(q) ||
+                          (c.category || '').toLowerCase().includes(q) ||
+                          (c.location_address && c.location_address.toLowerCase().includes(q));
     const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;

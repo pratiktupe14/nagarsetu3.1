@@ -161,9 +161,9 @@ export const AdminDepartmentsPage: React.FC = () => {
 
   // Helper function to match complaint to department name
   const isComplaintInDept = useCallback((c: Complaint, deptName: string) => {
-    if (!c.department_name) return false;
-    const cDept = c.department_name.toLowerCase();
-    const dName = deptName.toLowerCase();
+    if (!c || !c.department_name) return false;
+    const cDept = String(c.department_name || '').toLowerCase();
+    const dName = String(deptName || '').toLowerCase();
     
     // Extract key token like PWD, Sanitation, Water, Electrical, Drainage, Traffic, Parks
     if (dName.includes('pwd') || dName.includes('road')) return cDept.includes('pwd') || cDept.includes('road');

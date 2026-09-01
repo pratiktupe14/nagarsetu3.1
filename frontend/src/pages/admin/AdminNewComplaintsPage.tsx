@@ -95,11 +95,13 @@ export const AdminNewComplaintsPage: React.FC = () => {
 
   // Filter Logic
   const filteredComplaints = newComplaintsList.filter((c) => {
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      (c.complaint_number || '').toLowerCase().includes(q) ||
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.category || '').toLowerCase().includes(q) ||
+      (c.location_address && c.location_address.toLowerCase().includes(q));
     const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
     const matchesDepartment = departmentFilter === 'All' || (c.department_name && c.department_name.includes(departmentFilter));

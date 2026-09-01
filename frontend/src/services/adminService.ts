@@ -569,9 +569,9 @@ export function getDepartmentStaffRoster(departmentName?: string, complaints: Co
 
   if (!departmentName || departmentName === 'All') return roster;
 
-  const dLower = departmentName.toLowerCase();
+  const dLower = String(departmentName || '').toLowerCase();
   return roster.filter((s) => {
-    const sLower = s.department_name.toLowerCase();
+    const sLower = String(s.department_name || '').toLowerCase();
     if (sLower.includes(dLower) || dLower.includes(sLower)) return true;
 
     // Department Codes & Names cross-mapping (DEPT-1 through DEPT-7)

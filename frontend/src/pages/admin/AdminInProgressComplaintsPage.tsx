@@ -103,12 +103,14 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
 
   // Filter Logic
   const filteredComplaints = inProgressList.filter((c) => {
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.assigned_staff_name && c.assigned_staff_name.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      (c.complaint_number || '').toLowerCase().includes(q) ||
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.category || '').toLowerCase().includes(q) ||
+      (c.location_address && c.location_address.toLowerCase().includes(q)) ||
+      (c.assigned_staff_name && c.assigned_staff_name.toLowerCase().includes(q));
     const matchesDepartment = departmentFilter === 'All' || (c.department_name && c.department_name.includes(departmentFilter));
     const matchesCategory = categoryFilter === 'All' || c.category === categoryFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
