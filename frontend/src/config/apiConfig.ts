@@ -10,7 +10,7 @@ export const getApiUrl = (): string => {
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:5000';
   }
-  return 'https://backend-zeta-two-60.vercel.app';
+  return 'https://nagarsetu-backend-api.vercel.app';
 };
 
 export const getAiServiceUrl = (): string => {
@@ -19,7 +19,7 @@ export const getAiServiceUrl = (): string => {
     return envAiUrl.trim().replace(/\/$/, '');
   }
   const mainApi = getApiUrl();
-  return mainApi ? `${mainApi}/api/ai` : 'https://backend-zeta-two-60.vercel.app/api/ai';
+  return mainApi ? `${mainApi}/api/ai` : 'https://nagarsetu-backend-api.vercel.app/api/ai';
 };
 
 export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {
