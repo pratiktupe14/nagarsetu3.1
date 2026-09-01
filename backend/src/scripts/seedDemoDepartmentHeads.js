@@ -141,18 +141,18 @@ async function seed7DemoDepartmentHeads(queryFn) {
                mobile = ?,
                email = ?,
                password_hash = ?,
-               role = 'department_head',
+               role = ?,
                department_id = ?,
                employee_id = ?,
-               status = 'active'
+               status = ?
            WHERE id = ?`,
-          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId, userId]
+          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, 'department_head', targetDeptId, dMeta.employeeId, 'active', userId]
         ).catch(() => {});
         console.log(`✓ Updated user account for ${dMeta.headName} (${cleanEmail}) -> Dept ${targetDeptId}`);
       } else {
         const insUser = await q(
-          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, 'active')`,
-          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId]
+          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, 'department_head', targetDeptId, dMeta.employeeId, 'active']
         ).catch(() => ({ rows: [] }));
         userId = insUser.rows?.[0]?.id || null;
         if (!userId) {

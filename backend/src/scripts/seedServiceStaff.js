@@ -115,8 +115,8 @@ async function seedServiceStaff(queryFn) {
       const insUser = await q(
         `INSERT INTO users 
          (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref)
-         VALUES ($1, $2, $3, $4, 'service_staff', $5, $6, 'Field Service Staff', 'active', 'en')`,
-        [item.name, item.mobile, cleanEmail, passwordHash, deptId, item.employee_id]
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [item.name, item.mobile, cleanEmail, passwordHash, 'service_staff', deptId, item.employee_id, 'Field Service Staff', 'active', 'en']
       ).catch(() => ({ rows: [] }));
       userId = insUser.rows?.[0]?.id || null;
       if (!userId) {
