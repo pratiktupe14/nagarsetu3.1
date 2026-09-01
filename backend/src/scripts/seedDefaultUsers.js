@@ -22,8 +22,8 @@ async function seedDefaultUsers(query) {
 
       for (const u of usersToSeed) {
         await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
-          [u.name, u.mobile, u.email, u.passHash, u.role, u.lang]
+          `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [u.name, u.mobile, u.email, u.passHash, u.role, 'active', u.lang]
         );
       }
       console.log('Default demo users seeded successfully.');
@@ -35,8 +35,8 @@ async function seedDefaultUsers(query) {
         const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
         const adminHash = await bcrypt.hash(adminPass, salt);
         await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
-          ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'en']
+          `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'active', 'en']
         );
         console.log('Municipal Admin user added.');
       }
@@ -52,14 +52,14 @@ async function seedDefaultUsers(query) {
     if (citizenCheck.rows && citizenCheck.rows.length > 0) {
       const existingId = citizenCheck.rows[0].id;
       await query(
-        `UPDATE users SET name = 'Pratik Dilip Tupe', mobile = '8788562103', email = ?, password_hash = ?, role = 'citizen', status = 'active' WHERE id = ?`,
-        [citizenEmail, citizenHash, existingId]
+        `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = ?, status = ? WHERE id = ?`,
+        ['Pratik Dilip Tupe', '8788562103', citizenEmail, citizenHash, 'citizen', 'active', existingId]
       );
       console.log(`Citizen demo account (8788562103) updated idempotently for DB User ID: ${existingId}`);
     } else {
       const insRes = await query(
-        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'citizen', 'active', 'en')`,
-        ['Pratik Dilip Tupe', '8788562103', citizenEmail, citizenHash]
+        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['Pratik Dilip Tupe', '8788562103', citizenEmail, citizenHash, 'citizen', 'active', 'en']
       );
       const newId = insRes.rows[0].id;
       console.log(`Citizen demo account (8788562103) created with DB User ID: ${newId}`);
