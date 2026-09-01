@@ -216,27 +216,10 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       created_at: row.created_at
     }));
 
-    // Calculate Summary Stats from DB field_staff table
-    let statsSql = `SELECT status, COUNT(*) as count FROM field_staff WHERE 1=1`;
-    let statsParams = [];
-    if (!isAdmin) {
-      statsSql += ` AND department_id = $1`;
-      statsParams.push(userDeptId || -1);
-    }
-    statsSql += ` GROUP BY status`;
-    const statsRes = await query(statsSql, statsParams);
-
-    let totalStaff = 0;
-    let activeStaff = 0;
-    let inactiveStaff = 0;
-
-    statsRes.rows.forEach((r) => {
-      const cnt = parseInt(r.count, 10);
-      const st = (r.status || '').toLowerCase();
-      if (st === 'active') activeStaff += cnt;
-      if (st === 'inactive') inactiveStaff += cnt;
-      if (st !== 'archived') totalStaff += cnt;
-    });
+    // Calculate Summary Stats from staffList array directly for 100% accuracy
+    const totalStaff = staffList.filter(s => (s.status || '').toLowerCase() !== 'archived').length;
+    const activeStaff = staffList.filter(s => (s.status || '').toLowerCase() === 'active').length;
+    const inactiveStaff = staffList.filter(s => (s.status || '').toLowerCase() === 'inactive').length;
 
     // Total Active Tasks Across Department Staff
     let taskSql = `
