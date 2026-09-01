@@ -27,7 +27,7 @@ const seed7DemoDepartmentHeads = require('../scripts/seedDemoDepartmentHeads');
 function initDatabase() {
   return new Promise((resolve) => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const dbUrl = process.env.DATABASE_URL;
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING;
     const isPostgres = (DB_TYPE === 'postgres' || isProduction) && Boolean(dbUrl);
 
     const onInitDone = async () => {
@@ -265,6 +265,39 @@ async function createTablesPostgres() {
         UNIQUE(announcement_id, user_id)
       );
     `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS user_roles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        role TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        full_name TEXT,
+        avatar_url TEXT,
+        bio TEXT,
+        address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS task_assignments (
+        id SERIAL PRIMARY KEY,
+        complaint_id INTEGER REFERENCES complaints(id),
+        staff_id INTEGER REFERENCES users(id),
+        assigned_by INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'Assigned',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
 
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
     if (parseInt(deptCheck.rows[0].count, 10) === 0) {
@@ -613,14 +646,12 @@ function runMemQuery(sql, params = []) {
   const upper = s.toUpperCase();
 
   let targetTable = null;
-  for (const table of Object.keys(memStore)) {
-    if (upper.includes(`FROM ${table.toUpperCase()}`) || upper.includes(`INTO ${table.toUpperCase()}`) || upper.includes(`UPDATE ${table.toUpperCase()}`)) {
-      targetTable = table;
-      break;
-    }
+  const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
+  if (fromMatch && fromMatch[1]) {
+    targetTable = fromMatch[1].toLowerCase();
   }
 
-  if (!targetTable) {
+  if (!targetTable || !memStore[targetTable]) {
     targetTable = 'users';
   }
 
@@ -633,6 +664,10 @@ function runMemQuery(sql, params = []) {
     let list = memStore[targetTable] || [];
     if (params && params.length > 0) {
       const pStr = params.map(p => String(p).trim().toLowerCase().replace(/^%|%$/g, ''));
+      const isDeptQuery = upper.includes('WHERE DEPARTMENT_ID') || upper.includes('WHERE C.DEPARTMENT_ID') || upper.includes('WHERE FS.DEPARTMENT_ID') || upper.includes('AND C.DEPARTMENT_ID') || upper.includes('AND (C.DEPARTMENT_ID');
+      const isCitizenQuery = upper.includes('WHERE CITIZEN_ID') || upper.includes('WHERE C.CITIZEN_ID') || upper.includes('AND C.CITIZEN_ID');
+      const isIdQuery = upper.includes('WHERE C.ID =') || upper.includes('WHERE ID =') || upper.includes('WHERE CAST(C.ID AS TEXT) = $1');
+
       const filtered = list.filter(item => {
         if (!item) return false;
         const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
@@ -645,6 +680,17 @@ function runMemQuery(sql, params = []) {
         const itemName = item.name ? String(item.name).trim().toLowerCase() : '';
         const itemEmpId = item.employee_id ? String(item.employee_id).trim().toLowerCase() : '';
         const itemNumber = item.complaint_number ? String(item.complaint_number).trim().toLowerCase() : '';
+
+        if (isDeptQuery) {
+          return pStr.some(p => p !== '' && itemDeptId === p);
+        }
+        if (isCitizenQuery) {
+          return pStr.some(p => p !== '' && itemCitizenId === p);
+        }
+        if (isIdQuery) {
+          return pStr.some(p => p !== '' && (itemId === p || itemNumber === p));
+        }
+
         return pStr.some(p => p !== '' && (
           itemMobile === p || 
           itemEmail === p || 
@@ -688,12 +734,22 @@ function runMemQuery(sql, params = []) {
     if (setMatch && setMatch[1] && params.length > 0) {
       const setPairs = setMatch[1].split(',').map(p => p.trim());
       const whereVal = params[params.length - 1];
-      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal)));
+      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal) || String(item.complaint_number) === String(whereVal)));
       if (target) {
-        setPairs.forEach((pair, idx) => {
-          const colName = pair.split('=')[0].trim().toLowerCase();
-          if (params[idx] !== undefined) {
-            target[colName] = params[idx];
+        setPairs.forEach((pair) => {
+          const parts = pair.split('=');
+          const colName = parts[0].trim().toLowerCase();
+          const valExpr = parts[1] ? parts[1].trim() : '';
+          const pMatch = valExpr.match(/\$(\d+)/);
+          if (pMatch) {
+            const pIdx = parseInt(pMatch[1], 10) - 1;
+            if (params[pIdx] !== undefined) {
+              target[colName] = params[pIdx];
+            }
+          } else if (valExpr.toUpperCase().includes('CURRENT_TIMESTAMP') || valExpr.toUpperCase().includes('NOW()')) {
+            target[colName] = new Date().toISOString();
+          } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
+            target[colName] = valExpr.slice(1, -1);
           }
         });
       }
