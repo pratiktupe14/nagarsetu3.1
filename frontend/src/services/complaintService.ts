@@ -307,37 +307,46 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   }
   const targetDept = resolveDepartmentInfo(departmentId, departmentName);
 
-  // 1. Fetch entire complaint pool across Supabase, Backend, and LocalStorage
-  let allComplaints: Complaint[] = await getAllComplaints();
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
 
-  // 2. Also query Express Backend API /api/complaints if available
+  let backendComplaints: Complaint[] = [];
+
+  // 1. Query Express Backend API /api/department/complaints or /api/complaints
   try {
-    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    const res = await fetch(`${getApiUrl()}/api/complaints`, {
-      headers: getNoCacheHeaders()
-    });
+    const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });
     if (res.ok) {
       const data = await res.json();
-      const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
-      if (backendComplaints.length > 0) {
-        const map = new Map<string, Complaint>();
-        allComplaints.forEach((c) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) map.set(key, c);
-        });
-        backendComplaints.forEach((c: Complaint) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) {
-            const existing = map.get(key);
-            // DB record from backend takes authoritative precedence
-            map.set(key, existing ? { ...existing, ...c } : c);
-          }
-        });
-        allComplaints = Array.from(map.values());
+      backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
+    } else {
+      const fallbackRes = await fetch(`${getApiUrl()}/api/complaints`, { headers });
+      if (fallbackRes.ok) {
+        const fData = await fallbackRes.json();
+        backendComplaints = Array.isArray(fData) ? fData : Array.isArray(fData?.complaints) ? fData.complaints : [];
       }
     }
   } catch (e) {
     console.warn('Backend API getDepartmentComplaints fallback:', e);
+  }
+
+  // 2. Fetch entire complaint pool across Supabase and LocalStorage
+  let allComplaints: Complaint[] = await getAllComplaints();
+
+  if (backendComplaints.length > 0) {
+    const map = new Map<string, Complaint>();
+    allComplaints.forEach((c) => {
+      const key = c.complaint_number || String(c.id);
+      if (key) map.set(key, c);
+    });
+    backendComplaints.forEach((c: Complaint) => {
+      const key = c.complaint_number || String(c.id);
+      if (key) {
+        // Backend DB record takes absolute authoritative precedence
+        map.set(key, c);
+      }
+    });
+    allComplaints = Array.from(map.values());
+    saveStoredComplaints(allComplaints);
   }
 
   // 3. Authoritatively filter complaints belonging to target department

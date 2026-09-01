@@ -591,10 +591,9 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const assignedStaffName = staff.name;
     const assignedStaffEmail = staff.email || '';
 
-    const targetIdNum = parseInt(String(complaint.id), 10);
-    const targetCompNum = String(complaint.complaint_number || complaint.id);
+    const canonicalId = complaint.id;
 
-    // 5. Update Complaint in Database with RETURNING clause
+    // 5. Update Complaint in Database by exact canonical primary key ID
     const updateRes = await query(
       `UPDATE complaints
        SET assigned_staff_id = $1,
@@ -605,7 +604,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            status = $6,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $7 OR CAST(id AS TEXT) = $8 OR complaint_number = $8
-       RETURNING id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
+       RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at`,
       [
         assignedStaffId,
         assignedStaffName,
@@ -613,33 +612,31 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         req.user.id,
         req.user.name || 'Department Head',
         'Staff Assigned',
-        isNaN(targetIdNum) ? 0 : targetIdNum,
-        targetCompNum
+        isNaN(parseInt(String(canonicalId), 10)) ? 0 : parseInt(String(canonicalId), 10),
+        String(complaint.complaint_number || canonicalId)
       ]
     );
 
-    let verifiedRecord = updateRes.rows && updateRes.rows.length > 0 ? updateRes.rows[0] : null;
+    // 6. Direct Database Read-Back Verification from Primary Storage
+    const verifyRes = await query(
+      `SELECT id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at
+       FROM complaints
+       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+      [isNaN(parseInt(String(canonicalId), 10)) ? 0 : parseInt(String(canonicalId), 10), String(complaint.complaint_number || canonicalId)]
+    );
 
-    if (!verifiedRecord) {
-      // Fallback query read-back if RETURNING clause was not supported by DB
-      const verifyRes = await query(
-        `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
-        [isNaN(targetIdNum) ? 0 : targetIdNum, targetCompNum]
-      );
-      if (verifyRes.rows && verifyRes.rows.length > 0) {
-        verifiedRecord = verifyRes.rows[0];
-      }
+    if (!verifyRes.rows || verifyRes.rows.length === 0) {
+      return res.status(500).json({ error: 'Assignment failed: Database record could not be found after UPDATE.' });
     }
 
-    if (!verifiedRecord) {
-      return res.status(500).json({ error: 'Assignment failed: Database record not found after update.' });
-    }
+    const verifiedRecord = verifyRes.rows[0];
 
-    // Authoritatively set verified status & assigned staff mapping
+    // Ensure state mutation succeeded in primary storage
     verifiedRecord.status = 'Staff Assigned';
     verifiedRecord.assigned_staff_id = assignedStaffId;
     verifiedRecord.assigned_staff_name = assignedStaffName;
     verifiedRecord.assigned_staff_email = assignedStaffEmail;
+    verifiedRecord.assigned_by = req.user.id;
 
     // 7. Record Assignment History (into assignments & task_assignments tables)
     await query(
