@@ -27,10 +27,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (event.request.url.includes('/api/') || !event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request)
+      .then((response) => response || caches.match(event.request))
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') {
+          const indexCached = await caches.match('/index.html');
+          if (indexCached) return indexCached;
+        }
+        return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+      })
   );
 });
 
