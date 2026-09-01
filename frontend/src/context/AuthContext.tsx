@@ -7,7 +7,7 @@ import { getAllServiceStaffRecords } from '../services/adminService';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 interface AuthContextType {
-  user: UserProfile;
+  user: UserProfile | null;
   role: UserRole;
   loading: boolean;
   login: (identifier: string, password: string, role: UserRole) => Promise<boolean>;
@@ -826,7 +826,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
-        role: user.role,
+        role: user ? user.role : 'citizen',
         loading,
         login,
         loginWithOtp,
