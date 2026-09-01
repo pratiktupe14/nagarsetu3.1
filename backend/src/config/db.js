@@ -634,7 +634,15 @@ function runMemQuery(sql, params = []) {
         const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
         const itemEmail = item.email ? String(item.email).trim().toLowerCase() : '';
         const itemId = item.id !== undefined ? String(item.id).trim() : '';
-        return pStr.some(p => p !== '' && (itemMobile === p || itemEmail === p || itemId === p));
+        const itemCitizenId = item.citizen_id !== undefined ? String(item.citizen_id).trim() : '';
+        const itemNumber = item.complaint_number ? String(item.complaint_number).trim().toLowerCase() : '';
+        return pStr.some(p => p !== '' && (
+          itemMobile === p || 
+          itemEmail === p || 
+          itemId === p || 
+          itemCitizenId === p ||
+          itemNumber === p
+        ));
       });
       return Promise.resolve({ rows: filtered });
     }
