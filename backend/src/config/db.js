@@ -21,7 +21,7 @@ let useSqlite = false;
 const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
 
 function initDatabase() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const isPostgres = DB_TYPE === 'postgres' || isProduction;
 
@@ -36,17 +36,29 @@ function initDatabase() {
         });
         pgPool.query('SELECT NOW()', (err, res) => {
           if (err) {
-            console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback SQLite):', err.message);
+            if (isProduction) {
+              console.error('[DATABASE CRITICAL] PostgreSQL connection failed in PRODUCTION mode. Halting to prevent silent data divergence:', err.message);
+              return reject(err);
+            }
+            console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback SQLite in dev):', err.message);
             setupSqlite(resolve, resolve);
           } else {
             console.log('PostgreSQL connected successfully.');
             createTablesPostgres().then(resolve).catch(e => {
+              if (isProduction) {
+                console.error('[DATABASE CRITICAL] PostgreSQL table initialization failed in PRODUCTION mode:', e.message);
+                return reject(e);
+              }
               console.warn('[DATABASE TABLE INIT NOTE]', e.message);
               setupSqlite(resolve, resolve);
             });
           }
         });
       } catch (e) {
+        if (isProduction) {
+          console.error('[DATABASE CRITICAL] PostgreSQL Pool initialization exception in PRODUCTION mode:', e.message);
+          return reject(e);
+        }
         console.warn('[DATABASE POOL INIT NOTE]', e.message);
         setupSqlite(resolve, resolve);
       }
