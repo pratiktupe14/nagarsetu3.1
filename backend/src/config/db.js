@@ -703,12 +703,22 @@ function runMemQuery(sql, params = []) {
     if (setMatch && setMatch[1] && params.length > 0) {
       const setPairs = setMatch[1].split(',').map(p => p.trim());
       const whereVal = params[params.length - 1];
-      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal)));
+      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal) || String(item.complaint_number) === String(whereVal)));
       if (target) {
-        setPairs.forEach((pair, idx) => {
-          const colName = pair.split('=')[0].trim().toLowerCase();
-          if (params[idx] !== undefined) {
-            target[colName] = params[idx];
+        setPairs.forEach((pair) => {
+          const parts = pair.split('=');
+          const colName = parts[0].trim().toLowerCase();
+          const valExpr = parts[1] ? parts[1].trim() : '';
+          const pMatch = valExpr.match(/\$(\d+)/);
+          if (pMatch) {
+            const pIdx = parseInt(pMatch[1], 10) - 1;
+            if (params[pIdx] !== undefined) {
+              target[colName] = params[pIdx];
+            }
+          } else if (valExpr.toUpperCase().includes('CURRENT_TIMESTAMP') || valExpr.toUpperCase().includes('NOW()')) {
+            target[colName] = new Date().toISOString();
+          } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
+            target[colName] = valExpr.slice(1, -1);
           }
         });
       }
