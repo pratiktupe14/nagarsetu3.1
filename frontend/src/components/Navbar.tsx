@@ -147,7 +147,7 @@ export const Navbar: React.FC = () => {
             )}
 
             {/* NOTIFICATION CENTER DROPDOWN */}
-            <NotificationCenter />
+            {!isPublicPage && <NotificationCenter />}
 
             {/* User Profile / Logout */}
             {user && !isPublicPage ? (
@@ -190,7 +190,7 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center space-x-2">
-            <NotificationCenter />
+            {!isPublicPage && <NotificationCenter />}
             
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

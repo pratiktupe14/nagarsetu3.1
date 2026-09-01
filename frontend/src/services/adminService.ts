@@ -299,7 +299,7 @@ export async function updateServiceStaffApi(id: string, payload: Partial<Departm
 export async function deactivateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -312,7 +312,7 @@ export async function deactivateServiceStaffApi(id: string): Promise<{ success: 
 export async function activateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: getAuthHeaders()
     });
     const data = await res.json();

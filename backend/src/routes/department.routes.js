@@ -417,11 +417,7 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
   }
 });
 
-/**
- * POST /api/department/staff/:id/deactivate
- * Deactivate staff member (status -> 'inactive')
- */
-router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+const handleStaffDeactivate = async (req, res) => {
   try {
     const staffId = req.params.id;
     const { userDeptId } = await resolveUserDepartment(req);
@@ -445,13 +441,12 @@ router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department
     console.error('Error deactivating staff:', err);
     return res.status(500).json({ error: 'Failed to deactivate staff member' });
   }
-});
+};
 
-/**
- * POST /api/department/staff/:id/activate
- * Activate staff member (status -> 'active')
- */
-router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);
+router.patch('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);
+
+const handleStaffActivate = async (req, res) => {
   try {
     const staffId = req.params.id;
     const { userDeptId } = await resolveUserDepartment(req);
@@ -475,7 +470,10 @@ router.post('/staff/:id/activate', authenticateToken, requireRole(['department_h
     console.error('Error activating staff:', err);
     return res.status(500).json({ error: 'Failed to activate staff member' });
   }
-});
+};
+
+router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);
+router.patch('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);
 
 /**
  * DELETE /api/department/staff/:id
