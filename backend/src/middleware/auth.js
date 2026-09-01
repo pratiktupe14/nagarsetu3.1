@@ -45,12 +45,24 @@ function authenticateToken(req, res, next) {
   });
 }
 
+function normalizeRole(role) {
+  if (!role) return '';
+  const r = String(role).trim().toLowerCase();
+  if (r === 'service_staff' || r === 'staff' || r === 'field_staff') return 'service_staff';
+  if (r === 'admin' || r === 'city_admin') return 'city_admin';
+  if (r === 'officer' || r === 'department_head') return 'department_head';
+  if (r === 'citizen' || r === 'user') return 'citizen';
+  return r;
+}
+
 function requireRole(roles = []) {
+  const normalizedAllowed = roles.map(normalizeRole);
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    if (roles.length && !roles.includes(req.user.role)) {
+    const userRole = normalizeRole(req.user.role);
+    if (normalizedAllowed.length && !normalizedAllowed.includes(userRole) && !roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden: Access denied for user role' });
     }
     next();

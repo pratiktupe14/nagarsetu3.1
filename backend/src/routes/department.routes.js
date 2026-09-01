@@ -3,6 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const validateInput = require('../middleware/validateInput');
+const { assignStaffSchema } = require('../schemas/admin.schemas');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
@@ -510,7 +512,7 @@ router.delete('/staff/:id', authenticateToken, requireRole(['department_head', '
  * POST /api/department/assign
  * Assign complaint to active field staff member with database verification
  */
-router.post('/assign', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), async (req, res) => {
+router.post('/assign', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), validateInput(assignStaffSchema), async (req, res) => {
   try {
     const { complaint_id, staff_id } = req.body;
     if (!complaint_id || !staff_id) {

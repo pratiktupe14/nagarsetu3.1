@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const { uploadSingleImage } = require('../middleware/upload');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
@@ -415,8 +415,8 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
-// Purge/remove all complaints and associated records
-router.delete('/purge-all', async (req, res) => {
+// Purge/remove all complaints and associated records (Admin Only)
+router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
   try {
     await query(`DELETE FROM feedback`);
     await query(`DELETE FROM assignments`);
@@ -430,7 +430,7 @@ router.delete('/purge-all', async (req, res) => {
   }
 });
 
-router.post('/purge-all', async (req, res) => {
+router.post('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
   try {
     await query(`DELETE FROM feedback`);
     await query(`DELETE FROM assignments`);

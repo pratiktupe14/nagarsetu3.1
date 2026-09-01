@@ -773,9 +773,15 @@ async function query(sql, params = []) {
     return new Promise((resolve, reject) => {
       let sqliteSql = sql;
       let sqliteParams = [];
+
+      // Strip PostgreSQL RETURNING clause for SQLite run compatibility if needed
+      if (!sqliteSql.trim().toUpperCase().startsWith('SELECT')) {
+        sqliteSql = sqliteSql.replace(/\s+RETURNING\s+[\w*,\s]+/i, '');
+      }
+
       if (/\$\d+/.test(sql)) {
         sqliteParams = [];
-        sqliteSql = sql.replace(/\$(\d+)/g, (_, num) => {
+        sqliteSql = sqliteSql.replace(/\$(\d+)/g, (_, num) => {
           const idx = parseInt(num, 10) - 1;
           sqliteParams.push(params[idx]);
           return '?';
@@ -783,16 +789,20 @@ async function query(sql, params = []) {
       } else {
         sqliteParams = params;
       }
-      const isSelect = sqliteSql.trim().toUpperCase().startsWith('SELECT');
+
+      const trimmedUpper = sqliteSql.trim().toUpperCase();
+      const isSelect = trimmedUpper.startsWith('SELECT') || trimmedUpper.startsWith('PRAGMA') || trimmedUpper.startsWith('EXPLAIN');
       if (isSelect) {
         sqliteDb.all(sqliteSql, sqliteParams, (err, rows) => {
           if (err) return reject(err);
-          resolve({ rows });
+          resolve({ rows: rows || [], rowCount: (rows || []).length });
         });
       } else {
         sqliteDb.run(sqliteSql, sqliteParams, function (err) {
           if (err) return reject(err);
-          resolve({ rows: [{ id: this.lastID }], rowCount: this.changes });
+          const lastId = this.lastID;
+          const rows = (lastId !== undefined && lastId !== null && lastId !== 0) ? [{ id: lastId }] : [];
+          resolve({ rows, rowCount: this.changes || 0 });
         });
       }
     });

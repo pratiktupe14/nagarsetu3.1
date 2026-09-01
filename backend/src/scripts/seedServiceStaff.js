@@ -1,5 +1,4 @@
 const bcrypt = require('bcryptjs');
-const { query } = require('../config/db');
 
 const SERVICE_STAFF_DEFINITIONS = [
   // 0. Primary Demo Staff — Ramesh Kumar (36th Staff)
@@ -58,7 +57,7 @@ const SERVICE_STAFF_DEFINITIONS = [
 const DEMO_PASSWORD = 'nagarsetu@123';
 
 async function seedServiceStaff(queryFn) {
-  const q = queryFn || query;
+  const q = queryFn || require('../config/db').query;
   console.log('Starting Service Staff Seeding (36 Total Accounts)...');
 
   // Build dynamic department mapping
