@@ -129,6 +129,18 @@ async function createTablesPostgres() {
         priority TEXT DEFAULT 'Medium',
         status TEXT DEFAULT 'Submitted',
         department_id INTEGER REFERENCES departments(id),
+        assigned_staff_id TEXT,
+        assigned_staff_name TEXT,
+        assigned_staff_email TEXT,
+        assigned_by INTEGER,
+        assigned_by_name TEXT,
+        sla_deadline TIMESTAMP,
+        work_performed TEXT,
+        materials_used TEXT,
+        additional_notes TEXT,
+        verified_by INTEGER,
+        verified_by_name TEXT,
+        verified_at TIMESTAMP,
         latitude DOUBLE PRECISION NOT NULL DEFAULT 0,
         longitude DOUBLE PRECISION NOT NULL DEFAULT 0,
         location_source TEXT NOT NULL DEFAULT 'manual_pin',
@@ -147,6 +159,18 @@ async function createTablesPostgres() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    const safeAddPgCol = async (colDef) => {
+      try { await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS ${colDef};`); } catch (e) {}
+    };
+    await safeAddPgCol('assigned_staff_id TEXT');
+    await safeAddPgCol('assigned_staff_name TEXT');
+    await safeAddPgCol('assigned_staff_email TEXT');
+    await safeAddPgCol('assigned_by INTEGER');
+    await safeAddPgCol('assigned_by_name TEXT');
+    await safeAddPgCol('sla_deadline TIMESTAMP');
+    await safeAddPgCol('location_address TEXT');
+    await safeAddPgCol('complaint_number TEXT');
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (

@@ -708,20 +708,25 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               </div>
 
               {/* WORKLOAD STATS */}
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-blue-800 block">Active Tasks</span>
-                  <span className="text-lg font-extrabold text-blue-900 font-mono">{viewingStaff.active_tasks}</span>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-emerald-800 block">Completed</span>
-                  <span className="text-lg font-extrabold text-emerald-900 font-mono">{viewingStaff.completed_tasks}</span>
-                </div>
-                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-rose-800 block">Overdue</span>
-                  <span className="text-lg font-extrabold text-rose-900 font-mono">{viewingStaff.overdue_tasks}</span>
-                </div>
-              </div>
+              {(() => {
+                const currentStaff = staffList.find((s) => s.id === viewingStaff.id || s.employee_id === viewingStaff.employee_id) || viewingStaff;
+                return (
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-blue-800 block">Active Tasks</span>
+                      <span className="text-lg font-extrabold text-blue-900 font-mono">{currentStaff.active_tasks || 0}</span>
+                    </div>
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-emerald-800 block">Completed</span>
+                      <span className="text-lg font-extrabold text-emerald-900 font-mono">{currentStaff.completed_tasks || 0}</span>
+                    </div>
+                    <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-rose-800 block">Overdue</span>
+                      <span className="text-lg font-extrabold text-rose-900 font-mono">{currentStaff.overdue_tasks || 0}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex justify-end pt-2">
                 <button

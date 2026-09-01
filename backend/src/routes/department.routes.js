@@ -110,21 +110,39 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
-                 AND c.status IN ('Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified')
-             ) as active_tasks,
-             (
-               SELECT COUNT(DISTINCT c.id)
-               FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
-                 AND c.status = 'Resolved'
-             ) as completed_tasks,
-             (
-               SELECT COUNT(DISTINCT c.id)
-               FROM complaints c
-               WHERE (c.assigned_staff_id = CAST(fs.id AS TEXT) OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(fs.email) OR c.assigned_staff_name = fs.name)
-                 AND (c.status = 'Overdue' OR (c.status NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
-             ) as overdue_tasks
+               WHERE (
+                 c.assigned_staff_id = CAST(fs.id AS TEXT) 
+                 OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) 
+                 OR c.assigned_staff_id = fs.employee_id 
+                 OR (c.assigned_staff_email IS NOT NULL AND LOWER(c.assigned_staff_email) = LOWER(fs.email)) 
+                 OR (c.assigned_staff_name IS NOT NULL AND c.assigned_staff_name = fs.name)
+               )
+                AND CAST(c.status AS TEXT) IN ('Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified', 'Assigned')
+              ) AS active_tasks,
+              (
+                SELECT COUNT(DISTINCT c.id)
+                FROM complaints c
+                WHERE (
+                  c.assigned_staff_id = CAST(fs.id AS TEXT) 
+                  OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) 
+                  OR c.assigned_staff_id = fs.employee_id 
+                  OR (c.assigned_staff_email IS NOT NULL AND LOWER(c.assigned_staff_email) = LOWER(fs.email)) 
+                  OR (c.assigned_staff_name IS NOT NULL AND c.assigned_staff_name = fs.name)
+                )
+                AND CAST(c.status AS TEXT) = 'Resolved'
+              ) AS completed_tasks,
+              (
+                SELECT COUNT(DISTINCT c.id)
+                FROM complaints c
+                WHERE (
+                  c.assigned_staff_id = CAST(fs.id AS TEXT) 
+                  OR c.assigned_staff_id = CAST(fs.user_id AS TEXT) 
+                  OR c.assigned_staff_id = fs.employee_id 
+                  OR (c.assigned_staff_email IS NOT NULL AND LOWER(c.assigned_staff_email) = LOWER(fs.email)) 
+                  OR (c.assigned_staff_name IS NOT NULL AND c.assigned_staff_name = fs.name)
+                )
+                AND (CAST(c.status AS TEXT) = 'Overdue' OR (CAST(c.status AS TEXT) NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
+              ) AS overdue_tasks
       FROM field_staff fs
       LEFT JOIN departments d ON fs.department_id = d.id
       LEFT JOIN users u ON fs.user_id = u.id
@@ -529,25 +547,20 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     // 2. Fetch Selected Staff Member from field_staff (or users fallback)
     let staffRes = await query(
-      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
+      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status 
        FROM field_staff fs 
-       WHERE CAST(fs.user_id AS TEXT) = $1 OR fs.employee_id = $1 OR LOWER(fs.email) = LOWER($1)`,
+       WHERE CAST(fs.user_id AS TEXT) = $1 
+          OR fs.employee_id = $1 
+          OR CAST(fs.id AS TEXT) = $1
+          OR LOWER(fs.email) = LOWER($1)
+          OR LOWER(fs.name) = LOWER($1)`,
       [staff_id]
     );
-
-    if (!staffRes.rows || staffRes.rows.length === 0) {
-      staffRes = await query(
-        `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
-         FROM field_staff fs 
-         WHERE CAST(fs.id AS TEXT) = $1`,
-        [staff_id]
-      );
-    }
 
     let staff = staffRes.rows && staffRes.rows.length > 0 ? staffRes.rows[0] : null;
     if (!staff) {
       const uRes = await query(
-        `SELECT id, name, email, mobile, department_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR LOWER(email) = LOWER($1)) AND (role = 'service_staff' OR role = 'staff')`,
+        `SELECT id, name, email, mobile, department_id, employee_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)) AND (role = 'service_staff' OR role = 'staff')`,
         [staff_id]
       );
       if (uRes.rows && uRes.rows.length > 0) staff = uRes.rows[0];
