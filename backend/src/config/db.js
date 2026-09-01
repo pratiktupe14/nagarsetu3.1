@@ -613,14 +613,12 @@ function runMemQuery(sql, params = []) {
   const upper = s.toUpperCase();
 
   let targetTable = null;
-  for (const table of Object.keys(memStore)) {
-    if (upper.includes(`FROM ${table.toUpperCase()}`) || upper.includes(`INTO ${table.toUpperCase()}`) || upper.includes(`UPDATE ${table.toUpperCase()}`)) {
-      targetTable = table;
-      break;
-    }
+  const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
+  if (fromMatch && fromMatch[1]) {
+    targetTable = fromMatch[1].toLowerCase();
   }
 
-  if (!targetTable) {
+  if (!targetTable || !memStore[targetTable]) {
     targetTable = 'users';
   }
 
