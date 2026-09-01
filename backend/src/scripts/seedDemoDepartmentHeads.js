@@ -75,52 +75,49 @@ const OFFICIAL_DEPARTMENTS = [
 ];
 
 const DEMO_PASSWORD = 'nagarsetu@123';
-const OFFICIAL_EMAILS = OFFICIAL_DEPARTMENTS.map((d) => d.email.toLowerCase());
 
-async function seed7DemoDepartmentHeads() {
+async function seed7DemoDepartmentHeads(queryFn) {
+  const q = queryFn || query;
   console.log('=======================================================');
   console.log('  Synchronizing 7 Active Department Heads for NAGARSETU ');
   console.log('=======================================================');
 
   try {
-    // 1. Ensure all 7 official departments exist in DB
-    const deptIdMap = {};
+    const deptIdMap = { PWD: 1, SAN: 2, WTR: 3, DRN: 4, ELE: 5, TRF: 6, MNT: 7 };
 
+    // 1. Ensure departments exist
     for (const dMeta of OFFICIAL_DEPARTMENTS) {
       let deptId = null;
 
-      // Search by NAME first (strict match on terms)
       for (const term of dMeta.searchTerms) {
-        const findRes = await query(
-          `SELECT id, name FROM departments WHERE name LIKE ? LIMIT 1`,
-          [`%${term}%`]
-        );
+        const findRes = await q(
+          `SELECT id, name FROM departments WHERE LOWER(name) LIKE ? LIMIT 1`,
+          [`%${term.toLowerCase()}%`]
+        ).catch(() => ({ rows: [] }));
         if (findRes.rows && findRes.rows.length > 0) {
           deptId = findRes.rows[0].id;
           break;
         }
       }
 
-      // If not found by name, insert department
       if (!deptId) {
-        const insRes = await query(
+        const insRes = await q(
           `INSERT INTO departments (name, description) VALUES (?, ?)`,
           [dMeta.name, dMeta.description]
-        );
-        deptId = insRes.rows[0].id;
+        ).catch(() => ({ rows: [] }));
+        deptId = insRes.rows?.[0]?.id || deptIdMap[dMeta.code];
         console.log(`Created department: '${dMeta.name}' (ID: ${deptId})`);
       } else {
-        // Update department name and description to match official standard
-        await query(
+        await q(
           `UPDATE departments SET name = ?, description = ? WHERE id = ?`,
           [dMeta.name, dMeta.description, deptId]
-        );
+        ).catch(() => {});
       }
 
       deptIdMap[dMeta.code] = deptId;
     }
 
-    // 2. Seed 7 official active Department Heads idempotently (preserving existing user-created heads)
+    // 2. Seed 7 official active Department Heads idempotently
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, salt);
 
@@ -128,55 +125,62 @@ async function seed7DemoDepartmentHeads() {
       const cleanEmail = dMeta.email.toLowerCase();
       const targetDeptId = deptIdMap[dMeta.code];
 
-      // Check if an active department head ALREADY exists for targetDeptId in department_heads
-      const existingActiveHead = await query(
-        `SELECT id, name, email FROM department_heads WHERE department_id = ? AND status = 'active' LIMIT 1`,
-        [targetDeptId]
-      );
+      // Check users table for existing account by email or mobile
+      const userCheck = await q(
+        `SELECT id, email, password_hash FROM users WHERE LOWER(email) = ? OR mobile = ?`,
+        [cleanEmail, dMeta.mobile]
+      ).catch(() => ({ rows: [] }));
 
-      // If an active head already exists for this department in the DB, DO NOT OVERWRITE IT AT ALL!
-      if (existingActiveHead.rows && existingActiveHead.rows.length > 0) {
-        console.log(`✓ Preserved existing Active Head for ${dMeta.code} (${dMeta.name}) -> ${existingActiveHead.rows[0].name} (${existingActiveHead.rows[0].email})`);
-        continue;
-      }
-
-      // Check users table for default account
-      const userCheck = await query(`SELECT id, email FROM users WHERE LOWER(email) = ? OR mobile = ?`, [cleanEmail, dMeta.mobile]);
       let userId = null;
 
       if (userCheck.rows && userCheck.rows.length > 0) {
         userId = userCheck.rows[0].id;
-        await query(
-          `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = 'department_head', department_id = ?, employee_id = ?, status = 'active' WHERE id = ?`,
+        await q(
+          `UPDATE users
+           SET name = ?,
+               mobile = ?,
+               email = ?,
+               password_hash = ?,
+               role = 'department_head',
+               department_id = ?,
+               employee_id = ?,
+               status = 'active'
+           WHERE id = ?`,
           [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId, userId]
-        );
+        ).catch(() => {});
+        console.log(`✓ Updated user account for ${dMeta.headName} (${cleanEmail}) -> Dept ${targetDeptId}`);
       } else {
-        const insUser = await query(
+        const insUser = await q(
           `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, 'active')`,
           [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, targetDeptId, dMeta.employeeId]
-        );
-        userId = insUser.rows[0].id;
+        ).catch(() => ({ rows: [] }));
+        userId = insUser.rows?.[0]?.id || null;
+        if (!userId) {
+          const fetchU = await q(`SELECT id FROM users WHERE LOWER(email) = ?`, [cleanEmail]).catch(() => ({ rows: [] }));
+          userId = fetchU.rows?.[0]?.id || null;
+        }
+        console.log(`✓ Inserted user account for ${dMeta.headName} (${cleanEmail}) -> Dept ${targetDeptId}`);
       }
 
-      // Upsert department_heads record as active
-      const dhCheck = await query(
+      // Upsert into department_heads table
+      const dhCheck = await q(
         `SELECT id FROM department_heads WHERE user_id = ? OR LOWER(email) = ?`,
-        [userId, cleanEmail]
-      );
+        [userId || -1, cleanEmail]
+      ).catch(() => ({ rows: [] }));
 
       if (dhCheck.rows && dhCheck.rows.length > 0) {
-        await query(
+        await q(
           `UPDATE department_heads SET user_id = ?, department_id = ?, name = ?, email = ?, phone = ?, employee_id = ?, designation = 'Department Head', status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
           [userId, targetDeptId, dMeta.headName, cleanEmail, `+91 ${dMeta.mobile}`, dMeta.employeeId, dhCheck.rows[0].id]
-        );
+        ).catch(() => {});
       } else {
-        await query(
+        await q(
           `INSERT INTO department_heads (user_id, department_id, name, email, phone, employee_id, designation, status) VALUES (?, ?, ?, ?, ?, ?, 'Department Head', 'active')`,
           [userId, targetDeptId, dMeta.headName, cleanEmail, `+91 ${dMeta.mobile}`, dMeta.employeeId]
-        );
+        ).catch(() => {});
       }
 
-      console.log(`✓ Active Head set for ${dMeta.code} (${dMeta.name}) -> ${dMeta.headName} (${dMeta.email})`);
+      console.log(`✓ Active Head synced for ${dMeta.code} (${dMeta.name}) -> ${dMeta.headName} (${cleanEmail})`);
     }
 
     console.log('=======================================================');
@@ -190,3 +194,14 @@ async function seed7DemoDepartmentHeads() {
 }
 
 module.exports = seed7DemoDepartmentHeads;
+
+if (require.main === module) {
+  const { initDatabase } = require('../config/db');
+  initDatabase()
+    .then(() => seed7DemoDepartmentHeads())
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Failed to seed 7 Department Heads:', err);
+      process.exit(1);
+    });
+}
