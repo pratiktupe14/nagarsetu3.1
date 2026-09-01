@@ -54,7 +54,7 @@ const updateStatusSchema = {
 
 const addFeedbackSchema = {
   body: Joi.object({
-    complaint_id: Joi.number().integer().positive().required(),
+    complaint_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
     rating: Joi.number().integer().min(1).max(5).required(),
     comment: Joi.string().max(1000).allow('', null).optional()
   })

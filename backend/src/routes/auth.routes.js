@@ -9,6 +9,8 @@ const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = requi
 // Register endpoint (Citizen, Officer, Staff, Admin)
 router.post('/register', validateInput(registerSchema), async (req, res) => {
   try {
+    const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
+
     const cleanMobile = String(mobile).trim();
     const cleanEmail = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
 
@@ -51,8 +53,9 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     const { mobileOrEmail, password } = req.body;
 
     const cleanIdentifier = String(mobileOrEmail).trim().toLowerCase();
-    const sql = `SELECT * FROM users WHERE mobile = ? OR LOWER(email) = ?`;
-    let resUser = await query(sql, [mobileOrEmail.trim(), cleanIdentifier]);
+    const cleanMobile = String(mobileOrEmail).trim();
+    const sql = `SELECT * FROM users WHERE mobile = ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`;
+    let resUser = await query(sql, [cleanMobile, cleanIdentifier]);
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 

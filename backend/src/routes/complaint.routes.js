@@ -227,6 +227,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     return res.status(201).json({
       success: true,
       message: 'Complaint submitted successfully',
+      complaint_id: complaintId,
       complaint: {
         id: complaintId,
         complaint_number: finalComplaintNumber,
@@ -359,6 +360,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const complaint = result.rows[0];
 
+    // IDOR Authorization Guard: Citizens can ONLY view their own complaints
+    if (req.user && req.user.role === 'citizen') {
+      if (String(complaint.citizen_id) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'Access denied: You are not authorized to view this complaint.' });
+      }
+    }
+
     // Fetch assignment details if any
     const assignSql = `
       SELECT a.*, s.name as staff_name, s.mobile as staff_mobile, o.name as officer_name
@@ -378,16 +386,28 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Submit Feedback for resolved complaint
+// Submit Feedback for resolved complaint (IDOR protected)
 router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema), async (req, res) => {
   try {
     const { rating, comment } = req.body;
+
+    const checkSql = `SELECT id, citizen_id FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`;
+    const checkRes = await query(checkSql, [req.params.id, req.params.id, req.params.id]);
+
+    if (!checkRes.rows || checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = checkRes.rows[0];
+    if (req.user && req.user.role === 'citizen' && String(complaint.citizen_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Access denied: You are not authorized to submit feedback for this complaint.' });
+    }
 
     const insertSql = `
       INSERT INTO feedback (complaint_id, rating, comment)
       VALUES (?, ?, ?)
     `;
-    await query(insertSql, [req.params.id, rating, comment || '']);
+    await query(insertSql, [complaint.id, rating, comment || '']);
 
     return res.json({ message: 'Feedback submitted successfully' });
   } catch (err) {
