@@ -513,7 +513,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (backendErr: any) {
         if (backendErr && backendErr.message) {
           if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
-            throw new Error("Unable to connect to NagarSetu backend service. Please verify the backend API server is running on http://localhost:5000.");
+            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
           }
           throw backendErr;
         }
@@ -737,7 +737,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (backendErr: any) {
         if (backendErr && backendErr.message) {
           if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
-            throw new Error("Unable to connect to NagarSetu backend service. Please verify the backend API server is running on http://localhost:5000.");
+            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
           }
           throw backendErr;
         }
