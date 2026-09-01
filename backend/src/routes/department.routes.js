@@ -108,7 +108,7 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
              COALESCE(u.designation, 'Field Service Staff') as designation,
              COALESCE(fs.status, 'active') as status,
              u.language_pref, fs.created_at,
-             d.name as department_name,
+             d.name as department_name, d.code as department_code,
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
@@ -265,7 +265,7 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
     let sql = `
-      SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name
+      SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name, d.code as department_code
       FROM field_staff fs
       LEFT JOIN departments d ON fs.department_id = d.id
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
@@ -532,8 +532,9 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     // 2. Fetch Selected Staff Member from field_staff (or users fallback)
     let staffRes = await query(
-      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status 
+      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status, d.name as department_name, d.code as department_code 
        FROM field_staff fs 
+       LEFT JOIN departments d ON fs.department_id = d.id
        WHERE CAST(fs.user_id AS TEXT) = $1 
           OR fs.employee_id = $1 
           OR CAST(fs.id AS TEXT) = $1
@@ -562,13 +563,13 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     const normDept = (d) => {
       const s = String(d || '').trim().toLowerCase();
-      if (s === '1' || s.includes('pwd') || s.includes('road')) return 'PWD';
-      if (s === '2' || s.includes('san') || s.includes('waste')) return 'SAN';
-      if (s === '3' || s.includes('wtr') || s.includes('water')) return 'WTR';
-      if (s === '4' || s.includes('drn') || s.includes('drain')) return 'DRN';
-      if (s === '5' || s.includes('ele') || s.includes('electric')) return 'ELE';
-      if (s === '6' || s.includes('trf') || s.includes('traffic')) return 'TRF';
-      if (s === '7' || s.includes('mnt') || s.includes('maint')) return 'MNT';
+      if (s === '1' || s === 'pwd' || s.includes('pwd') || s.includes('road') || s.includes('public works')) return 'PWD';
+      if (s === '2' || s === 'san' || s.includes('san') || s.includes('waste') || s.includes('sanitat')) return 'SAN';
+      if (s === '3' || s === 'wtr' || s.includes('wtr') || s.includes('water') || s.includes('sewerage')) return 'WTR';
+      if (s === '4' || s === 'drn' || s.includes('drn') || s.includes('drain') || s.includes('sewage')) return 'DRN';
+      if (s === '5' || s === 'ele' || s.includes('ele') || s.includes('electric') || s.includes('light')) return 'ELE';
+      if (s === '6' || s === 'trf' || s.includes('trf') || s.includes('traffic')) return 'TRF';
+      if (s === '7' || s === 'mnt' || s.includes('mnt') || s.includes('maint')) return 'MNT';
       return s.toUpperCase();
     };
 
