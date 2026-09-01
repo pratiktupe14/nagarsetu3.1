@@ -317,6 +317,10 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.json({ message: 'Feedback submitted successfully' });
   } catch (err) {
     console.error('Submit feedback error:', err);
+    return res.status(500).json({ error: 'Failed to submit feedback' });
+  }
+});
+
 // Purge/remove all complaints and associated records
 router.delete('/purge-all', async (req, res) => {
   try {
