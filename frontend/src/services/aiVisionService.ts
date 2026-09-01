@@ -16,12 +16,13 @@ export const CIVIC_CATEGORIES = [
 export type CivicCategory = typeof CIVIC_CATEGORIES[number];
 
 export const OFFICIAL_DEPARTMENTS = [
-  'Roads & Public Works Department (PWD)',
-  'Sanitation & Solid Waste Management',
+  'Public Works Department',
+  'Sanitation & Waste Management',
   'Water Supply & Sewerage Board',
-  'Electrical & Public Lighting Department',
-  'Drainage & Sewerage Department',
-  'Traffic Engineering & Control Department'
+  'Drainage & Sewage Department',
+  'Electrical & Street Lighting',
+  'Traffic Management Department',
+  'Maintenance Department'
 ] as const;
 
 export type OfficialDepartment = typeof OFFICIAL_DEPARTMENTS[number];
@@ -34,22 +35,16 @@ export function normalizeDepartment(dept?: string, category?: string): string {
   const str = (dept || '').toLowerCase();
   const cat = (category || '').toLowerCase();
 
-  if (str.includes('electrical') || str.includes('light') || str.includes('street light') || str.includes('streetlight') || cat.includes('streetlight') || cat.includes('electrical')) {
-    return 'Electrical & Public Lighting Department';
-  }
   if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
-    return 'Sanitation & Solid Waste Management';
+    return 'Sanitation & Waste Management';
   }
   if (str.includes('water supply') || str.includes('water leakage') || str.includes('pipeline') || (str.includes('water') && !str.includes('drain') && !str.includes('sew')) || (cat.includes('water') && !cat.includes('drain'))) {
     return 'Water Supply & Sewerage Board';
   }
-  if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
-    return 'Sanitation & Waste Management';
-  }
   if (str.includes('drain') || str.includes('sewag') || str.includes('sewer') || cat.includes('drainage') || cat.includes('sewage')) {
     return 'Drainage & Sewage Department';
   }
-  if (str.includes('electric') || str.includes('streetlight') || str.includes('lighting') || cat.includes('streetlight') || cat.includes('electrical')) {
+  if (str.includes('electrical') || str.includes('electric') || str.includes('light') || str.includes('street light') || str.includes('lighting') || cat.includes('streetlight') || cat.includes('electrical')) {
     return 'Electrical & Street Lighting';
   }
   if (str.includes('traffic') || str.includes('signal') || cat.includes('traffic')) {
@@ -623,7 +618,7 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
     confidence: 0.0,
     confidence_level: 'Low',
     priority: 'Medium',
-    department: 'Roads & Public Works Department (PWD)',
+    department: 'Public Works Department',
     title: '', // CLEAN TITLE - DO NOT FILL WITH ERROR TEXT
     description: '', // CLEAN DESCRIPTION - DO NOT FILL WITH ERROR TEXT
     error_code: errorCode,

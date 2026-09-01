@@ -4,7 +4,7 @@ const https = require('https');
 const crypto = require('crypto');
 
 const VALID_TAXONOMY = {
-  'Road Damage / Pothole': 'Public Works Department (PWD)',
+  'Road Damage / Pothole': 'Public Works Department',
   'Water Leakage / Pipeline': 'Water Supply & Sewerage Board',
   'Garbage / Waste': 'Sanitation & Waste Management',
   'Drainage / Sewage': 'Drainage & Sewage Department',
@@ -82,7 +82,7 @@ Respond ONLY with a valid JSON object matching this exact structure:
 }`;
 
 function mapDepartment(category) {
-  return VALID_TAXONOMY[category] || 'Roads & Public Works Department (PWD)';
+  return VALID_TAXONOMY[category] || 'Public Works Department';
 }
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
@@ -304,7 +304,7 @@ async function analyzeComplaintPhoto(fileInput) {
       title: '', // Keep title clean
       description: '', // Keep description clean
       priority: 'Medium',
-      recommended_department: 'Roads & Public Works Department (PWD)',
+      recommended_department: 'Public Works Department',
       confidence: 0.0,
       detected_features: [],
       needs_manual_verification: true
