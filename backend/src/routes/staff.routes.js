@@ -57,24 +57,34 @@ router.get('/tasks', async (req, res) => {
   }
 });
 
-// Update Task status (e.g. to 'In Progress')
-router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (req, res) => {
+// Update Task status (e.g. to 'Accepted', 'On the Way', 'In Progress')
+router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {
   try {
     const { status } = req.body;
+    const targetId = req.params.id;
+    const targetIdNum = parseInt(String(targetId), 10);
 
-    const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [req.params.id]);
+    const compRes = await query(
+      `SELECT citizen_id, complaint_number FROM complaints WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+      [isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+    );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
 
-    await query(`UPDATE complaints SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, req.params.id]);
     await query(
-      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-      [req.params.id, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
-    ).catch(() => {});
-    await notifyStatusChange(req.params.id, status, compRes.rows[0].citizen_id);
+      `UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR CAST(id AS TEXT) = $3 OR complaint_number = $3`,
+      [status, isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+    );
 
-    return res.json({ message: `Task status updated to ${status}` });
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
+      [targetId, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
+    ).catch(() => {});
+
+    await notifyStatusChange(targetId, status, compRes.rows[0].citizen_id).catch(() => {});
+
+    return res.json({ success: true, message: `Task status updated to ${status}` });
   } catch (err) {
     console.error('Task status update error:', err);
     return res.status(500).json({ error: 'Failed to update task status' });

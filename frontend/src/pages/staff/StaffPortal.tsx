@@ -471,7 +471,7 @@ export const StaffPortal: React.FC = () => {
 
       await loadData();
       const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
-      setSelectedTask(updatedList.find((t) => t.id === taskId) || null);
+      setSelectedTask(updatedList.find((t) => String(t.id) === String(taskId) || t.complaint_number === taskId) || null);
     } catch (err) {
       console.error(err);
       toast.error('Unable to update task status. Please try again.');

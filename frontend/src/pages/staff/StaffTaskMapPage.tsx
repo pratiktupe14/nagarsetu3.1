@@ -273,7 +273,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
       await loadTasks();
       const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
-      setDetailModalTask(updatedList.find((t) => t.id === taskId) || null);
+      setDetailModalTask(updatedList.find((t) => String(t.id) === String(taskId) || t.complaint_number === taskId) || null);
     } catch (err) {
       console.error(err);
       toast.error('Unable to update task status. Please try again.');

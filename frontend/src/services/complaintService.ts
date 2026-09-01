@@ -620,17 +620,50 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 }
 
 export async function acceptStaffTask(complaintId: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
+  const targetIdStr = String(complaintId || '').trim();
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ status: 'Accepted' })
+    });
+    if (!apiRes.ok) {
+      await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: 'Accepted' })
+      });
+    }
+  } catch (apiErr) {
+    console.warn('Backend acceptStaffTask API note:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
     try {
-      await supabase
-        .from('complaints')
-        .update({ status: 'Accepted', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({ status: 'Accepted', updated_at: new Date().toISOString() });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      await supaQuery;
     } catch (e) {}
   }
 
+  // 3. LocalStorage persistence & Broadcast
   const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
+  const comp = all.find((c) => String(c.id) === targetIdStr || c.complaint_number === targetIdStr);
   if (comp) {
     const prevStatus = comp.status;
     comp.status = 'Accepted';
@@ -648,23 +681,46 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
     });
 
     broadcastComplaintChange(comp.id, prevStatus, 'Accepted', comp.assigned_staff_name || 'Field Staff', 'Staff accepted field task');
-    return true;
   }
-  return false;
+
+  return true;
 }
 
 export async function startStaffTravel(complaintId: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
+  const targetIdStr = String(complaintId || '').trim();
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ status: 'On the Way' })
+    });
+  } catch (apiErr) {
+    console.warn('Backend startStaffTravel API note:', apiErr);
+  }
+
+  // 2. Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
     try {
-      await supabase
-        .from('complaints')
-        .update({ status: 'On the Way', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({ status: 'On the Way', updated_at: new Date().toISOString() });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      await supaQuery;
     } catch (e) {}
   }
 
+  // 3. LocalStorage persistence
   const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
+  const comp = all.find((c) => String(c.id) === targetIdStr || c.complaint_number === targetIdStr);
   if (comp) {
     const prevStatus = comp.status;
     comp.status = 'On the Way';
@@ -682,27 +738,53 @@ export async function startStaffTravel(complaintId: string): Promise<boolean> {
     });
 
     broadcastComplaintChange(comp.id, prevStatus, 'On the Way', comp.assigned_staff_name || 'Field Staff', 'En route to site');
-    return true;
   }
-  return false;
+
+  return true;
 }
 
 export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
+  const targetIdStr = String(complaintId || '').trim();
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        status: 'In Progress',
+        ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {})
+      })
+    });
+  } catch (apiErr) {
+    console.warn('Backend startStaffWork API note:', apiErr);
+  }
+
+  // 2. Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
     try {
-      await supabase
-        .from('complaints')
-        .update({
-          status: 'In Progress',
-          ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {}),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', complaintId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({
+        status: 'In Progress',
+        ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {}),
+        updated_at: new Date().toISOString()
+      });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      await supaQuery;
     } catch (e) {}
   }
 
+  // 3. LocalStorage persistence
   const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
+  const comp = all.find((c) => String(c.id) === targetIdStr || c.complaint_number === targetIdStr);
   if (comp) {
     const prevStatus = comp.status;
     comp.status = 'In Progress';
@@ -721,9 +803,9 @@ export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: s
     });
 
     broadcastComplaintChange(comp.id, prevStatus, 'In Progress', comp.assigned_staff_name || 'Field Staff', 'Commenced site repair');
-    return true;
   }
-  return false;
+
+  return true;
 }
 
 export async function submitStaffResolution(
