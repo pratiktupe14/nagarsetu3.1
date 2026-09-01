@@ -33,14 +33,14 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-xs font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20 sm:h-24 py-2">
           
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group py-1">
             <img
               src="/logo.png"
               alt="NAGARSETU Civic Platform"
-              className="h-11 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105 max-w-[210px] sm:max-w-[270px]"
+              className="h-14 sm:h-18 md:h-20 w-auto object-contain transition-transform group-hover:scale-105 max-w-[280px] sm:max-w-[380px] md:max-w-[440px]"
             />
           </Link>
 
