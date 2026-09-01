@@ -1158,7 +1158,7 @@ export const DepartmentHeadPortal: React.FC = () => {
       const refreshedList = await getDepartmentComplaints(undefined, deptInfo.fullName);
       const assignedComp = refreshedList.find(c => String(c.id) === String(compObj.id) || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
 
-      if (!assignedComp || (assignedComp.status !== 'Staff Assigned' && assignedComp.status !== 'Assigned' && assignedComp.status !== 'In Progress' && assignedComp.status !== 'Accepted')) {
+      if (!assignedComp || ((assignedComp.status as string) !== 'Staff Assigned' && (assignedComp.status as string) !== 'Assigned' && (assignedComp.status as string) !== 'In Progress' && (assignedComp.status as string) !== 'Accepted')) {
         throw new Error(`Assignment verification warning: Task status read-back returned '${assignedComp?.status || 'Unassigned'}'. Please refresh and check database.`);
       }
 
