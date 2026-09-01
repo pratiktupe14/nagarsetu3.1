@@ -628,18 +628,15 @@ function runMemQuery(sql, params = []) {
   if (upper.startsWith('SELECT')) {
     let list = memStore[targetTable] || [];
     if (params && params.length > 0) {
-      const pStr = params.map(p => String(p).toLowerCase());
+      const pStr = params.map(p => String(p).trim().toLowerCase());
       const filtered = list.filter(item => {
         if (!item) return false;
-        return pStr.some(p => 
-          (item.mobile && String(item.mobile).toLowerCase() === p) ||
-          (item.email && String(item.email).toLowerCase() === p) ||
-          (item.id !== undefined && String(item.id) === p)
-        );
+        const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
+        const itemEmail = item.email ? String(item.email).trim().toLowerCase() : '';
+        const itemId = item.id !== undefined ? String(item.id).trim() : '';
+        return pStr.some(p => p !== '' && (itemMobile === p || itemEmail === p || itemId === p));
       });
-      if (filtered.length > 0) {
-        list = filtered;
-      }
+      return Promise.resolve({ rows: filtered });
     }
     return Promise.resolve({ rows: list });
   }
