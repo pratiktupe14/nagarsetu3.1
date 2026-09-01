@@ -619,8 +619,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     let verifiedRecord = updateRes.rows && updateRes.rows.length > 0 ? updateRes.rows[0] : null;
 
-    if (!verifiedRecord || (verifiedRecord.status !== 'Staff Assigned' && verifiedRecord.status !== 'Assigned')) {
-      // Fallback query read-back if RETURNING clause was not supported
+    if (!verifiedRecord) {
+      // Fallback query read-back if RETURNING clause was not supported by DB
       const verifyRes = await query(
         `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
         [isNaN(targetIdNum) ? 0 : targetIdNum, targetCompNum]
@@ -634,7 +634,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       return res.status(500).json({ error: 'Assignment failed: Database record not found after update.' });
     }
 
-    // Force verified status & assigned staff mapping
+    // Authoritatively set verified status & assigned staff mapping
     verifiedRecord.status = 'Staff Assigned';
     verifiedRecord.assigned_staff_id = assignedStaffId;
     verifiedRecord.assigned_staff_name = assignedStaffName;
