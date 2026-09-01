@@ -633,9 +633,9 @@ function runMemQuery(sql, params = []) {
     let list = memStore[targetTable] || [];
     if (params && params.length > 0) {
       const pStr = params.map(p => String(p).trim().toLowerCase().replace(/^%|%$/g, ''));
-      const isDeptQuery = upper.includes('DEPARTMENT_ID');
-      const isCitizenQuery = upper.includes('CITIZEN_ID');
-      const isIdQuery = upper.includes('WHERE C.ID =') || upper.includes('WHERE ID =') || upper.includes('WHERE CAST(C.ID');
+      const isDeptQuery = upper.includes('WHERE DEPARTMENT_ID') || upper.includes('WHERE C.DEPARTMENT_ID') || upper.includes('WHERE FS.DEPARTMENT_ID') || upper.includes('AND C.DEPARTMENT_ID') || upper.includes('AND (C.DEPARTMENT_ID');
+      const isCitizenQuery = upper.includes('WHERE CITIZEN_ID') || upper.includes('WHERE C.CITIZEN_ID') || upper.includes('AND C.CITIZEN_ID');
+      const isIdQuery = upper.includes('WHERE C.ID =') || upper.includes('WHERE ID =') || upper.includes('WHERE CAST(C.ID AS TEXT) = $1');
 
       const filtered = list.filter(item => {
         if (!item) return false;
