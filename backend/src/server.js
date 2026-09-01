@@ -54,7 +54,8 @@ async function seedDefaultUsers() {
       }
     }
 
-    // Ensure Demo Citizen account (mobile: 8788562103) exists idempotently
+    // Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently
+    await query(`UPDATE users SET name = 'Pratik Dilip Tupe' WHERE name = 'Demo Citizen' OR name = 'Citizen User' OR mobile = '8788562103'`).catch(() => {});
     const citizenCheck = await query(`SELECT * FROM users WHERE mobile = '8788562103'`);
     if (!citizenCheck.rows || citizenCheck.rows.length === 0) {
       const salt = await bcrypt.genSalt(10);
@@ -62,9 +63,9 @@ async function seedDefaultUsers() {
       const citizenHash = await bcrypt.hash(citizenPass, salt);
       await query(
         `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'citizen', 'active', 'en')`,
-        ['Demo Citizen', '8788562103', 'citizen8788@nagarsetu.gov.in', citizenHash]
+        ['Pratik Dilip Tupe', '8788562103', 'citizen8788@nagarsetu.gov.in', citizenHash]
       );
-      console.log('Demo Citizen account (8788562103) seeded successfully.');
+      console.log('Citizen account Pratik Dilip Tupe (8788562103) seeded successfully.');
     }
   } catch (err) {
     console.error('Error seeding default users:', err);

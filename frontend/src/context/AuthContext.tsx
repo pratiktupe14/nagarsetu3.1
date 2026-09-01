@@ -179,9 +179,9 @@ export function findServiceStaffByIdentifier(identifier: string): UserProfile | 
 export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   citizen: {
     id: 'citizen-user-id',
-    full_name: 'Citizen User',
-    mobile: '',
-    email: 'citizen@nagarsetu.gov.in',
+    full_name: 'Pratik Dilip Tupe',
+    mobile: '8788562103',
+    email: 'pratik@citizen.nagarsetu.gov.in',
     role: 'citizen',
     language_pref: 'en'
   },

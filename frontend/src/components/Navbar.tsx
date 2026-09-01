@@ -154,10 +154,14 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center space-x-3 pl-2 border-l border-gray-200">
                 <div className="text-right">
                   <span className="text-xs font-bold text-gray-900 block leading-tight">
-                    {user.full_name && user.full_name !== 'Department Head' ? user.full_name : 'Rahul Kumar'}
+                    {activeRole === 'citizen'
+                      ? (user.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')
+                      : (user.full_name && user.full_name !== 'Department Head' ? user.full_name : 'Rahul Kumar')}
                   </span>
-                  <span className="text-[10px] text-gray-500 font-medium block">
-                    {user.department_name ? user.department_name.split('(')[0].trim() : (activeRole || 'citizen').replace('_', ' ')}
+                  <span className="text-[10px] text-gray-500 font-medium block capitalize">
+                    {activeRole === 'citizen' || user.department_name === 'Unassigned Department' || !user.department_name
+                      ? 'Citizen'
+                      : user.department_name.split('(')[0].trim()}
                   </span>
                 </div>
 

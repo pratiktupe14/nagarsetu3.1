@@ -474,7 +474,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900 font-outfit text-sm">{user?.full_name || user?.email || 'Citizen User'}</span>
+                    <span className="font-bold text-gray-900 font-outfit text-sm">{user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}</span>
                     <span className="font-mono text-[10px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
                       Role: Citizen
                     </span>
