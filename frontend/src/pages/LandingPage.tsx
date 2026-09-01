@@ -4,7 +4,7 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  Sparkles, Building2, ArrowRight, User, Wrench
+  Sparkles, Building2, ArrowRight, User, Wrench, ShieldCheck
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -33,69 +33,106 @@ export const LandingPage: React.FC = () => {
               {t('landingHeroSubtitle')}
             </p>
 
-            {/* 3 DIRECT PORTAL CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-4 text-left">
+            {/* 4 DIRECT PORTAL CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto pt-6 text-left">
               
               {/* CITIZEN PORTAL */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 hover:border-emerald-500 transition-all flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-emerald-500/50 transition-all duration-300 group flex flex-col justify-between h-full">
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 group-hover:scale-110 transition-transform">
                     <User className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">{t('roleCitizen')} Portal</h3>
-                    <p className="text-xs text-gray-600 mt-1">{t('howItWorksStep1Desc')}</p>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider font-sans leading-snug min-h-[48px] flex items-center">
+                      {t('roleCitizen')} Portal
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-medium min-h-[36px]">
+                      AI photo classification & instant civic issue reporting.
+                    </p>
                   </div>
                 </div>
 
                 <Link
-                  to="/citizen/portal"
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+                  to="/login?role=citizen"
+                  className="mt-6 w-full py-3.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs tracking-wider shadow-sm flex items-center justify-center space-x-1.5 transition-all min-h-[44px] whitespace-nowrap"
                 >
-                  <span>{t('getStarted')} — {t('roleCitizen')}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Citizen Sign In</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </Link>
               </div>
 
               {/* CITY ADMIN PORTAL */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 hover:border-blue-500 transition-all flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-blue-500/50 transition-all duration-300 group flex flex-col justify-between h-full">
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 group-hover:scale-110 transition-transform">
                     <Building2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">{t('roleAdmin')} Portal</h3>
-                    <p className="text-xs text-gray-600 mt-1">{t('officerDashboardTitle')}</p>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider font-sans leading-snug min-h-[48px] flex items-center">
+                      Administrator Portal
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-medium min-h-[36px]">
+                      Municipal command center & executive analytics triage.
+                    </p>
                   </div>
                 </div>
 
                 <Link
-                  to="/admin/portal"
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+                  to="/login?role=city_admin"
+                  className="mt-6 w-full py-3.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs tracking-wider shadow-sm flex items-center justify-center space-x-1.5 transition-all min-h-[44px] whitespace-nowrap"
                 >
-                  <span>{t('getStarted')} — {t('roleAdmin')}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Admin Sign In</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </Link>
+              </div>
+
+              {/* DEPARTMENT HEAD PORTAL */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-purple-500/50 transition-all duration-300 group flex flex-col justify-between h-full">
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 group-hover:scale-110 transition-transform">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider font-sans leading-snug min-h-[48px] flex items-center">
+                      Dept Head Portal
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-medium min-h-[36px]">
+                      Department operations & field staff task triage.
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  to="/login?role=department_head"
+                  className="mt-6 w-full py-3.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs tracking-wider shadow-sm flex items-center justify-center space-x-1.5 transition-all min-h-[44px] whitespace-nowrap"
+                >
+                  <span>Department Head Sign In</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </Link>
               </div>
 
               {/* SERVICE STAFF PORTAL */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4 hover:border-amber-500 transition-all flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs hover:shadow-xl hover:-translate-y-1 hover:border-amber-500/50 transition-all duration-300 group flex flex-col justify-between h-full">
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 group-hover:scale-110 transition-transform">
                     <Wrench className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider">{t('serviceStaffPortal')}</h3>
-                    <p className="text-xs text-gray-600 mt-1">{t('myTasks')}</p>
+                    <h3 className="text-base font-extrabold text-gray-900 font-outfit uppercase tracking-wider font-sans leading-snug min-h-[48px] flex items-center">
+                      Field Staff Portal
+                    </h3>
+                    <p className="text-xs text-gray-500 leading-relaxed font-medium min-h-[36px]">
+                      Task navigation, resolution & photo proof upload.
+                    </p>
                   </div>
                 </div>
 
                 <Link
-                  to="/staff/portal"
-                  className="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+                  to="/login?role=service_staff"
+                  className="mt-6 w-full py-3.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs tracking-wider shadow-sm flex items-center justify-center space-x-1.5 transition-all min-h-[44px] whitespace-nowrap"
                 >
-                  <span>{t('getStarted')} — {t('roleStaff')}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Staff Sign In</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </Link>
               </div>
 

@@ -22,10 +22,11 @@ export const Navbar: React.FC = () => {
     navigate('/');
   };
 
-  const handleRoleSwitch = (targetRole: 'citizen' | 'city_admin' | 'service_staff') => {
+  const handleRoleSwitch = (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
     switchRole(targetRole);
     if (targetRole === 'citizen') navigate('/citizen/portal');
     if (targetRole === 'city_admin') navigate('/admin/portal');
+    if (targetRole === 'department_head') navigate('/department-head/portal');
     if (targetRole === 'service_staff') navigate('/staff/portal');
   };
 
@@ -227,6 +228,12 @@ export const Navbar: React.FC = () => {
               className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
             >
                City Administration View
+            </button>
+            <button
+              onClick={() => { handleRoleSwitch('department_head'); setMobileMenuOpen(false); }}
+              className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
+            >
+               Department Head View
             </button>
             <button
               onClick={() => { handleRoleSwitch('service_staff'); setMobileMenuOpen(false); }}
