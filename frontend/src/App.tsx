@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -55,8 +56,9 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <LanguageProvider>
-          <BrowserRouter>
-          <Routes>
+          <NotificationProvider>
+            <BrowserRouter>
+              <Routes>
             {/* Public Landing & Auth Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -512,8 +514,9 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
-      </LanguageProvider>
-    </AuthProvider>
-  </ErrorBoundary>
+      </NotificationProvider>
+    </LanguageProvider>
+  </AuthProvider>
+</ErrorBoundary>
   );
 }

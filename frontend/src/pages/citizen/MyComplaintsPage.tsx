@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -42,6 +43,7 @@ function getStageIndex(status: string): number {
 export const MyComplaintsPage: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translateStatus } = useLanguage();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -125,7 +127,7 @@ export const MyComplaintsPage: React.FC = () => {
     }
 
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      toast.warning('Geolocation is not supported by your browser.');
       return;
     }
 
@@ -138,7 +140,7 @@ export const MyComplaintsPage: React.FC = () => {
       },
       (err) => {
         console.error(err);
-        alert('Could not access current location. Please check browser permissions.');
+        toast.warning('Could not access current location. Please check browser permissions.');
         setGpsLoading(false);
       }
     );

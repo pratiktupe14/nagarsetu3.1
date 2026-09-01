@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -84,6 +85,7 @@ const getDepartmentInfo = (departmentName: string) => {
 export const StaffNewTasksPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useNotification();
 
   const staffName = user?.full_name || 'Field Officer';
   const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
@@ -260,7 +262,7 @@ export const StaffNewTasksPage: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      alert('Error starting task.');
+      toast.error('Unable to start task. Please try again.');
     }
   };
 

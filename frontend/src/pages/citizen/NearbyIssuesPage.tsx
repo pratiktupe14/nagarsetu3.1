@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -75,6 +76,7 @@ function MapController({
 export const NearbyIssuesPage: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translateStatus, translatePriority } = useLanguage();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
@@ -250,12 +252,12 @@ export const NearbyIssuesPage: React.FC = () => {
     setSupporting(true);
     try {
       await supportDuplicateComplaint(supportModalComplaint.id);
-      alert(`Thank you! Your support for complaint ${supportModalComplaint.complaint_number} has been recorded.`);
+      toast.success(`Thank you! Your support for complaint ${supportModalComplaint.complaint_number} has been recorded.`);
       setSupportModalComplaint(null);
       await loadData();
     } catch (e) {
       console.error(e);
-      alert('Error updating support.');
+      toast.error('Unable to record support. Please try again.');
     } finally {
       setSupporting(false);
     }

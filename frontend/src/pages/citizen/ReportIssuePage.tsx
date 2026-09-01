@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
 import {
@@ -38,6 +39,7 @@ interface AdditionalPhotoItem {
 export const ReportIssuePage: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translatePriority, translateDepartment } = useLanguage();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   // Primary Photo & AI State
@@ -177,7 +179,7 @@ export const ReportIssuePage: React.FC = () => {
   // Handle Additional Photo Upload / Different Angle Analysis
   const handleAdditionalPhotoSelect = async (file: File) => {
     if (additionalPhotos.length >= 4) {
-      alert('Maximum of 5 photos (1 primary + 4 additional angles) allowed per complaint.');
+      toast.warning('Maximum of 5 photos (1 primary + 4 additional angles) allowed per complaint.');
       return;
     }
 
@@ -321,7 +323,7 @@ export const ReportIssuePage: React.FC = () => {
       saveOfflineDraft({
         category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
       });
-      alert('Network issue detected. Complaint saved to offline drafts on your device.');
+      toast.info('Network issue detected. Complaint saved to offline drafts on your device.');
     } finally {
       setSubmitting(false);
     }
@@ -935,7 +937,7 @@ export const ReportIssuePage: React.FC = () => {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => alert(`Thank you! Your support for complaint ${nearbyDuplicates[0].complaint.complaint_number} has been recorded.`)}
+                      onClick={() => toast.success(`Thank you! Your support for complaint ${nearbyDuplicates[0].complaint.complaint_number} has been recorded.`)}
                       className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 min-h-[44px]"
                     >
                       {t('supportExisting')}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -84,6 +85,7 @@ const getDepartmentInfo = (departmentName: string) => {
 export const StaffInProgressTasksPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useNotification();
 
   const staffName = user?.full_name || 'Field Officer';
   const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
@@ -262,7 +264,7 @@ export const StaffInProgressTasksPage: React.FC = () => {
       await loadData();
     } catch (err) {
       console.error(err);
-      alert('Error adding progress note.');
+      toast.error('Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -271,7 +273,7 @@ export const StaffInProgressTasksPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -291,10 +293,10 @@ export const StaffInProgressTasksPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadData();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -38,6 +39,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export const AdminComplaintsPage: React.FC = () => {
+  const { toast } = useNotification();
   const location = useLocation();
   const isNewComplaintsPage = location.pathname.includes('/new');
 
@@ -153,7 +155,7 @@ export const AdminComplaintsPage: React.FC = () => {
     if (!selectedComplaint) return;
     setSubmittingAction(true);
     await verifyAndApproveComplaint(selectedComplaint.id, editPriority, editDepartment);
-    alert(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
+    toast.success(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
     await loadComplaints();
     const list = await getAllComplaints();
     setSelectedComplaint(list.find((item) => item.id === selectedComplaint.id) || null);
@@ -163,14 +165,14 @@ export const AdminComplaintsPage: React.FC = () => {
   // Handle Assign Staff
   const handleAssignStaff = async () => {
     if (!selectedComplaint || !selectedStaffId) {
-      alert('Please select a department staff member.');
+      toast.warning('Please select a department staff member.');
       return;
     }
     const roster = getDepartmentStaffRoster(editDepartment);
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
     setSubmittingAction(true);
     await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    alert(`Task assigned to ${staff.name} with ${slaHours}h SLA.`);
+    toast.success(`Task assigned to ${staff.name} with ${slaHours}h SLA.`);
     await loadComplaints();
     const list = await getAllComplaints();
     setSelectedComplaint(list.find((item) => item.id === selectedComplaint.id) || null);
@@ -368,7 +370,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => alert(`Bulk Action: Assign Department triggered for ${selectedIds.length} complaints.`)}
+                  onClick={() => toast.info(`Bulk Action: Assign Department triggered for ${selectedIds.length} complaints.`)}
                   className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 min-h-[44px]"
                 >
                   Assign Department
@@ -685,9 +687,9 @@ export const AdminComplaintsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center space-x-2 pt-1">
-                    <button type="button" onClick={() => alert(`Viewing existing master complaint ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
-                    <button type="button" onClick={() => alert(`Complaint linked to master ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
-                    <button type="button" onClick={() => alert('Marked as separate complaint')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Keep Separate</button>
+                    <button type="button" onClick={() => toast.info(`Viewing existing master complaint ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
+                    <button type="button" onClick={() => toast.success(`Complaint linked to master ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
+                    <button type="button" onClick={() => toast.info('Marked as separate complaint')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Keep Separate</button>
                   </div>
                 </div>
 
@@ -768,14 +770,14 @@ export const AdminComplaintsPage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => alert('Complaint rejected with feedback sent to citizen.')}
+                      onClick={() => toast.info('Complaint rejected with feedback sent to citizen.')}
                       className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[44px]"
                     >
                       Reject
                     </button>
                     <button
                       type="button"
-                      onClick={() => alert('Information request sent to citizen.')}
+                      onClick={() => toast.info('Information request sent to citizen.')}
                       className="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 min-h-[44px]"
                     >
                       Request Info

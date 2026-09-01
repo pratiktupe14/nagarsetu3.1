@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -91,6 +92,7 @@ function MapFlyToController({ center, zoom }: { center: [number, number] | null;
 
 export const StaffTaskMapPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useNotification();
 
   // Staff Identity & Department
   const staffName = user?.full_name || 'Field Officer';
@@ -274,7 +276,7 @@ export const StaffTaskMapPage: React.FC = () => {
       setDetailModalTask(updatedList.find((t) => t.id === taskId) || null);
     } catch (err) {
       console.error(err);
-      alert('Error updating task status.');
+      toast.error('Unable to update task status. Please try again.');
     }
   };
 
@@ -299,7 +301,7 @@ export const StaffTaskMapPage: React.FC = () => {
       setDetailModalTask(updatedList.find((t) => t.id === detailModalTask.id) || null);
     } catch (err) {
       console.error(err);
-      alert('Error adding progress note.');
+      toast.error('Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -309,7 +311,7 @@ export const StaffTaskMapPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailModalTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -329,10 +331,10 @@ export const StaffTaskMapPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadTasks();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }
