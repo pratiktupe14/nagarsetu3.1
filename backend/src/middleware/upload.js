@@ -5,9 +5,13 @@ const crypto = require('crypto');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
-// Ensure isolated uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Ensure isolated uploads directory exists (gracefully handle read-only serverless environment)
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('[UPLOAD DIR NOTE] Read-only serverless filesystem:', err.message);
 }
 
 // Allowed MIME types and extension mapping
