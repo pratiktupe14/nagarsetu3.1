@@ -1,12 +1,13 @@
 const app = require('../src/app');
 const { initDatabase } = require('../src/config/db');
 
-try {
-  if (typeof initDatabase === 'function') {
-    initDatabase().catch(err => console.warn('[SERVERLESS INIT NOTE]', err.message));
+let dbInitPromise = null;
+
+app.use((req, res, next) => {
+  if (!dbInitPromise && typeof initDatabase === 'function') {
+    dbInitPromise = initDatabase().catch(err => console.warn('[SERVERLESS DB INIT WARN]', err.message));
   }
-} catch (e) {
-  console.warn('[SERVERLESS INIT CATCH]', e.message);
-}
+  next();
+});
 
 module.exports = app;

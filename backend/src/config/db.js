@@ -31,7 +31,8 @@ function initDatabase() {
       try {
         pgPool = new Pool({
           connectionString: dbUrl,
-          ssl: { rejectUnauthorized: false }
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 3000
         });
         pgPool.query('SELECT NOW()', (err, res) => {
           if (err) {
