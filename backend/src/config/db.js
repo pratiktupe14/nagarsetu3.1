@@ -650,9 +650,21 @@ function runMemQuery(sql, params = []) {
   const upper = s.toUpperCase();
 
   let targetTable = null;
-  const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
-  if (fromMatch && fromMatch[1]) {
-    targetTable = fromMatch[1].toLowerCase();
+  if (upper.includes('FROM FIELD_STAFF') || upper.includes('INTO FIELD_STAFF') || upper.includes('UPDATE FIELD_STAFF')) {
+    targetTable = 'field_staff';
+  } else if (upper.includes('FROM DEPARTMENT_HEADS') || upper.includes('INTO DEPARTMENT_HEADS') || upper.includes('UPDATE DEPARTMENT_HEADS')) {
+    targetTable = 'department_heads';
+  } else if (upper.includes('FROM DEPARTMENTS') || upper.includes('INTO DEPARTMENTS') || upper.includes('UPDATE DEPARTMENTS')) {
+    targetTable = 'departments';
+  } else if (upper.includes('FROM COMPLAINTS') || upper.includes('INTO COMPLAINTS') || upper.includes('UPDATE COMPLAINTS')) {
+    targetTable = 'complaints';
+  } else if (upper.includes('FROM USERS') || upper.includes('INTO USERS') || upper.includes('UPDATE USERS')) {
+    targetTable = 'users';
+  } else {
+    const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
+    if (fromMatch && fromMatch[1]) {
+      targetTable = fromMatch[1].toLowerCase();
+    }
   }
 
   if (!targetTable || !memStore[targetTable]) {
