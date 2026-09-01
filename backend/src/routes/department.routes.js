@@ -596,10 +596,10 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            assigned_staff_email = $3,
            assigned_by = $4,
            assigned_by_name = $5,
-           status = 'Staff Assigned',
+           status = $6,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6 OR complaint_number = $6`,
-      [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', complaint.id]
+       WHERE id = $7 OR complaint_number = $7`,
+      [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', 'Staff Assigned', complaint.id]
     );
 
     if (updateRes && updateRes.rowCount !== undefined && updateRes.rowCount === 0) {

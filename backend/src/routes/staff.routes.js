@@ -82,7 +82,7 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 });
 
 // Resolve Task with "After" Photo Proof
-router.post(['/task/:id/resolve', '/tasks/:id/resolve'], uploadSingleImage('photo'), async (req, res) => {
+router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complete'], uploadSingleImage('photo'), async (req, res) => {
   const targetId = req.params.id;
   const bodyNum = req.body?.complaint_number || '';
   const bodyId = req.body?.complaint_id || '';
@@ -173,12 +173,12 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve'], uploadSingleImage('phot
              work_performed = $2, 
              materials_used = $3, 
              additional_notes = $4, 
-             status = 'Resolution Submitted', 
+             status = $5, 
              updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $5 
-            OR CAST(id AS TEXT) = $5 
-            OR complaint_number = $6`,
-        [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, primaryKeyId, complaintNum]
+         WHERE id = $6 
+            OR CAST(id AS TEXT) = $6 
+            OR complaint_number = $7`,
+        [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, 'Resolution Submitted', primaryKeyId, complaintNum]
       );
       affectedRows = updateRes?.rowCount !== undefined ? updateRes.rowCount : 1;
     } catch (uErr) {
