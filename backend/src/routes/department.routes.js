@@ -246,14 +246,6 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
         activeStaff,
         inactiveStaff,
         activeTasks: activeTasksCount
-      },
-      debug: {
-        sql,
-        params,
-        resultRowCount: result.rows ? result.rows.length : 0,
-        userRole,
-        isAdmin,
-        userDeptId
       }
     });
   } catch (err) {
