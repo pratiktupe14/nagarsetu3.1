@@ -26,11 +26,13 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    const success = await registerCitizen(fullName, mobile, email, password);
-    if (success) {
-      navigate('/citizen/portal');
-    } else {
-      setErrorMessage('Registration failed. Please check details or try again.');
+    try {
+      const success = await registerCitizen(fullName, mobile, email, password);
+      if (success) {
+        navigate('/citizen/portal');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Registration failed. Please check details or try again.');
     }
   };
 

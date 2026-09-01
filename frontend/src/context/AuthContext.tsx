@@ -697,6 +697,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     password?: string
   ): Promise<boolean> => {
     try {
+      // 1. Try local Express backend API registration first
+      try {
+        const response = await fetch(`${getApiUrl()}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: fullName.trim(),
+            mobile: mobile.trim(),
+            email: email && email.trim() !== '' ? email.trim() : undefined,
+            password: password || 'password123',
+            role: 'citizen'
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token && data.user) {
+            const registeredUser: UserProfile = {
+              id: String(data.user.id),
+              full_name: data.user.name || fullName,
+              mobile: data.user.mobile || mobile,
+              email: data.user.email || email,
+              role: 'citizen',
+              language_pref: data.user.language_pref || 'en'
+            };
+            setUser(registeredUser);
+            localStorage.setItem('nagarsetu_token', data.token);
+            localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));
+            return true;
+          }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          if (errData.error) {
+            throw new Error(errData.error);
+          }
+        }
+      } catch (backendErr: any) {
+        if (backendErr && backendErr.message) {
+          if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
+            throw new Error("Unable to connect to NagarSetu backend service. Please verify the backend API server is running on http://localhost:5000.");
+          }
+          throw backendErr;
+        }
+      }
+
       if (isSupabaseConfigured() && email && password) {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -736,19 +781,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      const newCitizen: UserProfile = {
-        id: 'citizen-' + Date.now(),
-        full_name: fullName || 'Registered Citizen',
-        mobile,
-        email,
-        role: 'citizen'
-      };
-      setUser(newCitizen);
-      localStorage.setItem('nagarsetu_user', JSON.stringify(newCitizen));
-      return true;
-    } catch (e) {
+      throw new Error("Registration failed. Please check details or try again.");
+    } catch (e: any) {
       console.error('Registration Error:', e);
-      return false;
+      throw e;
     }
   };
 

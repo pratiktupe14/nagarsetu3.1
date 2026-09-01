@@ -9,11 +9,12 @@ const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = requi
 // Register endpoint (Citizen, Officer, Staff, Admin)
 router.post('/register', validateInput(registerSchema), async (req, res) => {
   try {
-    const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
+    const cleanMobile = String(mobile).trim();
+    const cleanEmail = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
 
-    // Check existing user
-    const checkSql = `SELECT id FROM users WHERE mobile = ? OR (email IS NOT NULL AND email = ?)`;
-    const existing = await query(checkSql, [mobile, email || '']);
+    // Check existing user by mobile or email
+    const checkSql = `SELECT id FROM users WHERE mobile = ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`;
+    const existing = await query(checkSql, [cleanMobile, cleanEmail || '']);
     if (existing.rows && existing.rows.length > 0) {
       return res.status(400).json({ error: 'User with this mobile number or email already exists' });
     }
@@ -25,10 +26,10 @@ router.post('/register', validateInput(registerSchema), async (req, res) => {
       INSERT INTO users (name, mobile, email, password_hash, role, language_pref)
       VALUES (?, ?, ?, ?, ?, ?)
     `;
-    const result = await query(insertSql, [name, mobile, email || null, password_hash, role, language_pref]);
+    const result = await query(insertSql, [name.trim(), cleanMobile, cleanEmail, password_hash, role, language_pref]);
 
     const newUserId = result.rows[0].id;
-    const userObj = { id: newUserId, name, mobile, email, role, language_pref };
+    const userObj = { id: newUserId, name: name.trim(), mobile: cleanMobile, email: cleanEmail, role, language_pref };
     const token = generateToken(userObj);
 
     if (res.clearAuthAttempts) res.clearAuthAttempts();
