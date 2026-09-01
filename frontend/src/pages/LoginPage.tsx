@@ -29,8 +29,8 @@ export const LoginPage: React.FC = () => {
     setErrorMsg('');
     const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
     const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
-    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
-    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
+    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'nagarsetu@123';
+    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'password123';
 
     if (role === 'citizen') {
       setIdentifier('8788562103');
