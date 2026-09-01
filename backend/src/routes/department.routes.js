@@ -590,6 +590,9 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const assignedStaffName = staff.name;
     const assignedStaffEmail = staff.email || '';
 
+    const targetIdNum = parseInt(String(complaint.id), 10);
+    const targetCompNum = String(complaint.complaint_number || complaint.id);
+
     // 5. Update Complaint in Database with RETURNING clause
     const updateRes = await query(
       `UPDATE complaints
@@ -600,9 +603,18 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            assigned_by_name = $5,
            status = $6,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 OR CAST(complaint_number AS TEXT) = CAST($7 AS TEXT)
+       WHERE id = $7 OR CAST(id AS TEXT) = $8 OR complaint_number = $8
        RETURNING id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
-      [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', 'Staff Assigned', complaint.id]
+      [
+        assignedStaffId,
+        assignedStaffName,
+        assignedStaffEmail,
+        req.user.id,
+        req.user.name || 'Department Head',
+        'Staff Assigned',
+        isNaN(targetIdNum) ? 0 : targetIdNum,
+        targetCompNum
+      ]
     );
 
     let verifiedRecord = updateRes.rows && updateRes.rows.length > 0 ? updateRes.rows[0] : null;
@@ -610,8 +622,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     if (!verifiedRecord || (verifiedRecord.status !== 'Staff Assigned' && verifiedRecord.status !== 'Assigned')) {
       // Fallback query read-back if RETURNING clause was not supported
       const verifyRes = await query(
-        `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1 OR CAST(complaint_number AS TEXT) = CAST($1 AS TEXT)`,
-        [complaint.id]
+        `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+        [isNaN(targetIdNum) ? 0 : targetIdNum, targetCompNum]
       );
       if (verifyRes.rows && verifyRes.rows.length > 0) {
         verifiedRecord = verifyRes.rows[0];
