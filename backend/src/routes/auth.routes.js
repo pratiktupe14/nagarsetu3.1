@@ -129,17 +129,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       isMatch = await bcrypt.compare(password, user.password_hash);
     }
 
-    // Development-only fallback credential check
-    if (!isMatch && process.env.NODE_ENV !== 'production') {
-      const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
-      const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      const devHeadPass = process.env.DEMO_HEAD_PASSWORD || 'head123';
-      const devStaffPass = process.env.DEMO_STAFF_PASSWORD || 'staff123';
-      if (password === devAdminPass || password === devUserPass || password === devHeadPass || password === devStaffPass) {
-        isMatch = true;
-      }
-    }
-
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }

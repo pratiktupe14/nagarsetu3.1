@@ -54,18 +54,27 @@ async function seedDefaultUsers() {
       }
     }
 
-    // Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently
-    await query(`UPDATE users SET name = 'Pratik Dilip Tupe' WHERE name = 'Demo Citizen' OR name = 'Citizen User' OR mobile = '8788562103'`).catch(() => {});
-    const citizenCheck = await query(`SELECT * FROM users WHERE mobile = '8788562103'`);
-    if (!citizenCheck.rows || citizenCheck.rows.length === 0) {
-      const salt = await bcrypt.genSalt(10);
-      const citizenPass = '8788562103';
-      const citizenHash = await bcrypt.hash(citizenPass, salt);
+    // Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently with valid password_hash
+    const citizenPass = '8788562103';
+    const citizenSalt = await bcrypt.genSalt(10);
+    const citizenHash = await bcrypt.hash(citizenPass, citizenSalt);
+    const citizenEmail = 'citizen8788@nagarsetu.gov.in';
+
+    const citizenCheck = await query(`SELECT id FROM users WHERE mobile = '8788562103' OR LOWER(email) = ? OR name = 'Demo Citizen' OR name = 'Citizen User'`, [citizenEmail]);
+    if (citizenCheck.rows && citizenCheck.rows.length > 0) {
+      const existingId = citizenCheck.rows[0].id;
       await query(
-        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'citizen', 'active', 'en')`,
-        ['Pratik Dilip Tupe', '8788562103', 'citizen8788@nagarsetu.gov.in', citizenHash]
+        `UPDATE users SET name = 'Pratik Dilip Tupe', mobile = '8788562103', email = ?, password_hash = ?, role = 'citizen', status = 'active' WHERE id = ?`,
+        [citizenEmail, citizenHash, existingId]
       );
-      console.log('Citizen account Pratik Dilip Tupe (8788562103) seeded successfully.');
+      console.log(`Citizen demo account (8788562103) updated idempotently for DB User ID: ${existingId}`);
+    } else {
+      const insRes = await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'citizen', 'active', 'en')`,
+        ['Pratik Dilip Tupe', '8788562103', citizenEmail, citizenHash]
+      );
+      const newId = insRes.rows[0].id;
+      console.log(`Citizen demo account (8788562103) created with DB User ID: ${newId}`);
     }
   } catch (err) {
     console.error('Error seeding default users:', err);
