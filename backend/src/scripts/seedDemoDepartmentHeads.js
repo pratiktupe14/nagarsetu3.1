@@ -1,5 +1,4 @@
 const bcrypt = require('bcryptjs');
-const { query } = require('../config/db');
 
 const OFFICIAL_DEPARTMENTS = [
   {
@@ -77,7 +76,7 @@ const OFFICIAL_DEPARTMENTS = [
 const DEMO_PASSWORD = 'nagarsetu@123';
 
 async function seed7DemoDepartmentHeads(queryFn) {
-  const q = queryFn || query;
+  const q = queryFn || require('../config/db').query;
   console.log('=======================================================');
   console.log('  Synchronizing 7 Active Department Heads for NAGARSETU ');
   console.log('=======================================================');

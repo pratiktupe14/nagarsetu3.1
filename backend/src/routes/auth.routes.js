@@ -6,17 +6,29 @@ const { generateToken, authenticateToken } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
 
+function extractDigits(str) {
+  return String(str || '').replace(/\D/g, '');
+}
+
+function normalizeMobile(str) {
+  const digits = extractDigits(str);
+  if (digits.length >= 10) {
+    return digits.slice(-10);
+  }
+  return digits || String(str || '').trim();
+}
+
 // Register endpoint (Citizen, Officer, Staff, Admin)
 router.post('/register', validateInput(registerSchema), async (req, res) => {
   try {
     const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
 
-    const cleanMobile = String(mobile).trim();
+    const cleanMobile = normalizeMobile(mobile);
     const cleanEmail = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
 
     // Check existing user by mobile or email
-    const checkSql = `SELECT id FROM users WHERE mobile = ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`;
-    const existing = await query(checkSql, [cleanMobile, cleanEmail || '']);
+    const checkSql = `SELECT id FROM users WHERE mobile = ? OR mobile = ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`;
+    const existing = await query(checkSql, [cleanMobile, String(mobile).trim(), cleanEmail || '']);
     if (existing.rows && existing.rows.length > 0) {
       return res.status(400).json({ error: 'User with this mobile number or email already exists' });
     }
@@ -52,18 +64,32 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   try {
     const { mobileOrEmail, password } = req.body;
 
-    const cleanIdentifier = String(mobileOrEmail).trim().toLowerCase();
-    const cleanMobile = String(mobileOrEmail).trim();
-    const sql = `SELECT * FROM users WHERE mobile = ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`;
-    let resUser = await query(sql, [cleanMobile, cleanIdentifier]);
+    const rawInput = String(mobileOrEmail).trim();
+    const cleanIdentifier = rawInput.toLowerCase();
+    const digitsOnly = extractDigits(rawInput);
+    const normMobile = normalizeMobile(rawInput);
+
+    const sql = `
+      SELECT * FROM users 
+      WHERE mobile = ? 
+         OR mobile = ? 
+         OR mobile = ?
+         OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)
+      ORDER BY id DESC LIMIT 1
+    `;
+    let resUser = await query(sql, [rawInput, digitsOnly, normMobile, cleanIdentifier]);
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
     // Fallback: If user not found in users table, check department_heads or field_staff table
     if (!user) {
       const dhFallback = await query(
-        `SELECT dh.*, d.name as dept_name, d.code as dept_code FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE LOWER(dh.email) = ? OR dh.phone = ? ORDER BY dh.id DESC LIMIT 1`,
-        [cleanIdentifier, mobileOrEmail.trim()]
+        `SELECT dh.*, d.name as dept_name, d.code as dept_code 
+         FROM department_heads dh 
+         LEFT JOIN departments d ON d.id = dh.department_id 
+         WHERE LOWER(dh.email) = ? OR dh.phone = ? OR dh.phone LIKE ? OR dh.phone LIKE ?
+         ORDER BY dh.id DESC LIMIT 1`,
+        [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`]
       );
       if (dhFallback.rows && dhFallback.rows.length > 0) {
         const dh = dhFallback.rows[0];
@@ -88,8 +114,12 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
         };
       } else {
         const fsFallback = await query(
-          `SELECT fs.*, d.name as dept_name, d.code as dept_code FROM field_staff fs LEFT JOIN departments d ON d.id = fs.department_id WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.employee_id = ? ORDER BY fs.id DESC LIMIT 1`,
-          [cleanIdentifier, mobileOrEmail.trim(), cleanIdentifier]
+          `SELECT fs.*, d.name as dept_name, d.code as dept_code 
+           FROM field_staff fs 
+           LEFT JOIN departments d ON d.id = fs.department_id 
+           WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.phone LIKE ? OR fs.phone LIKE ? OR fs.employee_id = ? 
+           ORDER BY fs.id DESC LIMIT 1`,
+          [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`, rawInput]
         );
         if (fsFallback.rows && fsFallback.rows.length > 0) {
           const fs = fsFallback.rows[0];

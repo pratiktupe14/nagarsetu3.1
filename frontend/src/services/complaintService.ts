@@ -1468,9 +1468,13 @@ export async function purgeAllComplaints(): Promise<boolean> {
 
   // 2. Call backend API purge endpoint
   try {
-    const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE' });
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE', headers });
     if (!res.ok) {
-      await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'POST' });
+      await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'POST', headers });
     }
   } catch (e) {
     console.warn('Backend purge complaints note:', e);

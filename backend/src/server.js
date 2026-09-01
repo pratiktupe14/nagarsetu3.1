@@ -19,9 +19,6 @@ initDatabase()
     await seed7DemoDepartmentHeads();
     await seedServiceStaff();
     app.listen(PORT, () => {
-    await seed7DemoDepartmentHeads();
-    await seedServiceStaff();
-    app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);
       console.log(`=======================================================`);
