@@ -1174,7 +1174,7 @@ export const DepartmentHeadPortal: React.FC = () => {
         // If bulk department list read-back returned stale cache, re-fetch exact complaint directly from primary DB
         try {
           const singleComp = await getComplaintById(String(compObj.id || compObj.complaint_number));
-          if (singleComp && (singleComp.status === 'Staff Assigned' || singleComp.status === 'Assigned' || singleComp.status === 'In Progress')) {
+          if (singleComp && ((singleComp.status as string) === 'Staff Assigned' || (singleComp.status as string) === 'Assigned' || (singleComp.status as string) === 'In Progress')) {
             assignedComp = singleComp;
           } else {
             throw new Error(`Assignment verification failed: Database status read-back returned '${singleComp?.status || assignedComp?.status || 'Submitted'}' instead of 'Staff Assigned'.`);
