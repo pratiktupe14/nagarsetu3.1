@@ -149,6 +149,18 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
 
       if (!departmentId || !departmentName) {
+        const dTargetId = user.department_id || departmentId;
+        if (dTargetId) {
+          const dRes = await query(`SELECT id, name, code FROM departments WHERE id = ? OR code = ?`, [dTargetId, dTargetId]);
+          if (dRes.rows && dRes.rows.length > 0) {
+            departmentId = dRes.rows[0].id;
+            departmentName = dRes.rows[0].name;
+            departmentCode = dRes.rows[0].code;
+          }
+        }
+      }
+
+      if (!departmentId || !departmentName) {
         return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
       }
     } else if (user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer' || user.role === 'field_staff') {

@@ -22,6 +22,7 @@ const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
 
 const seedDefaultUsers = require('../scripts/seedDefaultUsers');
 const seedServiceStaff = require('../scripts/seedServiceStaff');
+const seed7DemoDepartmentHeads = require('../scripts/seedDemoDepartmentHeads');
 
 function initDatabase() {
   return new Promise((resolve) => {
@@ -32,6 +33,7 @@ function initDatabase() {
     const onInitDone = async () => {
       try {
         await seedDefaultUsers(query);
+        await seed7DemoDepartmentHeads(query);
         await seedServiceStaff(query);
       } catch (e) {
         console.warn('[SEED INIT NOTE]', e.message);
