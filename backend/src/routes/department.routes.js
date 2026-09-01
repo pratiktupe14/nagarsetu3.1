@@ -53,6 +53,43 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/department/complaints
+ * Fetch complaints for authenticated Department Head (or all for Admin)
+ */
+router.get('/complaints', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+  try {
+    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    let sql = `
+      SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
+      FROM complaints c
+      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN feedback f ON f.complaint_id = c.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (!isAdmin) {
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(userDeptId || -1, String(userDeptId || -1));
+    } else if (req.query.department_id) {
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(req.query.department_id, String(req.query.department_id));
+    }
+
+    sql += ` ORDER BY c.created_at DESC`;
+
+    const result = await query(sql, params);
+    return res.json({ complaints: result.rows, department_id: userDeptId, department_name: userDeptName });
+  } catch (err) {
+    console.error('Fetch department complaints error:', err);
+    return res.status(500).json({ error: 'Failed to fetch department complaints' });
+  }
+});
+
+/**
  * GET /api/department/staff
  * Fetch service staff for authenticated Department Head (or all for Admin)
  */
@@ -380,11 +417,7 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
   }
 });
 
-/**
- * POST /api/department/staff/:id/deactivate
- * Deactivate staff member (status -> 'inactive')
- */
-router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+const handleStaffDeactivate = async (req, res) => {
   try {
     const staffId = req.params.id;
     const { userDeptId } = await resolveUserDepartment(req);
@@ -408,13 +441,12 @@ router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department
     console.error('Error deactivating staff:', err);
     return res.status(500).json({ error: 'Failed to deactivate staff member' });
   }
-});
+};
 
-/**
- * POST /api/department/staff/:id/activate
- * Activate staff member (status -> 'active')
- */
-router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);
+router.patch('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);
+
+const handleStaffActivate = async (req, res) => {
   try {
     const staffId = req.params.id;
     const { userDeptId } = await resolveUserDepartment(req);
@@ -438,7 +470,10 @@ router.post('/staff/:id/activate', authenticateToken, requireRole(['department_h
     console.error('Error activating staff:', err);
     return res.status(500).json({ error: 'Failed to activate staff member' });
   }
-});
+};
+
+router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);
+router.patch('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);
 
 /**
  * DELETE /api/department/staff/:id
@@ -493,12 +528,21 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const complaint = compRes.rows[0];
 
     // 2. Fetch Selected Staff Member from field_staff (or users fallback)
-    const staffRes = await query(
+    let staffRes = await query(
       `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
        FROM field_staff fs 
-       WHERE fs.id = $1 OR fs.user_id = $1 OR fs.employee_id = $1 OR LOWER(fs.email) = LOWER($1)`,
+       WHERE CAST(fs.user_id AS TEXT) = $1 OR fs.employee_id = $1 OR LOWER(fs.email) = LOWER($1)`,
       [staff_id]
     );
+
+    if (!staffRes.rows || staffRes.rows.length === 0) {
+      staffRes = await query(
+        `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.status 
+         FROM field_staff fs 
+         WHERE CAST(fs.id AS TEXT) = $1`,
+        [staff_id]
+      );
+    }
 
     let staff = staffRes.rows && staffRes.rows.length > 0 ? staffRes.rows[0] : null;
     if (!staff) {
@@ -518,16 +562,15 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: `Cannot assign task: Staff member '${staff.name}' is currently inactive.` });
     }
 
-    // Helper: Normalize department code/id for secure isolation check
     const normDept = (d) => {
       const s = String(d || '').trim().toLowerCase();
       if (s === '1' || s.includes('pwd') || s.includes('road')) return 'PWD';
       if (s === '2' || s.includes('san') || s.includes('waste')) return 'SAN';
       if (s === '3' || s.includes('wtr') || s.includes('water')) return 'WTR';
-      if (s === '4' || s === '7' || s.includes('drn') || s.includes('drain')) return 'DRN';
-      if (s === '5' || s === '4' || s.includes('ele') || s.includes('electric')) return 'ELE';
+      if (s === '4' || s.includes('drn') || s.includes('drain')) return 'DRN';
+      if (s === '5' || s.includes('ele') || s.includes('electric')) return 'ELE';
       if (s === '6' || s.includes('trf') || s.includes('traffic')) return 'TRF';
-      if (s === '7' || s === '6' || s.includes('mnt') || s.includes('maint')) return 'MNT';
+      if (s === '7' || s.includes('mnt') || s.includes('maint')) return 'MNT';
       return s.toUpperCase();
     };
 
@@ -629,29 +672,46 @@ router.post('/verify', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: 'Complaint ID is required' });
     }
 
-    await query(
-      `UPDATE complaints 
-       SET status = $1, 
-           verified_by = $2, 
-           verified_by_name = $3, 
-           verified_at = CURRENT_TIMESTAMP, 
-           updated_at = CURRENT_TIMESTAMP 
-       WHERE CAST(id AS TEXT) = $4 OR complaint_number = $4`,
-      [targetStatus, verified_by || req.user.id, verified_by_name || req.user.name || 'Department Head', complaint_id]
-    );
+    const reworkReason = req.body?.rework_reason || req.body?.reason || '';
+    if (targetStatus === 'Reopened' && reworkReason) {
+      await query(
+        `UPDATE complaints 
+         SET status = $1, 
+             rework_reason = $2, 
+             admin_rejection_reason = $3, 
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE CAST(id AS TEXT) = $4 OR complaint_number = $5`,
+        [targetStatus, reworkReason, reworkReason, String(complaint_id), String(complaint_id)]
+      );
+    } else {
+      await query(
+        `UPDATE complaints 
+         SET status = $1, 
+             verified_by = $2, 
+             verified_by_name = $3, 
+             verified_at = CURRENT_TIMESTAMP, 
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE CAST(id AS TEXT) = $4 OR complaint_number = $5`,
+        [targetStatus, verified_by || req.user.id, verified_by_name || req.user.name || 'Department Head', String(complaint_id), String(complaint_id)]
+      );
+    }
 
     const verifyRes = await query(
-      `SELECT id, complaint_number, status, verified_by_name, updated_at FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
-      [complaint_id]
+      `SELECT id, complaint_number, status, verified_by_name, updated_at FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $2`,
+      [String(complaint_id), String(complaint_id)]
     );
 
     if (!verifyRes.rows || verifyRes.rows.length === 0 || verifyRes.rows[0].status !== targetStatus) {
       return res.status(500).json({ error: 'Verification failed: Database read-back failed' });
     }
 
+    const statusRemark = targetStatus === 'Reopened' 
+      ? `Department Head requested rework: ${reworkReason}` 
+      : `Department Head verified repair proof and resolved ticket.`;
+
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
-      [complaint_id, targetStatus, `Department Head verified repair proof and resolved ticket.`, 'Department Operations', req.user.name || 'Department Head']
+      [complaint_id, targetStatus, statusRemark, 'Department Operations', req.user.name || 'Department Head']
     ).catch(() => {});
 
     return res.json({

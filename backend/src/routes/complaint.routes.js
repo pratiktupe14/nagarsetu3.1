@@ -81,58 +81,57 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
   const inputStr = String(deptInput || '').trim();
   const catStr = String(categoryInput || '').trim();
   const titleStr = String(titleInput || '').trim();
-  const combined = `${inputStr} ${catStr} ${titleStr}`.toLowerCase();
 
-  // 1. Check direct numeric ID if valid in departments table
+  // 1. Direct numeric ID lookup in database
   const numericId = parseInt(inputStr, 10);
   if (!isNaN(numericId) && numericId > 0) {
-    const idRes = await query(`SELECT id FROM departments WHERE id = ? LIMIT 1`, [numericId]);
+    const idRes = await query(`SELECT id FROM departments WHERE id = $1 LIMIT 1`, [numericId]);
     if (idRes.rows && idRes.rows.length > 0) {
       return idRes.rows[0].id;
     }
   }
 
-  // 2. Direct exact or LIKE search by department name in DB
+  // 2. Direct exact or LIKE search by department code or name in DB
   if (inputStr) {
-    const nameRes = await query(`SELECT id FROM departments WHERE name LIKE ? OR description LIKE ? LIMIT 1`, [`%${inputStr}%`, `%${inputStr}%`]);
-    if (nameRes.rows && nameRes.rows.length > 0) {
-      return nameRes.rows[0].id;
+    const codeRes = await query(
+      `SELECT id FROM departments WHERE UPPER(code) = UPPER($1) OR UPPER(name) LIKE UPPER($2) OR UPPER(description) LIKE UPPER($2) LIMIT 1`,
+      [inputStr, `%${inputStr}%`]
+    );
+    if (codeRes.rows && codeRes.rows.length > 0) {
+      return codeRes.rows[0].id;
     }
   }
 
-  // 3. Match by department keywords against database names
+  // 3. Resolve department CODE dynamically from taxonomy keywords
+  const combined = `${catStr} ${titleStr}`.toLowerCase();
+  let resolvedCode = null;
+
   if (combined.includes('electric') || combined.includes('light') || combined.includes('street light') || combined.includes('ele')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Electric%' OR name LIKE '%Light%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('sanitat') || combined.includes('waste') || combined.includes('garbage') || combined.includes('san')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Sanitation%' OR name LIKE '%Waste%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('water') || combined.includes('pipeline') || combined.includes('leak') || combined.includes('wtr')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Water%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('drain') || combined.includes('sewag') || combined.includes('sewer') || combined.includes('drn')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Drain%' OR name LIKE '%Sewer%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('traffic') || combined.includes('signal') || combined.includes('trf')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Traffic%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('pothole') || combined.includes('road') || combined.includes('public works') || combined.includes('pwd')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Public Works%' OR name LIKE '%PWD%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
-  }
-  if (combined.includes('mainten') || combined.includes('building') || combined.includes('mnt')) {
-    const r = await query(`SELECT id FROM departments WHERE name LIKE '%Maintenance%' LIMIT 1`);
-    if (r.rows && r.rows.length > 0) return r.rows[0].id;
+    resolvedCode = 'ELE';
+  } else if (combined.includes('sanitat') || combined.includes('waste') || combined.includes('garbage') || combined.includes('dustbin') || combined.includes('san')) {
+    resolvedCode = 'SAN';
+  } else if (combined.includes('water') || combined.includes('pipeline') || combined.includes('leak') || combined.includes('wtr')) {
+    resolvedCode = 'WTR';
+  } else if (combined.includes('drain') || combined.includes('sewag') || combined.includes('sewer') || combined.includes('drn')) {
+    resolvedCode = 'DRN';
+  } else if (combined.includes('traffic') || combined.includes('signal') || combined.includes('trf')) {
+    resolvedCode = 'TRF';
+  } else if (combined.includes('pothole') || combined.includes('road') || combined.includes('asphalt') || combined.includes('public works') || combined.includes('pwd')) {
+    resolvedCode = 'PWD';
+  } else if (combined.includes('mainten') || combined.includes('building') || combined.includes('facility') || combined.includes('mnt')) {
+    resolvedCode = 'MNT';
   }
 
-  // 4. Default fallback to lowest department ID
-  const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
-  return fallbackRes.rows?.[0]?.id || 1;
+  // 4. If code resolved, fetch actual database departments.id
+  if (resolvedCode) {
+    const dbCodeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) LIMIT 1`, [resolvedCode]);
+    if (dbCodeRes.rows && dbCodeRes.rows.length > 0) {
+      return dbCodeRes.rows[0].id;
+    }
+  }
+
+  // Return null if department cannot be resolved (no fallback ID or PWD default)
+  return null;
 }
 
 // Step 2: Final Complaint Submission
@@ -155,6 +154,10 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const finalDeptId = await resolveDepartmentId(department_id, category, title);
+
+    if (!finalDeptId) {
+      return res.status(400).json({ error: 'Validation Error: Unable to resolve a valid municipal department for this complaint. Please select a valid department.' });
+    }
 
 
 
@@ -202,7 +205,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     return res.status(201).json({
       message: 'Complaint submitted successfully',
       complaint_id: complaintId,
-      complaint_number: finalComplaintNumber
+      complaint_number: finalComplaintNumber,
+      department_id: finalDeptId
     });
   } catch (err) {
     console.error('Submit complaint error:', err);
@@ -227,20 +231,54 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all complaints for Admin / Portals
+// Get all complaints for Admin (all departments) or Department Head (isolated by department_id)
 router.get('/', async (req, res) => {
   try {
-    const sql = `
-      SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
+    const jwt = require('jsonwebtoken');
+    const { JWT_SECRET } = require('../middleware/auth');
+
+    let authUser = null;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        authUser = jwt.verify(token, JWT_SECRET);
+      } catch (e) {}
+    }
+
+    let sql = `
+      SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      ORDER BY c.created_at DESC
+      WHERE 1=1
     `;
-    const result = await query(sql);
+    const params = [];
+
+    // Server-side Department Isolation for Department Head
+    if (authUser && authUser.role === 'department_head') {
+      let deptId = authUser.department_id;
+      if (!deptId) {
+        const uRes = await query('SELECT department_id FROM users WHERE id = $1 OR email = $2', [authUser.id, authUser.email || '']);
+        if (uRes.rows && uRes.rows.length > 0) deptId = uRes.rows[0].department_id;
+      }
+      if (!deptId) {
+        const dhRes = await query('SELECT department_id FROM department_heads WHERE (user_id = $1 OR LOWER(email) = LOWER($2)) AND status = \'active\'', [authUser.id, authUser.email || '']);
+        if (dhRes.rows && dhRes.rows.length > 0) deptId = dhRes.rows[0].department_id;
+      }
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(deptId || -1, String(deptId || -1));
+    } else if (req.query.department_id) {
+      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      params.push(req.query.department_id, String(req.query.department_id));
+    }
+
+    sql += ` ORDER BY c.created_at DESC`;
+
+    const result = await query(sql, params);
     return res.json({ complaints: result.rows });
   } catch (err) {
-    console.error('Fetch all complaints error:', err);
+    console.error('Fetch complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
   }
 });
@@ -320,7 +358,6 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
-
 // Purge/remove all complaints and associated records
 router.delete('/purge-all', async (req, res) => {
   try {

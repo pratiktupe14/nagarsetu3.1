@@ -776,7 +776,8 @@ export async function submitStaffResolution(
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
-      const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(complaintId)}/resolve`;
+      const targetParam = comp?.complaint_number || complaintId;
+      const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetParam)}/resolve`;
       const apiRes = await fetch(targetApiUrl, {
         method: 'POST',
         headers: {
@@ -784,6 +785,8 @@ export async function submitStaffResolution(
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          complaint_number: comp?.complaint_number || complaintId,
+          complaint_id: comp?.id || complaintId,
           photo_after_url: photoAfterUrl,
           work_performed: workPerformed,
           materials_used: materialsUsed || '',
@@ -1251,6 +1254,34 @@ export async function requestReworkDepartmentHead(
   headName: string
 ): Promise<boolean> {
   const nowIso = new Date().toISOString();
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        verified_by_name: headName,
+        status: 'Reopened',
+        rework_reason: reworkReason
+      })
+    });
+    if (!apiRes.ok) {
+      const errJson = await apiRes.json().catch(() => ({}));
+      throw new Error(errJson.error || `Server rework request failed (HTTP ${apiRes.status}).`);
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('failed') || apiErr.message.includes('Server'))) {
+      throw apiErr;
+    }
+    console.warn('Backend rework task API fallback:', apiErr);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
@@ -1311,7 +1342,7 @@ export async function approveResolutionDepartmentHead(
   // 1. Try Express backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    await fetch(`${getApiUrl()}/api/department/verify`, {
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1324,8 +1355,15 @@ export async function approveResolutionDepartmentHead(
         status: 'Resolved'
       })
     });
-  } catch (e) {
-    // Graceful fallback
+    if (!apiRes.ok) {
+      const errJson = await apiRes.json().catch(() => ({}));
+      throw new Error(errJson.error || `Server verification failed (HTTP ${apiRes.status}).`);
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('failed') || apiErr.message.includes('Server'))) {
+      throw apiErr;
+    }
+    console.warn('Backend verify task API fallback:', apiErr);
   }
 
   // 2. Try Supabase if configured

@@ -56,7 +56,7 @@ export const ReportIssuePage: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [priority, setPriority] = useState<PriorityLevel>('Medium');
-  const [department, setDepartment] = useState<string>('Roads & Public Works Department (PWD)');
+  const [department, setDepartment] = useState<string>('Public Works Department');
   const [isManuallyEdited, setIsManuallyEdited] = useState<boolean>(false);
 
   // Location States

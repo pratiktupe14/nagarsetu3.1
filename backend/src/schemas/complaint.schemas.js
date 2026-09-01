@@ -8,7 +8,7 @@ const createComplaintSchema = {
     title: Joi.string().min(3).max(200).required(),
     description: Joi.string().max(2000).allow('', null).optional(),
     priority: Joi.string().valid('Low', 'Medium', 'High', 'Critical').default('Medium'),
-    department_id: Joi.number().integer().positive().allow(null).optional(),
+    department_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
     latitude: Joi.number().min(-90).max(90).required(),
     longitude: Joi.number().min(-180).max(180).required(),
     location_source: Joi.string().allow('', null).optional(),
@@ -19,7 +19,21 @@ const createComplaintSchema = {
 
 const updateStatusSchema = {
   body: Joi.object({
-    status: Joi.string().valid('Submitted', 'Assigned', 'In Progress', 'Resolved', 'Reopened', 'Overdue').required(),
+    status: Joi.string().valid(
+      'Submitted',
+      'Verified',
+      'Approved',
+      'Department Assigned',
+      'Staff Assigned',
+      'Accepted',
+      'On the Way',
+      'In Progress',
+      'Resolution Submitted',
+      'Resolved',
+      'Reopened',
+      'Rejected',
+      'Overdue'
+    ).required(),
     remark: Joi.string().max(1000).allow('', null).optional(),
     department: Joi.string().max(150).allow('', null).optional()
   }),
