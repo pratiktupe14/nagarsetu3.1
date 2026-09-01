@@ -15,7 +15,7 @@ console.log(`[NAGARSETU AI] Gemini API configured: ${Boolean(GEMINI_API_KEY)}`);
  */
 router.get('/health', async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
+  const model = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
 
   if (!key || key.trim() === '' || key === 'your_gemini_api_key_here') {
     console.error('[NAGARSETU AI Health Check] Failed: GEMINI_API_KEY missing or unconfigured in environment.');

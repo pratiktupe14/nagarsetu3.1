@@ -18,6 +18,7 @@ import {
   getAllServiceStaffRecords, formatSlaRemainingTime, ServiceStaffMemberRecord,
   getDepartmentServiceStaff, getStaffMemberById
 } from '../../services/adminService';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   getNotificationsForRole, pushNotification, markNotificationAsRead,
   markAllNotificationsAsRead
@@ -1280,12 +1281,11 @@ export const DepartmentHeadPortal: React.FC = () => {
     const compToApprove = reviewModalComplaint || detailModalComplaint;
     if (!compToApprove) return;
 
-    // Security Department Isolation Check
-    const normDept = (d: string) => (d || '').split('(')[0].trim().toLowerCase();
-    const cDept = normDept(compToApprove.department_name || compToApprove.category);
-    const hDept = normDept(headDepartmentFull);
+    // Security Department Isolation Check using unified resolveDepartmentInfo
+    const cDept = resolveDepartmentInfo(compToApprove.department_id, compToApprove.department_name, compToApprove.category);
+    const hDept = resolveDepartmentInfo(headDeptId, headDepartmentFull || user?.department_name);
 
-    if (cDept && hDept && !cDept.includes(hDept) && !hDept.includes(cDept)) {
+    if (cDept.code !== 'ALL' && hDept.code !== 'ALL' && cDept.code !== hDept.code) {
       alert(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
       return;
     }
