@@ -20,11 +20,22 @@ let useSqlite = false;
 
 const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
 
+const seedDefaultUsers = require('../scripts/seedDefaultUsers');
+
 function initDatabase() {
   return new Promise((resolve) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const dbUrl = process.env.DATABASE_URL;
     const isPostgres = (DB_TYPE === 'postgres' || isProduction) && Boolean(dbUrl);
+
+    const onInitDone = async () => {
+      try {
+        await seedDefaultUsers(query);
+      } catch (e) {
+        console.warn('[SEED INIT NOTE]', e.message);
+      }
+      resolve();
+    };
 
     if (isPostgres && dbUrl) {
       console.log('Connecting to PostgreSQL database...');
@@ -37,22 +48,22 @@ function initDatabase() {
         pgPool.query('SELECT NOW()', (err, res) => {
           if (err) {
             console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback):', err.message);
-            setupSqlite(resolve, resolve);
+            setupSqlite(onInitDone, onInitDone);
           } else {
             console.log('PostgreSQL connected successfully.');
-            createTablesPostgres().then(resolve).catch(e => {
+            createTablesPostgres().then(onInitDone).catch(e => {
               console.warn('[DATABASE TABLE INIT NOTE]', e.message);
-              setupSqlite(resolve, resolve);
+              setupSqlite(onInitDone, onInitDone);
             });
           }
         });
       } catch (e) {
         console.warn('[DATABASE POOL INIT NOTE]', e.message);
-        setupSqlite(resolve, resolve);
+        setupSqlite(onInitDone, onInitDone);
       }
     } else {
       console.log('Initializing local/serverless development SQLite/Mem database...');
-      setupSqlite(resolve, resolve);
+      setupSqlite(onInitDone, onInitDone);
     }
   });
 }
