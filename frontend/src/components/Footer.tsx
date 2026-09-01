@@ -10,10 +10,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-600">
         
         <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold">
-            <Shield className="w-4 h-4" />
-          </div>
-          <span className="font-extrabold text-gray-900 font-outfit">NAGARSETU</span>
+          <img src="/logo.png" alt="NAGARSETU" className="h-8 w-auto object-contain" />
           <span className="text-gray-400">•</span>
           <span>{t('governancePlatform')}</span>
         </div>

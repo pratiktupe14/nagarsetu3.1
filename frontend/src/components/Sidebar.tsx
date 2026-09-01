@@ -371,20 +371,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="space-y-6 px-3">
         {/* NAGARSETU LOGO & ROLE BADGE */}
         <div className="flex flex-col space-y-2 pb-4 border-b border-gray-100">
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-emerald-700 transition-colors font-outfit shrink-0">
-              NS
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col overflow-hidden">
-                <span className="font-extrabold text-base text-gray-900 tracking-tight leading-none font-outfit truncate">
-                  NAGARSETU
-                </span>
-                <span className="text-[9px] uppercase tracking-wider text-emerald-700 font-bold font-mono">
-                  Civic Platform
-                </span>
-              </div>
-            )}
+          <Link to="/" className="flex items-center space-x-2 group">
+            <img
+              src="/logo.png"
+              alt="NAGARSETU"
+              className={`h-9 w-auto object-contain transition-transform group-hover:scale-105 ${isCollapsed ? 'mx-auto' : 'max-w-[180px]'}`}
+            />
           </Link>
 
           {!isCollapsed && (

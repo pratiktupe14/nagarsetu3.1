@@ -36,18 +36,12 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-emerald-700 transition-colors font-outfit">
-              NS
-            </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-lg text-gray-900 tracking-tight leading-none font-outfit">
-                NAGARSETU
-              </span>
-              <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold font-mono hidden sm:block">
-                Civic Platform
-              </span>
-            </div>
+          <Link to="/" className="flex items-center space-x-2 group py-1">
+            <img
+              src="/logo.png"
+              alt="NAGARSETU Civic Platform"
+              className="h-11 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105 max-w-[210px] sm:max-w-[270px]"
+            />
           </Link>
 
           {/* Center Navigation Links */}

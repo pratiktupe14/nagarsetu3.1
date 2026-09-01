@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import {
   Sparkles, Building2, ArrowRight, User, Wrench, ShieldCheck
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const { t, translateCategory } = useLanguage();
+  const { user } = useAuth();
+
+  const reportTarget = user ? '/citizen/report' : '/login?role=citizen';
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col justify-between">
@@ -177,7 +181,7 @@ export const LandingPage: React.FC = () => {
               {t('landingHeroSubtitle')}
             </p>
             <Link
-              to="/citizen/portal"
+              to={reportTarget}
               className="inline-flex items-center space-x-2 px-8 py-3.5 rounded-2xl bg-white text-emerald-700 font-extrabold text-xs uppercase tracking-wider shadow-sm hover:bg-emerald-50 transition-colors min-h-[44px]"
             >
               <span>{t('reportComplaint')}</span>
