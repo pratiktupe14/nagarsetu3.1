@@ -446,6 +446,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                             onClick={() => setViewingStaff(staff)}
                             className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                             title="View Staff Profile"
+                            aria-label={`View profile for ${staff.name}`}
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
@@ -457,6 +458,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                               onClick={() => handleOpenEdit(staff)}
                               className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                               title="Edit Staff Member"
+                              aria-label={`Edit ${staff.name}`}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span>Edit</span>
@@ -469,6 +471,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                               onClick={() => setDeactivateConfirmId(staff)}
                               className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                               title="Deactivate Staff"
+                              aria-label={`Deactivate ${staff.name}`}
                             >
                               <UserX className="w-3.5 h-3.5" />
                               <span>Deactivate</span>

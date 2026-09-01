@@ -84,7 +84,7 @@ export const FormPromptModal: React.FC<FormPromptModalProps> = ({
       aria-labelledby="prompt-dialog-title"
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200 font-sans"
     >
-      <div className="relative bg-white rounded-3xl border border-gray-200 shadow-2xl max-w-lg w-full p-6 space-y-5 transform transition-all animate-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-3xl border border-gray-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 transform transition-all animate-in zoom-in-95 duration-200">
         
         {/* CLOSE BUTTON */}
         <button
