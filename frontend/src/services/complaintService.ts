@@ -150,41 +150,32 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     }
   }
 
-  // 3. Merge with LocalStorage cached complaints (DB state takes absolute precedence)
-  const localAll = getStoredComplaints();
-  const dbMap = new Map<string, Complaint>();
-
-  list.forEach((c) => {
-    const key = c.complaint_number || String(c.id);
-    if (key) dbMap.set(key, c);
-  });
-
-  localAll.forEach((loc) => {
-    const key = loc.complaint_number || String(loc.id);
-    if (!key) return;
-    const dbRecord = dbMap.get(key);
-    if (!dbRecord) {
-      // Local draft not yet synced to backend
-      dbMap.set(key, loc);
-    } else {
-      // DB Record exists: Keep DB status, staff assignment, and timestamps as authoritative truth
-      dbMap.set(key, {
-        ...loc,
-        ...dbRecord, // DB overrides local
-        // Preserve local photo preview URLs if DB doesn't have public URLs yet
-        photo_before_url: dbRecord.photo_before_url || loc.photo_before_url,
-        photo_after_url: dbRecord.photo_after_url || loc.photo_after_url
-      });
-    }
-  });
-
-  const mergedList = Array.from(dbMap.values()).sort(
-    (a, b) => new Date(b.updated_at || b.created_at || Date.now()).getTime() - new Date(a.updated_at || a.created_at || Date.now()).getTime()
-  );
-
-  const { repairedComplaints } = await auditAndRepairComplaintLocations(mergedList);
-  const cleanList = repairedComplaints.filter((c) => !isDemoComplaint(c));
-  saveStoredComplaints(cleanList);
+  // 3. DB state is authoritative when backend or Supabase query succeeds
+  let finalComplaints: Complaint[] = [];
+  if (responseStatus === 200) {
+    const { repairedComplaints } = await auditAndRepairComplaintLocations(list);
+    finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
+    saveStoredComplaints(finalComplaints);
+  } else {
+    // Offline fallback: Merge local cached complaints
+    const localAll = getStoredComplaints();
+    const dbMap = new Map<string, Complaint>();
+    list.forEach((c) => {
+      const key = c.complaint_number || String(c.id);
+      if (key) dbMap.set(key, c);
+    });
+    localAll.forEach((loc) => {
+      const key = loc.complaint_number || String(loc.id);
+      if (!key) return;
+      if (!dbMap.has(key)) dbMap.set(key, loc);
+    });
+    const mergedList = Array.from(dbMap.values()).sort(
+      (a, b) => new Date(b.updated_at || b.created_at || Date.now()).getTime() - new Date(a.updated_at || a.created_at || Date.now()).getTime()
+    );
+    const { repairedComplaints } = await auditAndRepairComplaintLocations(mergedList);
+    finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
+    saveStoredComplaints(finalComplaints);
+  }
 
   // Development Diagnostic Logging
   console.log('[ADMIN DATA SYNC]', {
@@ -192,12 +183,11 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     fetchTime: startTime,
     responseStatus,
     databaseRecordCount: list.length,
-    lastUpdatedRecord: cleanList[0]?.updated_at || cleanList[0]?.created_at || 'N/A',
-    localCacheUsed: localAll.length > 0,
-    finalRecordCount: cleanList.length
+    lastUpdatedRecord: finalComplaints[0]?.updated_at || finalComplaints[0]?.created_at || 'N/A',
+    finalRecordCount: finalComplaints.length
   });
 
-  return cleanList;
+  return finalComplaints;
 }
 
 // Fetch citizen complaints from backend API, Supabase & LocalStorage
@@ -214,7 +204,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.complaints)) {
-          list = data.complaints as Complaint[];
+          return (data.complaints as Complaint[]).filter((c) => !isDemoComplaint(c));
         }
       }
     }
