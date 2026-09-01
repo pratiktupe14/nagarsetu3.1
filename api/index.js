@@ -1,8 +1,12 @@
 const app = require('../backend/src/app');
 const { initDatabase } = require('../backend/src/config/db');
 
-if (initDatabase) {
-  initDatabase().catch(err => console.warn('[SERVERLESS INIT NOTE]', err.message));
-}
+let initPromise = null;
 
-module.exports = app;
+module.exports = async (req, res) => {
+  if (!initPromise) {
+    initPromise = initDatabase().catch(err => console.warn('[SERVERLESS INIT NOTE]', err.message));
+  }
+  await initPromise;
+  return app(req, res);
+};
