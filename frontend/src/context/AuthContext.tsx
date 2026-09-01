@@ -226,12 +226,12 @@ export function getPortalForRole(role: UserRole): string {
 }
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile>(() => {
+  const [user, setUser] = useState<UserProfile | null>(() => {
     const cached = localStorage.getItem('nagarsetu_user');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.role) {
+        if (parsed && parsed.role && parsed.id) {
           if (parsed.role === 'service_staff' && (!parsed.department_id || !parsed.department_name)) {
             const resolved = findServiceStaffByIdentifier(parsed.email || parsed.employee_id || parsed.id || '');
             if (resolved) {
@@ -243,7 +243,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (e) {}
     }
-    return DEFAULT_ROLE_USERS.citizen;
+    return null;
   });
 
   const [loading, setLoading] = useState(true);
@@ -663,14 +663,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (targetRole === 'service_staff') {
-        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
-        setUser(staffUser);
-        localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
-        return true;
+        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
+        if (staffUser) {
+          setUser(staffUser);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+          return true;
+        }
       }
 
-      switchRole(targetRole);
-      return true;
+      throw new Error("Invalid login credentials. Please check your username/email and password.");
     } catch (e: any) {
       console.warn('Supabase Auth Login error:', e);
       throw e;
@@ -798,7 +799,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     localStorage.removeItem('nagarsetu_user');
     localStorage.removeItem('nagarsetu_token');
-    switchRole('citizen');
+    setUser(null);
   };
 
   if (loading) {
