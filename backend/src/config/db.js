@@ -27,7 +27,7 @@ const seed7DemoDepartmentHeads = require('../scripts/seedDemoDepartmentHeads');
 function initDatabase() {
   return new Promise((resolve) => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const dbUrl = process.env.DATABASE_URL;
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING;
     const isPostgres = (DB_TYPE === 'postgres' || isProduction) && Boolean(dbUrl);
 
     const onInitDone = async () => {
@@ -633,6 +633,10 @@ function runMemQuery(sql, params = []) {
     let list = memStore[targetTable] || [];
     if (params && params.length > 0) {
       const pStr = params.map(p => String(p).trim().toLowerCase().replace(/^%|%$/g, ''));
+      const isDeptQuery = upper.includes('DEPARTMENT_ID');
+      const isCitizenQuery = upper.includes('CITIZEN_ID');
+      const isIdQuery = upper.includes('WHERE C.ID =') || upper.includes('WHERE ID =') || upper.includes('WHERE CAST(C.ID');
+
       const filtered = list.filter(item => {
         if (!item) return false;
         const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
@@ -645,6 +649,17 @@ function runMemQuery(sql, params = []) {
         const itemName = item.name ? String(item.name).trim().toLowerCase() : '';
         const itemEmpId = item.employee_id ? String(item.employee_id).trim().toLowerCase() : '';
         const itemNumber = item.complaint_number ? String(item.complaint_number).trim().toLowerCase() : '';
+
+        if (isDeptQuery) {
+          return pStr.some(p => p !== '' && itemDeptId === p);
+        }
+        if (isCitizenQuery) {
+          return pStr.some(p => p !== '' && itemCitizenId === p);
+        }
+        if (isIdQuery) {
+          return pStr.some(p => p !== '' && (itemId === p || itemNumber === p));
+        }
+
         return pStr.some(p => p !== '' && (
           itemMobile === p || 
           itemEmail === p || 
