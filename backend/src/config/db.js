@@ -4,11 +4,15 @@ const fs = require('fs');
 
 let sqlite3 = null;
 function getSqlite3() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return null;
+  }
   if (!sqlite3) {
     try {
       sqlite3 = require('sqlite3').verbose();
     } catch (e) {
       console.warn('[SQLITE NOTE] sqlite3 native module not loaded:', e.message);
+      return null;
     }
   }
   return sqlite3;
