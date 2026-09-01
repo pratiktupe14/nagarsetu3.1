@@ -17,6 +17,7 @@ const mapsRoutes = require('./routes/maps.routes');
 const aiRoutes = require('./routes/ai.routes');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security Headers & Core Middleware
 const allowedOrigins = [
