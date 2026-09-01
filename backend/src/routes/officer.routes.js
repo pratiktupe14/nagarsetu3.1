@@ -109,22 +109,44 @@ router.get('/staff-list', async (req, res) => {
 // Verify & Approve / Reject Complaint
 router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {
   try {
-    const { complaint_id, action, rejection_reason } = req.body;
+    const { complaint_id, action, rejection_reason, corrected_category, corrected_department_id } = req.body;
 
-    const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [complaint_id]);
+    const compRes = await query(`SELECT citizen_id, category, department_id FROM complaints WHERE id = ?`, [complaint_id]);
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
-    const citizenId = compRes.rows[0].citizen_id;
+    const complaint = compRes.rows[0];
+    const citizenId = complaint.citizen_id;
 
     if (action === 'approve') {
-      await query(`UPDATE complaints SET status = 'Verified', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [complaint_id]);
+      let updateSql = `UPDATE complaints SET status = 'Verified', needs_manual_verification = 0, updated_at = CURRENT_TIMESTAMP`;
+      const updateParams = [];
+
+      if (corrected_category) {
+        updateSql += `, category = ?`;
+        updateParams.push(corrected_category);
+      }
+      if (corrected_department_id) {
+        updateSql += `, department_id = ?`;
+        updateParams.push(corrected_department_id);
+      }
+
+      updateSql += ` WHERE id = ?`;
+      updateParams.push(complaint_id);
+
+      await query(updateSql, updateParams);
+
+      const remarkText = (corrected_category || corrected_department_id)
+        ? `Complaint verified and approved with officer corrections (Category: ${corrected_category || complaint.category}).`
+        : 'Complaint verified and approved by municipal officer.';
+
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaint_id, 'Verified', 'Complaint verified and approved by municipal officer.', 'Municipal Review', req.user.name || 'Municipal Officer']
+        [complaint_id, 'Verified', remarkText, 'Municipal Review', req.user.name || 'Municipal Officer']
       ).catch(() => {});
+
       await notifyStatusChange(complaint_id, 'Verified', citizenId);
-      return res.json({ message: 'Complaint verified and approved' });
+      return res.json({ message: 'Complaint verified and approved', verified: true });
     } else if (action === 'reject') {
       await query(`UPDATE complaints SET status = 'Rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [complaint_id]);
       await query(

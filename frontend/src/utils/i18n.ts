@@ -1236,6 +1236,11 @@ export function translateStatus(status?: string, lang: SupportedLanguage = 'en')
   const normalized = status.trim().toLowerCase();
   
   if (normalized === 'submitted') return t('statusSubmitted', lang);
+  if (normalized === 'needs_verification' || normalized === 'needs verification') {
+    if (lang === 'hi') return 'सत्यापन आवश्यक';
+    if (lang === 'mr') return 'पडताळणी आवश्यक';
+    return 'Needs Verification';
+  }
   if (normalized === 'verified') return t('statusVerified', lang);
   if (normalized === 'approved') return t('statusApproved', lang);
   if (normalized === 'department assigned' || normalized === 'dept_assigned') return t('statusDeptAssigned', lang);

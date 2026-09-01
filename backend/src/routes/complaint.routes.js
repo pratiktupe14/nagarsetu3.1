@@ -10,6 +10,8 @@ const { resolveLocation, checkForDuplicates } = require('../services/locationSer
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
+const { normalizeCategory, getDepartmentForCategory, normalizeSpecificIssue } = require('../services/taxonomyService');
+
 // No-cache middleware for dynamic complaint data
 router.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -78,60 +80,45 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
 });
 
 async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
-  const inputStr = String(deptInput || '').trim();
-  const catStr = String(categoryInput || '').trim();
-  const titleStr = String(titleInput || '').trim();
+  // Authoritative taxonomy lookup using normalized category
+  const normalizedCategory = normalizeCategory(categoryInput || titleInput);
+  const deptInfo = getDepartmentForCategory(normalizedCategory);
 
-  // 1. Direct numeric ID lookup in database
-  const numericId = parseInt(inputStr, 10);
-  if (!isNaN(numericId) && numericId > 0) {
-    const idRes = await query(`SELECT id FROM departments WHERE id = $1 LIMIT 1`, [numericId]);
-    if (idRes.rows && idRes.rows.length > 0) {
-      return idRes.rows[0].id;
-    }
-  }
-
-  // 2. Direct exact or LIKE search by department code or name in DB
-  if (inputStr) {
-    const codeRes = await query(
-      `SELECT id FROM departments WHERE UPPER(code) = UPPER($1) OR UPPER(name) LIKE UPPER($2) OR UPPER(description) LIKE UPPER($2) LIMIT 1`,
-      [inputStr, `%${inputStr}%`]
-    );
+  // 1. Direct database lookup by department code (e.g., PWD, SAN, WTR, DRN, ELE, TRF, MNT)
+  if (deptInfo && deptInfo.code) {
+    const codeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) LIMIT 1`, [deptInfo.code]);
     if (codeRes.rows && codeRes.rows.length > 0) {
       return codeRes.rows[0].id;
     }
   }
 
-  // 3. Resolve department CODE dynamically from taxonomy keywords
-  const combined = `${catStr} ${titleStr}`.toLowerCase();
-  let resolvedCode = null;
-
-  if (combined.includes('electric') || combined.includes('light') || combined.includes('street light') || combined.includes('ele')) {
-    resolvedCode = 'ELE';
-  } else if (combined.includes('sanitat') || combined.includes('waste') || combined.includes('garbage') || combined.includes('dustbin') || combined.includes('san')) {
-    resolvedCode = 'SAN';
-  } else if (combined.includes('water') || combined.includes('pipeline') || combined.includes('leak') || combined.includes('wtr')) {
-    resolvedCode = 'WTR';
-  } else if (combined.includes('drain') || combined.includes('sewag') || combined.includes('sewer') || combined.includes('drn')) {
-    resolvedCode = 'DRN';
-  } else if (combined.includes('traffic') || combined.includes('signal') || combined.includes('trf')) {
-    resolvedCode = 'TRF';
-  } else if (combined.includes('pothole') || combined.includes('road') || combined.includes('asphalt') || combined.includes('public works') || combined.includes('pwd')) {
-    resolvedCode = 'PWD';
-  } else if (combined.includes('mainten') || combined.includes('building') || combined.includes('facility') || combined.includes('mnt')) {
-    resolvedCode = 'MNT';
-  }
-
-  // 4. If code resolved, fetch actual database departments.id
-  if (resolvedCode) {
-    const dbCodeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) LIMIT 1`, [resolvedCode]);
-    if (dbCodeRes.rows && dbCodeRes.rows.length > 0) {
-      return dbCodeRes.rows[0].id;
+  // 2. Direct database lookup by department name
+  if (deptInfo && deptInfo.name) {
+    const nameRes = await query(`SELECT id FROM departments WHERE UPPER(name) LIKE UPPER($1) LIMIT 1`, [`%${deptInfo.name}%`]);
+    if (nameRes.rows && nameRes.rows.length > 0) {
+      return nameRes.rows[0].id;
     }
   }
 
-  // Return null if department cannot be resolved (no fallback ID or PWD default)
-  return null;
+  // 3. Fallback: Lookup by user/dept input if provided
+  const inputStr = String(deptInput || '').trim();
+  if (inputStr) {
+    const numericId = parseInt(inputStr, 10);
+    if (!isNaN(numericId) && numericId > 0) {
+      const idRes = await query(`SELECT id FROM departments WHERE id = $1 LIMIT 1`, [numericId]);
+      if (idRes.rows && idRes.rows.length > 0) {
+        return idRes.rows[0].id;
+      }
+    }
+    const flexRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) OR UPPER(name) LIKE UPPER($2) LIMIT 1`, [inputStr, `%${inputStr}%`]);
+    if (flexRes.rows && flexRes.rows.length > 0) {
+      return flexRes.rows[0].id;
+    }
+  }
+
+  // Fallback to PWD (id 1) if database has entries
+  const defaultRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
+  return defaultRes.rows?.[0]?.id || 1;
 }
 
 // Step 2: Final Complaint Submission
@@ -149,64 +136,111 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       location_source,
       location_address,
       department_id,
-      duplicate_of_id
+      duplicate_of_id,
+      ai_category,
+      ai_specific_issue,
+      ai_confidence,
+      ai_severity,
+      ai_urgency,
+      ai_evidence,
+      ai_model,
+      ai_analyzed_at,
+      needs_manual_verification
     } = req.body;
 
+    const normalizedCategory = normalizeCategory(ai_category || category);
     const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-    const finalDeptId = await resolveDepartmentId(department_id, category, title);
+    const finalDeptId = await resolveDepartmentId(department_id, normalizedCategory, title);
 
     if (!finalDeptId) {
-      return res.status(400).json({ error: 'Validation Error: Unable to resolve a valid municipal department for this complaint. Please select a valid department.' });
+      return res.status(400).json({ error: 'Validation Error: Unable to resolve a valid municipal department for this complaint.' });
     }
 
-
+    const confidenceVal = typeof ai_confidence === 'number' ? ai_confidence : 0.90;
+    const isLowConfidence = confidenceVal < 0.80 || needs_manual_verification === true;
+    const initialStatus = isLowConfidence ? 'NEEDS_VERIFICATION' : 'Submitted';
 
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
-        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id
+        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id,
+        ai_category, ai_specific_issue, ai_confidence, ai_severity, ai_urgency, ai_evidence,
+        ai_model, ai_analyzed_at, needs_manual_verification
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
       finalComplaintNumber,
       req.user.id,
       photo_url,
-      category,
-      title,
+      normalizedCategory,
+      title || `${normalizedCategory} Defect`,
       description || '',
       priority,
+      initialStatus,
       finalDeptId,
       latitude,
       longitude,
       location_source || 'manual_pin',
       location_address || '',
-      duplicate_of_id || null
+      duplicate_of_id || null,
+      normalizedCategory,
+      ai_specific_issue || normalizeSpecificIssue(null, normalizedCategory),
+      confidenceVal,
+      (ai_severity || priority).toUpperCase(),
+      (ai_urgency || priority).toUpperCase(),
+      ai_evidence || description || 'Visual evidence recorded.',
+      ai_model || 'gemini-3.6-flash',
+      ai_analyzed_at || new Date().toISOString(),
+      isLowConfidence ? 1 : 0
     ]);
 
     const complaintId = result.rows[0].id;
 
-    // Record initial status history
+    // Fetch department name for status history
+    let deptName = 'Municipal Triage Queue';
     try {
       const deptNameRes = await query(`SELECT name FROM departments WHERE id = ?`, [finalDeptId]);
-      const deptName = deptNameRes.rows?.[0]?.name || 'Municipal Triage Queue';
+      if (deptNameRes.rows && deptNameRes.rows.length > 0) {
+        deptName = deptNameRes.rows[0].name;
+      }
+    } catch (dErr) {}
+
+    // Record initial status history
+    try {
+      const remarkText = isLowConfidence
+        ? 'Complaint registered. Awaiting officer manual verification (Low AI confidence / AI unavailable).'
+        : `Complaint registered and automatically routed to ${deptName} via AI Vision classification.`;
+
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaintId, 'Submitted', 'Complaint registered successfully by citizen.', deptName, 'Citizen']
+        [complaintId, initialStatus, remarkText, deptName, 'NAGARSETU AI Router']
       );
     } catch (hErr) {
       console.warn('Failed to record initial status history:', hErr.message);
     }
 
     // Send initial submission notification
-    await notifyStatusChange(complaintId, 'Submitted', req.user.id);
+    await notifyStatusChange(complaintId, initialStatus, req.user.id);
 
     return res.status(201).json({
+      success: true,
       message: 'Complaint submitted successfully',
-      complaint_id: complaintId,
-      complaint_number: finalComplaintNumber,
-      department_id: finalDeptId
+      complaint: {
+        id: complaintId,
+        complaint_number: finalComplaintNumber,
+        category: normalizedCategory,
+        specific_issue: ai_specific_issue || normalizeSpecificIssue(null, normalizedCategory),
+        urgency: ai_urgency || priority,
+        confidence: confidenceVal,
+        department: {
+          id: finalDeptId,
+          name: deptName
+        },
+        status: initialStatus,
+        needs_manual_verification: isLowConfidence
+      }
     });
   } catch (err) {
     console.error('Submit complaint error:', err);

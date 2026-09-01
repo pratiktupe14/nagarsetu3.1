@@ -296,12 +296,21 @@ export const ReportIssuePage: React.FC = () => {
         title: title || `${category} Issue Reported`,
         description: description || `Civic issue reported via NAGARSETU at ${locationAddress}`,
         priority,
-        status: 'Submitted' as const,
+        status: (aiResult && aiResult.confidence < 0.80) ? ('NEEDS_VERIFICATION' as const) : ('Submitted' as const),
         department_name: department,
         latitude: lat,
         longitude: lng,
         location_source: locationSource,
-        location_address: locationAddress
+        location_address: locationAddress,
+        ai_category: aiResult?.category || category,
+        ai_specific_issue: aiResult?.issue_type || category,
+        ai_confidence: aiResult?.confidence ?? 0.0,
+        ai_severity: aiResult?.priority || priority,
+        ai_urgency: aiResult?.priority || priority,
+        ai_evidence: aiResult?.description || description,
+        ai_model: aiResult?.mode || 'gemini-3.6-flash',
+        ai_analyzed_at: new Date().toISOString(),
+        needs_manual_verification: !aiResult || aiResult.confidence < 0.80 || aiResult.is_available === false
       };
 
       const created = await createComplaint(newComplaintData);

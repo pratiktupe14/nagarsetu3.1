@@ -2,6 +2,7 @@ export type UserRole = 'citizen' | 'city_admin' | 'department_head' | 'service_s
 
 export type ComplaintStatus = 
   | 'Submitted' 
+  | 'NEEDS_VERIFICATION'
   | 'Verified' 
   | 'Approved' 
   | 'Department Assigned' 
@@ -163,6 +164,15 @@ export interface Complaint {
   admin_rejection_reason?: string;
   rating?: number;
   feedback_comment?: string;
+  ai_category?: string;
+  ai_specific_issue?: string;
+  ai_confidence?: number;
+  ai_severity?: string;
+  ai_urgency?: string;
+  ai_evidence?: string;
+  ai_model?: string;
+  ai_analyzed_at?: string;
+  needs_manual_verification?: boolean;
   created_at: string;
   updated_at: string;
 }

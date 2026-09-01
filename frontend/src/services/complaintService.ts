@@ -588,14 +588,27 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
           longitude: newComplaint.longitude,
           location_source: newComplaint.location_source,
           location_address: newComplaint.location_address,
-          department_id: newComplaint.department_id
+          department_id: newComplaint.department_id,
+          ai_category: (newComplaint as any).ai_category || newComplaint.category,
+          ai_specific_issue: (newComplaint as any).ai_specific_issue,
+          ai_confidence: (newComplaint as any).ai_confidence,
+          ai_severity: (newComplaint as any).ai_severity,
+          ai_urgency: (newComplaint as any).ai_urgency,
+          ai_evidence: (newComplaint as any).ai_evidence,
+          ai_model: (newComplaint as any).ai_model,
+          ai_analyzed_at: (newComplaint as any).ai_analyzed_at,
+          needs_manual_verification: (newComplaint as any).needs_manual_verification
         })
       });
       if (res.ok) {
         const bData = await res.json();
         if (bData) {
-          if (bData.complaint_id) newComplaint.id = String(bData.complaint_id);
-          if (bData.complaint_number) newComplaint.complaint_number = bData.complaint_number;
+          const compInfo = bData.complaint || bData;
+          if (compInfo.id || bData.complaint_id) newComplaint.id = String(compInfo.id || bData.complaint_id);
+          if (compInfo.complaint_number || bData.complaint_number) newComplaint.complaint_number = compInfo.complaint_number || bData.complaint_number;
+          if (compInfo.status) newComplaint.status = compInfo.status;
+          if (compInfo.department?.id) newComplaint.department_id = compInfo.department.id;
+          if (compInfo.department?.name) newComplaint.department_name = compInfo.department.name;
         }
       }
     }
