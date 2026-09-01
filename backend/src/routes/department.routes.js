@@ -662,7 +662,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     return res.json({
       success: true,
-      message: `Task successfully assigned to ${staff.name}`,
+      message: `Task successfully assigned to ${staff.name} [V2]`,
       complaint_id: verifiedRecord.id,
       complaint_number: verifiedRecord.complaint_number,
       staff_id: assignedStaffId,
