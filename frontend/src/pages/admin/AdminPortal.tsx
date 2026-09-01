@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -37,6 +38,7 @@ const DEPARTMENT_OPTIONS = [
 
 export const AdminPortal: React.FC = () => {
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
+  const { toast } = useNotification();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,7 +97,7 @@ export const AdminPortal: React.FC = () => {
     if (!selectedComplaint) return;
     setSubmittingAction(true);
     await verifyAndApproveComplaint(selectedComplaint.id, editPriority, editDepartment);
-    alert(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
+    toast.success(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
     await loadComplaints();
     const updated = await getAllComplaints();
     setSelectedComplaint(updated.find((c) => c.id === selectedComplaint.id) || null);
@@ -115,7 +117,7 @@ export const AdminPortal: React.FC = () => {
 
   const handleAssignStaff = async () => {
     if (!selectedComplaint || !selectedStaffId) {
-      alert('Please select a department staff member to assign.');
+      toast.warning('Please select a department staff member to assign.');
       return;
     }
     const roster = getDepartmentStaffRoster(editDepartment);
@@ -123,7 +125,7 @@ export const AdminPortal: React.FC = () => {
 
     setSubmittingAction(true);
     await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    alert(`Task assigned to ${staff.name} with ${slaHours}h SLA deadline.`);
+    toast.success(`Task assigned to ${staff.name} with ${slaHours}h SLA deadline.`);
     await loadComplaints();
     const updated = await getAllComplaints();
     setSelectedComplaint(updated.find((c) => c.id === selectedComplaint.id) || null);
@@ -133,7 +135,7 @@ export const AdminPortal: React.FC = () => {
   const handleApproveResolution = async (complaintId: string) => {
     setSubmittingAction(true);
     await reviewResolutionAdmin(complaintId, true);
-    alert('Resolution Approved! Complaint officially marked as Resolved.');
+    toast.success('Resolution Approved! Complaint officially marked as Resolved.');
     setSelectedComplaint(null);
     await loadComplaints();
     setSubmittingAction(false);
@@ -144,7 +146,7 @@ export const AdminPortal: React.FC = () => {
     if (!selectedComplaint || !rejectionReason) return;
     setSubmittingAction(true);
     await reviewResolutionAdmin(selectedComplaint.id, false, rejectionReason);
-    alert('Resolution Rejected. Rejection feedback sent to field staff.');
+    toast.info('Resolution Rejected. Rejection feedback sent to field staff.');
     setShowRejectModal(false);
     setSelectedComplaint(null);
     setRejectionReason('');

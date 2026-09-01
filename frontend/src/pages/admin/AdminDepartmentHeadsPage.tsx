@@ -16,6 +16,7 @@ import { pushNotification } from '../../services/notificationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   Search, Plus, RefreshCw, Building2, Users, FileText, CheckCircle2,
@@ -41,6 +42,7 @@ const SEVEN_DEPARTMENTS_META = [
 export const AdminDepartmentHeadsPage: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { toast } = useNotification();
 
   const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -449,7 +451,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setDeactivateModalHead(null);
       await loadData();
     } catch (e: any) {
-      alert(e.message || 'Failed to deactivate Department Head.');
+      toast.error(e.message || 'Failed to deactivate Department Head.');
     } finally {
       setSubmitting(false);
     }
@@ -467,7 +469,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setTimeout(() => setToastMessage(null), 4000);
       await loadData();
     } catch (e: any) {
-      alert(e.message || 'Failed to reactivate Department Head.');
+      toast.error(e.message || 'Failed to reactivate Department Head.');
     } finally {
       setSubmitting(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
@@ -45,6 +46,7 @@ const SEED_STAFF_NOTIFICATIONS: NotificationItem[] = [];
 
 export const StaffNotificationsPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   // Staff Identity & Department
@@ -216,7 +218,7 @@ export const StaffNotificationsPage: React.FC = () => {
       loadNotifications();
     } catch (err) {
       console.error(err);
-      alert('Error updating task status.');
+      toast.error('Unable to update task status.');
     }
   };
 
@@ -239,7 +241,7 @@ export const StaffNotificationsPage: React.FC = () => {
       setDetailModalTask(updatedTask);
     } catch (err) {
       console.error(err);
-      alert('Error posting update.');
+      toast.error('Unable to post progress update.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -248,7 +250,7 @@ export const StaffNotificationsPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailModalTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -268,10 +270,10 @@ export const StaffNotificationsPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       loadNotifications();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }

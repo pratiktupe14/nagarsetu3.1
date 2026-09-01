@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -36,6 +37,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export const AdminInProgressComplaintsPage: React.FC = () => {
+  const { toast } = useNotification();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -581,7 +583,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => alert(`Department supervisor notified regarding ${selectedComplaint.complaint_number}.`)}
+                    onClick={() => toast.info(`Department supervisor notified regarding ${selectedComplaint.complaint_number}.`)}
                     className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px]"
                   >
                     Ping Field Officer

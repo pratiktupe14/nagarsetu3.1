@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -261,6 +262,7 @@ const formatRelativeTimestamp = (isoDateString: string) => {
 export const DepartmentHeadPortal: React.FC = () => {
   const { user, logout } = useAuth();
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
+  const { toast, showRichFeedback } = useNotification();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -595,7 +597,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Profile Update Handler (Real Supabase + Local Storage Update)
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
-      alert('Full Name cannot be empty.');
+      toast.warning('Full Name cannot be empty.');
       return;
     }
 
@@ -615,12 +617,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
 
       setIsEditingProfile(false);
-      setProfileSuccessMsg('Profile updated successfully.');
-      setTimeout(() => setProfileSuccessMsg(null), 4000);
+      toast.success('Profile updated successfully.');
       await loadData();
     } catch (err: any) {
       console.error('Error updating profile:', err);
-      alert(err.message || 'Unable to update profile.');
+      toast.error(err.message || 'Unable to update profile.');
     } finally {
       setSavingProfile(false);
     }
@@ -1128,7 +1129,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     const cleanStaffDept = String(staffObj.department_name || '').split('(')[0].trim().toLowerCase();
 
     if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
-      alert(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);
+      toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);
       return;
     }
 
@@ -1164,12 +1165,21 @@ export const DepartmentHeadPortal: React.FC = () => {
       setSelectedAssignComplaint(null);
       setSelectedAssignStaff(null);
       setSelectedStaffForAssign('');
-      alert(`Task assigned successfully to ${staffObj.name} (${staffObj.employee_id || 'Service Staff'}). Assignment verified.`);
+      
+      // Phase 7 UX Requirement: Rich Feedback Card for Task Assignment
+      await showRichFeedback({
+        title: 'Task Assigned Successfully',
+        complaintNumber: compObj.complaint_number || compObj.id,
+        staffName: staffObj.name,
+        staffId: staffObj.employee_id || 'STF-001',
+        departmentName: staffObj.department_name || deptInfo.fullName
+      });
+
       await loadData();
     } catch (err: any) {
       console.error(err);
       setAssignError(err.message || 'Error executing task assignment.');
-      alert(err.message || 'Error executing task assignment.');
+      toast.error(err.message || 'Error executing task assignment.');
     } finally {
       setAssigning(false);
     }
@@ -1178,12 +1188,12 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Execute Reassignment
   const handleExecuteReassignment = async () => {
     if (!reassignModalComplaint || !targetReassignStaffId) {
-      alert('Please select a service staff member to reassign this task to.');
+      toast.warning('Please select a service staff member to reassign this task to.');
       return;
     }
     const newStaff = departmentStaff.find((s) => s.id === targetReassignStaffId);
     if (!newStaff) {
-      alert('Selected staff member record not found.');
+      toast.warning('Selected staff member record not found.');
       return;
     }
 
@@ -1208,11 +1218,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       setReassignModalComplaint(null);
       setTargetReassignStaffId('');
       setReassignReason('');
-      alert(`Task reassigned successfully to ${newStaff.name} (${newStaff.employee_id || 'Service Staff'}). Assignment verified.`);
+      toast.success(`Task reassigned successfully to ${newStaff.name} (${newStaff.employee_id || 'Service Staff'}). Assignment verified.`);
       await loadData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error reassigning task.');
+      toast.error(err.message || 'Error reassigning task.');
     } finally {
       setReassigning(false);
     }
@@ -1221,7 +1231,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Execute Escalation
   const handleExecuteEscalation = async () => {
     if (!escalateModalComplaint || !escalationReason.trim()) {
-      alert('Please state the reason for escalating this critical overdue task.');
+      toast.warning('Please state the reason for escalating this critical overdue task.');
       return;
     }
 
@@ -1240,11 +1250,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       setEscalateModalComplaint(null);
       setEscalationReason('');
       setEscalationNotes('');
-      alert(`Task ${escalateModalComplaint.complaint_number} has been officially escalated to City Administration.`);
+      toast.success(`Task ${escalateModalComplaint.complaint_number} has been officially escalated to City Administration.`);
       await loadData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error escalating task.');
+      toast.error(err.message || 'Error escalating task.');
     } finally {
       setEscalating(false);
     }
@@ -1286,7 +1296,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     const hDept = normDept(headDepartmentFull);
 
     if (cDept && hDept && !cDept.includes(hDept) && !hDept.includes(cDept)) {
-      alert(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
+      toast.error(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
       return;
     }
 
@@ -1300,10 +1310,10 @@ export const DepartmentHeadPortal: React.FC = () => {
       setDetailModalComplaint(null);
       setConfirmApproveModal(null);
       await loadData();
-      alert(`Complaint ${compToApprove.complaint_number || complaintId} has been successfully verified, approved, and officially resolved!`);
+      toast.success(`Complaint ${compToApprove.complaint_number || complaintId} has been successfully verified, approved, and officially resolved!`);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error approving resolution.');
+      toast.error(err.message || 'Error approving resolution.');
     } finally {
       setReviewing(false);
     }
@@ -1312,7 +1322,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Request Field Work Rework
   const handleRequestRework = async (complaintId: string) => {
     if (!reworkReason.trim()) {
-      alert('Please provide instructions for the rework.');
+      toast.warning('Please provide instructions for the rework.');
       return;
     }
     setReviewing(true);
@@ -1321,10 +1331,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       setReviewModalComplaint(null);
       setShowReworkInput(false);
       setReworkReason('');
+      toast.success('Rework instructions sent to field staff.');
       await loadData();
     } catch (err) {
       console.error(err);
-      alert('Error requesting rework.');
+      toast.error('Error requesting rework.');
     } finally {
       setReviewing(false);
     }
@@ -1932,7 +1943,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                                   setMapCenter(coords);
                                   setMapZoom(15);
                                 },
-                                () => alert('Could not retrieve current location. Remaining on department view.')
+                                () => toast.warning('Could not retrieve current location. Remaining on department view.')
                               );
                             }
                           }}
