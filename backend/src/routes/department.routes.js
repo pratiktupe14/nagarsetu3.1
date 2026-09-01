@@ -614,8 +614,13 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       [complaint.id]
     );
 
-    if (!verifyRes.rows || verifyRes.rows.length === 0 || verifyRes.rows[0].status !== 'Staff Assigned') {
-      return res.status(500).json({ error: 'Assignment failed: Database read-back verification failed.' });
+    if (!verifyRes.rows || verifyRes.rows.length === 0 || (verifyRes.rows[0].status !== 'Staff Assigned' && verifyRes.rows[0].status !== 'Assigned')) {
+      console.error('[ASSIGN VERIFY DEBUG]', {
+        complaintId: complaint.id,
+        verifyRowsLength: verifyRes.rows ? verifyRes.rows.length : 0,
+        actualRow: verifyRes.rows?.[0]
+      });
+      return res.status(500).json({ error: `Assignment failed: Database read-back returned status '${verifyRes.rows?.[0]?.status || 'NONE'}'.` });
     }
 
     const verifiedRecord = verifyRes.rows[0];
