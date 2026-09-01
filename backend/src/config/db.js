@@ -608,44 +608,81 @@ function runMemQuery(sql, params = []) {
   const s = sql.trim();
   const upper = s.toUpperCase();
 
-  if (upper.includes('FROM DEPARTMENTS') || upper.includes('INTO DEPARTMENTS')) {
-    if (upper.startsWith('SELECT COUNT')) {
-      return Promise.resolve({ rows: [{ count: memStore.departments.length }] });
+  let targetTable = null;
+  for (const table of Object.keys(memStore)) {
+    if (upper.includes(`FROM ${table.toUpperCase()}`) || upper.includes(`INTO ${table.toUpperCase()}`) || upper.includes(`UPDATE ${table.toUpperCase()}`)) {
+      targetTable = table;
+      break;
     }
-    return Promise.resolve({ rows: memStore.departments });
+  }
+
+  if (!targetTable) {
+    targetTable = 'users';
   }
 
   if (upper.startsWith('SELECT COUNT')) {
-    for (const table of Object.keys(memStore)) {
-      if (upper.includes(`FROM ${table.toUpperCase()}`)) {
-        return Promise.resolve({ rows: [{ count: memStore[table].length }] });
-      }
-    }
-    return Promise.resolve({ rows: [{ count: 0 }] });
+    const list = memStore[targetTable] || [];
+    return Promise.resolve({ rows: [{ count: list.length }] });
   }
 
   if (upper.startsWith('SELECT')) {
-    for (const table of Object.keys(memStore)) {
-      if (upper.includes(`FROM ${table.toUpperCase()}`)) {
-        return Promise.resolve({ rows: memStore[table] });
+    let list = memStore[targetTable] || [];
+    if (params && params.length > 0) {
+      const pStr = params.map(p => String(p).toLowerCase());
+      const filtered = list.filter(item => {
+        if (!item) return false;
+        return pStr.some(p => 
+          (item.mobile && String(item.mobile).toLowerCase() === p) ||
+          (item.email && String(item.email).toLowerCase() === p) ||
+          (item.id !== undefined && String(item.id) === p)
+        );
+      });
+      if (filtered.length > 0) {
+        list = filtered;
       }
     }
-    return Promise.resolve({ rows: [] });
+    return Promise.resolve({ rows: list });
   }
 
   if (upper.startsWith('INSERT')) {
-    for (const table of Object.keys(memStore)) {
-      if (upper.includes(`INTO ${table.toUpperCase()}`)) {
-        const newId = memStore[table].length + 1;
-        const newObj = { id: newId, created_at: new Date().toISOString() };
-        memStore[table].push(newObj);
-        return Promise.resolve({ rows: [{ id: newId }], rowCount: 1 });
-      }
+    const newId = (memStore[targetTable] ? memStore[targetTable].length : 0) + 1;
+    const newObj = { id: newId, status: 'active', created_at: new Date().toISOString() };
+    
+    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
+    if (colMatch && colMatch[1]) {
+      const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase());
+      cols.forEach((col, idx) => {
+        if (params[idx] !== undefined) {
+          newObj[col] = params[idx];
+        }
+      });
     }
-    return Promise.resolve({ rows: [{ id: 1 }], rowCount: 1 });
+    
+    if (!memStore[targetTable]) memStore[targetTable] = [];
+    memStore[targetTable].push(newObj);
+    return Promise.resolve({ rows: [{ id: newId }], rowCount: 1 });
   }
 
-  return Promise.resolve({ rows: [], rowCount: 1 });
+  if (upper.startsWith('UPDATE')) {
+    const list = memStore[targetTable] || [];
+    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+(.+?)\s+WHERE/i);
+    if (setMatch && setMatch[1] && params.length > 0) {
+      const setPairs = setMatch[1].split(',').map(p => p.trim());
+      const whereVal = params[params.length - 1];
+      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal)));
+      if (target) {
+        setPairs.forEach((pair, idx) => {
+          const colName = pair.split('=')[0].trim().toLowerCase();
+          if (params[idx] !== undefined) {
+            target[colName] = params[idx];
+          }
+        });
+      }
+    }
+    return Promise.resolve({ rows: [], rowCount: 1 });
+  }
+
+  return Promise.resolve({ rows: memStore[targetTable] || [], rowCount: 1 });
 }
 
 // Universal query runner wrapper
