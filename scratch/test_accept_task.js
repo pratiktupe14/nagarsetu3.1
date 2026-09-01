@@ -9,10 +9,11 @@ async function testAcceptTaskFlow() {
   const citLoginRes = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier: '8788562103', password: 'password123' })
+    body: JSON.stringify({ mobileOrEmail: '8788562103', password: '8788562103' })
   });
   const citLogin = await citLoginRes.json();
-  const citToken = citLogin.token;
+  console.log('citLogin:', citLogin);
+  const citToken = citLogin.token || citLogin.data?.token;
 
   const compRes = await fetch(`${API_URL}/api/complaints/submit`, {
     method: 'POST',
@@ -21,26 +22,29 @@ async function testAcceptTaskFlow() {
       Authorization: `Bearer ${citToken}`
     },
     body: JSON.stringify({
+      title: 'Pothole on Main Road',
       category: 'Road Damage / Pothole',
-      specific_issue: 'road_damage_pothole',
-      urgency: 'High',
       department_id: 1,
       description: 'Pothole on Main Road near City Center',
-      location_address: 'Main Road, Nashik'
+      location_address: 'Main Road, Nashik',
+      latitude: 20.005,
+      longitude: 73.785,
+      photo_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7'
     })
   });
   const compData = await compRes.json();
-  const complaintId = compData.complaint_id || compData.complaint?.id;
-  console.log(`1. Created PWD Complaint ID: ${complaintId} (${compData.complaint?.complaint_number})`);
+  console.log('compData:', compData);
+  const complaintId = compData.complaint_id || compData.complaint?.id || compData.id;
+  console.log(`1. Created PWD Complaint ID: ${complaintId} (${compData.complaint?.complaint_number || compData.complaint_number})`);
 
   // 2. Login PWD Department Head & Assign to Ramesh Kumar (STF-001)
   const headLoginRes = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier: 'rahul.kumar@nagarsetu.gov.in', password: 'password123' })
+    body: JSON.stringify({ mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in', password: 'nagarsetu@123' })
   });
   const headLogin = await headLoginRes.json();
-  const headToken = headLogin.token;
+  const headToken = headLogin.token || headLogin.data?.token;
 
   const assignRes = await fetch(`${API_URL}/api/department/assign`, {
     method: 'POST',
@@ -54,16 +58,16 @@ async function testAcceptTaskFlow() {
     })
   });
   const assignData = await assignRes.json();
-  console.log(`2. Task Assigned status: '${assignData.status}' to Staff: '${assignData.staff_name}'`);
+  console.log('assignData:', assignData);
 
   // 3. Login Field Staff Ramesh Kumar
   const staffLoginRes = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier: 'staff@nagarsetu.gov.in', password: 'password123' })
+    body: JSON.stringify({ mobileOrEmail: 'staff@nagarsetu.gov.in', password: 'nagarsetu@123' })
   });
   const staffLogin = await staffLoginRes.json();
-  const staffToken = staffLogin.token;
+  const staffToken = staffLogin.token || staffLogin.data?.token;
 
   // 4. Call POST /api/staff/task/:id/status with { status: 'Accepted' }
   const acceptRes = await fetch(`${API_URL}/api/staff/task/${complaintId}/status`, {
