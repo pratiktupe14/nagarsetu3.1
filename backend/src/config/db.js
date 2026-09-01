@@ -134,6 +134,15 @@ async function createTablesPostgres() {
         location_source TEXT NOT NULL DEFAULT 'manual_pin',
         location_address TEXT,
         duplicate_of_id INTEGER REFERENCES complaints(id),
+        ai_category TEXT,
+        ai_specific_issue TEXT,
+        ai_confidence DOUBLE PRECISION,
+        ai_severity TEXT,
+        ai_urgency TEXT,
+        ai_evidence TEXT,
+        ai_model TEXT,
+        ai_analyzed_at TIMESTAMP,
+        needs_manual_verification INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -340,6 +349,15 @@ function createTablesSqlite() {
       safeAddColumn('complaints', 'verified_at DATETIME');
       safeAddColumn('complaints', 'rework_reason TEXT');
       safeAddColumn('complaints', 'admin_rejection_reason TEXT');
+      safeAddColumn('complaints', 'ai_category TEXT');
+      safeAddColumn('complaints', 'ai_specific_issue TEXT');
+      safeAddColumn('complaints', 'ai_confidence REAL');
+      safeAddColumn('complaints', 'ai_severity TEXT');
+      safeAddColumn('complaints', 'ai_urgency TEXT');
+      safeAddColumn('complaints', 'ai_evidence TEXT');
+      safeAddColumn('complaints', 'ai_model TEXT');
+      safeAddColumn('complaints', 'ai_analyzed_at DATETIME');
+      safeAddColumn('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (
@@ -378,6 +396,15 @@ function createTablesSqlite() {
           longitude REAL NOT NULL,
           location_source TEXT NOT NULL,
           duplicate_of_id INTEGER,
+          ai_category TEXT,
+          ai_specific_issue TEXT,
+          ai_confidence REAL,
+          ai_severity TEXT,
+          ai_urgency TEXT,
+          ai_evidence TEXT,
+          ai_model TEXT,
+          ai_analyzed_at DATETIME,
+          needs_manual_verification INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (citizen_id) REFERENCES users(id),

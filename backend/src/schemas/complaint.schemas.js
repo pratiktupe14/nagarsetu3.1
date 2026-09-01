@@ -13,7 +13,16 @@ const createComplaintSchema = {
     longitude: Joi.number().min(-180).max(180).required(),
     location_source: Joi.string().allow('', null).optional(),
     location_address: Joi.string().max(500).allow('', null).optional(),
-    duplicate_of_id: Joi.number().integer().positive().allow(null).optional()
+    duplicate_of_id: Joi.number().integer().positive().allow(null).optional(),
+    ai_category: Joi.string().max(150).allow('', null).optional(),
+    ai_specific_issue: Joi.string().max(150).allow('', null).optional(),
+    ai_confidence: Joi.number().min(0).max(1).allow(null).optional(),
+    ai_severity: Joi.string().max(50).allow('', null).optional(),
+    ai_urgency: Joi.string().max(50).allow('', null).optional(),
+    ai_evidence: Joi.string().max(2000).allow('', null).optional(),
+    ai_model: Joi.string().max(100).allow('', null).optional(),
+    ai_analyzed_at: Joi.string().allow('', null).optional(),
+    needs_manual_verification: Joi.boolean().allow(null).optional()
   })
 };
 
@@ -21,6 +30,7 @@ const updateStatusSchema = {
   body: Joi.object({
     status: Joi.string().valid(
       'Submitted',
+      'NEEDS_VERIFICATION',
       'Verified',
       'Approved',
       'Department Assigned',

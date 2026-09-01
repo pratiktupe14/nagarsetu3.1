@@ -2,99 +2,81 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
+const { normalizeCategory, getDepartmentForCategory, normalizeSpecificIssue } = require('./taxonomyService');
 
-const VALID_TAXONOMY = {
-  'Road Damage / Pothole': 'Public Works Department',
-  'Water Leakage / Pipeline': 'Water Supply & Sewerage Board',
-  'Garbage / Waste': 'Sanitation & Waste Management',
-  'Drainage / Sewage': 'Drainage & Sewage Department',
-  'Streetlight / Electrical': 'Electrical & Street Lighting',
-  'Traffic Infrastructure': 'Traffic Management Department',
-  'Public Infrastructure Damage': 'Maintenance Department',
-  'Other Civic Issue': 'Maintenance Department',
-  'Building Maintenance': 'Maintenance Department'
-};
+const CONFIDENCE_THRESHOLD = parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.80');
 
-
-const SYSTEM_PROMPT = `You are NAGARSETU 3.0's civic issue vision analyzer.
+const SYSTEM_PROMPT = `You are NAGARSETU 3.1's civic issue vision analyzer.
 
 Analyze ONLY the actual image provided.
-
 Do not infer the issue from the filename.
 Do not reuse previous analysis.
 Do not assume every image is a road issue.
 
-Determine the physical civic issue visible in the image.
+Determine the physical civic defect visible in the image.
 
-Allowed categories:
+Classification Guidelines:
+1. If visible water is flowing from a broken pipe, damaged pipeline, leaking municipal water line, water ponding due to pipe break, or water infrastructure failure:
+   Primary Category: Water Leakage / Pipeline
+   Suggested Department: Water Supply & Sewerage Board
 
-Road Damage / Pothole
-Water Leakage / Pipeline
-Garbage / Waste
-Drainage / Sewage
-Streetlight / Electrical
-Traffic Infrastructure
-Public Infrastructure Damage
-Other Civic Issue
+2. If the image shows a pothole, crater, pavement crack, road surface deterioration, or broken asphalt:
+   Primary Category: Road Damage / Pothole
+   Suggested Department: Public Works Department (PWD)
 
-If the image visibly shows a leaking or damaged water pipeline, flowing water from municipal water infrastructure, or a water-line failure, classify it as:
+3. If the image shows garbage, trash accumulation, overflowing waste bin, solid waste, or illegal dumping:
+   Primary Category: Garbage / Waste
+   Suggested Department: Sanitation & Waste Management
 
-Water Leakage / Pipeline
+4. If the image shows an overflowing drain, choked sewer, clogged gutter, open manhole shaft, or stagnant wastewater:
+   Primary Category: Drainage / Sewage
+   Suggested Department: Drainage & Sewage Department
 
-If the image visibly shows potholes, pavement cracks, road craters, damaged asphalt, or road-surface deterioration, classify it as:
+5. If the image shows a non-functional, broken, or damaged streetlight, lamp post, or exposed electrical wire:
+   Primary Category: Streetlight / Electrical
+   Suggested Department: Electrical & Street Lighting
 
-Road Damage / Pothole
+6. If the image shows a damaged traffic light, broken signal pole, or road signage defect:
+   Primary Category: Traffic Infrastructure
+   Suggested Department: Traffic Management Department
 
-If garbage or waste is visible:
+7. If the image shows damaged public footpath pavers, broken curb, or public railing damage:
+   Primary Category: Public Infrastructure Damage
+   Suggested Department: Maintenance Department
 
-Garbage / Waste
+8. If evidence is unreadable or insufficient to identify a specific civic issue:
+   Primary Category: Other Civic Issue
+   Suggested Department: Maintenance Department
+   Set confidence score low (< 0.50).
 
-If blocked/open drainage or sewage overflow is visible:
-
-Drainage / Sewage
-
-If a broken streetlight/electrical civic infrastructure is visible:
-
-Streetlight / Electrical
-
-If a traffic signal or traffic infrastructure issue is visible:
-
-Traffic Infrastructure
-
-If evidence is insufficient:
-
-Other Civic Issue
-
-Do not invent visual information.
+If multiple issues exist in the image (e.g. garbage next to a pothole), identify the primary issue clearly in "primary_issue" and secondary issues in "secondary_issues".
 
 Respond ONLY with a valid JSON object matching this exact structure:
 {
+  "is_civic_issue": true,
   "category": "One of: Road Damage / Pothole, Water Leakage / Pipeline, Garbage / Waste, Drainage / Sewage, Streetlight / Electrical, Traffic Infrastructure, Public Infrastructure Damage, Other Civic Issue",
+  "specific_issue": "e.g. large_road_pothole or leaking_water_pipe",
+  "primary_issue": "Short name of primary defect",
+  "secondary_issues": ["list of secondary defects if present"],
   "title": "Short descriptive title of the defect",
   "description": "Factual description based strictly on visible evidence.",
-  "priority": "LOW or MEDIUM or HIGH or CRITICAL",
   "severity": "LOW or MEDIUM or HIGH or CRITICAL",
-  "recommended_department": "Corresponding department name from taxonomy",
+  "urgency": "LOW or MEDIUM or HIGH or CRITICAL",
+  "priority": "LOW or MEDIUM or HIGH or CRITICAL",
+  "evidence": "Factual visual evidence description",
+  "suggested_department": "Corresponding suggested department name",
   "confidence": 0.94,
-  "detected_features": ["list", "of", "features"],
-  "is_civic_issue": true,
-  "needs_manual_verification": false
+  "detected_features": ["list", "of", "detected", "visual", "elements"]
 }`;
-
-function mapDepartment(category) {
-  return VALID_TAXONOMY[category] || 'Public Works Department';
-}
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
 
-  console.log(`[GEMINI] Request started`);
-  console.log(`[GEMINI] API key configured: ${Boolean(apiKey && apiKey.trim() !== '')}`);
-  console.log(`[GEMINI] Target Model: ${model}`);
+  console.log(`[NAGARSETU AI] Calling Gemini Vision API with model: ${model}`);
 
   if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
-    console.error('[GEMINI ERROR] GEMINI_API_KEY is missing or unconfigured in environment.');
+    console.error('[NAGARSETU AI ERROR] GEMINI_API_KEY is missing or unconfigured in server environment.');
     const errObj = new Error('Gemini analysis failed: GEMINI_API_KEY is not configured in server environment.');
     errObj.statusCode = 503;
     errObj.errorCode = 'AI_SERVICE_UNCONFIGURED';
@@ -189,11 +171,18 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
             }
 
             const resultObj = JSON.parse(cleanText);
-            const category = (resultObj.category && Object.prototype.hasOwnProperty.call(VALID_TAXONOMY, resultObj.category))
-              ? resultObj.category
-              : 'Other Civic Issue';
-            const department = mapDepartment(category);
-            const confidence = typeof resultObj.confidence === 'number' ? resultObj.confidence : 0.92;
+
+            // Normalize category and resolve department authoritatively using taxonomyService
+            const normalizedCategory = normalizeCategory(resultObj.category);
+            const deptInfo = getDepartmentForCategory(normalizedCategory);
+            const specificIssue = normalizeSpecificIssue(resultObj.specific_issue || resultObj.primary_issue, normalizedCategory);
+
+            const confidence = typeof resultObj.confidence === 'number' ? Math.min(1.0, Math.max(0.0, resultObj.confidence)) : 0.92;
+            const needsVerification = confidence < CONFIDENCE_THRESHOLD || resultObj.needs_manual_verification === true;
+
+            const severity = (resultObj.severity || 'HIGH').toUpperCase();
+            const urgency = (resultObj.urgency || resultObj.priority || severity).toUpperCase();
+            const priority = (resultObj.priority || severity).toUpperCase();
 
             resolve({
               success: true,
@@ -201,15 +190,23 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
               image_hash: imageHash,
               model: model,
               is_civic_issue: resultObj.is_civic_issue ?? true,
-              category: category,
-              title: resultObj.title || `${category} Defect`,
-              description: resultObj.description || 'Vision AI identified civic issue based on visual evidence.',
-              severity: (resultObj.severity || 'HIGH').toUpperCase(),
-              priority: (resultObj.priority || 'High').charAt(0).toUpperCase() + (resultObj.priority || 'High').slice(1).toLowerCase(),
-              recommended_department: department,
-              confidence: confidence,
+              category: normalizedCategory,
+              specific_issue: specificIssue,
+              primary_issue: resultObj.primary_issue || normalizedCategory,
+              secondary_issues: resultObj.secondary_issues || [],
+              title: resultObj.title || `${normalizedCategory} Defect`,
+              description: resultObj.description || 'Vision AI identified civic defect based on visual evidence.',
+              severity: severity,
+              urgency: urgency,
+              priority: priority,
+              evidence: resultObj.evidence || resultObj.description || 'Visual evidence extracted by Gemini Vision.',
+              suggested_department: resultObj.suggested_department || deptInfo.name,
+              recommended_department: deptInfo.name,
+              department_code: deptInfo.code,
+              confidence: Math.round(confidence * 100) / 100,
               detected_features: resultObj.detected_features || [],
-              needs_manual_verification: resultObj.needs_manual_verification ?? (confidence < 0.80)
+              needs_manual_verification: needsVerification,
+              analyzed_at: new Date().toISOString()
             });
           } catch (e) {
             const errObj = new Error(`Structured JSON parse error: ${e.message}`);
@@ -289,7 +286,10 @@ async function analyzeComplaintPhoto(fileInput) {
         err = fbErr;
       }
     }
+
     console.error('[NAGARSETU Backend Error]', err.message);
+    const fallbackDept = getDepartmentForCategory('Other Civic Issue');
+
     return {
       success: false,
       statusCode: err.statusCode || 500,
@@ -298,16 +298,25 @@ async function analyzeComplaintPhoto(fileInput) {
       retryable: (err.statusCode === 429 || err.statusCode === 504 || err.statusCode === 500),
       analysis_id: crypto.randomUUID(),
       image_hash: imageHash,
-      model: 'none',
+      model: 'fallback_manual',
       is_civic_issue: false,
       category: 'Other Civic Issue',
-      title: '', // Keep title clean
-      description: '', // Keep description clean
+      specific_issue: 'unclassified_defect',
+      primary_issue: 'Other Civic Issue',
+      secondary_issues: [],
+      title: '',
+      description: '',
+      severity: 'LOW',
+      urgency: 'LOW',
       priority: 'Medium',
-      recommended_department: 'Public Works Department',
+      evidence: 'AI service unavailable. Manual verification required.',
+      suggested_department: fallbackDept.name,
+      recommended_department: fallbackDept.name,
+      department_code: fallbackDept.code,
       confidence: 0.0,
       detected_features: [],
-      needs_manual_verification: true
+      needs_manual_verification: true,
+      analyzed_at: new Date().toISOString()
     };
   }
 }

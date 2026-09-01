@@ -6,6 +6,7 @@ export const StatusBadge: React.FC<{ status: ComplaintStatus }> = ({ status }) =
   const { translateStatus } = useLanguage();
   const styles: Record<ComplaintStatus, string> = {
     Submitted: 'bg-gray-50 text-gray-700 border-gray-200',
+    NEEDS_VERIFICATION: 'bg-amber-50 text-amber-900 border-amber-300 font-bold',
     Verified: 'bg-blue-50 text-blue-700 border-blue-200',
     Approved: 'bg-blue-50 text-blue-700 border-blue-200',
     'Department Assigned': 'bg-sky-50 text-sky-700 border-sky-200',
