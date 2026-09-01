@@ -717,14 +717,37 @@ function runMemQuery(sql, params = []) {
     const newId = (memStore[targetTable] ? memStore[targetTable].length : 0) + 1;
     const newObj = { id: newId, status: 'active', created_at: new Date().toISOString() };
     
-    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
-    if (colMatch && colMatch[1]) {
+    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+    if (colMatch && colMatch[1] && colMatch[2]) {
       const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase());
+      const vals = colMatch[2].split(',').map(v => v.trim());
+      
+      let pIdxCounter = 0;
       cols.forEach((col, idx) => {
-        if (params[idx] !== undefined) {
-          newObj[col] = params[idx];
+        const valExpr = vals[idx] ? vals[idx] : '';
+        if (valExpr === '?' || valExpr.startsWith('$')) {
+          if (params[pIdxCounter] !== undefined) {
+            newObj[col] = params[pIdxCounter];
+          }
+          pIdxCounter++;
+        } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
+          newObj[col] = valExpr.slice(1, -1);
+        } else if (valExpr.toUpperCase() === 'NULL') {
+          newObj[col] = null;
+        } else if (valExpr) {
+          newObj[col] = valExpr;
         }
       });
+    } else {
+      const colMatchOnly = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
+      if (colMatchOnly && colMatchOnly[1]) {
+        const cols = colMatchOnly[1].split(',').map(c => c.trim().toLowerCase());
+        cols.forEach((col, idx) => {
+          if (params[idx] !== undefined) {
+            newObj[col] = params[idx];
+          }
+        });
+      }
     }
     
     if (!memStore[targetTable]) memStore[targetTable] = [];
