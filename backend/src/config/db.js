@@ -264,7 +264,38 @@ async function createTablesPostgres() {
         read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(announcement_id, user_id)
       );
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS user_roles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        role TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        full_name TEXT,
+        avatar_url TEXT,
+        bio TEXT,
+        address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS task_assignments (
+        id SERIAL PRIMARY KEY,
+        complaint_id INTEGER REFERENCES complaints(id),
+        staff_id INTEGER REFERENCES users(id),
+        assigned_by INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'Assigned',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
 
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
     if (parseInt(deptCheck.rows[0].count, 10) === 0) {
