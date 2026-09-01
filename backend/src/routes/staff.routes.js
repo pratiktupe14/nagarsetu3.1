@@ -82,7 +82,7 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 });
 
 // Resolve Task with "After" Photo Proof
-router.post('/task/:id/resolve', async (req, res) => {
+router.post(['/task/:id/resolve', '/tasks/:id/resolve'], uploadSingleImage('photo'), async (req, res) => {
   const targetId = req.params.id;
   const bodyNum = req.body?.complaint_number || '';
   const bodyId = req.body?.complaint_id || '';
@@ -198,7 +198,12 @@ router.post('/task/:id/resolve', async (req, res) => {
 
     const verifiedComp = verifyRes.rows && verifyRes.rows.length > 0 ? verifyRes.rows[0] : null;
     const readBackStatus = verifiedComp?.status || 'N/A';
-    const isVerified = verifiedComp && (verifiedComp.status === 'Resolution Submitted' || verifiedComp.status === 'Completed — Pending Verification');
+    const isVerified = verifiedComp && (
+      verifiedComp.status === 'Resolution Submitted' ||
+      verifiedComp.status === 'Completed — Pending Verification' ||
+      verifiedComp.status === 'Work Completed — Waiting for Verification' ||
+      verifiedComp.status === 'Resolved'
+    );
 
     // SERVER-SIDE DIAGNOSTIC LOGGING (STEP 2)
     console.log('========== [RESOLVE DEBUG] ==========');

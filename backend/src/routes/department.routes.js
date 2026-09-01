@@ -685,6 +685,41 @@ router.post('/verify', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: 'Complaint ID is required' });
     }
 
+    // 1. Authoritative Complaint Lookup from Database
+    const compRes = await query(
+      `SELECT id, complaint_number, citizen_id, department_id, status FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $2`,
+      [String(complaint_id), String(complaint_id)]
+    );
+
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint record not found.' });
+    }
+    const complaint = compRes.rows[0];
+
+    // 2. Resolve Authenticated User's Department
+    const { userDeptId } = await resolveUserDepartment(req);
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    const normDept = (d) => {
+      const s = String(d || '').trim().toLowerCase();
+      if (s === '1' || s.includes('pwd') || s.includes('road') || s.includes('public works')) return '1';
+      if (s === '2' || s.includes('san') || s.includes('waste') || s.includes('garbage')) return '2';
+      if (s === '3' || s.includes('wtr') || s.includes('water') || s.includes('sewerage board')) return '3';
+      if (s === '4' || s.includes('drn') || s.includes('drain') || s.includes('sewage')) return '4';
+      if (s === '5' || s.includes('ele') || s.includes('electric') || s.includes('light')) return '5';
+      if (s === '6' || s.includes('trf') || s.includes('traffic')) return '6';
+      if (s === '7' || s.includes('mnt') || s.includes('maint')) return '7';
+      return s.toUpperCase();
+    };
+
+    // 3. Department Security Guard: Ensure Department Head can only verify complaints in their department
+    if (!isAdmin) {
+      if (!userDeptId || !complaint.department_id || normDept(userDeptId) !== normDept(complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot verify a complaint belonging to another department.' });
+      }
+    }
+
     const reworkReason = req.body?.rework_reason || req.body?.reason || '';
     if (targetStatus === 'Reopened' && reworkReason) {
       await query(
