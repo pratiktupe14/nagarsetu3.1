@@ -40,7 +40,7 @@ if (cleanupTimer && typeof cleanupTimer.unref === 'function') {
  */
 function authRateLimiter(req, res, next) {
   const windowMs = getEnvInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000); // Default 15 minutes
-  const maxAttempts = getEnvInt('RATE_LIMIT_AUTH_MAX', 5); // Allow 5 free attempts before backoff
+  const maxAttempts = getEnvInt('RATE_LIMIT_AUTH_MAX', 50); // Allow 50 attempts before backoff
   const baseBackoffSec = getEnvInt('RATE_LIMIT_AUTH_BACKOFF_BASE_SEC', 30); // 30s base multiplier
 
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
@@ -108,7 +108,7 @@ function authRateLimiter(req, res, next) {
 // 2. Public Endpoints Rate Limiter (Health, Geocoding, public maps)
 const publicRateLimiter = rateLimit({
   windowMs: getEnvInt('RATE_LIMIT_PUBLIC_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
-  max: getEnvInt('RATE_LIMIT_PUBLIC_MAX', 100), // 100 requests per 15 minutes
+  max: getEnvInt('RATE_LIMIT_PUBLIC_MAX', 1000), // 1000 requests per 15 minutes
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -120,7 +120,7 @@ const publicRateLimiter = rateLimit({
 // 3. Authenticated User Actions Rate Limiter (Complaints, Admin, Staff, Officer)
 const authedRateLimiter = rateLimit({
   windowMs: getEnvInt('RATE_LIMIT_AUTHED_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
-  max: getEnvInt('RATE_LIMIT_AUTHED_MAX', 300), // 300 requests per 15 minutes
+  max: getEnvInt('RATE_LIMIT_AUTHED_MAX', 3000), // 3000 requests per 15 minutes
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,

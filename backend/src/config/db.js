@@ -623,36 +623,52 @@ function createTablesSqlite() {
   });
 }
 
-const memStore = {
-  departments: [
-    { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
-    { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
-    { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
-    { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
-    { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
-    { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
-    { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
-  ],
-  users: [],
-  department_heads: [],
-  field_staff: [],
-  complaints: [],
-  assignments: [],
-  feedback: [],
-  notifications: [],
-  complaint_status_history: [],
-  announcements: [],
-  announcement_reads: []
-};
+if (!global._memStore) {
+  global._memStore = {
+    departments: [
+      { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
+      { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
+      { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
+      { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
+      { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
+      { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
+      { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
+    ],
+    users: [],
+    department_heads: [],
+    field_staff: [],
+    complaints: [],
+    assignments: [],
+    task_assignments: [],
+    feedback: [],
+    notifications: [],
+    complaint_status_history: [],
+    announcements: [],
+    announcement_reads: []
+  };
+}
+const memStore = global._memStore;
 
 function runMemQuery(sql, params = []) {
   const s = sql.trim();
   const upper = s.toUpperCase();
 
   let targetTable = null;
-  const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
-  if (fromMatch && fromMatch[1]) {
-    targetTable = fromMatch[1].toLowerCase();
+  if (upper.includes('FROM FIELD_STAFF') || upper.includes('INTO FIELD_STAFF') || upper.includes('UPDATE FIELD_STAFF')) {
+    targetTable = 'field_staff';
+  } else if (upper.includes('FROM DEPARTMENT_HEADS') || upper.includes('INTO DEPARTMENT_HEADS') || upper.includes('UPDATE DEPARTMENT_HEADS')) {
+    targetTable = 'department_heads';
+  } else if (upper.includes('FROM DEPARTMENTS') || upper.includes('INTO DEPARTMENTS') || upper.includes('UPDATE DEPARTMENTS')) {
+    targetTable = 'departments';
+  } else if (upper.includes('FROM COMPLAINTS') || upper.includes('INTO COMPLAINTS') || upper.includes('UPDATE COMPLAINTS')) {
+    targetTable = 'complaints';
+  } else if (upper.includes('FROM USERS') || upper.includes('INTO USERS') || upper.includes('UPDATE USERS')) {
+    targetTable = 'users';
+  } else {
+    const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
+    if (fromMatch && fromMatch[1]) {
+      targetTable = fromMatch[1].toLowerCase();
+    }
   }
 
   if (!targetTable || !memStore[targetTable]) {
@@ -714,17 +730,42 @@ function runMemQuery(sql, params = []) {
   }
 
   if (upper.startsWith('INSERT')) {
-    const newId = (memStore[targetTable] ? memStore[targetTable].length : 0) + 1;
+    const list = memStore[targetTable] || [];
+    const maxId = list.length > 0 ? Math.max(...list.map(i => Number(i.id) || 0)) : 0;
+    const newId = maxId + 1;
     const newObj = { id: newId, status: 'active', created_at: new Date().toISOString() };
     
-    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
-    if (colMatch && colMatch[1]) {
+    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+    if (colMatch && colMatch[1] && colMatch[2]) {
       const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase());
+      const vals = colMatch[2].split(',').map(v => v.trim());
+      
+      let pIdxCounter = 0;
       cols.forEach((col, idx) => {
-        if (params[idx] !== undefined) {
-          newObj[col] = params[idx];
+        const valExpr = vals[idx] ? vals[idx] : '';
+        if (valExpr === '?' || valExpr.startsWith('$')) {
+          if (params[pIdxCounter] !== undefined) {
+            newObj[col] = params[pIdxCounter];
+          }
+          pIdxCounter++;
+        } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
+          newObj[col] = valExpr.slice(1, -1);
+        } else if (valExpr.toUpperCase() === 'NULL') {
+          newObj[col] = null;
+        } else if (valExpr) {
+          newObj[col] = valExpr;
         }
       });
+    } else {
+      const colMatchOnly = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
+      if (colMatchOnly && colMatchOnly[1]) {
+        const cols = colMatchOnly[1].split(',').map(c => c.trim().toLowerCase());
+        cols.forEach((col, idx) => {
+          if (params[idx] !== undefined) {
+            newObj[col] = params[idx];
+          }
+        });
+      }
     }
     
     if (!memStore[targetTable]) memStore[targetTable] = [];
@@ -734,12 +775,30 @@ function runMemQuery(sql, params = []) {
 
   if (upper.startsWith('UPDATE')) {
     const list = memStore[targetTable] || [];
-    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+(.+?)\s+WHERE/i);
+    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+([\s\S]+?)\s+WHERE\s+([\s\S]+)/i);
     if (setMatch && setMatch[1] && params.length > 0) {
       const setPairs = setMatch[1].split(',').map(p => p.trim());
-      const whereVal = params[params.length - 1];
-      const target = list.find(item => item && (String(item.id) === String(whereVal) || String(item.mobile) === String(whereVal) || String(item.complaint_number) === String(whereVal)));
-      if (target) {
+      const whereClause = setMatch[2];
+
+      const wherePMatches = [...whereClause.matchAll(/\$(\d+)/g)];
+      const wherePIndices = wherePMatches.map(m => parseInt(m[1], 10) - 1);
+      const whereVals = wherePIndices.length > 0
+        ? wherePIndices.map(idx => params[idx]).filter(v => v !== undefined && v !== null)
+        : [params[params.length - 1]];
+
+      const targets = list.filter(item => {
+        if (!item) return false;
+        const itemId = item.id !== undefined ? String(item.id).trim() : '';
+        const itemNum = item.complaint_number ? String(item.complaint_number).trim() : '';
+        const itemMobile = item.mobile ? String(item.mobile).trim() : '';
+        const itemEmail = item.email ? String(item.email).trim() : '';
+        return whereVals.some(v => {
+          const sv = String(v).trim();
+          return sv !== '' && (itemId === sv || itemNum === sv || itemMobile === sv || itemEmail === sv);
+        });
+      });
+
+      targets.forEach(target => {
         setPairs.forEach((pair) => {
           const parts = pair.split('=');
           const colName = parts[0].trim().toLowerCase();
@@ -756,7 +815,9 @@ function runMemQuery(sql, params = []) {
             target[colName] = valExpr.slice(1, -1);
           }
         });
-      }
+      });
+
+      return Promise.resolve({ rows: targets.map(t => ({ ...t })), rowCount: targets.length || 1 });
     }
     return Promise.resolve({ rows: [], rowCount: 1 });
   }

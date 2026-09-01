@@ -196,16 +196,17 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
 
   // 1. Try Express backend API first
   try {
-    const token = localStorage.getItem('nagarsetu_token');
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
       const res = await fetch(`${getApiUrl()}/api/complaints/my`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getNoCacheHeaders()
       });
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.complaints)) {
-          return (data.complaints as Complaint[]).filter((c) => !isDemoComplaint(c));
-        }
+        const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
+        const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
+        saveStoredComplaints(cleanList);
+        return cleanList;
       }
     }
   } catch (bErr) {
@@ -223,39 +224,22 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
 
       if (!error && data) {
         list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+        saveStoredComplaints(list);
+        return list;
       }
     } catch (err) {
       console.warn('Supabase getCitizenComplaints fallback:', err);
     }
   }
 
-  // 3. Merge with LocalStorage cached complaints so local creations are preserved
+  // 3. Fallback to LocalStorage cache if offline or unauthenticated
   const localAll = getStoredComplaints();
-  const filteredLocal = localAll.filter((c) => {
+  return localAll.filter((c) => {
     if (isDemoComplaint(c)) return false;
-    if (!citizenId || citizenId.trim() === '') return false;
+    if (!citizenId || citizenId.trim() === '') return true;
     return String(c.citizen_id) === String(citizenId);
-  });
-
-  const map = new Map<string, Complaint>();
-
-  // Add backend / Supabase list items
-  list.forEach((c) => {
-    const key = c.complaint_number || String(c.id);
-    if (key) map.set(key, c);
-  });
-
-  // Merge local items (preserving preview photos & local IDs)
-  filteredLocal.forEach((lc) => {
-    const key = lc.complaint_number || String(lc.id);
-    if (key) {
-      const existing = map.get(key);
-      map.set(key, existing ? { ...existing, ...lc } : lc);
-    }
-  });
-
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  }).sort(
+    (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
   );
 }
 
@@ -323,37 +307,46 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   }
   const targetDept = resolveDepartmentInfo(departmentId, departmentName);
 
-  // 1. Fetch entire complaint pool across Supabase, Backend, and LocalStorage
-  let allComplaints: Complaint[] = await getAllComplaints();
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
 
-  // 2. Also query Express Backend API /api/complaints if available
+  let backendComplaints: Complaint[] = [];
+
+  // 1. Query Express Backend API /api/department/complaints or /api/complaints
   try {
-    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    const res = await fetch(`${getApiUrl()}/api/complaints`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
+    const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });
     if (res.ok) {
       const data = await res.json();
-      const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
-      if (backendComplaints.length > 0) {
-        const map = new Map<string, Complaint>();
-        allComplaints.forEach((c) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) map.set(key, c);
-        });
-        backendComplaints.forEach((c: Complaint) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) {
-            const existing = map.get(key);
-            // DB record from backend takes authoritative precedence
-            map.set(key, existing ? { ...existing, ...c } : c);
-          }
-        });
-        allComplaints = Array.from(map.values());
+      backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
+    } else {
+      const fallbackRes = await fetch(`${getApiUrl()}/api/complaints`, { headers });
+      if (fallbackRes.ok) {
+        const fData = await fallbackRes.json();
+        backendComplaints = Array.isArray(fData) ? fData : Array.isArray(fData?.complaints) ? fData.complaints : [];
       }
     }
   } catch (e) {
     console.warn('Backend API getDepartmentComplaints fallback:', e);
+  }
+
+  // 2. Fetch entire complaint pool across Supabase and LocalStorage
+  let allComplaints: Complaint[] = await getAllComplaints();
+
+  if (backendComplaints.length > 0) {
+    const map = new Map<string, Complaint>();
+    allComplaints.forEach((c) => {
+      const key = c.complaint_number || String(c.id);
+      if (key) map.set(key, c);
+    });
+    backendComplaints.forEach((c: Complaint) => {
+      const key = c.complaint_number || String(c.id);
+      if (key) {
+        // Backend DB record takes absolute authoritative precedence
+        map.set(key, c);
+      }
+    });
+    allComplaints = Array.from(map.values());
+    saveStoredComplaints(allComplaints);
   }
 
   // 3. Authoritatively filter complaints belonging to target department
@@ -542,24 +535,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
   // Sync with Express backend API
   try {
-    let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    if (!token) {
-      try {
-        const loginRes = await fetch(`${getApiUrl()}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobileOrEmail: '9876543210', password: 'password123' })
-        });
-        if (loginRes.ok) {
-          const lData = await loginRes.json();
-          if (lData.token) {
-            token = lData.token;
-            localStorage.setItem('nagarsetu_token', token);
-          }
-        }
-      } catch (lErr) {}
-    }
-
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
       const res = await fetch(`${getApiUrl()}/api/complaints/submit`, {
         method: 'POST',
@@ -600,10 +576,18 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
           if (compInfo.department?.id) newComplaint.department_id = compInfo.department.id;
           if (compInfo.department?.name) newComplaint.department_name = compInfo.department.name;
         }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to submit complaint to backend service (HTTP ${res.status})`);
       }
+    } else {
+      console.warn('Complaint submitted while unauthenticated token missing.');
     }
-  } catch (bErr) {
-    console.warn('Backend API createComplaint sync note:', bErr);
+  } catch (bErr: any) {
+    console.error('Backend API createComplaint error:', bErr);
+    if (bErr.message && !bErr.message.includes('Failed to fetch')) {
+      throw bErr;
+    }
   }
 
   const all = getStoredComplaints();

@@ -332,6 +332,15 @@ export function matchComplaintToDepartment(
 export function isStaffInDepartment(s: any, deptId: string | number, deptCode: string, deptName: string): boolean {
   if (!s) return false;
 
+  const targetResolved = resolveDepartmentInfo(deptId, deptName, undefined);
+  const staffResolved = resolveDepartmentInfo(s.department_id, s.department_name, undefined);
+
+  if (targetResolved.code !== 'UNASSIGNED' && staffResolved.code !== 'UNASSIGNED') {
+    if (targetResolved.code === staffResolved.code || targetResolved.id === staffResolved.id) {
+      return true;
+    }
+  }
+
   // 1. Direct department_id match
   if (s.department_id !== undefined && s.department_id !== null) {
     const sDeptId = String(s.department_id).toLowerCase();
@@ -342,7 +351,7 @@ export function isStaffInDepartment(s: any, deptId: string | number, deptCode: s
     const codeIdMap: Record<string, string> = {
       PWD: '1', SAN: '2', WTR: '3', DRN: '4', ELE: '5', TRF: '6', MNT: '7'
     };
-    const mappedId = codeIdMap[(deptCode || '').toUpperCase()];
+    const mappedId = codeIdMap[(deptCode || targetResolved.code || '').toUpperCase()];
     if (mappedId && sDeptId === mappedId) return true;
   }
 

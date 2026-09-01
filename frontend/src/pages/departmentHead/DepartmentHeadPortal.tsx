@@ -1126,12 +1126,24 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Confirm Task Assignment to Department Staff
   const handleExecuteAssignment = async (compObj: Complaint, staffObj: ServiceStaffMemberRecord) => {
-    const cleanHeadDept = String(headDepartmentFull || '').split('(')[0].trim().toLowerCase();
-    const cleanStaffDept = String(staffObj.department_name || '').split('(')[0].trim().toLowerCase();
+    const headDeptResolved = resolveDepartmentInfo(headDeptId, headDepartmentFull || deptInfo.fullName);
+    const staffDeptResolved = resolveDepartmentInfo(staffObj.department_id, staffObj.department_name);
+    const compDeptResolved = resolveDepartmentInfo(compObj.department_id, compObj.department_name || (compObj as any).department, compObj.category);
 
-    if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
-      toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);
-      return;
+    // 1. Staff Department Matching Check against Department Head (by immutable department ID/code)
+    if (headDeptResolved.code !== 'UNASSIGNED' && staffDeptResolved.code !== 'UNASSIGNED') {
+      if (headDeptResolved.code !== staffDeptResolved.code && headDeptResolved.id !== staffDeptResolved.id) {
+        toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name || staffDeptResolved.fullName}) does not belong to your department (${headDeptResolved.fullName}).`);
+        return;
+      }
+    }
+
+    // 2. Complaint Department Matching Check against Department Head (by immutable department ID/code)
+    if (headDeptResolved.code !== 'UNASSIGNED' && compDeptResolved.code !== 'UNASSIGNED') {
+      if (headDeptResolved.code !== compDeptResolved.code && headDeptResolved.id !== compDeptResolved.id) {
+        toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Complaint '${compObj.complaint_number || compObj.id}' (${compDeptResolved.fullName}) does not belong to your department (${headDeptResolved.fullName}).`);
+        return;
+      }
     }
 
     setAssigning(true);
@@ -1156,9 +1168,9 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       // Read-back verification to guarantee persistence before displaying success
       const refreshedList = await getDepartmentComplaints(undefined, deptInfo.fullName);
-      const assignedComp = refreshedList.find(c => c.id === compObj.id || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
+      const assignedComp = refreshedList.find(c => String(c.id) === String(compObj.id) || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
 
-      if (!assignedComp || (assignedComp.status !== 'Staff Assigned' && assignedComp.status !== 'In Progress' && assignedComp.status !== 'Accepted')) {
+      if (!assignedComp || ((assignedComp.status as string) !== 'Staff Assigned' && (assignedComp.status as string) !== 'Assigned' && (assignedComp.status as string) !== 'In Progress' && (assignedComp.status as string) !== 'Accepted')) {
         throw new Error(`Assignment verification warning: Task status read-back returned '${assignedComp?.status || 'Unassigned'}'. Please refresh and check database.`);
       }
 
