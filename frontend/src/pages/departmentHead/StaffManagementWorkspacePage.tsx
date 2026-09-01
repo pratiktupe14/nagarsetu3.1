@@ -20,11 +20,11 @@ import {
 export const StaffManagementWorkspacePage: React.FC = () => {
   const { user, role } = useAuth();
   const activeRole = role || user?.role || 'citizen';
-  const isAdmin = ['admin', 'city_admin'].includes(activeRole);
+  const isAdmin = ['admin', 'city_admin', 'super_admin', 'municipal_admin'].includes(activeRole);
   const isDeptHead = activeRole === 'department_head';
 
   const userDeptName = user?.department_name || (isDeptHead ? 'My Department' : 'City Administration');
-  const userDeptId = user?.department_id ? String(user.department_id) : undefined;
+  const userDeptId = isAdmin ? undefined : (user?.department_id ? String(user.department_id) : undefined);
 
   const [staffList, setStaffList] = useState<DepartmentStaffApiItem[]>([]);
   const [summary, setSummary] = useState<DepartmentStaffApiSummary>({
@@ -73,9 +73,9 @@ export const StaffManagementWorkspacePage: React.FC = () => {
     setError(null);
     try {
       const res = await fetchDepartmentStaffApi({
-        status: statusFilter.toLowerCase(),
+        status: statusFilter === 'All' ? 'all' : statusFilter.toLowerCase(),
         search: searchQuery,
-        department_id: userDeptId
+        department_id: isAdmin ? undefined : userDeptId
       });
       setStaffList(res.staff);
       setSummary(res.summary);
@@ -85,7 +85,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery, userDeptId]);
+  }, [statusFilter, searchQuery, userDeptId, isAdmin]);
 
   useEffect(() => {
     loadStaffData();
