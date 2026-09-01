@@ -19,6 +19,18 @@ const aiRoutes = require('./routes/ai.routes');
 const app = express();
 app.set('trust proxy', 1);
 
+const { initDatabase } = require('./config/db');
+let dbInitPromise = null;
+app.use(async (req, res, next) => {
+  if (!dbInitPromise && typeof initDatabase === 'function') {
+    dbInitPromise = initDatabase().catch(err => console.warn('[DB INIT WARN]', err.message));
+  }
+  if (dbInitPromise) {
+    await dbInitPromise;
+  }
+  next();
+});
+
 // Security Headers & Core Middleware
 const allowedOrigins = [
   process.env.FRONTEND_URL,
