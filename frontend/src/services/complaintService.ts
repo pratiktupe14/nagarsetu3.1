@@ -1134,10 +1134,12 @@ export async function assignTaskByDepartmentHead(
     console.warn('Backend assign task API fallback:', apiErr);
   }
 
+  const compIdStr = String(complaintId || '').trim();
+
   // 2. Try Supabase if configured
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && compIdStr) {
     try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(compIdStr);
       const updateFields: Record<string, any> = {
         assigned_staff_id: staffId,
         assigned_staff_name: staffName,
@@ -1150,9 +1152,9 @@ export async function assignTaskByDepartmentHead(
 
       let supaQuery = supabase.from('complaints').update(updateFields);
       if (isUuid) {
-        supaQuery = supaQuery.eq('id', complaintId);
+        supaQuery = supaQuery.eq('id', compIdStr);
       } else {
-        supaQuery = supaQuery.eq('complaint_number', complaintId);
+        supaQuery = supaQuery.eq('complaint_number', compIdStr);
       }
 
       const { data: updateRows, error: supaErr } = await supaQuery.select();
@@ -1162,9 +1164,9 @@ export async function assignTaskByDepartmentHead(
         // Read back from database to verify persistence
         let readQuery = supabase.from('complaints').select('id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status');
         if (isUuid) {
-          readQuery = readQuery.eq('id', complaintId);
+          readQuery = readQuery.eq('id', compIdStr);
         } else {
-          readQuery = readQuery.eq('complaint_number', complaintId);
+          readQuery = readQuery.eq('complaint_number', compIdStr);
         }
 
         const { data: verifyRow } = await readQuery.maybeSingle();
@@ -1179,14 +1181,14 @@ export async function assignTaskByDepartmentHead(
 
   // 3. LocalStorage persistence
   const all = getStoredComplaints();
-  let comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
+  let comp = all.find((c) => String(c.id) === compIdStr || c.complaint_number === compIdStr);
   const prevStatus = comp ? comp.status : 'Submitted';
 
   if (!comp) {
     // If complaint was not yet in LocalStorage cache, create entry
     comp = {
       id: complaintId,
-      complaint_number: complaintId.startsWith('NS-') ? complaintId : `NS-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+      complaint_number: compIdStr.startsWith('NS-') ? compIdStr : `NS-2026-${Math.floor(100000 + Math.random() * 900000)}`,
       title: 'Assigned Civic Complaint',
       description: 'Task assigned by Department Head',
       category: 'General Civic Issue',

@@ -1167,11 +1167,24 @@ export const DepartmentHeadPortal: React.FC = () => {
       }
 
       // Read-back verification to guarantee persistence before displaying success
-      const refreshedList = await getDepartmentComplaints(undefined, deptInfo.fullName);
-      const assignedComp = refreshedList.find(c => String(c.id) === String(compObj.id) || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
+      const refreshedList = await getDepartmentComplaints(headDeptId, deptInfo.fullName);
+      let assignedComp = refreshedList.find(c => String(c.id) === String(compObj.id) || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
 
       if (!assignedComp || ((assignedComp.status as string) !== 'Staff Assigned' && (assignedComp.status as string) !== 'Assigned' && (assignedComp.status as string) !== 'In Progress' && (assignedComp.status as string) !== 'Accepted')) {
-        throw new Error(`Assignment verification warning: Task status read-back returned '${assignedComp?.status || 'Unassigned'}'. Please refresh and check database.`);
+        // If bulk department list read-back returned stale cache, re-fetch exact complaint directly from primary DB
+        try {
+          const singleComp = await getComplaintById(String(compObj.id || compObj.complaint_number));
+          if (singleComp && (singleComp.status === 'Staff Assigned' || singleComp.status === 'Assigned' || singleComp.status === 'In Progress')) {
+            assignedComp = singleComp;
+          } else {
+            throw new Error(`Assignment verification failed: Database status read-back returned '${singleComp?.status || assignedComp?.status || 'Submitted'}' instead of 'Staff Assigned'.`);
+          }
+        } catch (singleErr: any) {
+          if (singleErr.message && singleErr.message.includes('Assignment verification failed')) {
+            throw singleErr;
+          }
+          throw new Error(`Assignment verification failed: Task status read-back returned '${assignedComp?.status || 'Submitted'}'.`);
+        }
       }
 
       setAssignModalComplaint(null);
