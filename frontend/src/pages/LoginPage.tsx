@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth, getPortalForRole } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types/database.types';
@@ -9,6 +9,7 @@ import { Shield, User, Building2, Wrench, Smartphone, Mail, Lock, ArrowRight, Ch
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { t } = useLanguage();
 
@@ -45,6 +46,18 @@ export const LoginPage: React.FC = () => {
       setPassword(demoStaffPass);
     }
   };
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const roleParam = searchParams.get('role');
+    if (roleParam) {
+      let target: UserRole = 'citizen';
+      if (roleParam === 'city_admin' || roleParam === 'admin') target = 'city_admin';
+      else if (roleParam === 'department_head' || roleParam === 'dept_head') target = 'department_head';
+      else if (roleParam === 'service_staff' || roleParam === 'staff') target = 'service_staff';
+      handleRoleChange(target);
+    }
+  }, [location.search]);
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
