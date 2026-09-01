@@ -21,7 +21,7 @@ async function clearAllComplaints() {
   await safeDelete('feedback');
 
   try {
-    await query(`DELETE FROM notifications WHERE type IN ('submitted', 'staff_assigned', 'resolution_submitted', 'resolved', 'reopened', 'department_assigned') OR complaint_id IS NOT NULL`);
+    await query(`DELETE FROM notifications WHERE complaint_id IS NOT NULL`);
     console.log('✓ Cleared complaint notifications from: notifications');
   } catch (e) {
     console.log(`- Notifications cleanup notice: ${e.message}`);
