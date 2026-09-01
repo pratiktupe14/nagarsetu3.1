@@ -771,7 +771,7 @@ function runMemQuery(sql, params = []) {
 
   if (upper.startsWith('UPDATE')) {
     const list = memStore[targetTable] || [];
-    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+(.+?)\s+WHERE\s+(.+)/i);
+    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+([\s\S]+?)\s+WHERE\s+([\s\S]+)/i);
     if (setMatch && setMatch[1] && params.length > 0) {
       const setPairs = setMatch[1].split(',').map(p => p.trim());
       const whereClause = setMatch[2];
