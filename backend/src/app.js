@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { authRateLimiter, publicRateLimiter, authedRateLimiter, authenticatedRateLimiter } = require('./middleware/rateLimiter');
+const { authRateLimiter, publicRateLimiter, authedRateLimiter, authenticatedRateLimiter, aiRateLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes = require('./routes/auth.routes');
@@ -90,7 +90,7 @@ app.get('/api/health', publicRateLimiter, (req, res) => {
 // Register API Routes with Appropriate Rate Limiters
 app.use('/api/auth', authRateLimiter, authRoutes);
 app.use('/api/maps', publicRateLimiter, mapsRoutes);
-app.use('/api/ai', authedRateLimiter || publicRateLimiter, aiRoutes);
+app.use('/api/ai', aiRateLimiter || publicRateLimiter, aiRoutes);
 
 app.use('/api/complaints', authedRateLimiter || authenticatedRateLimiter, complaintRoutes);
 app.use('/api/officer', authedRateLimiter || authenticatedRateLimiter, officerRoutes);

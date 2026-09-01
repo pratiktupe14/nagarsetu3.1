@@ -129,9 +129,26 @@ const authedRateLimiter = rateLimit({
   }
 });
 
+// 4. Dedicated AI Vision API Rate Limiter (Prevent AI quota exhaustion)
+const aiRateLimiter = rateLimit({
+  windowMs: getEnvInt('RATE_LIMIT_AI_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
+  max: getEnvInt('RATE_LIMIT_AI_MAX', 60), // 60 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  message: {
+    success: false,
+    error: {
+      code: 'AI_RATE_LIMIT_EXCEEDED',
+      message: 'AI Vision analysis rate limit exceeded. Please wait a few minutes before submitting another photo.'
+    }
+  }
+});
+
 module.exports = {
   authRateLimiter,
   publicRateLimiter,
   authedRateLimiter,
-  authenticatedRateLimiter: authedRateLimiter
+  authenticatedRateLimiter: authedRateLimiter,
+  aiRateLimiter
 };
