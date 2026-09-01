@@ -76,7 +76,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   if (variant === 'compact') {
     return (
-      <div className={`inline-flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 max-w-full ${className}`}>
+      <div className={`inline-flex items-center gap-0.5 sm:gap-1 bg-gray-100/90 p-1 rounded-xl border border-gray-200/80 shrink-0 ${className}`}>
         {LANGUAGE_OPTIONS.map((opt) => {
           const isSelected = lang === opt.code;
           return (
@@ -86,9 +86,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               onClick={() => changeLanguage(opt.code)}
               aria-pressed={isSelected}
               title={opt.label}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition-all ${
                 isSelected
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
               }`}
             >

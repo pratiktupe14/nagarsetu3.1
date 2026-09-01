@@ -33,14 +33,14 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-xs font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 sm:h-24 py-2">
+        <div className="flex items-center justify-between h-16 sm:h-24 py-1.5 sm:py-2">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group py-1">
+          <Link to="/" className="flex items-center space-x-2 group py-1 shrink">
             <img
               src="/logo.png"
               alt="NAGARSETU Civic Platform"
-              className="h-14 sm:h-18 md:h-20 w-auto object-contain transition-transform group-hover:scale-105 max-w-[280px] sm:max-w-[380px] md:max-w-[440px]"
+              className="h-10 sm:h-16 md:h-20 w-auto object-contain transition-transform group-hover:scale-105 max-w-[160px] sm:max-w-[340px] md:max-w-[440px]"
             />
           </Link>
 
@@ -100,7 +100,7 @@ export const Navbar: React.FC = () => {
             </nav>
           )}
 
-          {/* Right Actions */}
+          {/* Right Actions - Desktop */}
           <div className="hidden md:flex items-center space-x-3">
             
             {/* Language Selector */}
@@ -187,13 +187,15 @@ export const Navbar: React.FC = () => {
 
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center space-x-2">
+          {/* Right Actions - Mobile */}
+          <div className="flex md:hidden items-center space-x-1.5">
+            <LanguageSelector variant="dropdown" />
             {!isPublicPage && <NotificationCenter />}
             
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-gray-700 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl text-gray-700 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+              aria-label="Toggle Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -204,42 +206,34 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200 p-4 space-y-4 text-xs font-semibold">
-          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-            <span className="text-gray-500 font-bold">Language</span>
+        <div className="md:hidden bg-white border-b border-gray-200 p-4 space-y-4 text-xs font-semibold shadow-lg">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+            <span className="text-gray-500 font-bold">Select Language</span>
             <LanguageSelector variant="compact" />
           </div>
 
-          <div className="space-y-2">
-            <button
-              onClick={() => { handleRoleSwitch('citizen'); setMobileMenuOpen(false); }}
-              className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
-            >
-              Citizen View
-            </button>
-            <button
-              onClick={() => { handleRoleSwitch('city_admin'); setMobileMenuOpen(false); }}
-              className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
-            >
-               City Administration View
-            </button>
-            <button
-              onClick={() => { handleRoleSwitch('department_head'); setMobileMenuOpen(false); }}
-              className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
-            >
-               Department Head View
-            </button>
-            <button
-              onClick={() => { handleRoleSwitch('service_staff'); setMobileMenuOpen(false); }}
-              className="w-full text-left p-2.5 rounded-xl bg-gray-50 text-gray-800 font-bold"
-            >
-               Field Staff View
-            </button>
-          </div>
+          {!user && (
+            <div className="grid grid-cols-2 gap-2 pb-2">
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2.5 rounded-xl bg-gray-100 text-gray-800 font-bold text-center flex items-center justify-center min-h-[44px]"
+              >
+                {t('login')}
+              </Link>
+              <Link
+                to="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-center flex items-center justify-center min-h-[44px]"
+              >
+                {t('register')}
+              </Link>
+            </div>
+          )}
 
           {user && (
             <button
-              onClick={handleLogout}
+              onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
               className="w-full p-2.5 rounded-xl bg-rose-50 text-rose-700 font-bold text-left flex items-center space-x-2 min-h-[44px]"
             >
               <LogOut className="w-4 h-4" />
