@@ -227,23 +227,44 @@ export async function fetchDepartmentStaffApi(params?: {
     rawRecords = rawRecords.filter((s) => isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name));
   }
 
-  const defaultStaff = rawRecords.map((s) => ({
-    id: s.id,
-    name: s.name,
-    email: s.email,
-    mobile: s.contact_number,
-    contact_number: s.contact_number,
-    employee_id: s.employee_id,
-    designation: s.role || 'Field Service Staff',
-    department_name: s.department_name,
-    status: (s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
-    active_tasks: 0,
-    completed_tasks: 0,
-    overdue_tasks: 0,
-    language: 'en',
-    joined_date: s.joined_date,
-    created_at: s.created_at
-  }));
+  const storedComplaints = getStoredComplaints();
+  const defaultStaff = rawRecords.map((s) => {
+    const isAssigned = (c: any) =>
+      c.assigned_staff_id === s.id ||
+      c.assigned_staff_id === s.employee_id ||
+      (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (s.email || '').toLowerCase()) ||
+      c.assigned_staff_name === s.name;
+
+    const activeTasks = storedComplaints.filter(
+      (c) => isAssigned(c) && ['Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified'].includes(c.status)
+    ).length;
+
+    const completedTasks = storedComplaints.filter(
+      (c) => isAssigned(c) && c.status === 'Resolved'
+    ).length;
+
+    const overdueTasks = storedComplaints.filter(
+      (c) => isAssigned(c) && ((c.status as string) === 'Overdue' || (c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < new Date()))
+    ).length;
+
+    return {
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      mobile: s.contact_number,
+      contact_number: s.contact_number,
+      employee_id: s.employee_id,
+      designation: s.role || 'Field Service Staff',
+      department_name: s.department_name,
+      status: (s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
+      active_tasks: activeTasks,
+      completed_tasks: completedTasks,
+      overdue_tasks: overdueTasks,
+      language: 'en',
+      joined_date: s.joined_date,
+      created_at: s.created_at
+    };
+  });
 
   return {
     staff: defaultStaff,
@@ -348,6 +369,9 @@ export interface ServiceStaffMemberRecord {
   ward_area: string;
   joined_date: string;
   created_at: string;
+  active_tasks?: number;
+  completed_tasks?: number;
+  overdue_tasks?: number;
 }
 
 export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
@@ -440,7 +464,10 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
         email: s.email,
         ward_area: 'Nashik City',
         joined_date: s.joined_date || new Date().toISOString(),
-        created_at: s.created_at || new Date().toISOString()
+        created_at: s.created_at || new Date().toISOString(),
+        active_tasks: s.active_tasks || 0,
+        completed_tasks: s.completed_tasks || 0,
+        overdue_tasks: s.overdue_tasks || 0
       }));
     }
   } catch (e) {
@@ -519,7 +546,34 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
   }
 
   const all = getAllServiceStaffRecords();
-  return all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
+  const staff = all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
+  if (!staff) return null;
+
+  const storedComplaints = getStoredComplaints();
+  const isAssigned = (c: any) =>
+    c.assigned_staff_id === staff.id ||
+    c.assigned_staff_id === staff.employee_id ||
+    (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (staff.email || '').toLowerCase()) ||
+    c.assigned_staff_name === staff.name;
+
+  const activeTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && ['Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified'].includes(c.status)
+  ).length;
+
+  const completedTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && c.status === 'Resolved'
+  ).length;
+
+  const overdueTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && ((c.status as string) === 'Overdue' || (c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < new Date()))
+  ).length;
+
+  return {
+    ...staff,
+    active_tasks: activeTasks,
+    completed_tasks: completedTasks,
+    overdue_tasks: overdueTasks
+  };
 }
 
 export function saveServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
@@ -555,7 +609,7 @@ export function getDepartmentStaffRoster(departmentName?: string, complaints: Co
   const allStaff = getAllServiceStaffRecords();
   const roster: DepartmentStaffMember[] = allStaff.map((s) => {
     const activeTasks = complaints.filter(
-      (c) => c.assigned_staff_id === s.id && c.status !== 'Resolved' && c.status !== 'Rejected'
+      (c) => (c.assigned_staff_id === s.id || c.assigned_staff_id === s.employee_id || (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (s.email || '').toLowerCase()) || c.assigned_staff_name === s.name) && c.status !== 'Resolved' && c.status !== 'Rejected'
     ).length;
     return {
       id: s.id,
