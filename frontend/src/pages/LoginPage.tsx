@@ -13,8 +13,8 @@ export const LoginPage: React.FC = () => {
   const { t } = useLanguage();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('citizen');
-  const [identifier, setIdentifier] = useState('9876543210');
-  const [password, setPassword] = useState('password123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [useOtp, setUseOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -32,8 +32,8 @@ export const LoginPage: React.FC = () => {
     const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
 
     if (role === 'citizen') {
-      setIdentifier('9876543210');
-      setPassword(demoUserPass);
+      setIdentifier('');
+      setPassword('');
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
       setPassword(demoAdminPass);

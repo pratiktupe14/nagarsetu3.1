@@ -483,11 +483,11 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-600">
                     <div className="flex items-center space-x-1">
                       <Mail className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{user?.email || 'rahul@citizen.nagarsetu.gov.in'}</span>
+                      <span>{user?.email || 'N/A'}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Smartphone className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{user?.mobile || '9876543210'}</span>
+                      <span>{user?.mobile || 'N/A'}</span>
                     </div>
                   </div>
 

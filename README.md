@@ -68,7 +68,7 @@ npm run dev
 
 | Role | Mobile / Login | Password | Initial View |
 | :--- | :--- | :--- | :--- |
-| **Citizen** | `9876543210` | `password123` | Report Issue & My Complaints |
+| **Citizen** | *(Register via `/register`)* | *(Self-created)* | Report Issue & My Complaints |
 | **Municipal Officer** | `9876543211` | `password123` | Command Center Dashboard |
 | **Field Maintenance Staff** | `9876543212` | `password123` | Assigned Tasks & Resolution Upload |
 | **Municipal Admin** | `9876543213` | `password123` | Executive Analytics & Hotspot Map |

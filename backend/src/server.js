@@ -11,6 +11,9 @@ const PORT = process.env.PORT || 5000;
 // Initial Seed Users for fast demo testing
 async function seedDefaultUsers() {
   try {
+    // Purge Rahul Sharma (Citizen) demo account if present
+    await query(`DELETE FROM users WHERE mobile = '9876543210' OR LOWER(email) = 'rahul@citizen.nagarsetu.gov.in'`).catch(() => {});
+
     const resCount = await query(`SELECT COUNT(*) as count FROM users`);
     if (resCount.rows && resCount.rows[0].count === 0) {
       console.log('Seeding default demo users (Citizen, Officer, Staff, Admin)...');
@@ -20,8 +23,10 @@ async function seedDefaultUsers() {
       const defaultHash = await bcrypt.hash(userPass, salt);
       const adminHash = await bcrypt.hash(adminPass, salt);
 
+      // Purge Rahul Sharma (Citizen) demo account if present
+      await query(`DELETE FROM users WHERE mobile = '9876543210' OR LOWER(email) = 'rahul@citizen.nagarsetu.gov.in'`).catch(() => {});
+
       const usersToSeed = [
-        { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en', passHash: defaultHash },
         { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en', passHash: defaultHash },
         { name: 'Ramesh Kumar (Field Staff)', mobile: '9876543212', email: 'staff@nagarsetu.gov.in', role: 'staff', lang: 'en', passHash: defaultHash },
         { name: 'Municipal Admin', mobile: '9876543213', email: 'admin@nagarsetu.gov.in', role: 'admin', lang: 'en', passHash: adminHash }
