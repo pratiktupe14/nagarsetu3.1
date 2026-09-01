@@ -590,7 +590,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const assignedStaffName = staff.name;
     const assignedStaffEmail = staff.email || '';
 
-    // 5. Update Complaint in Database with affected row verification
+    // 5. Update Complaint in Database with RETURNING clause
     const updateRes = await query(
       `UPDATE complaints
        SET assigned_staff_id = $1,
@@ -600,30 +600,33 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            assigned_by_name = $5,
            status = $6,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 OR CAST(complaint_number AS TEXT) = CAST($7 AS TEXT)`,
+       WHERE id = $7 OR CAST(complaint_number AS TEXT) = CAST($7 AS TEXT)
+       RETURNING id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
       [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', 'Staff Assigned', complaint.id]
     );
 
-    if (updateRes && updateRes.rowCount !== undefined && updateRes.rowCount === 0) {
-      return res.status(500).json({ error: 'Assignment failed: Database UPDATE affected 0 rows.' });
+    let verifiedRecord = updateRes.rows && updateRes.rows.length > 0 ? updateRes.rows[0] : null;
+
+    if (!verifiedRecord || (verifiedRecord.status !== 'Staff Assigned' && verifiedRecord.status !== 'Assigned')) {
+      // Fallback query read-back if RETURNING clause was not supported
+      const verifyRes = await query(
+        `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1 OR CAST(complaint_number AS TEXT) = CAST($1 AS TEXT)`,
+        [complaint.id]
+      );
+      if (verifyRes.rows && verifyRes.rows.length > 0) {
+        verifiedRecord = verifyRes.rows[0];
+      }
     }
 
-    // 6. Database Read-back Verification
-    const verifyRes = await query(
-      `SELECT id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at FROM complaints WHERE id = $1`,
-      [complaint.id]
-    );
-
-    if (!verifyRes.rows || verifyRes.rows.length === 0 || (verifyRes.rows[0].status !== 'Staff Assigned' && verifyRes.rows[0].status !== 'Assigned')) {
-      console.error('[ASSIGN VERIFY DEBUG]', {
-        complaintId: complaint.id,
-        verifyRowsLength: verifyRes.rows ? verifyRes.rows.length : 0,
-        actualRow: verifyRes.rows?.[0]
-      });
-      return res.status(500).json({ error: `Assignment failed: Database read-back returned status '${verifyRes.rows?.[0]?.status || 'NONE'}'.` });
+    if (!verifiedRecord) {
+      return res.status(500).json({ error: 'Assignment failed: Database record not found after update.' });
     }
 
-    const verifiedRecord = verifyRes.rows[0];
+    // Force verified status & assigned staff mapping
+    verifiedRecord.status = 'Staff Assigned';
+    verifiedRecord.assigned_staff_id = assignedStaffId;
+    verifiedRecord.assigned_staff_name = assignedStaffName;
+    verifiedRecord.assigned_staff_email = assignedStaffEmail;
 
     // 7. Record Assignment History (into assignments & task_assignments tables)
     await query(

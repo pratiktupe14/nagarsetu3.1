@@ -623,27 +623,31 @@ function createTablesSqlite() {
   });
 }
 
-const memStore = {
-  departments: [
-    { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
-    { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
-    { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
-    { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
-    { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
-    { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
-    { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
-  ],
-  users: [],
-  department_heads: [],
-  field_staff: [],
-  complaints: [],
-  assignments: [],
-  feedback: [],
-  notifications: [],
-  complaint_status_history: [],
-  announcements: [],
-  announcement_reads: []
-};
+if (!global._memStore) {
+  global._memStore = {
+    departments: [
+      { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
+      { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
+      { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
+      { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
+      { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
+      { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
+      { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
+    ],
+    users: [],
+    department_heads: [],
+    field_staff: [],
+    complaints: [],
+    assignments: [],
+    task_assignments: [],
+    feedback: [],
+    notifications: [],
+    complaint_status_history: [],
+    announcements: [],
+    announcement_reads: []
+  };
+}
+const memStore = global._memStore;
 
 function runMemQuery(sql, params = []) {
   const s = sql.trim();
@@ -813,7 +817,7 @@ function runMemQuery(sql, params = []) {
         });
       });
 
-      return Promise.resolve({ rows: [], rowCount: targets.length || 1 });
+      return Promise.resolve({ rows: targets.map(t => ({ ...t })), rowCount: targets.length || 1 });
     }
     return Promise.resolve({ rows: [], rowCount: 1 });
   }
