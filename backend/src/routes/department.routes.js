@@ -600,7 +600,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
            assigned_by_name = $5,
            status = $6,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 OR complaint_number = $7`,
+       WHERE id = $7 OR CAST(complaint_number AS TEXT) = CAST($7 AS TEXT)`,
       [assignedStaffId, assignedStaffName, assignedStaffEmail, req.user.id, req.user.name || 'Department Head', 'Staff Assigned', complaint.id]
     );
 
