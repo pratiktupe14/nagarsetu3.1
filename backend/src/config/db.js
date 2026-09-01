@@ -272,21 +272,28 @@ async function createTablesPostgres() {
 
 function setupSqlite(resolve, reject) {
   useSqlite = true;
-  const sqliteMod = getSqlite3();
-  if (!sqliteMod) {
-    console.warn('[SQLITE NOTE] Cannot initialize SQLite without native module.');
+  const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION);
+  const sqliteMod = isVercel ? null : getSqlite3();
+  if (!sqliteMod || isVercel) {
+    console.warn('[STORAGE NOTE] Serverless environment detected. Using fast resilient memory store.');
     return resolve ? resolve() : null;
   }
-  const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
-  const dbPath = isVercel ? path.join('/tmp', 'nagarsetu.sqlite') : path.join(__dirname, '../../nagarsetu.sqlite');
-  sqliteDb = new sqliteMod.Database(dbPath, (err) => {
-    if (err) {
-      console.error('Error connecting to SQLite DB:', err);
-      return reject ? reject(err) : null;
-    }
-    console.log('Using SQLite database at:', dbPath);
-    createTablesSqlite().then(resolve).catch(reject);
-  });
+  const dbPath = path.join(__dirname, '../../nagarsetu.sqlite');
+  try {
+    sqliteDb = new sqliteMod.Database(dbPath, (err) => {
+      if (err) {
+        console.warn('Error connecting to SQLite DB, using in-memory store:', err.message);
+        sqliteDb = null;
+        return resolve ? resolve() : null;
+      }
+      console.log('Using SQLite database at:', dbPath);
+      createTablesSqlite().then(resolve).catch(() => resolve());
+    });
+  } catch (err) {
+    console.warn('SQLite init exception, using in-memory store:', err.message);
+    sqliteDb = null;
+    return resolve ? resolve() : null;
+  }
 }
 
 function createTablesSqlite() {
