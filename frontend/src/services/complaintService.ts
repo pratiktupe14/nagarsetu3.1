@@ -314,7 +314,7 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     const res = await fetch(`${getApiUrl()}/api/complaints`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+      headers: getNoCacheHeaders()
     });
     if (res.ok) {
       const data = await res.json();
