@@ -630,20 +630,30 @@ function runMemQuery(sql, params = []) {
   if (upper.startsWith('SELECT')) {
     let list = memStore[targetTable] || [];
     if (params && params.length > 0) {
-      const pStr = params.map(p => String(p).trim().toLowerCase());
+      const pStr = params.map(p => String(p).trim().toLowerCase().replace(/^%|%$/g, ''));
       const filtered = list.filter(item => {
         if (!item) return false;
         const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
         const itemEmail = item.email ? String(item.email).trim().toLowerCase() : '';
         const itemId = item.id !== undefined ? String(item.id).trim() : '';
+        const itemUserId = item.user_id !== undefined ? String(item.user_id).trim() : '';
         const itemCitizenId = item.citizen_id !== undefined ? String(item.citizen_id).trim() : '';
+        const itemDeptId = item.department_id !== undefined ? String(item.department_id).trim() : '';
+        const itemStatus = item.status ? String(item.status).trim().toLowerCase() : '';
+        const itemName = item.name ? String(item.name).trim().toLowerCase() : '';
+        const itemEmpId = item.employee_id ? String(item.employee_id).trim().toLowerCase() : '';
         const itemNumber = item.complaint_number ? String(item.complaint_number).trim().toLowerCase() : '';
         return pStr.some(p => p !== '' && (
           itemMobile === p || 
           itemEmail === p || 
           itemId === p || 
+          itemUserId === p ||
           itemCitizenId === p ||
-          itemNumber === p
+          itemDeptId === p ||
+          itemStatus === p ||
+          itemEmpId === p ||
+          itemNumber === p ||
+          (p.length >= 2 && (itemName.includes(p) || itemEmail.includes(p) || itemMobile.includes(p)))
         ));
       });
       return Promise.resolve({ rows: filtered });
