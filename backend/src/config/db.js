@@ -264,6 +264,8 @@ async function createTablesPostgres() {
         read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(announcement_id, user_id)
       );
+    `);
+
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS user_roles (
         id SERIAL PRIMARY KEY,
