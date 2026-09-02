@@ -80,9 +80,9 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
       [targetId, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
-    ).catch(() => {});
+    ).catch(err => console.warn('[STAFF ROUTE HISTORY WARN]', err.message));
 
-    await notifyStatusChange(targetId, status, compRes.rows[0].citizen_id).catch(() => {});
+    await notifyStatusChange(targetId, status, compRes.rows[0].citizen_id).catch(err => console.warn('[STAFF ROUTE NOTIFICATION WARN]', err.message));
 
     return res.json({ success: true, message: `Task status updated to ${status}` });
   } catch (err) {
@@ -240,14 +240,14 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES ($1, $2, $3, $4, $5)`,
       [complaint.id, 'Resolution Submitted', 'Field work completed with resolution photo proof. Awaiting Department Head verification.', 'Field Operations', req.user.name || 'Field Staff']
-    ).catch(() => {});
+    ).catch(err => console.warn('[STAFF RESOLVE HISTORY WARN]', err.message));
 
     await query(
       `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 OR staff_id = $2)`,
       [primaryKeyId, req.user.id]
-    ).catch(() => {});
+    ).catch(err => console.warn('[STAFF ASSIGNMENT UPDATE WARN]', err.message));
 
-    await notifyStatusChange(complaint.id, 'Resolution Submitted', complaint.citizen_id).catch(() => {});
+    await notifyStatusChange(complaint.id, 'Resolution Submitted', complaint.citizen_id).catch(err => console.warn('[STAFF RESOLVE NOTIFICATION WARN]', err.message));
 
     return res.json({
       success: true,

@@ -178,14 +178,16 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   }
 
   // Development Diagnostic Logging
-  console.log('[ADMIN DATA SYNC]', {
-    apiUrl: `${getApiUrl()}/api/complaints`,
-    fetchTime: startTime,
-    responseStatus,
-    databaseRecordCount: list.length,
-    lastUpdatedRecord: finalComplaints[0]?.updated_at || finalComplaints[0]?.created_at || 'N/A',
-    finalRecordCount: finalComplaints.length
-  });
+  if (import.meta.env.DEV) {
+    console.log('[ADMIN DATA SYNC]', {
+      apiUrl: `${getApiUrl()}/api/complaints`,
+      fetchTime: startTime,
+      responseStatus,
+      databaseRecordCount: list.length,
+      lastUpdatedRecord: finalComplaints[0]?.updated_at || finalComplaints[0]?.created_at || 'N/A',
+      finalRecordCount: finalComplaints.length
+    });
+  }
 
   return finalComplaints;
 }
@@ -1542,7 +1544,7 @@ export async function purgeAllComplaints(): Promise<boolean> {
     };
     const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE', headers });
     if (!res.ok) {
-      await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'POST', headers });
+      console.warn('Backend purge complaints endpoint returned status:', res.status);
     }
   } catch (e) {
     console.warn('Backend purge complaints note:', e);

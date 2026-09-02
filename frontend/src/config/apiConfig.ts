@@ -32,3 +32,14 @@ export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}
     ...additionalHeaders
   };
 };
+
+export const handleApiResponse = async (res: Response): Promise<any> => {
+  if (res.status === 429) {
+    throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+  }
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || `API Error (${res.status})`);
+  }
+  return res.json();
+};

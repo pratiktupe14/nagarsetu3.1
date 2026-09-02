@@ -43,7 +43,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [slaAlertOverdue, setSlaAlertOverdue] = useState(true);
 
   // Application Settings State
-  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_admin_lang') || 'en');
+  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_admin_lang') || 'en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [timeFormat, setTimeFormat] = useState('12 Hour');
   const [autoRefreshInterval, setAutoRefreshInterval] = useState('30s');

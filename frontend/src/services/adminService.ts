@@ -185,14 +185,9 @@ export async function fetchDepartmentStaffApi(params?: {
     if (params?.search) qParams.append('search', params.search);
     if (params?.department_id) qParams.append('department_id', params.department_id);
 
-    let res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
+    const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
       headers: getAuthHeaders()
     });
-    if (!res.ok && (res.status === 404 || res.status === 502)) {
-      res = await fetch(`${getApiUrl()}/api/departments/staff?${qParams.toString()}`, {
-        headers: getAuthHeaders()
-      });
-    }
 
     if (res.ok) {
       const data = await res.json();

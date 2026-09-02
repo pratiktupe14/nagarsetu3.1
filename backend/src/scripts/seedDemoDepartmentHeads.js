@@ -73,7 +73,7 @@ const OFFICIAL_DEPARTMENTS = [
   }
 ];
 
-const DEMO_PASSWORD = 'nagarsetu@123';
+const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || process.env.DEMO_USER_PASSWORD || 'nagarsetu@123';
 
 async function seed7DemoDepartmentHeads(queryFn) {
   const q = queryFn || require('../config/db').query;

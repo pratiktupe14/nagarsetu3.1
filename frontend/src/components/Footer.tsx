@@ -16,9 +16,9 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-6 text-gray-500 font-medium">
-          <a href="#" className="hover:text-emerald-700">{t('privacyPolicy')}</a>
-          <a href="#" className="hover:text-emerald-700">{t('termsOfService')}</a>
-          <a href="#" className="hover:text-emerald-700">{t('municipalHelpdesk')}</a>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('privacyPolicy')}</button>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('termsOfService')}</button>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('municipalHelpdesk')}</button>
         </div>
 
         <div className="text-gray-400 font-mono text-[11px]">

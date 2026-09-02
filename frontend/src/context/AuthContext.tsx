@@ -438,27 +438,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const resolvedHead = findDepartmentHeadByIdentifier(user.email);
       if (resolvedHead) roleUser = resolvedHead;
     }
-    setUser(roleUser);
-    localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
 
-    // Ensure valid JWT token is fetched and cached in localStorage for API routes
-    if (!localStorage.getItem('nagarsetu_token')) {
-      try {
-        const loginId = user?.email || (newRole === 'city_admin' ? '9876543213' : '9876543210');
-        const loginPass = newRole === 'city_admin' ? 'NagarSetu@Admin2026!' : 'password123';
-        const res = await fetch(`${getApiUrl()}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.token) {
-            localStorage.setItem('nagarsetu_token', data.token);
+    // Always fetch fresh backend token for the target role to maintain authorization synchronization
+    try {
+      let loginId = roleUser.email || roleUser.mobile;
+      if (!loginId) {
+        loginId = newRole === 'city_admin' ? '9876543213' : newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : newRole === 'service_staff' ? '9876543211' : '9876543210';
+      }
+      const loginPass = newRole === 'city_admin' ? 'NagarSetu@Admin2026!' : 'password123';
+      const res = await fetch(`${getApiUrl()}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token && data.user) {
+          localStorage.setItem('nagarsetu_token', data.token);
+          if (data.user.role) {
+            const backendRole = data.user.role === 'admin' ? 'city_admin' : data.user.role;
+            roleUser = { ...roleUser, role: backendRole as UserRole, id: String(data.user.id || roleUser.id) };
           }
         }
-      } catch (e) {}
+      }
+    } catch (e) {
+      console.warn('Role switch token sync notice:', e);
     }
+
+    setUser(roleUser);
+    localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
   };
 
   const login = async (identifier: string, password: string, targetRole: UserRole): Promise<boolean> => {

@@ -34,7 +34,7 @@ const LOCAL_STORAGE_ANNOUNCEMENTS = 'nagarsetu_official_announcements';
 const LOCAL_STORAGE_MAINTENANCE = 'nagarsetu_maintenance_works';
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('nagarsetu_token') || localStorage.getItem('token') || '';
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {})

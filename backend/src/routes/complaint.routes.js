@@ -86,7 +86,7 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
 
   // 1. Direct database lookup by department code (e.g., PWD, SAN, WTR, DRN, ELE, TRF, MNT)
   if (deptInfo && deptInfo.code) {
-    const codeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) LIMIT 1`, [deptInfo.code]);
+    const codeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) LIMIT 1`, [deptInfo.code]);
     if (codeRes.rows && codeRes.rows.length > 0) {
       return codeRes.rows[0].id;
     }
@@ -94,7 +94,7 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
 
   // 2. Direct database lookup by department name
   if (deptInfo && deptInfo.name) {
-    const nameRes = await query(`SELECT id FROM departments WHERE UPPER(name) LIKE UPPER($1) LIMIT 1`, [`%${deptInfo.name}%`]);
+    const nameRes = await query(`SELECT id FROM departments WHERE UPPER(name) LIKE UPPER(?) LIMIT 1`, [`%${deptInfo.name}%`]);
     if (nameRes.rows && nameRes.rows.length > 0) {
       return nameRes.rows[0].id;
     }
@@ -105,12 +105,12 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
   if (inputStr) {
     const numericId = parseInt(inputStr, 10);
     if (!isNaN(numericId) && numericId > 0) {
-      const idRes = await query(`SELECT id FROM departments WHERE id = $1 LIMIT 1`, [numericId]);
+      const idRes = await query(`SELECT id FROM departments WHERE id = ? LIMIT 1`, [numericId]);
       if (idRes.rows && idRes.rows.length > 0) {
         return idRes.rows[0].id;
       }
     }
-    const flexRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER($1) OR UPPER(name) LIKE UPPER($2) LIMIT 1`, [inputStr, `%${inputStr}%`]);
+    const flexRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) OR UPPER(name) LIKE UPPER(?) LIMIT 1`, [inputStr, `%${inputStr}%`]);
     if (flexRes.rows && flexRes.rows.length > 0) {
       return flexRes.rows[0].id;
     }
@@ -267,19 +267,9 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 });
 
 // Get all complaints for Admin (all departments) or Department Head (isolated by department_id)
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const jwt = require('jsonwebtoken');
-    const { JWT_SECRET } = require('../middleware/auth');
-
-    let authUser = null;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        authUser = jwt.verify(token, JWT_SECRET);
-      } catch (e) {}
-    }
+    const authUser = req.user;
 
     let sql = `
       SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
@@ -292,22 +282,22 @@ router.get('/', async (req, res) => {
 
     // Server-side Data Isolation based on Role
     if (authUser && authUser.role === 'citizen') {
-      sql += ` AND (c.citizen_id = $1 OR CAST(c.citizen_id AS TEXT) = $2)`;
+      sql += ` AND (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
       params.push(authUser.id, String(authUser.id));
     } else if (authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
-        const uRes = await query('SELECT department_id FROM users WHERE id = $1 OR email = $2', [authUser.id, authUser.email || '']);
+        const uRes = await query('SELECT department_id FROM users WHERE id = ? OR email = ?', [authUser.id, authUser.email || '']);
         if (uRes.rows && uRes.rows.length > 0) deptId = uRes.rows[0].department_id;
       }
       if (!deptId) {
-        const dhRes = await query('SELECT department_id FROM department_heads WHERE (user_id = $1 OR LOWER(email) = LOWER($2)) AND status = \'active\'', [authUser.id, authUser.email || '']);
+        const dhRes = await query('SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = LOWER(?)) AND status = \'active\'', [authUser.id, authUser.email || '']);
         if (dhRes.rows && dhRes.rows.length > 0) deptId = dhRes.rows[0].department_id;
       }
-      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
       params.push(deptId || -1, String(deptId || -1));
     } else if (req.query.department_id) {
-      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
+      sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
       params.push(req.query.department_id, String(req.query.department_id));
     }
 
@@ -417,20 +407,6 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
 });
 // Purge/remove all complaints and associated records (Admin Only)
 router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
-  try {
-    await query(`DELETE FROM feedback`);
-    await query(`DELETE FROM assignments`);
-    await query(`DELETE FROM complaint_status_history`);
-    await query(`DELETE FROM notifications`);
-    await query(`DELETE FROM complaints`);
-    return res.json({ message: 'All complaints and associated records purged successfully' });
-  } catch (err) {
-    console.error('Purge all complaints error:', err);
-    return res.status(500).json({ error: 'Failed to purge complaints' });
-  }
-});
-
-router.post('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
   try {
     await query(`DELETE FROM feedback`);
     await query(`DELETE FROM assignments`);

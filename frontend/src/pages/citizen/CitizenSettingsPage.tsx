@@ -19,7 +19,7 @@ export const CitizenSettingsPage: React.FC = () => {
   >('general');
 
   // General Settings State
-  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_language') || 'en');
+  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_language') || 'en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [timeFormat, setTimeFormat] = useState('12 Hours (AM/PM)');
 

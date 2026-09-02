@@ -8,29 +8,28 @@ const adminToken = jwt.sign({ id: 1, role: 'city_admin', email: 'admin@nagarsetu
 
 const server = app.listen(0, async () => {
   const port = server.address().port;
-  console.log(`BUG-002 test server running on port ${port}`);
+  console.log(`BUG-002 DELETE test server running on port ${port}`);
 
-  // Test POST request to /api/complaints/purge-all
-  const reqPost = http.request(`http://localhost:${port}/api/complaints/purge-all`, {
-    method: 'POST',
+  const reqDelete = http.request(`http://localhost:${port}/api/complaints/purge-all`, {
+    method: 'DELETE',
     headers: { 'Authorization': `Bearer ${adminToken}` }
   }, (res) => {
-    console.log(`POST STATUS: ${res.statusCode}`);
+    console.log(`DELETE STATUS: ${res.statusCode}`);
     server.close();
-    if (res.statusCode === 404) {
-      console.log('BUG-002 PASSED: POST /api/complaints/purge-all returned 404 (only DELETE supported)');
+    if (res.statusCode === 200) {
+      console.log('BUG-002 DELETE PASSED: DELETE /api/complaints/purge-all returned 200 OK');
       process.exit(0);
     } else {
-      console.log(`BUG-002 FAILED: POST /api/complaints/purge-all returned ${res.statusCode} (duplicate POST route still active)`);
+      console.log(`BUG-002 DELETE FAILED: Returned ${res.statusCode} instead of 200`);
       process.exit(1);
     }
   });
 
-  reqPost.on('error', err => {
+  reqDelete.on('error', err => {
     console.error('Request error:', err);
     server.close();
     process.exit(1);
   });
 
-  reqPost.end();
+  reqDelete.end();
 });

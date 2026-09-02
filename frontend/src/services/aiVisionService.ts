@@ -290,9 +290,11 @@ export async function extractVisualFeatures(imageInput: File | string): Promise<
       vector
     };
   } catch (err) {
-    const mockHash = typeof imageInput === 'string' ? imageInput.substring(0, 16) : 'a1b2c3d4e5f60718';
+    const fallbackSeed = typeof imageInput === 'string' && imageInput.length > 5 
+      ? imageInput.substring(imageInput.length - 16) 
+      : `${Date.now().toString(16)}${Math.floor(Math.random() * 0xffffff).toString(16)}`.substring(0, 16);
     return {
-      dHash: mockHash,
+      dHash: fallbackSeed.padStart(16, '0'),
       brightness: 120,
       contrast: 65,
       dominantColors: ['#475569', '#059669'],

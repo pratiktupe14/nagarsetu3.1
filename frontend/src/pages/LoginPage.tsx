@@ -239,9 +239,9 @@ export const LoginPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="font-bold text-gray-700">{t('password')}</label>
-                    <a href="#" className="text-[11px] text-emerald-600 font-semibold hover:underline">
+                    <button type="button" onClick={(e) => { e.preventDefault(); alert('Please contact Municipal Admin to reset password.'); }} className="text-[11px] text-emerald-600 font-semibold hover:underline cursor-pointer">
                       {t('forgotPassword')}
-                    </a>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />

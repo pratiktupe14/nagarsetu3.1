@@ -53,7 +53,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* DEMO ROLE SWITCHER DROPDOWN */}
         {activeRole !== 'department_head' && (
           <div className="relative group">
-            <button className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
+            <button aria-label="Switch User Role" className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="capitalize">{activeRole.replace('_', ' ')}</span>
               <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
