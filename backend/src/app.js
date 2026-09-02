@@ -19,9 +19,47 @@ const aiRoutes = require('./routes/ai.routes');
 const app = express();
 app.set('trust proxy', 1);
 
+// Security Headers & Core Middleware — CORS MUST BE FIRST
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
+  'https://nagarsetu3-1.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:5000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:5000'
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Database initialization middleware (skip for OPTIONS preflight)
 const { initDatabase, query, getIsSqlite } = require('./config/db');
 let dbInitPromise = null;
 app.use(async (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
   try {
     if (!dbInitPromise && typeof initDatabase === 'function') {
       dbInitPromise = initDatabase();
@@ -39,35 +77,6 @@ app.use(async (req, res, next) => {
     });
   }
 });
-
-// Security Headers & Core Middleware
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
-  'https://nagarsetu3-1.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'http://localhost:5000',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:4173',
-  'http://127.0.0.1:5000'
-].filter(Boolean);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
-  credentials: true
-}));
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static uploads safely (Prevent execution as script/code)
 app.use('/uploads', (req, res, next) => {

@@ -574,12 +574,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (backendErr: any) {
         if (backendErr && backendErr.message) {
-          if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
+          const errMsg = backendErr.message.toLowerCase();
+          // If explicit credentials error from backend, re-throw immediately
+          if (errMsg.includes('invalid credentials') || errMsg.includes('password') || errMsg.includes('department assignment') || errMsg.includes('inactive')) {
+            throw backendErr;
+          }
+          // If connection failure or server error, log warning and allow Supabase fallback
+          console.warn(`Backend API login connection note (${getApiUrl()}):`, backendErr.message);
+          if (!isSupabaseConfigured()) {
             throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
           }
-          throw backendErr;
         }
-        console.warn('Backend API login note:', backendErr);
       }
 
       const cleanEmail = cleanIdentifier.includes('@') ? cleanIdentifier.toLowerCase() : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
@@ -798,10 +803,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (backendErr: any) {
         if (backendErr && backendErr.message) {
-          if (backendErr.message === 'Failed to fetch' || backendErr.name === 'TypeError' || backendErr.message.toLowerCase().includes('failed to fetch')) {
+          const errMsg = backendErr.message.toLowerCase();
+          if (errMsg.includes('already registered') || errMsg.includes('already exists') || errMsg.includes('mobile number already')) {
+            throw backendErr;
+          }
+          console.warn(`Backend API registration note (${getApiUrl()}):`, backendErr.message);
+          if (!isSupabaseConfigured()) {
             throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
           }
-          throw backendErr;
         }
       }
 

@@ -43,7 +43,14 @@ function initDatabase() {
   initPromise = new Promise(async (resolve, reject) => {
     const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
     const isProduction = process.env.NODE_ENV === 'production';
-    const dbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING || '').trim();
+    const rawDbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING || '').trim();
+    
+    // Sanitize DB URL: strip surrounding quotes and accidental "DATABASE_URL=" prefix
+    let dbUrl = rawDbUrl.replace(/^["']|["']$/g, '').trim();
+    if (dbUrl.startsWith('DATABASE_URL=')) dbUrl = dbUrl.slice('DATABASE_URL='.length).trim();
+    if (dbUrl.startsWith('POSTGRES_URL=')) dbUrl = dbUrl.slice('POSTGRES_URL='.length).trim();
+    dbUrl = dbUrl.replace(/^["']|["']$/g, '').trim();
+
     const shouldBePostgres = isVercel || isProduction || DB_TYPE === 'postgres' || Boolean(dbUrl);
 
     const onInitDone = async () => {
@@ -60,6 +67,18 @@ function initDatabase() {
     if (shouldBePostgres) {
       if (!dbUrl) {
         const errMsg = 'FATAL DATABASE ERROR: PostgreSQL connection string (DATABASE_URL / POSTGRES_URL) is required in Vercel/Production mode. In-memory fallback is disabled.';
+        console.error(errMsg);
+        return reject(new Error(errMsg));
+      }
+
+      if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+        const errMsg = `FATAL DATABASE ERROR: Invalid DATABASE_URL format. Connection string must start with "postgresql://" or "postgres://". Received invalid value: "${dbUrl}". Please update DATABASE_URL in Vercel Project Settings to your real Supabase connection string (e.g. postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres).`;
+        console.error(errMsg);
+        return reject(new Error(errMsg));
+      }
+
+      if (dbUrl.includes('[YOUR-PASSWORD]') || dbUrl.includes('[YOUR_PASSWORD]') || dbUrl.includes('[PASSWORD]')) {
+        const errMsg = 'FATAL DATABASE ERROR: DATABASE_URL contains placeholder "[YOUR-PASSWORD]". Please replace it with your actual Supabase database password in Vercel Project Settings.';
         console.error(errMsg);
         return reject(new Error(errMsg));
       }
