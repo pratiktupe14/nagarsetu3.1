@@ -258,6 +258,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 3500);
 
     async function checkCurrentSession() {
+      // 1. Authoritative Backend Database Session Check
+      const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+      if (storedToken) {
+        try {
+          const res = await fetch(`${getApiUrl()}/api/auth/me`, {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.user && isMounted) {
+              const u = data.user;
+              const authenticatedUser: UserProfile = {
+                id: String(u.id),
+                full_name: u.name,
+                email: u.email || '',
+                mobile: u.mobile || '',
+                role: (u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role)) as UserRole,
+                department_id: u.department_id ? String(u.department_id) : undefined,
+                department_name: u.department_name || undefined,
+                department_code: u.department_code || undefined,
+                employee_id: u.employee_id || undefined,
+                language_pref: u.language_pref || 'en'
+              };
+              setUser(authenticatedUser);
+              localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+              if (isMounted) setLoading(false);
+              clearTimeout(safetyTimer);
+              return;
+            }
+          } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+            localStorage.removeItem('nagarsetu_token');
+            localStorage.removeItem('nagarsetu_user');
+            sessionStorage.removeItem('nagarsetu_token');
+            sessionStorage.removeItem('nagarsetu_user');
+            if (isMounted) setUser(null);
+          }
+        } catch (backendErr) {
+          console.warn('Authoritative backend /api/auth/me check note:', backendErr);
+        }
+      }
+
       if (!isSupabaseConfigured()) {
         if (isMounted) setLoading(false);
         clearTimeout(safetyTimer);
@@ -417,9 +463,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('onAuthStateChange setup note:', e);
     }
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'nagarsetu_token' || e.key === 'nagarsetu_user') {
+        checkCurrentSession();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
+      window.removeEventListener('storage', handleStorageChange);
       if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
         try {
           authSubscription.unsubscribe();

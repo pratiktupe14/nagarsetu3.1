@@ -4,7 +4,7 @@ const fs = require('fs');
 
 let sqlite3 = null;
 function getSqlite3() {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION) {
     return null;
   }
   if (!sqlite3) {
@@ -21,18 +21,30 @@ function getSqlite3() {
 let pgPool = null;
 let sqliteDb = null;
 let useSqlite = false;
+let isInitializing = false;
+let initPromise = null;
 
-const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
+const DB_TYPE = (process.env.DB_TYPE || '').toLowerCase(); // 'postgres' or 'sqlite'
 
 const seedDefaultUsers = require('../scripts/seedDefaultUsers');
 const seedServiceStaff = require('../scripts/seedServiceStaff');
 const seed7DemoDepartmentHeads = require('../scripts/seedDemoDepartmentHeads');
 
+/**
+ * Initialize PostgreSQL or local SQLite database.
+ * NOTE: Serverless/Vercel environments MUST use persistent PostgreSQL.
+ * Memory store fallbacks are strictly prohibited.
+ */
 function initDatabase() {
-  return new Promise((resolve) => {
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = new Promise(async (resolve, reject) => {
+    const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
     const isProduction = process.env.NODE_ENV === 'production';
-    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING;
-    const isPostgres = (DB_TYPE === 'postgres' || isProduction) && Boolean(dbUrl);
+    const dbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING || '').trim();
+    const shouldBePostgres = isVercel || isProduction || DB_TYPE === 'postgres' || Boolean(dbUrl);
 
     const onInitDone = async () => {
       try {
@@ -45,48 +57,70 @@ function initDatabase() {
       resolve();
     };
 
-    if (isPostgres && dbUrl) {
-      console.log('Connecting to PostgreSQL database...');
+    if (shouldBePostgres) {
+      if (!dbUrl) {
+        const errMsg = 'FATAL DATABASE ERROR: PostgreSQL connection string (DATABASE_URL / POSTGRES_URL) is required in Vercel/Production mode. In-memory fallback is disabled.';
+        console.error(errMsg);
+        return reject(new Error(errMsg));
+      }
+
+      console.log('Connecting to persistent PostgreSQL database...');
       try {
-        pgPool = new Pool({
-          connectionString: dbUrl,
-          ssl: { rejectUnauthorized: false },
-          connectionTimeoutMillis: 3000
-        });
-        pgPool.query('SELECT NOW()', (err, res) => {
-          if (err) {
-            console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback):', err.message);
-            setupSqlite(onInitDone, onInitDone);
-          } else {
-            console.log('PostgreSQL connected successfully.');
-            createTablesPostgres().then(onInitDone).catch(e => {
-              console.warn('[DATABASE TABLE INIT NOTE]', e.message);
-              setupSqlite(onInitDone, onInitDone);
-            });
-          }
-        });
-      } catch (e) {
-        console.warn('[DATABASE POOL INIT NOTE]', e.message);
-        setupSqlite(onInitDone, onInitDone);
+        if (!pgPool) {
+          pgPool = new Pool({
+            connectionString: dbUrl,
+            ssl: { rejectUnauthorized: false },
+            max: 10,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000
+          });
+
+          pgPool.on('error', (err) => {
+            console.error('[POSTGRES POOL UNEXPECTED ERROR]:', err.message);
+          });
+        }
+
+        // Verify connection with active query
+        const testRes = await pgPool.query('SELECT NOW() as connected_at');
+        console.log('PostgreSQL connected successfully at:', testRes.rows[0]?.connected_at);
+
+        // Ensure all required persistent tables and columns exist
+        await createTablesPostgres();
+        useSqlite = false;
+        await onInitDone();
+      } catch (err) {
+        console.error('FATAL POSTGRESQL CONNECTION ERROR:', err.message);
+        // Clear cached pool on connection error so subsequent requests can re-attempt
+        if (pgPool) {
+          pgPool.end().catch(() => {});
+          pgPool = null;
+        }
+        return reject(new Error(`Database Connection Failed: ${err.message}. Serverless memory fallback is disabled.`));
       }
     } else {
-      console.log('Initializing local/serverless development SQLite/Mem database...');
-      setupSqlite(onInitDone, onInitDone);
+      // Local development SQLite mode (only allowed when NOT in Vercel and NOT in Production)
+      console.log('Initializing local development SQLite database...');
+      setupSqlite(onInitDone, reject);
     }
   });
+
+  return initPromise;
 }
 
 async function createTablesPostgres() {
   try {
+    // 1. Departments table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS departments (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
+        code TEXT,
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
+    // 2. Users table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -97,12 +131,15 @@ async function createTablesPostgres() {
         role TEXT NOT NULL DEFAULT 'citizen',
         department_id INTEGER REFERENCES departments(id),
         employee_id TEXT,
+        designation TEXT DEFAULT 'Field Service Staff',
         status TEXT DEFAULT 'active',
         language_pref TEXT DEFAULT 'en',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
+    // 3. Department Heads table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS department_heads (
         id SERIAL PRIMARY KEY,
@@ -119,6 +156,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 4. Field Staff table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS field_staff (
         id SERIAL PRIMARY KEY,
@@ -135,6 +173,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 5. Complaints table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS complaints (
         id SERIAL PRIMARY KEY,
@@ -160,6 +199,8 @@ async function createTablesPostgres() {
         verified_by INTEGER,
         verified_by_name TEXT,
         verified_at TIMESTAMP,
+        rework_reason TEXT,
+        admin_rejection_reason TEXT,
         latitude DOUBLE PRECISION NOT NULL DEFAULT 0,
         longitude DOUBLE PRECISION NOT NULL DEFAULT 0,
         location_source TEXT NOT NULL DEFAULT 'manual_pin',
@@ -179,18 +220,49 @@ async function createTablesPostgres() {
       );
     `);
 
-    const safeAddPgCol = async (colDef) => {
-      try { await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS ${colDef};`); } catch (e) {}
+    // Safe column migrations for PostgreSQL complaints table
+    const safeAddPgCol = async (table, colDef) => {
+      try { await pgPool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${colDef};`); } catch (e) {}
     };
-    await safeAddPgCol('assigned_staff_id TEXT');
-    await safeAddPgCol('assigned_staff_name TEXT');
-    await safeAddPgCol('assigned_staff_email TEXT');
-    await safeAddPgCol('assigned_by INTEGER');
-    await safeAddPgCol('assigned_by_name TEXT');
-    await safeAddPgCol('sla_deadline TIMESTAMP');
-    await safeAddPgCol('location_address TEXT');
-    await safeAddPgCol('complaint_number TEXT');
 
+    await safeAddPgCol('departments', 'code TEXT');
+    await safeAddPgCol('users', "designation TEXT DEFAULT 'Field Service Staff'");
+    await safeAddPgCol('users', 'employee_id TEXT');
+    await safeAddPgCol('users', "status TEXT DEFAULT 'active'");
+    await safeAddPgCol('users', "language_pref TEXT DEFAULT 'en'");
+    await safeAddPgCol('users', 'updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    await safeAddPgCol('field_staff', 'user_id INTEGER');
+    await safeAddPgCol('field_staff', 'department_id INTEGER');
+    await safeAddPgCol('field_staff', "role TEXT DEFAULT 'field_staff'");
+    await safeAddPgCol('field_staff', "status TEXT DEFAULT 'active'");
+
+    await safeAddPgCol('complaints', 'complaint_number TEXT');
+    await safeAddPgCol('complaints', 'assigned_staff_id TEXT');
+    await safeAddPgCol('complaints', 'assigned_staff_name TEXT');
+    await safeAddPgCol('complaints', 'assigned_staff_email TEXT');
+    await safeAddPgCol('complaints', 'assigned_by INTEGER');
+    await safeAddPgCol('complaints', 'assigned_by_name TEXT');
+    await safeAddPgCol('complaints', 'sla_deadline TIMESTAMP');
+    await safeAddPgCol('complaints', 'work_performed TEXT');
+    await safeAddPgCol('complaints', 'materials_used TEXT');
+    await safeAddPgCol('complaints', 'additional_notes TEXT');
+    await safeAddPgCol('complaints', 'verified_by INTEGER');
+    await safeAddPgCol('complaints', 'verified_by_name TEXT');
+    await safeAddPgCol('complaints', 'verified_at TIMESTAMP');
+    await safeAddPgCol('complaints', 'rework_reason TEXT');
+    await safeAddPgCol('complaints', 'admin_rejection_reason TEXT');
+    await safeAddPgCol('complaints', 'location_address TEXT');
+    await safeAddPgCol('complaints', 'ai_category TEXT');
+    await safeAddPgCol('complaints', 'ai_specific_issue TEXT');
+    await safeAddPgCol('complaints', 'ai_confidence DOUBLE PRECISION');
+    await safeAddPgCol('complaints', 'ai_severity TEXT');
+    await safeAddPgCol('complaints', 'ai_urgency TEXT');
+    await safeAddPgCol('complaints', 'ai_evidence TEXT');
+    await safeAddPgCol('complaints', 'ai_model TEXT');
+    await safeAddPgCol('complaints', 'ai_analyzed_at TIMESTAMP');
+    await safeAddPgCol('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
+
+    // 6. Assignments table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
         id SERIAL PRIMARY KEY,
@@ -202,6 +274,19 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 7. Task assignments table
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS task_assignments (
+        id SERIAL PRIMARY KEY,
+        complaint_id INTEGER REFERENCES complaints(id),
+        staff_id INTEGER REFERENCES users(id),
+        assigned_by INTEGER REFERENCES users(id),
+        status TEXT DEFAULT 'Assigned',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 8. Feedback tables
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS feedback (
         id SERIAL PRIMARY KEY,
@@ -212,6 +297,17 @@ async function createTablesPostgres() {
       );
     `);
 
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS complaint_feedback (
+        id SERIAL PRIMARY KEY,
+        complaint_id INTEGER REFERENCES complaints(id),
+        rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 9. Notifications table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
@@ -224,6 +320,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 10. Complaint status history table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS complaint_status_history (
         id SERIAL PRIMARY KEY,
@@ -236,6 +333,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 11. Announcements table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
@@ -260,6 +358,13 @@ async function createTablesPostgres() {
       );
     `);
 
+    await safeAddPgCol('announcements', "status TEXT DEFAULT 'Published'");
+    await safeAddPgCol('announcements', "target_audience TEXT DEFAULT 'all_departments'");
+    await safeAddPgCol('announcements', 'target_role TEXT');
+    await safeAddPgCol('announcements', "created_by_role TEXT DEFAULT 'city_admin'");
+    await safeAddPgCol('announcements', 'expires_at TIMESTAMP');
+
+    // 12. Announcement reads table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS announcement_reads (
         id SERIAL PRIMARY KEY,
@@ -270,6 +375,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 13. User roles table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS user_roles (
         id SERIAL PRIMARY KEY,
@@ -279,6 +385,7 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 14. Profiles table
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS profiles (
         id SERIAL PRIMARY KEY,
@@ -291,61 +398,69 @@ async function createTablesPostgres() {
       );
     `);
 
-    await pgPool.query(`
-      CREATE TABLE IF NOT EXISTS task_assignments (
-        id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
-        staff_id INTEGER REFERENCES users(id),
-        assigned_by INTEGER REFERENCES users(id),
-        status TEXT DEFAULT 'Assigned',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-
+    // Seed default departments if table is empty
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
-    if (parseInt(deptCheck.rows[0].count, 10) === 0) {
+    if (parseInt(deptCheck.rows[0]?.count || 0, 10) === 0) {
       await pgPool.query(`
-        INSERT INTO departments (id, name, description) VALUES
-          (1, 'Public Works Department (PWD)', 'Road repairs, potholes, and asphalt infrastructure'),
-          (2, 'Sanitation & Waste Management', 'Garbage pickup, trash overflow, and public cleanliness'),
-          (3, 'Water Supply & Sewerage Board', 'Pipeline leakages, drainage overflows, and water supply'),
-          (4, 'Drainage & Sewage Department', 'Drainage blockage, sewage overflow, open drains, and culverts'),
-          (5, 'Electrical & Street Lighting', 'Streetlight repair, electrical poles, and public lighting'),
-          (6, 'Traffic Management Department', 'Traffic signal repairs, road signage, and junction issues'),
-          (7, 'Maintenance Department', 'General civic facility repairs, building maintenance, and public asset upkeep')
-        ON CONFLICT (id) DO NOTHING;
+        INSERT INTO departments (id, name, code, description) VALUES
+          (1, 'Public Works Department (PWD)', 'PWD', 'Road repairs, potholes, and asphalt infrastructure'),
+          (2, 'Sanitation & Waste Management', 'SAN', 'Garbage pickup, trash overflow, and public cleanliness'),
+          (3, 'Water Supply & Sewerage Board', 'WTR', 'Pipeline leakages, drainage overflows, and water supply'),
+          (4, 'Drainage & Sewage Department', 'DRN', 'Drainage blockage, sewage overflow, open drains, and culverts'),
+          (5, 'Electrical & Street Lighting', 'ELE', 'Streetlight repair, electrical poles, and public lighting'),
+          (6, 'Traffic Management Department', 'TRF', 'Traffic signal repairs, road signage, and junction issues'),
+          (7, 'Maintenance Department', 'MNT', 'General civic facility repairs, building maintenance, and public asset upkeep')
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          code = EXCLUDED.code,
+          description = EXCLUDED.description;
       `);
+    } else {
+      await pgPool.query("UPDATE departments SET code = 'PWD' WHERE (code IS NULL OR code = '') AND (id = 1 OR name ILIKE '%Public Works%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'SAN' WHERE (code IS NULL OR code = '') AND (id = 2 OR name ILIKE '%Sanitation%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'WTR' WHERE (code IS NULL OR code = '') AND (id = 3 OR name ILIKE '%Water%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'DRN' WHERE (code IS NULL OR code = '') AND (id = 4 OR name ILIKE '%Drainage%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'ELE' WHERE (code IS NULL OR code = '') AND (id = 5 OR name ILIKE '%Electrical%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'TRF' WHERE (code IS NULL OR code = '') AND (id = 6 OR name ILIKE '%Traffic%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'MNT' WHERE (code IS NULL OR code = '') AND (id = 7 OR name ILIKE '%Maintenance%');").catch(() => {});
     }
   } catch (err) {
     console.error('Error creating PostgreSQL tables:', err);
+    throw err;
   }
 }
 
-
 function setupSqlite(resolve, reject) {
   useSqlite = true;
-  const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION);
-  const sqliteMod = isVercel ? null : getSqlite3();
-  if (!sqliteMod || isVercel) {
-    console.warn('[STORAGE NOTE] Serverless environment detected. Using fast resilient memory store.');
-    return resolve ? resolve() : null;
+  const isVercel = Boolean(process.env.VERCEL || process.env.NOW_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (isVercel) {
+    const err = new Error('FATAL: Serverless environment detected. Persistent PostgreSQL (DATABASE_URL) is required.');
+    console.error(err.message);
+    return reject ? reject(err) : null;
   }
+
+  const sqliteMod = getSqlite3();
+  if (!sqliteMod) {
+    const err = new Error('SQLite native module not available and in-memory storage is disabled.');
+    console.error(err.message);
+    return reject ? reject(err) : null;
+  }
+
   const dbPath = path.join(__dirname, '../../nagarsetu.sqlite');
   try {
     sqliteDb = new sqliteMod.Database(dbPath, (err) => {
       if (err) {
-        console.warn('Error connecting to SQLite DB, using in-memory store:', err.message);
+        console.error('Error connecting to SQLite DB:', err.message);
         sqliteDb = null;
-        return resolve ? resolve() : null;
+        return reject ? reject(err) : null;
       }
-      console.log('Using SQLite database at:', dbPath);
-      createTablesSqlite().then(resolve).catch(() => resolve());
+      console.log('Using local SQLite database at:', dbPath);
+      createTablesSqlite().then(resolve).catch(reject);
     });
   } catch (err) {
-    console.warn('SQLite init exception, using in-memory store:', err.message);
+    console.error('SQLite init exception:', err.message);
     sqliteDb = null;
-    return resolve ? resolve() : null;
+    return reject ? reject(err) : null;
   }
 }
 
@@ -404,7 +519,6 @@ function createTablesSqlite() {
         );
       `);
 
-      // Safe column additions for existing databases
       const safeAddColumn = (table, colDef) => {
         sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef};`, () => {});
       };
@@ -446,6 +560,7 @@ function createTablesSqlite() {
         CREATE TABLE IF NOT EXISTS departments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
+          code TEXT,
           description TEXT
         );
       `);
@@ -572,7 +687,6 @@ function createTablesSqlite() {
         );
       `);
 
-      // Safe column additions for SQLite migrations
       const safeAddSqliteColumn = (table, colDef) => {
         sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef}`, () => {});
       };
@@ -595,7 +709,6 @@ function createTablesSqlite() {
         );
       `);
 
-      // Seed initial default departments if empty
       sqliteDb.get("SELECT COUNT(*) as count FROM departments", (err, row) => {
         if (!err && row && row.count === 0) {
           const stmt = sqliteDb.prepare("INSERT INTO departments (id, name, code, description) VALUES (?, ?, ?, ?)");
@@ -608,7 +721,7 @@ function createTablesSqlite() {
           stmt.run(7, "Maintenance Department", "MNT", "General civic facility repairs, building maintenance, and public asset upkeep");
           stmt.finalize();
         }
-        
+
         sqliteDb.run("UPDATE departments SET code = 'PWD' WHERE id = 1 OR name LIKE '%Public Works%'");
         sqliteDb.run("UPDATE departments SET code = 'SAN' WHERE id = 2 OR name LIKE '%Sanitation%'");
         sqliteDb.run("UPDATE departments SET code = 'WTR' WHERE id = 3 OR name LIKE '%Water%'");
@@ -618,218 +731,19 @@ function createTablesSqlite() {
         sqliteDb.run("UPDATE departments SET code = 'MNT' WHERE id = 7 OR name LIKE '%Maintenance%'");
         resolve();
       });
-
     });
   });
 }
 
-if (!global._memStore) {
-  global._memStore = {
-    departments: [
-      { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
-      { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
-      { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
-      { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
-      { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
-      { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
-      { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
-    ],
-    users: [],
-    department_heads: [],
-    field_staff: [],
-    complaints: [],
-    assignments: [],
-    task_assignments: [],
-    feedback: [],
-    notifications: [],
-    complaint_status_history: [],
-    announcements: [],
-    announcement_reads: []
-  };
-}
-const memStore = global._memStore;
-
-function runMemQuery(sql, params = []) {
-  const s = sql.trim();
-  const upper = s.toUpperCase();
-
-  let targetTable = null;
-  if (upper.includes('FROM FIELD_STAFF') || upper.includes('INTO FIELD_STAFF') || upper.includes('UPDATE FIELD_STAFF')) {
-    targetTable = 'field_staff';
-  } else if (upper.includes('FROM DEPARTMENT_HEADS') || upper.includes('INTO DEPARTMENT_HEADS') || upper.includes('UPDATE DEPARTMENT_HEADS')) {
-    targetTable = 'department_heads';
-  } else if (upper.includes('FROM DEPARTMENTS') || upper.includes('INTO DEPARTMENTS') || upper.includes('UPDATE DEPARTMENTS')) {
-    targetTable = 'departments';
-  } else if (upper.includes('FROM COMPLAINTS') || upper.includes('INTO COMPLAINTS') || upper.includes('UPDATE COMPLAINTS')) {
-    targetTable = 'complaints';
-  } else if (upper.includes('FROM USERS') || upper.includes('INTO USERS') || upper.includes('UPDATE USERS')) {
-    targetTable = 'users';
-  } else {
-    const fromMatch = upper.match(/(?:FROM|INTO|UPDATE)\s+([A-Z0-9_]+)/i);
-    if (fromMatch && fromMatch[1]) {
-      targetTable = fromMatch[1].toLowerCase();
-    }
-  }
-
-  if (!targetTable || !memStore[targetTable]) {
-    targetTable = 'users';
-  }
-
-  if (upper.startsWith('SELECT COUNT')) {
-    const list = memStore[targetTable] || [];
-    return Promise.resolve({ rows: [{ count: list.length }] });
-  }
-
-  if (upper.startsWith('SELECT')) {
-    let list = memStore[targetTable] || [];
-    if (params && params.length > 0) {
-      const pStr = params.map(p => String(p).trim().toLowerCase().replace(/^%|%$/g, ''));
-      const isDeptQuery = upper.includes('WHERE DEPARTMENT_ID') || upper.includes('WHERE C.DEPARTMENT_ID') || upper.includes('WHERE FS.DEPARTMENT_ID') || upper.includes('AND C.DEPARTMENT_ID') || upper.includes('AND (C.DEPARTMENT_ID');
-      const isCitizenQuery = upper.includes('WHERE CITIZEN_ID') || upper.includes('WHERE C.CITIZEN_ID') || upper.includes('AND C.CITIZEN_ID');
-      const isIdQuery = upper.includes('WHERE C.ID =') || upper.includes('WHERE ID =') || upper.includes('WHERE CAST(C.ID AS TEXT) = $1');
-
-      const filtered = list.filter(item => {
-        if (!item) return false;
-        const itemMobile = item.mobile ? String(item.mobile).trim().toLowerCase() : '';
-        const itemEmail = item.email ? String(item.email).trim().toLowerCase() : '';
-        const itemId = item.id !== undefined ? String(item.id).trim() : '';
-        const itemUserId = item.user_id !== undefined ? String(item.user_id).trim() : '';
-        const itemCitizenId = item.citizen_id !== undefined ? String(item.citizen_id).trim() : '';
-        const itemDeptId = item.department_id !== undefined ? String(item.department_id).trim() : '';
-        const itemStatus = item.status ? String(item.status).trim().toLowerCase() : '';
-        const itemName = item.name ? String(item.name).trim().toLowerCase() : '';
-        const itemEmpId = item.employee_id ? String(item.employee_id).trim().toLowerCase() : '';
-        const itemNumber = item.complaint_number ? String(item.complaint_number).trim().toLowerCase() : '';
-
-        if (isDeptQuery) {
-          return pStr.some(p => p !== '' && itemDeptId === p);
-        }
-        if (isCitizenQuery) {
-          return pStr.some(p => p !== '' && itemCitizenId === p);
-        }
-        if (isIdQuery) {
-          return pStr.some(p => p !== '' && (itemId === p || itemNumber === p));
-        }
-
-        return pStr.some(p => p !== '' && (
-          itemMobile === p || 
-          itemEmail === p || 
-          itemId === p || 
-          itemUserId === p ||
-          itemCitizenId === p ||
-          itemDeptId === p ||
-          itemStatus === p ||
-          itemEmpId === p ||
-          itemNumber === p ||
-          (p.length >= 2 && (itemName.includes(p) || itemEmail.includes(p) || itemMobile.includes(p)))
-        ));
-      });
-      return Promise.resolve({ rows: filtered });
-    }
-    return Promise.resolve({ rows: list });
-  }
-
-  if (upper.startsWith('INSERT')) {
-    const list = memStore[targetTable] || [];
-    const maxId = list.length > 0 ? Math.max(...list.map(i => Number(i.id) || 0)) : 0;
-    const newId = maxId + 1;
-    const newObj = { id: newId, status: 'active', created_at: new Date().toISOString() };
-    
-    const colMatch = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
-    if (colMatch && colMatch[1] && colMatch[2]) {
-      const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase());
-      const vals = colMatch[2].split(',').map(v => v.trim());
-      
-      let pIdxCounter = 0;
-      cols.forEach((col, idx) => {
-        const valExpr = vals[idx] ? vals[idx] : '';
-        if (valExpr === '?' || valExpr.startsWith('$')) {
-          if (params[pIdxCounter] !== undefined) {
-            newObj[col] = params[pIdxCounter];
-          }
-          pIdxCounter++;
-        } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
-          newObj[col] = valExpr.slice(1, -1);
-        } else if (valExpr.toUpperCase() === 'NULL') {
-          newObj[col] = null;
-        } else if (valExpr) {
-          newObj[col] = valExpr;
-        }
-      });
-    } else {
-      const colMatchOnly = s.match(/INSERT\s+INTO\s+\w+\s*\(([^)]+)\)/i);
-      if (colMatchOnly && colMatchOnly[1]) {
-        const cols = colMatchOnly[1].split(',').map(c => c.trim().toLowerCase());
-        cols.forEach((col, idx) => {
-          if (params[idx] !== undefined) {
-            newObj[col] = params[idx];
-          }
-        });
-      }
-    }
-    
-    if (!memStore[targetTable]) memStore[targetTable] = [];
-    memStore[targetTable].push(newObj);
-    return Promise.resolve({ rows: [{ id: newId }], rowCount: 1 });
-  }
-
-  if (upper.startsWith('UPDATE')) {
-    const list = memStore[targetTable] || [];
-    const setMatch = s.match(/UPDATE\s+\w+\s+SET\s+([\s\S]+?)\s+WHERE\s+([\s\S]+)/i);
-    if (setMatch && setMatch[1] && params.length > 0) {
-      const setPairs = setMatch[1].split(',').map(p => p.trim());
-      const whereClause = setMatch[2];
-
-      const wherePMatches = [...whereClause.matchAll(/\$(\d+)/g)];
-      const wherePIndices = wherePMatches.map(m => parseInt(m[1], 10) - 1);
-      const whereVals = wherePIndices.length > 0
-        ? wherePIndices.map(idx => params[idx]).filter(v => v !== undefined && v !== null)
-        : [params[params.length - 1]];
-
-      const targets = list.filter(item => {
-        if (!item) return false;
-        const itemId = item.id !== undefined ? String(item.id).trim() : '';
-        const itemNum = item.complaint_number ? String(item.complaint_number).trim() : '';
-        const itemMobile = item.mobile ? String(item.mobile).trim() : '';
-        const itemEmail = item.email ? String(item.email).trim() : '';
-        return whereVals.some(v => {
-          const sv = String(v).trim();
-          return sv !== '' && (itemId === sv || itemNum === sv || itemMobile === sv || itemEmail === sv);
-        });
-      });
-
-      targets.forEach(target => {
-        setPairs.forEach((pair) => {
-          const parts = pair.split('=');
-          const colName = parts[0].trim().toLowerCase();
-          const valExpr = parts[1] ? parts[1].trim() : '';
-          const pMatch = valExpr.match(/\$(\d+)/);
-          if (pMatch) {
-            const pIdx = parseInt(pMatch[1], 10) - 1;
-            if (params[pIdx] !== undefined) {
-              target[colName] = params[pIdx];
-            }
-          } else if (valExpr.toUpperCase().includes('CURRENT_TIMESTAMP') || valExpr.toUpperCase().includes('NOW()')) {
-            target[colName] = new Date().toISOString();
-          } else if (valExpr.startsWith("'") || valExpr.startsWith('"')) {
-            target[colName] = valExpr.slice(1, -1);
-          }
-        });
-      });
-
-      return Promise.resolve({ rows: targets.map(t => ({ ...t })), rowCount: targets.length || 1 });
-    }
-    return Promise.resolve({ rows: [], rowCount: 1 });
-  }
-
-  return Promise.resolve({ rows: memStore[targetTable] || [], rowCount: 1 });
-}
-
-// Universal query runner wrapper
+/**
+ * Universal query runner wrapper.
+ * Directly executes against PostgreSQL or SQLite.
+ * Never silently switches to memory state.
+ */
 async function query(sql, params = []) {
   if (useSqlite) {
     if (!sqliteDb) {
-      return runMemQuery(sql, params);
+      throw new Error('Database Error: SQLite database connection is unavailable.');
     }
     return new Promise((resolve, reject) => {
       let sqliteSql = sql;
@@ -868,24 +782,30 @@ async function query(sql, params = []) {
       }
     });
   } else {
+    // Persistent PostgreSQL database query
+    if (!pgPool) {
+      // Lazy initialize if pool not ready
+      await initDatabase();
+    }
+    if (!pgPool) {
+      throw new Error('Database Error: PostgreSQL connection pool is uninitialized.');
+    }
+
+    let pgSql = sql;
+    let paramIndex = 1;
+    pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+
+    const trimmed = pgSql.trim();
+    if (trimmed.toUpperCase().startsWith('INSERT') && !trimmed.toUpperCase().includes('RETURNING')) {
+      pgSql += ' RETURNING id';
+    }
+
     try {
-      let pgSql = sql;
-      let paramIndex = 1;
-      pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
-
-      const trimmed = pgSql.trim();
-      if (trimmed.toUpperCase().startsWith('INSERT') && !trimmed.toUpperCase().includes('RETURNING')) {
-        pgSql += ' RETURNING id';
-      }
-
       return await pgPool.query(pgSql, params);
     } catch (err) {
-      console.warn('[DATABASE QUERY WARN] PostgreSQL query failed, activating SQLite/Mem fallback:', err.message);
-      if (!sqliteDb) {
-        await new Promise(r => setupSqlite(r, r));
-      }
-      useSqlite = true;
-      return query(sql, params);
+      console.error('[DATABASE QUERY ERROR]', err.message);
+      // DO NOT fall back to SQLite or memory store. Re-throw error so data consistency is preserved.
+      throw err;
     }
   }
 }

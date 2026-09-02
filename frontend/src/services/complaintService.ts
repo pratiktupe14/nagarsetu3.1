@@ -133,8 +133,8 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     console.warn('Express backend getAllComplaints fallback:', err);
   }
 
-  // 2. Try Supabase if configured and backend yielded no list
-  if (list.length === 0 && isSupabaseConfigured()) {
+  // 2. Try Supabase ONLY if Express Backend API was unreachable (responseStatus !== 200)
+  if (responseStatus !== 200 && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -143,7 +143,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
 
       if (!error && data) {
         list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
-        if (responseStatus === 0) responseStatus = 200;
+        responseStatus = 200;
       }
     } catch (err) {
       console.warn('Supabase getAllComplaints fallback:', err);

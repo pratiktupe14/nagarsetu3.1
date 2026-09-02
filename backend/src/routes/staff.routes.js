@@ -65,11 +65,37 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     const targetIdNum = parseInt(String(targetId), 10);
 
     const compRes = await query(
-      `SELECT citizen_id, complaint_number FROM complaints WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+      `SELECT id, citizen_id, complaint_number, department_id, assigned_staff_id, assigned_staff_email 
+       FROM complaints 
+       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
       [isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
     );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+
+    // Staff Authorization Guard: Only assigned staff or staff in same department (or admin) can update status
+    const userRole = req.user.role || 'service_staff';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    if (!isAdmin) {
+      let userDeptId = req.user.department_id;
+      if (!userDeptId) {
+        const fsCheck = await query('SELECT department_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
+        if (fsCheck.rows && fsCheck.rows.length > 0) userDeptId = fsCheck.rows[0].department_id;
+      }
+
+      const isSameDept = userDeptId && complaint.department_id && String(userDeptId) === String(complaint.department_id);
+      const isAssignedToUser = (
+        (complaint.assigned_staff_id && (String(complaint.assigned_staff_id) === String(req.user.id) || String(complaint.assigned_staff_id) === String(req.user.employee_id))) ||
+        (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
+      );
+
+      if (!isSameDept && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to update tasks belonging to another department.' });
+      }
     }
 
     await query(

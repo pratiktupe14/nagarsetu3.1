@@ -295,9 +295,82 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   }
 });
 
-// Get current user profile
-router.get('/me', authenticateToken, (req, res) => {
-  return res.json({ user: req.user });
+// Get authoritative current user profile directly from persistent database
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRes = await query(
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
+              d.name as department_name, d.code as department_code
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.id = ? OR CAST(u.id AS TEXT) = ?
+       LIMIT 1`,
+      [userId, String(userId)]
+    );
+
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User record not found in persistent database' });
+    }
+
+    const u = userRes.rows[0];
+    const userRole = u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role);
+
+    let departmentId = u.department_id ? String(u.department_id) : null;
+    let departmentName = u.department_name || null;
+    let departmentCode = u.department_code || null;
+
+    if (!departmentId && userRole === 'department_head') {
+      const dhRes = await query(
+        `SELECT dh.department_id, d.name as dept_name, d.code as dept_code 
+         FROM department_heads dh 
+         LEFT JOIN departments d ON d.id = dh.department_id 
+         WHERE dh.user_id = ? OR LOWER(dh.email) = LOWER(?)`,
+        [u.id, u.email || '']
+      );
+      if (dhRes.rows && dhRes.rows.length > 0) {
+        departmentId = String(dhRes.rows[0].department_id);
+        departmentName = dhRes.rows[0].dept_name;
+        departmentCode = dhRes.rows[0].dept_code;
+      }
+    } else if (!departmentId && userRole === 'service_staff') {
+      const fsRes = await query(
+        `SELECT fs.department_id, d.name as dept_name, d.code as dept_code 
+         FROM field_staff fs 
+         LEFT JOIN departments d ON d.id = fs.department_id 
+         WHERE fs.user_id = ? OR LOWER(fs.email) = LOWER(?) OR fs.employee_id = ?`,
+        [u.id, u.email || '', u.employee_id || '']
+      );
+      if (fsRes.rows && fsRes.rows.length > 0) {
+        departmentId = String(fsRes.rows[0].department_id);
+        departmentName = fsRes.rows[0].dept_name;
+        departmentCode = fsRes.rows[0].dept_code;
+      }
+    }
+
+    const userObj = {
+      id: u.id,
+      name: u.name,
+      mobile: u.mobile,
+      email: u.email,
+      role: userRole,
+      department_id: departmentId,
+      department_name: departmentName,
+      department_code: departmentCode,
+      employee_id: u.employee_id || null,
+      designation: u.designation || null,
+      status: u.status || 'active',
+      language_pref: u.language_pref || 'en'
+    };
+
+    return res.json({
+      success: true,
+      user: userObj
+    });
+  } catch (err) {
+    console.error('Fetch /api/auth/me database error:', err);
+    return res.status(500).json({ error: 'Failed to retrieve user profile from database' });
+  }
 });
 
 module.exports = router;

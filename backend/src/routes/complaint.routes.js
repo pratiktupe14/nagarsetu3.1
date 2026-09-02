@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const { uploadSingleImage } = require('../middleware/upload');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, optionalAuthenticateToken, requireRole } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
@@ -266,8 +266,8 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all complaints for Admin (all departments) or Department Head (isolated by department_id)
-router.get('/', authenticateToken, async (req, res) => {
+// Get complaints for Admin (all departments), Department Head (isolated by department), Citizen (own), or Public
+router.get('/', optionalAuthenticateToken, async (req, res) => {
   try {
     const authUser = req.user;
 
@@ -296,9 +296,18 @@ router.get('/', authenticateToken, async (req, res) => {
       }
       sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
       params.push(deptId || -1, String(deptId || -1));
-    } else if (req.query.department_id) {
-      sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
-      params.push(req.query.department_id, String(req.query.department_id));
+    } else if (authUser && (authUser.role === 'admin' || authUser.role === 'city_admin')) {
+      if (req.query.department_id) {
+        sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
+        params.push(req.query.department_id, String(req.query.department_id));
+      }
+    } else {
+      // Unauthenticated / Public visitor: show non-draft complaints, allow optional department_id filter
+      if (req.query.department_id) {
+        sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
+        params.push(req.query.department_id, String(req.query.department_id));
+      }
+      sql += ` AND (c.status != 'Draft' AND c.status != 'draft')`;
     }
 
     sql += ` ORDER BY c.created_at DESC`;

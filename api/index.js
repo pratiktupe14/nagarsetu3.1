@@ -4,9 +4,18 @@ const { initDatabase } = require('../backend/src/config/db');
 let initPromise = null;
 
 module.exports = async (req, res) => {
-  if (!initPromise) {
-    initPromise = initDatabase().catch(err => console.warn('[SERVERLESS INIT NOTE]', err.message));
+  try {
+    if (!initPromise) {
+      initPromise = initDatabase();
+    }
+    await initPromise;
+  } catch (err) {
+    initPromise = null;
+    console.error('[SERVERLESS DATABASE FATAL ERROR]:', err.message);
+    return res.status(500).json({
+      error: 'Database Connection Error',
+      message: err.message
+    });
   }
-  await initPromise;
   return app(req, res);
 };

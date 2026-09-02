@@ -19,16 +19,25 @@ const aiRoutes = require('./routes/ai.routes');
 const app = express();
 app.set('trust proxy', 1);
 
-const { initDatabase } = require('./config/db');
+const { initDatabase, query, getIsSqlite } = require('./config/db');
 let dbInitPromise = null;
 app.use(async (req, res, next) => {
-  if (!dbInitPromise && typeof initDatabase === 'function') {
-    dbInitPromise = initDatabase().catch(err => console.warn('[DB INIT WARN]', err.message));
+  try {
+    if (!dbInitPromise && typeof initDatabase === 'function') {
+      dbInitPromise = initDatabase();
+    }
+    if (dbInitPromise) {
+      await dbInitPromise;
+    }
+    next();
+  } catch (err) {
+    dbInitPromise = null;
+    console.error('[DB INIT FATAL ERROR]:', err.message);
+    return res.status(500).json({
+      error: 'Database Connection Error',
+      message: err.message
+    });
   }
-  if (dbInitPromise) {
-    await dbInitPromise;
-  }
-  next();
 });
 
 // Security Headers & Core Middleware
@@ -89,15 +98,31 @@ app.get('/api', (req, res) => {
   });
 });
 
-app.get('/api/health', publicRateLimiter, (req, res) => {
-  res.json({
-    success: true,
-    message: 'NAGARSETU Backend is running',
-    status: 'ok',
-    service: 'NAGARSETU Express Backend API',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/health', publicRateLimiter, async (req, res) => {
+  try {
+    const isSqlite = getIsSqlite();
+    const testSql = isSqlite ? "SELECT datetime('now') as db_time" : "SELECT NOW() as db_time";
+    const dbRes = await query(testSql);
+    res.json({
+      success: true,
+      message: 'NAGARSETU Backend is running',
+      status: 'ok',
+      service: 'NAGARSETU Express Backend API',
+      database: 'connected',
+      database_type: isSqlite ? 'sqlite' : 'postgres',
+      db_time: dbRes.rows[0]?.db_time || new Date().toISOString(),
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      success: false,
+      message: 'Database connection check failed',
+      status: 'database_error',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Register API Routes with Appropriate Rate Limiters
