@@ -1,0 +1,402 @@
+{
+  "backendRoutes": [
+    {
+      "method": "GET",
+      "fullPath": "/api/admin/analytics",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/analytics"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/admin/hotspots",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/hotspots"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/admin/users",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/users"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/admin/users",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/users"
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/admin/users/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/users/:id"
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/admin/users/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/users/:id"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/admin/departments",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/departments"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/admin/departments",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/departments"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/admin/department-heads",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/admin/department-heads",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads"
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/admin/department-heads/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads/:id"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/admin/department-heads/:id/deactivate",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads/:id/deactivate"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/admin/department-heads/:id/reactivate",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads/:id/reactivate"
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/admin/department-heads/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "rawPath": "/department-heads/:id"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/ai/health",
+      "file": "backend\\src\\routes\\ai.routes.js",
+      "rawPath": "/health"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/ai/analyze",
+      "file": "backend\\src\\routes\\ai.routes.js",
+      "rawPath": "/analyze"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/announcements",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/announcements/:id/read",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/:id/read"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/announcements",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/announcements/admin/all",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/admin/all"
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/announcements/:id",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/:id"
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/announcements/:id",
+      "file": "backend\\src\\routes\\announcement.routes.js",
+      "rawPath": "/:id"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/register",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "rawPath": "/register"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/login",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "rawPath": "/login"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/otp-request",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "rawPath": "/otp-request"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/otp-verify",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "rawPath": "/otp-verify"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/auth/me",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "rawPath": "/me"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/analyze-upload",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/analyze-upload"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/submit",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/submit"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/complaints/:id/history",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/:id/history"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/complaints",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/complaints/my",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/my"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/complaints/:id",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/:id"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/:id/feedback",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/:id/feedback"
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/complaints/purge-all",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/purge-all"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/purge-all",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "rawPath": "/purge-all"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/departments",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/departments/complaints",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/complaints"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/departments/staff",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/departments/staff/assignable",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/assignable"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/staff",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff"
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/departments/staff/:id",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/staff/:id/deactivate",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id/deactivate"
+    },
+    {
+      "method": "PATCH",
+      "fullPath": "/api/departments/staff/:id/deactivate",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id/deactivate"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/staff/:id/activate",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id/activate"
+    },
+    {
+      "method": "PATCH",
+      "fullPath": "/api/departments/staff/:id/activate",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id/activate"
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/departments/staff/:id",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/staff/:id"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/assign",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/assign"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/verify",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "rawPath": "/verify"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/maps/geocode",
+      "file": "backend\\src\\routes\\maps.routes.js",
+      "rawPath": "/geocode"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/maps/reverse-geocode",
+      "file": "backend\\src\\routes\\maps.routes.js",
+      "rawPath": "/reverse-geocode"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/maps/directions",
+      "file": "backend\\src\\routes\\maps.routes.js",
+      "rawPath": "/directions"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/maps/validate",
+      "file": "backend\\src\\routes\\maps.routes.js",
+      "rawPath": "/validate"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/notifications/my",
+      "file": "backend\\src\\routes\\notification.routes.js",
+      "rawPath": "/my"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/notifications/mark-read",
+      "file": "backend\\src\\routes\\notification.routes.js",
+      "rawPath": "/mark-read"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/officer/dashboard",
+      "file": "backend\\src\\routes\\officer.routes.js",
+      "rawPath": "/dashboard"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/officer/staff-list",
+      "file": "backend\\src\\routes\\officer.routes.js",
+      "rawPath": "/staff-list"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/officer/verify",
+      "file": "backend\\src\\routes\\officer.routes.js",
+      "rawPath": "/verify"
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/officer/assign",
+      "file": "backend\\src\\routes\\officer.routes.js",
+      "rawPath": "/assign"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/officer/duplicates",
+      "file": "backend\\src\\routes\\officer.routes.js",
+      "rawPath": "/duplicates"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/staff/tasks",
+      "file": "backend\\src\\routes\\staff.routes.js",
+      "rawPath": "/tasks"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api/health",
+      "file": "backend/src/app.js"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/api",
+      "file": "backend/src/app.js"
+    },
+    {
+      "method": "GET",
+      "fullPath": "/",
+      "file": "backend/src/app.js"
+    }
+  ],
+  "frontendCalls": [
+    {
+      "file": "frontend\\src\\services\\aiVisionService.ts",
+      "line": 143,
+      "url": "/api/ai/health",
+      "method": "GET",
+      "lineText": "const endpoint = baseUrl ? `${baseUrl}/api/ai/health` : '/api/ai/health';"
+    },
+    {
+      "file": "frontend\\src\\services\\aiVisionService.ts",
+      "line": 411,
+      "url": "/api/ai/analyze",
+      "method": "GET",
+      "lineText": "const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';"
+    }
+  ],
+  "missingBackendRoutes": []
+}
