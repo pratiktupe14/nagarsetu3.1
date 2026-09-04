@@ -51,17 +51,38 @@ function initDatabase() {
     if (dbUrl.startsWith('POSTGRES_URL=')) dbUrl = dbUrl.slice('POSTGRES_URL='.length).trim();
     dbUrl = dbUrl.replace(/^["']|["']$/g, '').trim();
 
+    // Auto-normalize URL encoding for passwords containing special characters (e.g. '@')
+    const urlMatch = dbUrl.match(/^(postgres(?:ql)?:\/\/)([^:]+):(.+)@([^@]+)$/);
+    if (urlMatch) {
+      const [, proto, user, pass, hostRest] = urlMatch;
+      try {
+        const decodedPass = decodeURIComponent(pass);
+        const encodedPass = encodeURIComponent(decodedPass);
+        dbUrl = `${proto}${user}:${encodedPass}@${hostRest}`;
+      } catch (e) {
+        // Keep original if decoding fails
+      }
+    }
+
     const shouldBePostgres = isVercel || isProduction || DB_TYPE === 'postgres' || Boolean(dbUrl);
 
     const onInitDone = async () => {
-      try {
-        await seedDefaultUsers(query);
-        await seed7DemoDepartmentHeads(query);
-        await seedServiceStaff(query);
-      } catch (e) {
-        console.warn('[SEED INIT NOTE]', e.message);
-      }
       resolve();
+      // Asynchronously ensure seeds only if database is completely empty
+      (async () => {
+        try {
+          const userCount = await query('SELECT COUNT(*) as count FROM users').catch(() => ({ rows: [{ count: 0 }] }));
+          if (parseInt(userCount.rows[0]?.count || 0, 10) === 0) {
+            console.log('Database empty, seeding default data...');
+            await seedDefaultUsers(query);
+            await seed7DemoDepartmentHeads(query);
+            await seedServiceStaff(query);
+            console.log('Default data seeding completed.');
+          }
+        } catch (e) {
+          console.warn('[SEED NOTE]:', e.message);
+        }
+      })().catch(() => {});
     };
 
     if (shouldBePostgres) {
@@ -83,7 +104,8 @@ function initDatabase() {
         return reject(new Error(errMsg));
       }
 
-      console.log('Connecting to persistent PostgreSQL database...');
+      const maskedUrl = dbUrl.replace(/:([^@/]+)@/, ':***@');
+      console.log('Connecting to persistent PostgreSQL database at:', maskedUrl);
       try {
         if (!pgPool) {
           pgPool = new Pool({
@@ -103,8 +125,12 @@ function initDatabase() {
         const testRes = await pgPool.query('SELECT NOW() as connected_at');
         console.log('PostgreSQL connected successfully at:', testRes.rows[0]?.connected_at);
 
-        // Ensure all required persistent tables and columns exist
-        await createTablesPostgres();
+        // Ensure all required persistent tables exist (only run full DDL if users table is absent)
+        const regCheck = await pgPool.query("SELECT to_regclass('public.users') as reg;").catch(() => ({ rows: [] }));
+        if (!regCheck.rows[0]?.reg) {
+          console.log('PostgreSQL schema not found, running initial table migrations...');
+          await createTablesPostgres();
+        }
         useSqlite = false;
         await onInitDone();
       } catch (err) {
@@ -128,8 +154,16 @@ function initDatabase() {
 
 async function createTablesPostgres() {
   try {
+    const safeCreateTable = async (sql) => {
+      try {
+        await pgPool.query(sql);
+      } catch (e) {
+        console.warn('[POSTGRES DDL NOTE]:', e.message);
+      }
+    };
+
     // 1. Departments table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS departments (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
@@ -139,8 +173,8 @@ async function createTablesPostgres() {
       );
     `);
 
-    // 2. Users table
-    await pgPool.query(`
+    // 2. Users table (department_id is TEXT without rigid FK to support both UUID & integer schemas)
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -148,7 +182,7 @@ async function createTablesPostgres() {
         email TEXT UNIQUE,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'citizen',
-        department_id INTEGER REFERENCES departments(id),
+        department_id TEXT,
         employee_id TEXT,
         designation TEXT DEFAULT 'Field Service Staff',
         status TEXT DEFAULT 'active',
@@ -159,11 +193,11 @@ async function createTablesPostgres() {
     `);
 
     // 3. Department Heads table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS department_heads (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        department_id INTEGER REFERENCES departments(id),
+        user_id TEXT,
+        department_id TEXT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         phone TEXT,
@@ -176,11 +210,11 @@ async function createTablesPostgres() {
     `);
 
     // 4. Field Staff table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS field_staff (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        department_id INTEGER NOT NULL REFERENCES departments(id),
+        user_id TEXT,
+        department_id TEXT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         phone TEXT,
@@ -193,11 +227,11 @@ async function createTablesPostgres() {
     `);
 
     // 5. Complaints table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS complaints (
         id SERIAL PRIMARY KEY,
         complaint_number TEXT,
-        citizen_id INTEGER REFERENCES users(id),
+        citizen_id TEXT,
         photo_before_url TEXT NOT NULL,
         photo_after_url TEXT,
         category TEXT NOT NULL,
@@ -205,17 +239,17 @@ async function createTablesPostgres() {
         description TEXT,
         priority TEXT DEFAULT 'Medium',
         status TEXT DEFAULT 'Submitted',
-        department_id INTEGER REFERENCES departments(id),
+        department_id TEXT,
         assigned_staff_id TEXT,
         assigned_staff_name TEXT,
         assigned_staff_email TEXT,
-        assigned_by INTEGER,
+        assigned_by TEXT,
         assigned_by_name TEXT,
         sla_deadline TIMESTAMP,
         work_performed TEXT,
         materials_used TEXT,
         additional_notes TEXT,
-        verified_by INTEGER,
+        verified_by TEXT,
         verified_by_name TEXT,
         verified_at TIMESTAMP,
         rework_reason TEXT,
@@ -224,7 +258,7 @@ async function createTablesPostgres() {
         longitude DOUBLE PRECISION NOT NULL DEFAULT 0,
         location_source TEXT NOT NULL DEFAULT 'manual_pin',
         location_address TEXT,
-        duplicate_of_id INTEGER REFERENCES complaints(id),
+        duplicate_of_id TEXT,
         ai_category TEXT,
         ai_specific_issue TEXT,
         ai_confidence DOUBLE PRECISION,
@@ -282,44 +316,44 @@ async function createTablesPostgres() {
     await safeAddPgCol('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
 
     // 6. Assignments table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS assignments (
         id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
-        staff_id INTEGER REFERENCES users(id),
-        assigned_by INTEGER REFERENCES users(id),
+        complaint_id TEXT,
+        staff_id TEXT,
+        assigned_by TEXT,
         assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         resolved_at TIMESTAMP
       );
     `);
 
     // 7. Task assignments table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS task_assignments (
         id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
-        staff_id INTEGER REFERENCES users(id),
-        assigned_by INTEGER REFERENCES users(id),
+        complaint_id TEXT,
+        staff_id TEXT,
+        assigned_by TEXT,
         status TEXT DEFAULT 'Assigned',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     // 8. Feedback tables
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS feedback (
         id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
+        complaint_id TEXT,
         rating INTEGER CHECK (rating >= 1 AND rating <= 5),
         comment TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS complaint_feedback (
         id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
+        complaint_id TEXT,
         rating INTEGER CHECK (rating >= 1 AND rating <= 5),
         comment TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -327,11 +361,11 @@ async function createTablesPostgres() {
     `);
 
     // 9. Notifications table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        complaint_id INTEGER REFERENCES complaints(id),
+        user_id TEXT,
+        complaint_id TEXT,
         channel TEXT DEFAULT 'in_app',
         message TEXT NOT NULL,
         is_read INTEGER DEFAULT 0,
@@ -340,10 +374,10 @@ async function createTablesPostgres() {
     `);
 
     // 10. Complaint status history table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS complaint_status_history (
         id SERIAL PRIMARY KEY,
-        complaint_id INTEGER REFERENCES complaints(id),
+        complaint_id TEXT,
         status TEXT NOT NULL,
         remark TEXT,
         department TEXT,
@@ -353,7 +387,7 @@ async function createTablesPostgres() {
     `);
 
     // 11. Announcements table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -364,7 +398,7 @@ async function createTablesPostgres() {
         target_type TEXT DEFAULT 'all',
         target_audience TEXT DEFAULT 'all_departments',
         target_role TEXT,
-        department_id INTEGER REFERENCES departments(id),
+        department_id TEXT,
         department_name TEXT,
         created_by TEXT DEFAULT 'City Admin',
         posted_by TEXT DEFAULT 'City Admin',
@@ -384,7 +418,7 @@ async function createTablesPostgres() {
     await safeAddPgCol('announcements', 'expires_at TIMESTAMP');
 
     // 12. Announcement reads table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS announcement_reads (
         id SERIAL PRIMARY KEY,
         announcement_id INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
@@ -395,20 +429,20 @@ async function createTablesPostgres() {
     `);
 
     // 13. User roles table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS user_roles (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id TEXT,
         role TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     // 14. Profiles table
-    await pgPool.query(`
+    await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS profiles (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id TEXT,
         full_name TEXT,
         avatar_url TEXT,
         bio TEXT,
@@ -435,13 +469,13 @@ async function createTablesPostgres() {
           description = EXCLUDED.description;
       `);
     } else {
-      await pgPool.query("UPDATE departments SET code = 'PWD' WHERE (code IS NULL OR code = '') AND (id = 1 OR name ILIKE '%Public Works%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'SAN' WHERE (code IS NULL OR code = '') AND (id = 2 OR name ILIKE '%Sanitation%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'WTR' WHERE (code IS NULL OR code = '') AND (id = 3 OR name ILIKE '%Water%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'DRN' WHERE (code IS NULL OR code = '') AND (id = 4 OR name ILIKE '%Drainage%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'ELE' WHERE (code IS NULL OR code = '') AND (id = 5 OR name ILIKE '%Electrical%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'TRF' WHERE (code IS NULL OR code = '') AND (id = 6 OR name ILIKE '%Traffic%');").catch(() => {});
-      await pgPool.query("UPDATE departments SET code = 'MNT' WHERE (code IS NULL OR code = '') AND (id = 7 OR name ILIKE '%Maintenance%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'PWD' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '1' OR name ILIKE '%Public Works%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'SAN' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '2' OR name ILIKE '%Sanitation%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'WTR' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '3' OR name ILIKE '%Water%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'DRN' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '4' OR name ILIKE '%Drainage%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'ELE' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '5' OR name ILIKE '%Electrical%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'TRF' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '6' OR name ILIKE '%Traffic%');").catch(() => {});
+      await pgPool.query("UPDATE departments SET code = 'MNT' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '7' OR name ILIKE '%Maintenance%');").catch(() => {});
     }
   } catch (err) {
     console.error('Error creating PostgreSQL tables:', err);

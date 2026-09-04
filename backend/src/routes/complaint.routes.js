@@ -326,12 +326,12 @@ router.get('/my', authenticateToken, async (req, res) => {
     const sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?
+      LEFT JOIN departments d ON CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+      LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
+      WHERE CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [req.user.id, String(req.user.id)]);
+    const result = await query(sql, [String(req.user.id)]);
     return res.json({ complaints: result.rows });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
@@ -347,12 +347,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
              u.name as citizen_name, u.mobile as citizen_mobile,
              f.rating, f.comment as feedback_comment, f.created_at as feedback_created_at
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      LEFT JOIN users u ON c.citizen_id = u.id
-      LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
+      LEFT JOIN departments d ON CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+      LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT)
+      LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
+      WHERE CAST(c.id AS TEXT) = ? OR c.complaint_number = ?
     `;
-    const result = await query(sql, [req.params.id, req.params.id, req.params.id]);
+    const result = await query(sql, [String(req.params.id), String(req.params.id)]);
     if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }

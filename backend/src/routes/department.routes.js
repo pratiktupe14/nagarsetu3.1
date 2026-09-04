@@ -30,9 +30,9 @@ async function resolveUserDepartment(req) {
     const dhRes = await query(
       `SELECT dh.department_id, d.name as department_name 
        FROM department_heads dh 
-       LEFT JOIN departments d ON d.id = dh.department_id 
-       WHERE dh.user_id = $1 OR dh.email = $2`,
-      [req.user.id, req.user.email]
+       LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
+       WHERE CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR dh.email = $2`,
+      [String(req.user.id), req.user.email]
     );
     if (dhRes.rows.length > 0) {
       userDeptId = dhRes.rows[0].department_id || userDeptId;
@@ -146,8 +146,8 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
                 AND (CAST(c.status AS TEXT) = 'Overdue' OR (CAST(c.status AS TEXT) NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
               ) AS overdue_tasks
       FROM field_staff fs
-      LEFT JOIN departments d ON fs.department_id = d.id
-      LEFT JOIN users u ON fs.user_id = u.id
+      LEFT JOIN departments d ON CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+      LEFT JOIN users u ON CAST(fs.user_id AS TEXT) = CAST(u.id AS TEXT)
       WHERE 1=1
     `;
 
@@ -155,8 +155,8 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
 
     // Department Isolation for Department Head
     if (!isAdmin) {
-      sql += ` AND fs.department_id = $1`;
-      params.push(userDeptId || -1);
+      sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
+      params.push(String(userDeptId || -1));
     } else if (req.query.department_id) {
       let deptFilterId = req.query.department_id;
       const codeToIdMap = {
@@ -224,20 +224,25 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
     const inactiveStaff = staffList.filter(s => (s.status || '').toLowerCase() === 'inactive').length;
 
     // Total Active Tasks Across Department Staff
-    let taskSql = `
-      SELECT COUNT(DISTINCT a.id) as active_tasks_count
-      FROM assignments a
-      JOIN complaints c ON c.id = a.complaint_id
-      JOIN field_staff fs ON (a.staff_id = fs.id OR a.staff_id = fs.user_id)
-      WHERE c.status IN ('Assigned', 'In Progress', 'Verified')
-    `;
-    let taskParams = [];
-    if (!isAdmin) {
-      taskSql += ` AND fs.department_id = $1`;
-      taskParams.push(userDeptId || -1);
+    let activeTasksCount = 0;
+    try {
+      let taskSql = `
+        SELECT COUNT(DISTINCT a.id) as active_tasks_count
+        FROM assignments a
+        JOIN complaints c ON CAST(c.id AS TEXT) = CAST(a.complaint_id AS TEXT)
+        JOIN field_staff fs ON (CAST(a.staff_id AS TEXT) = CAST(fs.id AS TEXT) OR CAST(a.staff_id AS TEXT) = CAST(fs.user_id AS TEXT))
+        WHERE CAST(c.status AS TEXT) IN ('Assigned', 'In Progress', 'Verified')
+      `;
+      let taskParams = [];
+      if (!isAdmin) {
+        taskSql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR CAST(c.department_id AS TEXT) = CAST($1 AS TEXT))`;
+        taskParams.push(String(userDeptId || -1));
+      }
+      const taskRes = await query(taskSql, taskParams);
+      activeTasksCount = parseInt(taskRes.rows[0]?.active_tasks_count || 0, 10);
+    } catch (e) {
+      console.warn('Active tasks count note:', e.message);
     }
-    const taskRes = await query(taskSql, taskParams);
-    const activeTasksCount = parseInt(taskRes.rows[0]?.active_tasks_count || 0, 10);
 
     return res.json({
       staff: staffList,

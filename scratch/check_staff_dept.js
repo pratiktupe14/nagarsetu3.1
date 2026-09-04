@@ -1,12 +1,17 @@
-const { query } = require('../backend/src/config/db');
+const { Pool } = require('../backend/node_modules/pg');
+const pool = new Pool({ connectionString: 'postgresql://postgres.ozeiymkbxtrqqdoxtmhm:P1d2s3j4t5%40@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres' });
 
 async function check() {
-  const uRes = await query(`SELECT id, name, email, department_id FROM users WHERE id = 32`);
-  const fsRes = await query(`SELECT id, user_id, name, email, department_id FROM field_staff WHERE user_id = 32 OR id = 32`);
-  const dhRes = await query(`SELECT id, user_id, department_id FROM department_heads WHERE email = 'aditya.joshi@nagarsetu.gov.in'`);
-  console.log('User 32:', uRes.rows);
-  console.log('Field Staff 32:', fsRes.rows);
-  console.log('ELE Head:', dhRes.rows);
+  const u = await pool.query("SELECT id, name, email, role, department_id, employee_id, status FROM users WHERE LOWER(email) = 'staff@nagarsetu.gov.in'");
+  console.log('users row for staff@nagarsetu.gov.in:', u.rows);
+  
+  const fs = await pool.query("SELECT id, user_id, department_id, name, email, employee_id, status FROM field_staff WHERE LOWER(email) = 'staff@nagarsetu.gov.in'");
+  console.log('field_staff row for staff@nagarsetu.gov.in:', fs.rows);
+
+  const depts = await pool.query("SELECT id, name, code FROM departments");
+  console.log('all departments:', depts.rows);
+
+  await pool.end();
 }
 
-check();
+check().catch(console.error);

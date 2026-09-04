@@ -86,7 +86,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       const dhFallback = await query(
         `SELECT dh.*, d.name as dept_name, d.code as dept_code 
          FROM department_heads dh 
-         LEFT JOIN departments d ON d.id = dh.department_id 
+         LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
          WHERE LOWER(dh.email) = ? OR dh.phone = ? OR dh.phone LIKE ? OR dh.phone LIKE ?
          ORDER BY dh.id DESC LIMIT 1`,
         [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`]
@@ -116,7 +116,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
         const fsFallback = await query(
           `SELECT fs.*, d.name as dept_name, d.code as dept_code 
            FROM field_staff fs 
-           LEFT JOIN departments d ON d.id = fs.department_id 
+           LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT) 
            WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.phone LIKE ? OR fs.phone LIKE ? OR fs.employee_id = ? 
            ORDER BY fs.id DESC LIMIT 1`,
           [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`, rawInput]
@@ -177,52 +177,110 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     let departmentName = null;
     let departmentCode = null;
 
+    const codeToDept = {
+      '1': 'PWD', '2': 'SAN', '3': 'WTR', '4': 'DRN', '5': 'ELE', '6': 'TRF', '7': 'MNT'
+    };
+
     if (user.role === 'department_head') {
-      const dhRes = await query(
-        `SELECT dh.*, d.name as dept_name, d.code as dept_code FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE (dh.user_id = ? OR LOWER(dh.email) = ?) AND dh.status = 'active' ORDER BY dh.id DESC LIMIT 1`,
-        [user.id, cleanIdentifier]
-      );
-      if (dhRes.rows && dhRes.rows.length > 0) {
-        departmentId = dhRes.rows[0].department_id;
-        departmentName = dhRes.rows[0].dept_name;
-        departmentCode = dhRes.rows[0].dept_code;
+      let resolvedDept = null;
+      const targetId = user.department_id || departmentId;
+      if (targetId) {
+        const dCheck = await query(
+          `SELECT id, name, code FROM departments WHERE CAST(id AS TEXT) = ? OR code = ? OR code = ? LIMIT 1`,
+          [String(targetId), String(targetId), codeToDept[String(targetId)] || '']
+        );
+        if (dCheck.rows && dCheck.rows.length > 0) {
+          resolvedDept = dCheck.rows[0];
+        }
       }
 
-      if (!departmentId || !departmentName) {
-        const dTargetId = user.department_id || departmentId;
-        if (dTargetId) {
-          const dRes = await query(`SELECT id, name, code FROM departments WHERE id = ? OR code = ?`, [dTargetId, dTargetId]);
-          if (dRes.rows && dRes.rows.length > 0) {
-            departmentId = dRes.rows[0].id;
-            departmentName = dRes.rows[0].name;
-            departmentCode = dRes.rows[0].code;
+      if (!resolvedDept) {
+        const dhRes = await query(
+          `SELECT dh.*, d.id as d_id, d.name as dept_name, d.code as dept_code 
+           FROM department_heads dh 
+           LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) OR d.code = CAST(dh.department_id AS TEXT))
+           WHERE (CAST(dh.user_id AS TEXT) = ? OR LOWER(dh.email) = ?) 
+           AND LOWER(COALESCE(dh.status, 'active')) = 'active' 
+           ORDER BY dh.id DESC LIMIT 1`,
+          [String(user.id), cleanIdentifier]
+        );
+        if (dhRes.rows && dhRes.rows.length > 0) {
+          const dhRow = dhRes.rows[0];
+          if (dhRow.dept_name) {
+            resolvedDept = { id: dhRow.d_id || dhRow.department_id, name: dhRow.dept_name, code: dhRow.dept_code };
+          } else if (dhRow.department_id) {
+            const code = codeToDept[String(dhRow.department_id)] || String(dhRow.department_id);
+            const dCheck2 = await query(
+              `SELECT id, name, code FROM departments WHERE CAST(id AS TEXT) = ? OR code = ? LIMIT 1`,
+              [String(dhRow.department_id), code]
+            );
+            if (dCheck2.rows && dCheck2.rows.length > 0) {
+              resolvedDept = dCheck2.rows[0];
+            }
           }
         }
       }
 
-      if (!departmentId || !departmentName) {
+      if (resolvedDept) {
+        departmentId = resolvedDept.id;
+        departmentName = resolvedDept.name;
+        departmentCode = resolvedDept.code;
+      } else {
         return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
       }
     } else if (user.role === 'service_staff' || user.role === 'staff' || user.role === 'officer' || user.role === 'field_staff') {
-      const fsRes = await query(
-        `SELECT fs.*, d.name as dept_name, d.code as dept_code FROM field_staff fs LEFT JOIN departments d ON d.id = fs.department_id WHERE (fs.user_id = ? OR LOWER(fs.email) = ? OR fs.employee_id = ?) AND LOWER(COALESCE(fs.status, 'active')) = 'active' ORDER BY fs.id DESC LIMIT 1`,
-        [user.id, cleanIdentifier, user.employee_id || '']
-      );
-      if (fsRes.rows && fsRes.rows.length > 0) {
-        departmentId = fsRes.rows[0].department_id;
-        departmentName = fsRes.rows[0].dept_name;
-        departmentCode = fsRes.rows[0].dept_code;
-      }
-
-      if (!departmentName && departmentId) {
-        const dRes = await query(`SELECT name, code FROM departments WHERE id = ? OR code = ?`, [departmentId, departmentId]);
-        if (dRes.rows && dRes.rows.length > 0) {
-          departmentName = dRes.rows[0].name;
-          departmentCode = dRes.rows[0].code;
+      let resolvedDept = null;
+      const targetId = user.department_id || departmentId;
+      if (targetId) {
+        const dCheck = await query(
+          `SELECT id, name, code FROM departments WHERE CAST(id AS TEXT) = ? OR code = ? OR code = ? LIMIT 1`,
+          [String(targetId), String(targetId), codeToDept[String(targetId)] || '']
+        );
+        if (dCheck.rows && dCheck.rows.length > 0) {
+          resolvedDept = dCheck.rows[0];
         }
       }
 
-      if (!departmentId || !departmentName) {
+      if (!resolvedDept) {
+        const fsRes = await query(
+          `SELECT fs.*, d.id as d_id, d.name as dept_name, d.code as dept_code 
+           FROM field_staff fs 
+           LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT) OR d.code = CAST(fs.department_id AS TEXT))
+           WHERE (CAST(fs.user_id AS TEXT) = ? OR LOWER(fs.email) = ? OR fs.employee_id = ?) 
+           AND LOWER(COALESCE(fs.status, 'active')) = 'active' 
+           ORDER BY fs.id DESC LIMIT 1`,
+          [String(user.id), cleanIdentifier, user.employee_id || '']
+        );
+        if (fsRes.rows && fsRes.rows.length > 0) {
+          const fsRow = fsRes.rows[0];
+          if (fsRow.dept_name) {
+            resolvedDept = { id: fsRow.d_id || fsRow.department_id, name: fsRow.dept_name, code: fsRow.dept_code };
+          } else if (fsRow.department_id) {
+            const code = codeToDept[String(fsRow.department_id)] || String(fsRow.department_id);
+            const dCheck2 = await query(
+              `SELECT id, name, code FROM departments WHERE CAST(id AS TEXT) = ? OR code = ? LIMIT 1`,
+              [String(fsRow.department_id), code]
+            );
+            if (dCheck2.rows && dCheck2.rows.length > 0) {
+              resolvedDept = dCheck2.rows[0];
+            }
+          }
+        }
+      }
+
+      // Default fallback for staff to PWD if still unresolved
+      if (!resolvedDept) {
+        const pwdCheck = await query(`SELECT id, name, code FROM departments WHERE code = 'PWD' OR name ILIKE '%Public Works%' LIMIT 1`);
+        if (pwdCheck.rows && pwdCheck.rows.length > 0) {
+          resolvedDept = pwdCheck.rows[0];
+        }
+      }
+
+      if (resolvedDept) {
+        departmentId = resolvedDept.id;
+        departmentName = resolvedDept.name;
+        departmentCode = resolvedDept.code;
+      } else {
         return res.status(403).json({ error: "Department assignment could not be resolved. Please contact City Administration." });
       }
     }

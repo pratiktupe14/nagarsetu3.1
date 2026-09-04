@@ -131,6 +131,7 @@ async function seedServiceStaff(queryFn) {
       [cleanEmail, item.employee_id, userId || -1]
     ).catch(() => ({ rows: [] }));
 
+    const fsDeptId = defaultDeptIdMap[item.deptCode] || 1;
     if (existingFs.rows && existingFs.rows.length > 0) {
       await q(
         `UPDATE field_staff
@@ -144,14 +145,14 @@ async function seedServiceStaff(queryFn) {
              status = 'active',
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $7`,
-        [userId, deptId, item.name, cleanEmail, item.mobile, item.employee_id, existingFs.rows[0].id]
+        [userId, fsDeptId, item.name, cleanEmail, item.mobile, item.employee_id, existingFs.rows[0].id]
       ).catch(() => {});
     } else {
       await q(
         `INSERT INTO field_staff
          (user_id, department_id, name, email, phone, employee_id, role, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'field_staff', 'active')`,
-        [userId, deptId, item.name, cleanEmail, item.mobile, item.employee_id]
+        [userId, fsDeptId, item.name, cleanEmail, item.mobile, item.employee_id]
       ).catch(() => {});
     }
   }

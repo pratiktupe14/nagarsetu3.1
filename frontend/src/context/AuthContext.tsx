@@ -529,11 +529,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 1. Try Local Express Backend API authentication first
       try {
-        const response = await fetch(`${getApiUrl()}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
-        });
+        let response: Response;
+        try {
+          response = await fetch(`${getApiUrl()}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
+          });
+        } catch (fetchErr: any) {
+          console.warn(`Backend API login connection note (${getApiUrl()}):`, fetchErr.message);
+          if (!isSupabaseConfigured()) {
+            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
+          }
+          throw fetchErr;
+        }
+
         if (response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
@@ -568,22 +578,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } else {
           const errData = await response.json().catch(() => ({}));
-          if (errData.error) {
-            throw new Error(errData.error);
-          }
+          const errMsg = errData.message || errData.error || (response.status === 401 ? 'Invalid credentials' : response.status === 500 ? 'Backend server error. Please try again later.' : 'Authentication failed');
+          throw new Error(errMsg);
         }
       } catch (backendErr: any) {
-        if (backendErr && backendErr.message) {
-          const errMsg = backendErr.message.toLowerCase();
-          // If explicit credentials error from backend, re-throw immediately
-          if (errMsg.includes('invalid credentials') || errMsg.includes('password') || errMsg.includes('department assignment') || errMsg.includes('inactive')) {
-            throw backendErr;
-          }
-          // If connection failure or server error, log warning and allow Supabase fallback
-          console.warn(`Backend API login connection note (${getApiUrl()}):`, backendErr.message);
-          if (!isSupabaseConfigured()) {
-            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
-          }
+        if (backendErr && backendErr.message && !backendErr.message.includes('fetch')) {
+          throw backendErr;
+        }
+        if (!isSupabaseConfigured()) {
+          throw backendErr;
         }
       }
 
@@ -767,17 +770,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       // 1. Try local Express backend API registration first
       try {
-        const response = await fetch(`${getApiUrl()}/api/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: fullName.trim(),
-            mobile: mobile.trim(),
-            email: email && email.trim() !== '' ? email.trim() : undefined,
-            password: password || 'password123',
-            role: 'citizen'
-          })
-        });
+        let response: Response;
+        try {
+          response = await fetch(`${getApiUrl()}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: fullName.trim(),
+              mobile: mobile.trim(),
+              email: email && email.trim() !== '' ? email.trim() : undefined,
+              password: password || 'password123',
+              role: 'citizen'
+            })
+          });
+        } catch (fetchErr: any) {
+          console.warn(`Backend API registration note (${getApiUrl()}):`, fetchErr.message);
+          if (!isSupabaseConfigured()) {
+            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
+          }
+          throw fetchErr;
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -797,20 +809,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } else {
           const errData = await response.json().catch(() => ({}));
-          if (errData.error) {
-            throw new Error(errData.error);
-          }
+          const errMsg = errData.message || errData.error || 'Registration failed. Please check your details.';
+          throw new Error(errMsg);
         }
       } catch (backendErr: any) {
-        if (backendErr && backendErr.message) {
-          const errMsg = backendErr.message.toLowerCase();
-          if (errMsg.includes('already registered') || errMsg.includes('already exists') || errMsg.includes('mobile number already')) {
-            throw backendErr;
-          }
-          console.warn(`Backend API registration note (${getApiUrl()}):`, backendErr.message);
-          if (!isSupabaseConfigured()) {
-            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
-          }
+        if (backendErr && backendErr.message && !backendErr.message.includes('fetch')) {
+          throw backendErr;
+        }
+        if (!isSupabaseConfigured()) {
+          throw backendErr;
         }
       }
 
