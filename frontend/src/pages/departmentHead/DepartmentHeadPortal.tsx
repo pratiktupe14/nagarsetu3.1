@@ -11,7 +11,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { DepartmentHeadAnnouncements } from '../../components/DepartmentHeadAnnouncements';
 import {
-  getStoredComplaints, getStaffTasks, assignTaskByDepartmentHead,
+  getStaffTasks, assignTaskByDepartmentHead,
   requestReworkDepartmentHead, approveResolutionDepartmentHead, getComplaintById,
   getDepartmentComplaints
 } from '../../services/complaintService';

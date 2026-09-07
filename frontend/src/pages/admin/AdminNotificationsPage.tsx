@@ -4,7 +4,8 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications
+  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications,
+  syncNotificationsFromBackend
 } from '../../services/notificationService';
 import { NotificationItem, NotificationType } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -42,11 +43,15 @@ export const AdminNotificationsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'All' | 'Unread' | 'Read' | 'Complaint' | 'SLA' | 'Staff' | 'Critical'>('All');
 
   // Load Notifications
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let list = getNotificationsForRole(user?.id, 'city_admin');
+      setNotifications(list);
+
+      await syncNotificationsFromBackend();
+      list = getNotificationsForRole(user?.id, 'city_admin');
       setNotifications(list);
     } catch (e) {
       console.error(e);

@@ -11,7 +11,7 @@ import {
   DepartmentLeadershipSummary
 } from '../../services/departmentService';
 import { getDepartmentServiceStaff } from '../../services/adminService';
-import { getStoredComplaints } from '../../services/complaintService';
+import { getAllComplaints } from '../../services/complaintService';
 import { pushNotification } from '../../services/notificationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
@@ -290,7 +290,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
     if (!viewDeptComplaintsModal) return;
     setViewDeptComplaintsModal((prev) => (prev ? { ...prev, loading: true, error: null } : null));
     try {
-      const allComplaints = await getStoredComplaints();
+      const allComplaints = await getAllComplaints();
       const targetQuery = deptId || deptCode || deptName || '';
       const filtered = allComplaints.filter((c) => matchComplaintToDepartment(c, targetQuery, undefined, deptName));
       setViewDeptComplaintsModal((prev) => (prev ? { ...prev, complaints: filtered, loading: false, error: null } : null));

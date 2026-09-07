@@ -14,9 +14,9 @@ import {
   submitStaffResolution
 } from '../../services/complaintService';
 import { resolveDepartmentInfo } from '../../services/departmentService';
-import { formatSlaRemainingTime, logActivity, getComplaintActivityLogs } from '../../services/adminService';
-import { getNotificationsForRole, markNotificationAsRead } from '../../services/notificationService';
-import { Complaint, ComplaintStatus, NotificationItem } from '../../types/database.types';
+import { formatSlaRemainingTime, logActivity, fetchComplaintActivityLogs } from '../../services/adminService';
+import { getNotificationsForRole, syncNotificationsFromBackend, markNotificationAsRead } from '../../services/notificationService';
+import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
@@ -189,6 +189,7 @@ export const StaffPortal: React.FC = () => {
   const [workNotes, setWorkNotes] = useState('');
   const [materialsUsed, setMaterialsUsed] = useState('');
   const [submittingResolution, setSubmittingResolution] = useState(false);
+  const [recentActivities, setRecentActivities] = useState<ComplaintActivityLog[]>([]);
 
   // Auto-set default activeTab based on sub-route
   useEffect(() => {
@@ -207,8 +208,16 @@ export const StaffPortal: React.FC = () => {
       const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name, user?.employee_id);
       setTasks(list);
 
-      const notifs = getNotificationsForRole(user?.id, 'service_staff');
+      const notifs = await syncNotificationsFromBackend().catch(() => getNotificationsForRole(user?.id, 'service_staff'));
       setNotifications(notifs);
+
+      if (list.length > 0) {
+        fetchComplaintActivityLogs(list[0].id)
+          .then((logs) => setRecentActivities(logs.slice(0, 4)))
+          .catch(() => setRecentActivities([]));
+      } else {
+        setRecentActivities([]);
+      }
     } catch (e) {
       console.error(e);
       setError('Unable to load dashboard data.');
@@ -352,12 +361,6 @@ export const StaffPortal: React.FC = () => {
     );
   }, [tasks]);
 
-  // RECENT ACTIVITY LOGS
-  const recentActivities = useMemo(() => {
-    if (tasks.length === 0) return [];
-    const firstCompId = tasks[0].id;
-    return getComplaintActivityLogs(firstCompId).slice(0, 4);
-  }, [tasks]);
 
   // FILTERED TASKS FOR LIST VIEW
   const filteredTasks = useMemo(() => {

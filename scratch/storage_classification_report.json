@@ -1,0 +1,598 @@
+{
+  "localStorageGet": [
+    {
+      "file": "src/components/DashboardLayout.tsx",
+      "line": 19,
+      "text": "const saved = localStorage.getItem('nagarsetu_sidebar_collapsed');"
+    },
+    {
+      "file": "src/components/ProtectedRoute.tsx",
+      "line": 35,
+      "text": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/config/apiConfig.ts",
+      "line": 26,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 230,
+      "text": "const cached = localStorage.getItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 262,
+      "text": "const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/context/LanguageContext.tsx",
+      "line": 27,
+      "text": "const savedLocal = localStorage.getItem('nagarsetu_lang') as SupportedLanguage;"
+    },
+    {
+      "file": "src/pages/admin/AdminSettingsPage.tsx",
+      "line": 46,
+      "text": "const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_admin_lang') || 'en');"
+    },
+    {
+      "file": "src/pages/admin/AdminSettingsPage.tsx",
+      "line": 62,
+      "text": "const cachedLang = localStorage.getItem('nagarsetu_admin_lang');"
+    },
+    {
+      "file": "src/pages/citizen/CitizenSettingsPage.tsx",
+      "line": 22,
+      "text": "const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_language') || 'en');"
+    },
+    {
+      "file": "src/pages/citizen/CitizenSettingsPage.tsx",
+      "line": 34,
+      "text": "Number(localStorage.getItem('nagarsetu_default_radius')) || 500"
+    },
+    {
+      "file": "src/pages/citizen/TrackComplaintPage.tsx",
+      "line": 129,
+      "text": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/pages/LoginPage.tsx",
+      "line": 88,
+      "text": "const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');"
+    },
+    {
+      "file": "src/pages/staff/StaffSettingsPage.tsx",
+      "line": 58,
+      "text": "(localStorage.getItem('nagarsetu_staff_lang') as 'en' | 'hi' | 'mr') ||"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 732,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 836,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/aiVisionService.ts",
+      "line": 110,
+      "text": "const raw = localStorage.getItem(AI_ANALYSIS_CACHE_KEY);"
+    },
+    {
+      "file": "src/services/announcementService.ts",
+      "line": 37,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 48,
+      "text": "if (localStorage.getItem(key)) {"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 163,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 217,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 246,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 273,
+      "text": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 393,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 476,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 534,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 582,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 661,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 843,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 938,
+      "text": "const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 945,
+      "text": "const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 987,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1080,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1153,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1254,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 220,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 439,
+      "text": "let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 523,
+      "text": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 675,
+      "text": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/locationService.ts",
+      "line": 170,
+      "text": "const raw = localStorage.getItem(GEOCODE_CACHE_KEY);"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 28,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 117,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 150,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    }
+  ],
+  "localStorageSet": [
+    {
+      "file": "src/components/DashboardLayout.tsx",
+      "line": 26,
+      "text": "localStorage.setItem('nagarsetu_sidebar_collapsed', String(next));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 238,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(resolved));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 290,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 380,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 458,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 511,
+      "text": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 523,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 575,
+      "text": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 576,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 654,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 678,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 685,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 720,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 729,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 739,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 760,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 806,
+      "text": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 807,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 858,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(newCitizen));"
+    },
+    {
+      "file": "src/context/LanguageContext.tsx",
+      "line": 40,
+      "text": "localStorage.setItem('nagarsetu_lang', userLang);"
+    },
+    {
+      "file": "src/context/LanguageContext.tsx",
+      "line": 49,
+      "text": "localStorage.setItem('nagarsetu_lang', newLang);"
+    },
+    {
+      "file": "src/context/LanguageContext.tsx",
+      "line": 56,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "src/pages/admin/AdminSettingsPage.tsx",
+      "line": 72,
+      "text": "localStorage.setItem('nagarsetu_admin_lang', language);"
+    },
+    {
+      "file": "src/pages/citizen/CitizenSettingsPage.tsx",
+      "line": 55,
+      "text": "localStorage.setItem('nagarsetu_language', language);"
+    },
+    {
+      "file": "src/pages/citizen/CitizenSettingsPage.tsx",
+      "line": 56,
+      "text": "localStorage.setItem('nagarsetu_default_radius', String(defaultRadius));"
+    },
+    {
+      "file": "src/pages/citizen/CitizenSettingsPage.tsx",
+      "line": 293,
+      "text": "localStorage.setItem('nagarsetu_default_radius', String(val));"
+    },
+    {
+      "file": "src/pages/departmentHead/DepartmentHeadPortal.tsx",
+      "line": 618,
+      "text": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "src/pages/staff/StaffSettingsPage.tsx",
+      "line": 117,
+      "text": "localStorage.setItem('nagarsetu_staff_lang', newLang);"
+    },
+    {
+      "file": "src/services/aiVisionService.ts",
+      "line": 121,
+      "text": "localStorage.setItem(AI_ANALYSIS_CACHE_KEY, JSON.stringify(cache));"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 941,
+      "text": "localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(drafts));"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 451,
+      "text": "localStorage.setItem('nagarsetu_token', token);"
+    },
+    {
+      "file": "src/services/locationService.ts",
+      "line": 181,
+      "text": "localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));"
+    }
+  ],
+  "localStorageRemove": [
+    {
+      "file": "src/components/ProtectedRoute.tsx",
+      "line": 42,
+      "text": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/components/ProtectedRoute.tsx",
+      "line": 43,
+      "text": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/components/Sidebar.tsx",
+      "line": 356,
+      "text": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 296,
+      "text": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 297,
+      "text": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 878,
+      "text": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 879,
+      "text": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 109,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_DEPARTMENTS_KEY);"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 392,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_STAFF_KEY);"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 828,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 49,
+      "text": "localStorage.removeItem(key);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 59,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 950,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1248,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1249,
+      "text": "LEGACY_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 9,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_NOTIFS_KEY);"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 10,
+      "text": "localStorage.removeItem('nagarsetu_notifications');"
+    },
+    {
+      "file": "src/services/profileService.ts",
+      "line": 7,
+      "text": "localStorage.removeItem(LOCAL_STORAGE_PROFILES_KEY);"
+    }
+  ],
+  "sessionStorage": [
+    {
+      "file": "src/config/apiConfig.ts",
+      "line": 26,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 262,
+      "text": "const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 298,
+      "text": "sessionStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/context/AuthContext.tsx",
+      "line": 299,
+      "text": "sessionStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 732,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/adminService.ts",
+      "line": 836,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/announcementService.ts",
+      "line": 37,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 163,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 217,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 246,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 393,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 476,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 534,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 582,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 661,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 843,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 987,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1080,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1153,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/complaintService.ts",
+      "line": 1254,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 220,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/departmentService.ts",
+      "line": 439,
+      "text": "let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 28,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 117,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "src/services/notificationService.ts",
+      "line": 150,
+      "text": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    }
+  ],
+  "mockData": [],
+  "demoData": [],
+  "fallbackData": []
+}

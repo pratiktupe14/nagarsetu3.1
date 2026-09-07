@@ -9,7 +9,8 @@ import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications
+  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications,
+  syncNotificationsFromBackend
 } from '../../services/notificationService';
 import {
   getStaffTasks, acceptStaffTask, startStaffTravel, startStaffWork,
@@ -79,22 +80,15 @@ export const StaffNotificationsPage: React.FC = () => {
   const [submittingResolution, setSubmittingResolution] = useState(false);
 
   // Load Notifications for Staff
-  const loadNotifications = useCallback(() => {
+  const loadNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
-      
-      // Ensure seed staff notifications exist if list is sparse
-      const existingIds = new Set(list.map((n) => n.id));
-      const missingSeeds = SEED_STAFF_NOTIFICATIONS.filter((s) => !existingIds.has(s.id));
-      if (missingSeeds.length > 0) {
-        const allStored = getStoredNotifications();
-        const merged = [...missingSeeds, ...allStored];
-        saveStoredNotifications(merged);
-        list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
-      }
+      setNotifications(list);
 
+      await syncNotificationsFromBackend();
+      list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
       setNotifications(list);
     } catch (e) {
       console.error(e);

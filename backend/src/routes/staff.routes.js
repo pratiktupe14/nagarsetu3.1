@@ -17,10 +17,14 @@ router.get('/tasks', async (req, res) => {
     const fsRes = await query(
       `SELECT fs.*, d.name as dept_name 
        FROM field_staff fs 
-       LEFT JOIN departments d ON d.id = fs.department_id 
-       WHERE fs.user_id = $1 OR LOWER(fs.email) = LOWER($2) OR fs.employee_id = $3
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(fs.department_id AS TEXT))
+         OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+       )
+       WHERE CAST(fs.user_id AS TEXT) = CAST($1 AS TEXT) OR LOWER(fs.email) = LOWER($2) OR fs.employee_id = $3
        LIMIT 1`,
-      [req.user.id, req.user.email || '', req.user.employee_id || '']
+      [String(req.user.id), req.user.email || '', req.user.employee_id || '']
     );
 
     let staff = fsRes.rows && fsRes.rows.length > 0 ? fsRes.rows[0] : null;
@@ -30,13 +34,22 @@ router.get('/tasks', async (req, res) => {
     let staffFsId = staff ? staff.id : req.user.id;
 
     let sql = `
-      SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name
+      SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name, d.code as department_code
       FROM complaints c
-      LEFT JOIN assignments a ON (a.complaint_id = c.id OR CAST(a.complaint_id AS TEXT) = CAST(c.id AS TEXT))
-      LEFT JOIN departments d ON (c.department_id = d.id OR CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT))
+      LEFT JOIN assignments a ON (CAST(a.complaint_id AS TEXT) = CAST(c.id AS TEXT) OR a.complaint_id = c.complaint_number)
+      LEFT JOIN departments d ON (
+        CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
+        OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+        OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+        OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+        OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+        OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+        OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+      )
       WHERE (
-        c.assigned_staff_id = $1 OR CAST(c.assigned_staff_id AS TEXT) = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
-        OR a.staff_id = $1 OR CAST(a.staff_id AS TEXT) = $1 OR a.staff_id = $2 OR CAST(a.staff_id AS TEXT) = $2 OR a.staff_id = $3 OR CAST(a.staff_id AS TEXT) = $3
+        CAST(c.assigned_staff_id AS TEXT) = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
+        OR CAST(a.staff_id AS TEXT) = $1 OR CAST(a.staff_id AS TEXT) = $2 OR CAST(a.staff_id AS TEXT) = $3
         OR (LOWER(c.assigned_staff_email) = LOWER($4) AND $4 != '')
         OR c.assigned_staff_name = $5
       )
@@ -44,7 +57,11 @@ router.get('/tasks', async (req, res) => {
     const params = [String(staffFsId), String(staffUserId), String(req.user.id), staffEmail, req.user.name || ''];
 
     if (staffDeptId) {
-      sql += ` AND (c.department_id = $6 OR CAST(c.department_id AS TEXT) = $6 OR d.id = $6 OR CAST(d.id AS TEXT) = $6)`;
+      sql += ` AND (
+        CAST(c.department_id AS TEXT) = $6 
+        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $6)
+        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($6))
+      )`;
       params.push(String(staffDeptId));
     }
 

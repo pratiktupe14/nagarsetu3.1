@@ -18,8 +18,8 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
     let sql = `
       SELECT c.*, d.name as department_name, u.name as citizen_name, u.mobile as citizen_mobile
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      LEFT JOIN users u ON c.citizen_id = u.id
+      LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR c.department_id = d.code)
+      LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT)
       WHERE 1=1
     `;
     const params = [];
@@ -74,7 +74,7 @@ router.get('/staff-list', async (req, res) => {
     let sql = `
       SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name
       FROM field_staff fs
-      LEFT JOIN departments d ON fs.department_id = d.id
+      LEFT JOIN departments d ON (CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT) OR fs.department_id = d.code)
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
     const params = [];
@@ -260,8 +260,8 @@ router.get('/duplicates', async (req, res) => {
     const sql = `
       SELECT c.*, d.name as department_name, orig.title as original_title
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      INNER JOIN complaints orig ON c.duplicate_of_id = orig.id
+      LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR c.department_id = d.code)
+      INNER JOIN complaints orig ON CAST(c.duplicate_of_id AS TEXT) = CAST(orig.id AS TEXT)
       ORDER BY c.created_at DESC
     `;
     const result = await query(sql);

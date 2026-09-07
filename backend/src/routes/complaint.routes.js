@@ -173,7 +173,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     const result = await query(insertSql, [
       finalComplaintNumber,
       req.user.id,
-      photo_url,
+      photo_url || '',
       normalizedCategory,
       title || `${normalizedCategory} Defect`,
       description || '',
@@ -254,10 +254,10 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   try {
     const historyRes = await query(
       `SELECT h.* FROM complaint_status_history h
-       LEFT JOIN complaints c ON h.complaint_id = c.id
-       WHERE h.complaint_id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
+       LEFT JOIN complaints c ON CAST(h.complaint_id AS TEXT) = CAST(c.id AS TEXT)
+       WHERE CAST(h.complaint_id AS TEXT) = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
        ORDER BY h.created_at ASC`,
-      [req.params.id, req.params.id, req.params.id]
+      [String(req.params.id), String(req.params.id), String(req.params.id)]
     );
     return res.json({ history: historyRes.rows || [] });
   } catch (err) {
@@ -265,6 +265,20 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch status history' });
   }
 });
+
+// Helper for department join condition
+const DEPT_JOIN_SQL = `
+  LEFT JOIN departments d ON (
+    CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+    OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
+    OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+    OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+    OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+    OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+    OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+    OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+  )
+`;
 
 // Get complaints for Admin (all departments), Department Head (isolated by department), Citizen (own), or Public
 router.get('/', optionalAuthenticateToken, async (req, res) => {
@@ -274,16 +288,16 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
     let sql = `
       SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      LEFT JOIN feedback f ON f.complaint_id = c.id
+      ${DEPT_JOIN_SQL}
+      LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE 1=1
     `;
     const params = [];
 
     // Server-side Data Isolation based on Role
     if (authUser && authUser.role === 'citizen') {
-      sql += ` AND (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
-      params.push(authUser.id, String(authUser.id));
+      sql += ` AND (CAST(c.citizen_id AS TEXT) = ?)`;
+      params.push(String(authUser.id));
     } else if (authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
@@ -294,18 +308,30 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
         const dhRes = await query('SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = LOWER(?)) AND status = \'active\'', [authUser.id, authUser.email || '']);
         if (dhRes.rows && dhRes.rows.length > 0) deptId = dhRes.rows[0].department_id;
       }
-      sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
-      params.push(deptId || -1, String(deptId || -1));
+      sql += ` AND (
+        CAST(c.department_id AS TEXT) = ?
+        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = ?)
+        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER(?))
+      )`;
+      params.push(String(deptId || -1), String(deptId || -1), String(deptId || -1));
     } else if (authUser && (authUser.role === 'admin' || authUser.role === 'city_admin')) {
       if (req.query.department_id) {
-        sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
-        params.push(req.query.department_id, String(req.query.department_id));
+        sql += ` AND (
+          CAST(c.department_id AS TEXT) = ?
+          OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = ?)
+          OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER(?))
+        )`;
+        params.push(String(req.query.department_id), String(req.query.department_id), String(req.query.department_id));
       }
     } else {
       // Unauthenticated / Public visitor: show non-draft complaints, allow optional department_id filter
       if (req.query.department_id) {
-        sql += ` AND (c.department_id = ? OR CAST(c.department_id AS TEXT) = ?)`;
-        params.push(req.query.department_id, String(req.query.department_id));
+        sql += ` AND (
+          CAST(c.department_id AS TEXT) = ?
+          OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = ?)
+          OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER(?))
+        )`;
+        params.push(String(req.query.department_id), String(req.query.department_id), String(req.query.department_id));
       }
       sql += ` AND (c.status != 'Draft' AND c.status != 'draft')`;
     }
@@ -324,9 +350,9 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
 router.get('/my', authenticateToken, async (req, res) => {
   try {
     const sql = `
-      SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
+      SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
       FROM complaints c
-      LEFT JOIN departments d ON CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+      ${DEPT_JOIN_SQL}
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
@@ -343,11 +369,11 @@ router.get('/my', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const sql = `
-      SELECT c.*, d.name as department_name,
+      SELECT c.*, d.name as department_name, d.code as department_code,
              u.name as citizen_name, u.mobile as citizen_mobile,
              f.rating, f.comment as feedback_comment, f.created_at as feedback_created_at
       FROM complaints c
-      LEFT JOIN departments d ON CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+      ${DEPT_JOIN_SQL}
       LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT)
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE CAST(c.id AS TEXT) = ? OR c.complaint_number = ?

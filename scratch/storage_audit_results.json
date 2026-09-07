@@ -1,0 +1,1094 @@
+{
+  "localStorage": [
+    {
+      "file": "components/DashboardLayout.tsx",
+      "line": 19,
+      "content": "const saved = localStorage.getItem('nagarsetu_sidebar_collapsed');"
+    },
+    {
+      "file": "components/DashboardLayout.tsx",
+      "line": 26,
+      "content": "localStorage.setItem('nagarsetu_sidebar_collapsed', String(next));"
+    },
+    {
+      "file": "components/ProtectedRoute.tsx",
+      "line": 35,
+      "content": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "components/ProtectedRoute.tsx",
+      "line": 42,
+      "content": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "components/ProtectedRoute.tsx",
+      "line": 43,
+      "content": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "components/Sidebar.tsx",
+      "line": 356,
+      "content": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "config/apiConfig.ts",
+      "line": 26,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 230,
+      "content": "const cached = localStorage.getItem('nagarsetu_user');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 238,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(resolved));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 262,
+      "content": "const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 290,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 296,
+      "content": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 297,
+      "content": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 380,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 458,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 511,
+      "content": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 523,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 575,
+      "content": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 576,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 654,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 678,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 685,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 720,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 729,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 739,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 760,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 806,
+      "content": "localStorage.setItem('nagarsetu_token', data.token);"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 807,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 858,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(newCitizen));"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 878,
+      "content": "localStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 879,
+      "content": "localStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "context/LanguageContext.tsx",
+      "line": 27,
+      "content": "const savedLocal = localStorage.getItem('nagarsetu_lang') as SupportedLanguage;"
+    },
+    {
+      "file": "context/LanguageContext.tsx",
+      "line": 40,
+      "content": "localStorage.setItem('nagarsetu_lang', userLang);"
+    },
+    {
+      "file": "context/LanguageContext.tsx",
+      "line": 49,
+      "content": "localStorage.setItem('nagarsetu_lang', newLang);"
+    },
+    {
+      "file": "context/LanguageContext.tsx",
+      "line": 56,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "pages/admin/AdminSettingsPage.tsx",
+      "line": 46,
+      "content": "const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_admin_lang') || 'en');"
+    },
+    {
+      "file": "pages/admin/AdminSettingsPage.tsx",
+      "line": 62,
+      "content": "const cachedLang = localStorage.getItem('nagarsetu_admin_lang');"
+    },
+    {
+      "file": "pages/admin/AdminSettingsPage.tsx",
+      "line": 72,
+      "content": "localStorage.setItem('nagarsetu_admin_lang', language);"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 22,
+      "content": "const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_language') || 'en');"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 34,
+      "content": "Number(localStorage.getItem('nagarsetu_default_radius')) || 500"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 55,
+      "content": "localStorage.setItem('nagarsetu_language', language);"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 56,
+      "content": "localStorage.setItem('nagarsetu_default_radius', String(defaultRadius));"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 293,
+      "content": "localStorage.setItem('nagarsetu_default_radius', String(val));"
+    },
+    {
+      "file": "pages/citizen/TrackComplaintPage.tsx",
+      "line": 129,
+      "content": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "pages/departmentHead/DepartmentHeadPortal.tsx",
+      "line": 618,
+      "content": "localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 88,
+      "content": "const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');"
+    },
+    {
+      "file": "pages/staff/StaffSettingsPage.tsx",
+      "line": 58,
+      "content": "(localStorage.getItem('nagarsetu_staff_lang') as 'en' | 'hi' | 'mr') ||"
+    },
+    {
+      "file": "pages/staff/StaffSettingsPage.tsx",
+      "line": 117,
+      "content": "localStorage.setItem('nagarsetu_staff_lang', newLang);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 106,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_DEPARTMENTS_KEY);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 112,
+      "content": "localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(DEFAULT_MUNICIPAL_DEPARTMENTS));"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 117,
+      "content": "localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(depts));"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 377,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 386,
+      "content": "localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(DEFAULT_SERVICE_STAFF));"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 515,
+      "content": "localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(staff));"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 719,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 812,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 830,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 842,
+      "content": "localStorage.setItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY, JSON.stringify(all));"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 110,
+      "content": "const raw = localStorage.getItem(AI_ANALYSIS_CACHE_KEY);"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 121,
+      "content": "localStorage.setItem(AI_ANALYSIS_CACHE_KEY, JSON.stringify(cache));"
+    },
+    {
+      "file": "services/announcementService.ts",
+      "line": 37,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 49,
+      "content": "const legacyData = localStorage.getItem(key);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 51,
+      "content": "localStorage.removeItem(key);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 57,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_COMPLAINTS_KEY);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 75,
+      "content": "localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(clean));"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 178,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 232,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 261,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 288,
+      "content": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 328,
+      "content": "// Insert new complaint into Supabase & LocalStorage"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 408,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 491,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 549,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 597,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 676,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 858,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 953,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 956,
+      "content": "localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(drafts));"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 960,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 965,
+      "content": "localStorage.removeItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1002,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1095,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1168,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1260,
+      "content": "// 1. Clear LocalStorage cached complaints"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1263,
+      "content": "localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1264,
+      "content": "LEGACY_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1269,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 221,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 440,
+      "content": "let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 452,
+      "content": "localStorage.setItem('nagarsetu_token', token);"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 524,
+      "content": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 679,
+      "content": "const token = localStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 170,
+      "content": "const raw = localStorage.getItem(GEOCODE_CACHE_KEY);"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 181,
+      "content": "localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 8,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_NOTIFS_KEY);"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 18,
+      "content": "localStorage.setItem(LOCAL_STORAGE_NOTIFS_KEY, JSON.stringify(notifs));"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 25,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 80,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 113,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/profileService.ts",
+      "line": 6,
+      "content": "const data = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY);"
+    },
+    {
+      "file": "services/profileService.ts",
+      "line": 16,
+      "content": "localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles));"
+    }
+  ],
+  "sessionStorage": [
+    {
+      "file": "config/apiConfig.ts",
+      "line": 26,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 262,
+      "content": "const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 298,
+      "content": "sessionStorage.removeItem('nagarsetu_token');"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 299,
+      "content": "sessionStorage.removeItem('nagarsetu_user');"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 719,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/announcementService.ts",
+      "line": 37,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 178,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 232,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 261,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 408,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 491,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 549,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 597,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 676,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 858,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1002,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1095,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1168,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1269,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 221,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 440,
+      "content": "let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 25,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 80,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 113,
+      "content": "const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');"
+    }
+  ],
+  "mockData": [],
+  "demoData": [],
+  "fallbackData": [],
+  "mock": [],
+  "demo": [
+    {
+      "file": "components/DashboardHeader.tsx",
+      "line": 53,
+      "content": "{/* DEMO ROLE SWITCHER DROPDOWN */}"
+    },
+    {
+      "file": "components/DashboardHeader.tsx",
+      "line": 96,
+      "content": "? (user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')"
+    },
+    {
+      "file": "components/Navbar.tsx",
+      "line": 109,
+      "content": "{/* Demo Role Selector */}"
+    },
+    {
+      "file": "components/Navbar.tsx",
+      "line": 153,
+      "content": "? (user.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 189,
+      "content": "id: 'demo-admin-id-202',"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 207,
+      "content": "id: 'demo-head-id-404',"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 219,
+      "content": "export const DEMO_USERS = DEFAULT_ROLE_USERS;"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 660,
+      "content": "const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 661,
+      "content": "const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 662,
+      "content": "const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 663,
+      "content": "const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 669,
+      "content": "password === demoAdminPass ||"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 670,
+      "content": "password === demoUserPass ||"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 671,
+      "content": "password === demoHeadPass ||"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 672,
+      "content": "password === demoStaffPass"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 674,
+      "content": "console.info('Supabase auth failed for demo account, using demo session fallback.');"
+    },
+    {
+      "file": "pages/admin/AdminPortal.tsx",
+      "line": 683,
+      "content": "[DEMO AI ENGINE]"
+    },
+    {
+      "file": "pages/citizen/CitizenPortal.tsx",
+      "line": 165,
+      "content": "{t('welcome')}, {user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}"
+    },
+    {
+      "file": "pages/citizen/CitizenSettingsPage.tsx",
+      "line": 477,
+      "content": "<span className=\"font-bold text-gray-900 font-outfit text-sm\">{user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}</span>"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 30,
+      "content": "const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 31,
+      "content": "const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 32,
+      "content": "const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'nagarsetu@123';"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 33,
+      "content": "const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'password123';"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 40,
+      "content": "setPassword(demoAdminPass);"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 43,
+      "content": "setPassword(demoHeadPass);"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 46,
+      "content": "setPassword(demoStaffPass);"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 80,
+      "content": "setErrorMsg('Invalid OTP. Please enter 123456 for demo verification.');"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 277,
+      "content": "{/* Citizen Registration Link & Demo Account Badge */}"
+    },
+    {
+      "file": "pages/LoginPage.tsx",
+      "line": 283,
+      "content": "<span>Demo Account: <strong className=\"font-bold\">8788562103</strong></span>"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 320,
+      "content": "export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 323,
+      "content": "// 0. Primary Demo Staff — Ramesh Kumar (36th Staff)"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 27,
+      "content": "* Identifies if a complaint object is a demo/fake record"
+    },
+    {
+      "file": "types/database.types.ts",
+      "line": 34,
+      "content": "export type AIMode = 'demo' | 'production';"
+    },
+    {
+      "file": "utils/i18n.ts",
+      "line": 85,
+      "content": "demoAccounts: \"Pre-seeded Demo Login Accounts\","
+    },
+    {
+      "file": "utils/i18n.ts",
+      "line": 480,
+      "content": "demoAccounts: \"डेमो लॉगिन खाते\","
+    },
+    {
+      "file": "utils/i18n.ts",
+      "line": 875,
+      "content": "demoAccounts: \"डेमो लॉगिन खाती\","
+    }
+  ],
+  "fallback": [
+    {
+      "file": "components/LiveGoogleMap.tsx",
+      "line": 79,
+      "content": "console.warn('Google Maps API Key not configured. Enabling fallback map viewer.');"
+    },
+    {
+      "file": "components/LiveGoogleMap.tsx",
+      "line": 102,
+      "content": "console.warn('Failed to load Google Maps JS SDK. Using fallback map viewer.');"
+    },
+    {
+      "file": "components/LiveGoogleMap.tsx",
+      "line": 277,
+      "content": "// 5. FALLBACK VIEW (Leaflet / OpenStreetMap with CartoDB Voyager Light Tiles)"
+    },
+    {
+      "file": "components/Sidebar.tsx",
+      "line": 118,
+      "content": "// Fallback"
+    },
+    {
+      "file": "components/Sidebar.tsx",
+      "line": 317,
+      "content": "// Ignore fallback errors"
+    },
+    {
+      "file": "context/AuthContext.tsx",
+      "line": 674,
+      "content": "console.info('Supabase auth failed for demo account, using demo session fallback.');"
+    },
+    {
+      "file": "context/LanguageContext.tsx",
+      "line": 98,
+      "content": "// Fallback safe dummy context if used outside provider during initialization"
+    },
+    {
+      "file": "pages/admin/AdminOverdueComplaintsPage.tsx",
+      "line": 120,
+      "content": "// Default fallback 24h from created_at"
+    },
+    {
+      "file": "pages/admin/AdminOverdueComplaintsPage.tsx",
+      "line": 121,
+      "content": "const fallbackDeadline = new Date(c.created_at).getTime() + 24 * 3600000;"
+    },
+    {
+      "file": "pages/admin/AdminOverdueComplaintsPage.tsx",
+      "line": 122,
+      "content": "const diffMs = Date.now() - fallbackDeadline;"
+    },
+    {
+      "file": "pages/citizen/ReportIssuePage.tsx",
+      "line": 103,
+      "content": "console.warn('GPS detection failed, fallback to Nashik Center pin');"
+    },
+    {
+      "file": "pages/citizen/ReportIssuePage.tsx",
+      "line": 269,
+      "content": "console.warn('Primary image upload fallback triggered:', uploadErr);"
+    },
+    {
+      "file": "pages/citizen/ReportIssuePage.tsx",
+      "line": 367,
+      "content": "? '🟡 AI Service Quota Limit (Manual Fallback Ready)'"
+    },
+    {
+      "file": "pages/citizen/TrackComplaintPage.tsx",
+      "line": 141,
+      "content": "// Fallback silent"
+    },
+    {
+      "file": "pages/staff/StaffTaskMapPage.tsx",
+      "line": 584,
+      "content": "/* 21. MISSING LOCATION FALLBACK */"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 717,
+      "content": "// 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 737,
+      "content": "console.warn('Backend assignStaffToTask error fallback:', e);"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 946,
+      "content": "// Calculate Complaints Metrics for department using department_id & text match fallback"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 1051,
+      "content": "// Fallback: Direct database updates if RPC not executed yet"
+    },
+    {
+      "file": "services/adminService.ts",
+      "line": 1102,
+      "content": "// Fallback direct update"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 293,
+      "content": "const fallbackSeed = typeof imageInput === 'string' && imageInput.length > 5"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 297,
+      "content": "dHash: fallbackSeed.padStart(16, '0'),"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 401,
+      "content": "return file; // Fallback to original file on failure"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 614,
+      "content": "const fallbackCategory: CivicCategory = 'Road Damage / Pothole';"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 615,
+      "content": "const meta = VALID_TAXONOMY_MAP[fallbackCategory];"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 617,
+      "content": "const fallbackResult: AIVisionResult = {"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 621,
+      "content": "category: fallbackCategory,"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 640,
+      "content": "setAnalysisCache(imageHash, fallbackResult);"
+    },
+    {
+      "file": "services/aiVisionService.ts",
+      "line": 641,
+      "content": "return fallbackResult;"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 104,
+      "content": "// Persistent Base64 Data URL fallback to prevent temporary blob expiration across reloads"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 113,
+      "content": "// Fetch all complaints from Supabase with real geocoding fallback"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 133,
+      "content": "console.warn('Express backend getAllComplaints fallback:', err);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 149,
+      "content": "console.warn('Supabase getAllComplaints fallback:', err);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 299,
+      "content": "console.warn('Express backend getComplaintById fallback note:', backendErr);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 316,
+      "content": "console.warn('Supabase getComplaintById fallback:', err);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 401,
+      "content": "console.warn('Supabase createComplaint insert fallback:', err);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 703,
+      "content": "console.warn('Backend resolve task API fallback:', apiErr);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1023,
+      "content": "console.warn('Backend assign task API fallback:', apiErr);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1117,
+      "content": "console.warn('Backend rework task API fallback:', apiErr);"
+    },
+    {
+      "file": "services/complaintService.ts",
+      "line": 1190,
+      "content": "console.warn('Backend verify task API fallback:', apiErr);"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 219,
+      "content": "// Backend API fallback"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 292,
+      "content": "// 3. Fallback match by Category & Title taxonomy (AI Routing)"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 492,
+      "content": "// 2. Fallback / Merge with Supabase"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 573,
+      "content": "// Calculate Real Staff Count for department from Express API, profiles, or fallback staff records"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 574,
+      "content": "const fallbackStaffRecords = getAllServiceStaffRecords();"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 576,
+      "content": "const matchedFallbackStaff = fallbackStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 807,
+      "content": "// 5. Fallback Direct Database Upserts"
+    },
+    {
+      "file": "services/departmentService.ts",
+      "line": 978,
+      "content": "// Fallback: get target head record"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 243,
+      "content": "const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=${mode}`;"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 263,
+      "content": "navigation_url: data.navigation_url || fallbackUrl,"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 270,
+      "content": "return { navigation_url: fallbackUrl };"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 308,
+      "content": "// 2. OpenStreetMap Nominatim Fallback - Search address cleanly without hardcoding any location!"
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 631,
+      "content": "* Only attempts fallback geocoding if coordinates are completely missing (null/NaN)."
+    },
+    {
+      "file": "services/locationService.ts",
+      "line": 670,
+      "content": "// Only attempt fallback geocoding if coordinates are completely missing (null/NaN)"
+    },
+    {
+      "file": "services/notificationService.ts",
+      "line": 52,
+      "content": "console.warn('Backend notifications sync fallback:', err);"
+    }
+  ]
+}

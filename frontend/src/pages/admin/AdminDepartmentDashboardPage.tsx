@@ -7,11 +7,10 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
-  getAllServiceStaffRecords,
+  fetchDepartmentStaffApi,
   ServiceStaffMemberRecord
 } from '../../services/adminService';
-import { getStoredProfiles } from '../../services/profileService';
-import { Complaint, UserProfile } from '../../types/database.types';
+import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
 import {
@@ -91,7 +90,6 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
   const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>([]);
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
   const [dbDepartments, setDbDepartments] = useState<MunicipalDepartment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,21 +104,34 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const [compList, heads, depts] = await Promise.all([
+      const [compList, heads, depts, staffRes] = await Promise.all([
         getAllComplaints(),
         getDepartmentHeads(),
-        getDepartments()
+        getDepartments(),
+        fetchDepartmentStaffApi().catch(() => ({ staff: [] }))
       ]);
 
       setComplaints(compList);
       setHeadSummaries(heads);
       setDbDepartments(depts);
 
-      const staff = getAllServiceStaffRecords();
+      const staff: ServiceStaffMemberRecord[] = (staffRes?.staff || []).map((s: any) => ({
+        id: String(s.id),
+        name: s.name,
+        employee_id: s.employee_id || `STF-${s.id}`,
+        department_name: s.department_name || 'Municipal Department',
+        role: s.designation || 'Service Staff',
+        status: (s.status || 'Active').toLowerCase() === 'active' ? 'Available' : 'Offline',
+        contact_number: s.mobile || s.contact_number || '+91 98220 00000',
+        email: s.email,
+        ward_area: 'Nashik City',
+        joined_date: s.created_at || new Date().toISOString(),
+        created_at: s.created_at || new Date().toISOString(),
+        active_tasks: s.active_tasks || 0,
+        completed_tasks: s.completed_tasks || 0,
+        overdue_tasks: s.overdue_tasks || 0
+      }));
       setStaffMembers(staff);
-
-      const profs = getStoredProfiles();
-      setProfiles(profs);
     } catch (e: any) {
       console.error('Error loading department dashboard data:', e);
       setErrorMsg('Unable to load department dashboard data from database.');

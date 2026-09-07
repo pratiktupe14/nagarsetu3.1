@@ -45,27 +45,18 @@ function getAuthHeaders(): HeadersInit {
  * Fetch Department Head / User Announcements (Filtered securely by backend)
  */
 export async function getDepartmentHeadAnnouncements(): Promise<AnnouncementItem[]> {
-  try {
-    const res = await fetch(`${getApiUrl()}/api/announcements`, {
-      headers: getAuthHeaders()
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.announcements)) {
-        return data.announcements;
-      }
+  const res = await fetch(`${getApiUrl()}/api/announcements`, {
+    headers: getAuthHeaders()
+  });
+  if (res.ok) {
+    const data = await res.json();
+    if (Array.isArray(data.announcements)) {
+      return data.announcements;
     }
-  } catch (err) {
-    console.warn('Backend fetch failed, using fallback announcements:', err);
+    return [];
   }
-
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_ANNOUNCEMENTS);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.error(e);
-  }
-  return [];
+  const errData = await res.json().catch(() => ({}));
+  throw new Error(errData.error || `Failed to fetch announcements (HTTP ${res.status})`);
 }
 
 /**
@@ -218,12 +209,30 @@ export async function createAnnouncement(announcement: Omit<OfficialAnnouncement
 
 export async function getMaintenanceWorks(): Promise<MaintenanceWork[]> {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_MAINTENANCE);
-    if (raw) return JSON.parse(raw);
+    const announcements = await getDepartmentHeadAnnouncements();
+    const maintenanceAnnouncements = announcements.filter(
+      (a) => a.type === 'Maintenance' || a.title?.toLowerCase().includes('maintenance') || a.title?.toLowerCase().includes('repair')
+    );
+    return maintenanceAnnouncements.map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      department_name: a.department_name || 'Public Works Department (PWD)',
+      area: a.target_audience || 'Nashik City',
+      location_address: a.target_audience || 'Nashik City',
+      latitude: 19.9975,
+      longitude: 73.7898,
+      status: (a.status === 'Published' ? 'In Progress' : 'Planned') as any,
+      priority: a.priority as any,
+      start_date: a.published_at || a.created_at,
+      expected_completion: a.expires_at || new Date(Date.now() + 7 * 86400000).toISOString(),
+      created_by: a.posted_by,
+      created_at: a.created_at,
+      updated_at: a.updated_at || a.created_at
+    }));
   } catch (e) {
-    console.error(e);
+    return [];
   }
-  return [];
 }
 
 export async function getMaintenanceWorkById(id: string): Promise<MaintenanceWork | null> {
@@ -232,14 +241,19 @@ export async function getMaintenanceWorkById(id: string): Promise<MaintenanceWor
 }
 
 export async function createMaintenanceWork(work: Omit<MaintenanceWork, 'id' | 'created_at' | 'updated_at'>): Promise<MaintenanceWork> {
-  const raw = localStorage.getItem(LOCAL_STORAGE_MAINTENANCE);
-  const list: MaintenanceWork[] = raw ? JSON.parse(raw) : [];
-  const newWork: MaintenanceWork = {
+  const res = await createGenericAnnouncement({
+    title: work.title,
+    description: work.description,
+    type: 'Maintenance',
+    priority: work.priority === 'Critical' ? 'Critical' : 'High',
+    target_type: 'all',
+    department_name: work.department_name,
+    status: 'Published'
+  });
+  return {
     ...work,
-    id: `maint-${Date.now()}`,
+    id: res.announcement?.id || `maint-${Date.now()}`,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
-  localStorage.setItem(LOCAL_STORAGE_MAINTENANCE, JSON.stringify([newWork, ...list]));
-  return newWork;
 }

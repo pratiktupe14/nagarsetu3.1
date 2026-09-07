@@ -42,7 +42,16 @@ router.get('/analytics', async (req, res) => {
       SELECT d.name as department_name, COUNT(c.id) as total_complaints,
              SUM(CASE WHEN c.status = 'Resolved' THEN 1 ELSE 0 END) as resolved_count
       FROM departments d
-      LEFT JOIN complaints c ON c.department_id = d.id
+      LEFT JOIN complaints c ON (
+        CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
+        OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+        OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+        OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+        OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+        OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+        OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+      )
       GROUP BY d.id, d.name
     `;
     const deptRes = await query(deptSql);
@@ -166,8 +175,17 @@ router.get('/department-heads', async (req, res) => {
       SELECT dh.*, d.name as department_name, d.description as department_description,
              u.id as linked_user_id, u.role as user_role, u.status as user_status
       FROM department_heads dh
-      LEFT JOIN departments d ON d.id = dh.department_id
-      LEFT JOIN users u ON u.id = dh.user_id OR LOWER(u.email) = LOWER(dh.email)
+      LEFT JOIN departments d ON (
+        CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+        OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+        OR (CAST(dh.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+        OR (CAST(dh.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+        OR (CAST(dh.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+        OR (CAST(dh.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+        OR (CAST(dh.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+        OR (CAST(dh.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+      )
+      LEFT JOIN users u ON CAST(u.id AS TEXT) = CAST(dh.user_id AS TEXT) OR LOWER(u.email) = LOWER(dh.email)
       ${whereClause}
       ORDER BY COALESCE(dh.updated_at, dh.created_at) DESC, dh.id DESC
     `;
@@ -294,7 +312,13 @@ router.post('/department-heads', async (req, res) => {
 
     // Read-back updated department_head record from database
     const readBackRes = await query(
-      `SELECT dh.*, d.name as department_name FROM department_heads dh LEFT JOIN departments d ON dh.department_id = d.id WHERE dh.user_id = ? OR dh.email = ?`,
+      `SELECT dh.*, d.name as department_name FROM department_heads dh 
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+         OR (CAST(dh.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+       )
+       WHERE CAST(dh.user_id AS TEXT) = CAST(? AS TEXT) OR dh.email = ?`,
       [userId, cleanEmail]
     );
     const updatedHead = readBackRes.rows && readBackRes.rows.length > 0 ? readBackRes.rows[0] : null;
@@ -380,7 +404,13 @@ router.put('/department-heads/:id', async (req, res) => {
 
     // Read-back updated department_head record
     const readBackRes = await query(
-      `SELECT dh.*, d.name as department_name FROM department_heads dh LEFT JOIN departments d ON dh.department_id = d.id WHERE dh.user_id = ? OR dh.email = ?`,
+      `SELECT dh.*, d.name as department_name FROM department_heads dh 
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+         OR (CAST(dh.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+       )
+       WHERE CAST(dh.user_id AS TEXT) = CAST(? AS TEXT) OR dh.email = ?`,
       [targetUserId, newEmail]
     );
     const updatedHead = readBackRes.rows && readBackRes.rows.length > 0 ? readBackRes.rows[0] : null;

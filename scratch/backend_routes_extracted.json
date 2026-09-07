@@ -1,0 +1,457 @@
+[
+  {
+    "file": "admin.routes.js",
+    "line": 27,
+    "method": "GET",
+    "path": "/analytics",
+    "fullLine": "router.get('/analytics', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 76,
+    "method": "GET",
+    "path": "/hotspots",
+    "fullLine": "router.get('/hotspots', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 91,
+    "method": "GET",
+    "path": "/users",
+    "fullLine": "router.get('/users', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 101,
+    "method": "POST",
+    "path": "/users",
+    "fullLine": "router.post('/users', validateInput(createUserSchema), async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 121,
+    "method": "PUT",
+    "path": "/users/:id",
+    "fullLine": "router.put('/users/:id', validateInput(updateUserSchema), async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 136,
+    "method": "DELETE",
+    "path": "/users/:id",
+    "fullLine": "router.delete('/users/:id', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 146,
+    "method": "GET",
+    "path": "/departments",
+    "fullLine": "router.get('/departments', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 155,
+    "method": "POST",
+    "path": "/departments",
+    "fullLine": "router.post('/departments', validateInput(createDepartmentSchema), async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 170,
+    "method": "GET",
+    "path": "/department-heads",
+    "fullLine": "router.get('/department-heads', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 251,
+    "method": "POST",
+    "path": "/department-heads",
+    "fullLine": "router.post('/department-heads', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 340,
+    "method": "PUT",
+    "path": "/department-heads/:id",
+    "fullLine": "router.put('/department-heads/:id', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 429,
+    "method": "POST",
+    "path": "/department-heads/:id/deactivate",
+    "fullLine": "router.post('/department-heads/:id/deactivate', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 447,
+    "method": "POST",
+    "path": "/department-heads/:id/reactivate",
+    "fullLine": "router.post('/department-heads/:id/reactivate', async (req, res) => {"
+  },
+  {
+    "file": "admin.routes.js",
+    "line": 466,
+    "method": "DELETE",
+    "path": "/department-heads/:id",
+    "fullLine": "router.delete('/department-heads/:id', async (req, res) => {"
+  },
+  {
+    "file": "ai.routes.js",
+    "line": 16,
+    "method": "GET",
+    "path": "/health",
+    "fullLine": "router.get('/health', async (req, res) => {"
+  },
+  {
+    "file": "ai.routes.js",
+    "line": 128,
+    "method": "POST",
+    "path": "/analyze",
+    "fullLine": "router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 43,
+    "method": "GET",
+    "path": "/",
+    "fullLine": "router.get('/', async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 128,
+    "method": "POST",
+    "path": "/:id/read",
+    "fullLine": "router.post('/:id/read', async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 152,
+    "method": "POST",
+    "path": "/",
+    "fullLine": "router.post('/', requireRole(['admin', 'city_admin', 'department_head']), async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 289,
+    "method": "GET",
+    "path": "/admin/all",
+    "fullLine": "router.get('/admin/all', requireRole(['admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 331,
+    "method": "PUT",
+    "path": "/:id",
+    "fullLine": "router.put('/:id', requireRole(['admin', 'city_admin', 'department_head']), async (req, res) => {"
+  },
+  {
+    "file": "announcement.routes.js",
+    "line": 380,
+    "method": "DELETE",
+    "path": "/:id",
+    "fullLine": "router.delete('/:id', requireRole(['admin', 'city_admin', 'department_head']), async (req, res) => {"
+  },
+  {
+    "file": "auth.routes.js",
+    "line": 22,
+    "method": "POST",
+    "path": "/register",
+    "fullLine": "router.post('/register', validateInput(registerSchema), async (req, res) => {"
+  },
+  {
+    "file": "auth.routes.js",
+    "line": 63,
+    "method": "POST",
+    "path": "/login",
+    "fullLine": "router.post('/login', validateInput(loginSchema), async (req, res) => {"
+  },
+  {
+    "file": "auth.routes.js",
+    "line": 324,
+    "method": "POST",
+    "path": "/otp-request",
+    "fullLine": "router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {"
+  },
+  {
+    "file": "auth.routes.js",
+    "line": 330,
+    "method": "POST",
+    "path": "/otp-verify",
+    "fullLine": "router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {"
+  },
+  {
+    "file": "auth.routes.js",
+    "line": 357,
+    "method": "GET",
+    "path": "/me",
+    "fullLine": "router.get('/me', authenticateToken, async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 24,
+    "method": "POST",
+    "path": "/analyze-upload",
+    "fullLine": "router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 125,
+    "method": "POST",
+    "path": "/submit",
+    "fullLine": "router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 253,
+    "method": "GET",
+    "path": "/:id/history",
+    "fullLine": "router.get('/:id/history', authenticateToken, async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 284,
+    "method": "GET",
+    "path": "/",
+    "fullLine": "router.get('/', optionalAuthenticateToken, async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 350,
+    "method": "GET",
+    "path": "/my",
+    "fullLine": "router.get('/my', authenticateToken, async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 369,
+    "method": "GET",
+    "path": "/:id",
+    "fullLine": "router.get('/:id', authenticateToken, async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 415,
+    "method": "POST",
+    "path": "/:id/feedback",
+    "fullLine": "router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema), async (req, res) => {"
+  },
+  {
+    "file": "complaint.routes.js",
+    "line": 444,
+    "method": "DELETE",
+    "path": "/purge-all",
+    "fullLine": "router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 47,
+    "method": "GET",
+    "path": "/",
+    "fullLine": "router.get('/', async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 61,
+    "method": "GET",
+    "path": "/complaints",
+    "fullLine": "router.get('/complaints', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 115,
+    "method": "GET",
+    "path": "/staff",
+    "fullLine": "router.get('/staff', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 283,
+    "method": "GET",
+    "path": "/staff/assignable",
+    "fullLine": "router.get('/staff/assignable', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 328,
+    "method": "POST",
+    "path": "/staff",
+    "fullLine": "router.post('/staff', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 410,
+    "method": "PUT",
+    "path": "/staff/:id",
+    "fullLine": "router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 483,
+    "method": "POST",
+    "path": "/staff/:id/deactivate",
+    "fullLine": "router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 484,
+    "method": "PATCH",
+    "path": "/staff/:id/deactivate",
+    "fullLine": "router.patch('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffDeactivate);"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 512,
+    "method": "POST",
+    "path": "/staff/:id/activate",
+    "fullLine": "router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 513,
+    "method": "PATCH",
+    "path": "/staff/:id/activate",
+    "fullLine": "router.patch('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), handleStaffActivate);"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 519,
+    "method": "DELETE",
+    "path": "/staff/:id",
+    "fullLine": "router.delete('/staff/:id', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 549,
+    "method": "POST",
+    "path": "/assign",
+    "fullLine": "router.post('/assign', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), validateInput(assignStaffSchema), async (req, res) => {"
+  },
+  {
+    "file": "department.routes.js",
+    "line": 720,
+    "method": "POST",
+    "path": "/verify",
+    "fullLine": "router.post('/verify', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {"
+  },
+  {
+    "file": "maps.routes.js",
+    "line": 65,
+    "method": "POST",
+    "path": "/geocode",
+    "fullLine": "router.post('/geocode', validateInput(geocodeSchema), async (req, res) => {"
+  },
+  {
+    "file": "maps.routes.js",
+    "line": 72,
+    "method": "POST",
+    "path": "/reverse-geocode",
+    "fullLine": "router.post('/reverse-geocode', validateInput(reverseGeocodeSchema), async (req, res) => {"
+  },
+  {
+    "file": "maps.routes.js",
+    "line": 82,
+    "method": "POST",
+    "path": "/directions",
+    "fullLine": "router.post('/directions', validateInput(directionsSchema), async (req, res) => {"
+  },
+  {
+    "file": "maps.routes.js",
+    "line": 95,
+    "method": "POST",
+    "path": "/validate",
+    "fullLine": "router.post('/validate', validateInput(validateLocationSchema), async (req, res) => {"
+  },
+  {
+    "file": "notification.routes.js",
+    "line": 11,
+    "method": "GET",
+    "path": "/my",
+    "fullLine": "router.get('/my', async (req, res) => {"
+  },
+  {
+    "file": "notification.routes.js",
+    "line": 41,
+    "method": "POST",
+    "path": "/mark-read",
+    "fullLine": "router.post('/mark-read', validateInput(markReadSchema), async (req, res) => {"
+  },
+  {
+    "file": "officer.routes.js",
+    "line": 14,
+    "method": "GET",
+    "path": "/dashboard",
+    "fullLine": "router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res) => {"
+  },
+  {
+    "file": "officer.routes.js",
+    "line": 72,
+    "method": "GET",
+    "path": "/staff-list",
+    "fullLine": "router.get('/staff-list', async (req, res) => {"
+  },
+  {
+    "file": "officer.routes.js",
+    "line": 110,
+    "method": "POST",
+    "path": "/verify",
+    "fullLine": "router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {"
+  },
+  {
+    "file": "officer.routes.js",
+    "line": 168,
+    "method": "POST",
+    "path": "/assign",
+    "fullLine": "router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {"
+  },
+  {
+    "file": "officer.routes.js",
+    "line": 258,
+    "method": "GET",
+    "path": "/duplicates",
+    "fullLine": "router.get('/duplicates', async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 15,
+    "method": "GET",
+    "path": "/tasks",
+    "fullLine": "router.get('/tasks', async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 78,
+    "method": "POST",
+    "path": "/task/:id/status",
+    "fullLine": "router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 78,
+    "method": "POST",
+    "path": "/tasks/:id/status",
+    "fullLine": "router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 138,
+    "method": "POST",
+    "path": "/task/:id/resolve",
+    "fullLine": "router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complete'], uploadSingleImage('photo'), async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 138,
+    "method": "POST",
+    "path": "/tasks/:id/resolve",
+    "fullLine": "router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complete'], uploadSingleImage('photo'), async (req, res) => {"
+  },
+  {
+    "file": "staff.routes.js",
+    "line": 138,
+    "method": "POST",
+    "path": "/complaints/:id/complete",
+    "fullLine": "router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complete'], uploadSingleImage('photo'), async (req, res) => {"
+  }
+]

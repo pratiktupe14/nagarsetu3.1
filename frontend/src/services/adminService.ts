@@ -1,5 +1,5 @@
 import { Complaint, ComplaintActivityLog, DepartmentStaffMember, AdminKPIStats, PriorityLevel } from '../types/database.types';
-import { getStoredComplaints, saveStoredComplaints } from './complaintService';
+import { getAllComplaints } from './complaintService';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -102,19 +102,23 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
   }
 ];
 
+// In-memory runtime cache for municipal departments (PostgreSQL is authoritative source)
+let memoryDepartments: MunicipalDepartmentRecord[] = [...DEFAULT_MUNICIPAL_DEPARTMENTS];
+
+try {
+  localStorage.removeItem(LOCAL_STORAGE_DEPARTMENTS_KEY);
+} catch (e) {}
+
 export function getMunicipalDepartments(): MunicipalDepartmentRecord[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_DEPARTMENTS_KEY);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {}
-  }
-  localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(DEFAULT_MUNICIPAL_DEPARTMENTS));
-  return DEFAULT_MUNICIPAL_DEPARTMENTS;
+  return memoryDepartments;
+}
+
+export function setMemoryMunicipalDepartments(depts: MunicipalDepartmentRecord[]) {
+  memoryDepartments = depts;
 }
 
 export function saveMunicipalDepartments(depts: MunicipalDepartmentRecord[]) {
-  localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(depts));
+  memoryDepartments = depts;
 }
 
 export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRecord, 'id' | 'created_at'> & { id?: string }): MunicipalDepartmentRecord {
@@ -191,16 +195,25 @@ export async function fetchDepartmentStaffApi(params?: {
 
     if (res.ok) {
       const data = await res.json();
-      if (data && Array.isArray(data.staff)) {
-        console.log('[ADMIN DATA SYNC]', {
-          apiUrl: `${getApiUrl()}/api/department/staff`,
-          fetchTime: new Date().toISOString(),
-          responseStatus: res.status,
-          databaseRecordCount: data.staff.length,
-          lastUpdatedRecord: data.staff[0]?.created_at || 'N/A',
-          localCacheUsed: false,
-          finalRecordCount: data.staff.length
-        });
+        const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => ({
+          id: String(s.id),
+          name: s.name,
+          employee_id: s.employee_id || `STF-${s.id}`,
+          department_name: s.department_name || 'Municipal Department',
+          role: s.designation || s.role || 'Service Staff',
+          status: (s.status || 'active').toLowerCase() === 'active' ? 'Available' : 'Offline',
+          contact_number: s.mobile || s.contact_number || s.phone || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.created_at || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString(),
+          active_tasks: s.active_tasks || 0,
+          completed_tasks: s.completed_tasks || 0,
+          overdue_tasks: s.overdue_tasks || 0
+        }));
+        if (mappedStaff.length > 0) {
+          memoryStaffRecords = mappedStaff;
+        }
         return {
           staff: data.staff,
           summary: data.summary || {
@@ -211,66 +224,13 @@ export async function fetchDepartmentStaffApi(params?: {
           }
         };
       }
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Failed to fetch department staff (HTTP ${res.status})`);
+    } catch (err: any) {
+      console.error('Failed to fetch staff from API:', err);
+      throw err;
     }
-  } catch (err) {
-    console.warn('Failed to fetch staff from API:', err);
   }
-
-  let rawRecords = getAllServiceStaffRecords();
-  if (params?.department_id) {
-    const targetDept = resolveDepartmentInfo(params.department_id);
-    rawRecords = rawRecords.filter((s) => isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name));
-  }
-
-  const storedComplaints = getStoredComplaints();
-  const defaultStaff = rawRecords.map((s) => {
-    const isAssigned = (c: any) =>
-      c.assigned_staff_id === s.id ||
-      c.assigned_staff_id === s.employee_id ||
-      (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (s.email || '').toLowerCase()) ||
-      c.assigned_staff_name === s.name;
-
-    const activeTasks = storedComplaints.filter(
-      (c) => isAssigned(c) && ['Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified'].includes(c.status)
-    ).length;
-
-    const completedTasks = storedComplaints.filter(
-      (c) => isAssigned(c) && c.status === 'Resolved'
-    ).length;
-
-    const overdueTasks = storedComplaints.filter(
-      (c) => isAssigned(c) && ((c.status as string) === 'Overdue' || (c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < new Date()))
-    ).length;
-
-    return {
-      id: s.id,
-      name: s.name,
-      email: s.email,
-      mobile: s.contact_number,
-      contact_number: s.contact_number,
-      employee_id: s.employee_id,
-      designation: s.role || 'Field Service Staff',
-      department_name: s.department_name,
-      status: (s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
-      active_tasks: activeTasks,
-      completed_tasks: completedTasks,
-      overdue_tasks: overdueTasks,
-      language: 'en',
-      joined_date: s.joined_date,
-      created_at: s.created_at
-    };
-  });
-
-  return {
-    staff: defaultStaff,
-    summary: {
-      totalStaff: defaultStaff.length,
-      activeStaff: defaultStaff.filter((s) => s.status === 'Active').length,
-      inactiveStaff: defaultStaff.filter((s) => s.status === 'Inactive').length,
-      activeTasks: 0
-    }
-  };
-}
 
 export async function createServiceStaffApi(payload: {
   name: string;
@@ -425,18 +385,19 @@ const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [
   { id: 'stf-mnt-05', name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10035', email: 'yogesh.shinde@nagarsetu.gov.in', ward_area: 'Satpur (Ward 24)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' }
 ];
 
+// In-memory runtime cache for service staff records (PostgreSQL is authoritative source)
+let memoryStaffRecords: ServiceStaffMemberRecord[] = [...DEFAULT_SERVICE_STAFF];
+
+try {
+  localStorage.removeItem(LOCAL_STORAGE_STAFF_KEY);
+} catch (e) {}
+
 export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);
-  if (data) {
-    try {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length >= 36) {
-        return parsed;
-      }
-    } catch (e) {}
-  }
-  localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(DEFAULT_SERVICE_STAFF));
-  return DEFAULT_SERVICE_STAFF;
+  return memoryStaffRecords;
+}
+
+export function setMemoryServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
+  memoryStaffRecords = staff;
 }
 
 export async function getDepartmentServiceStaff(departmentId?: string, departmentName?: string): Promise<ServiceStaffMemberRecord[]> {
@@ -447,7 +408,7 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
   // 1. Try Backend Express API first
   try {
     const apiRes = await fetchDepartmentStaffApi({ department_id: departmentId });
-    if (apiRes.staff && apiRes.staff.length > 0) {
+    if (apiRes && Array.isArray(apiRes.staff)) {
       return apiRes.staff.map((s) => ({
         id: s.id,
         name: s.name,
@@ -469,10 +430,10 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
     console.warn('fetchDepartmentStaffApi failed in getDepartmentServiceStaff:', e);
   }
 
-function isValidUuid(id?: string): boolean {
-  if (!id) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-}
+  function isValidUuid(id?: string): boolean {
+    if (!id) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
 
   // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
@@ -485,7 +446,7 @@ function isValidUuid(id?: string): boolean {
         query = query.or(`department_name.ilike.%${cleanDept}%,employee_id.ilike.%${cleanDept}%`);
       }
       const { data, error } = await query;
-      if (!error && data && Array.isArray(data) && data.length > 0) {
+      if (!error && data && Array.isArray(data)) {
         return data.map((p: any) => ({
           id: p.id,
           name: p.full_name || p.name || 'Staff Member',
@@ -505,15 +466,7 @@ function isValidUuid(id?: string): boolean {
     }
   }
 
-  // 3. Fallback to default roster filtered by department ID, code, or name
-  const all = getAllServiceStaffRecords();
-  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
-  
-  const filtered = all.filter((s) => {
-    return isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name);
-  });
-
-  return filtered;
+  return [];
 }
 
 export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {
@@ -544,7 +497,7 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
   const staff = all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
   if (!staff) return null;
 
-  const storedComplaints = getStoredComplaints();
+  const storedComplaints = await getAllComplaints().catch(() => []);
   const isAssigned = (c: any) =>
     c.assigned_staff_id === staff.id ||
     c.assigned_staff_id === staff.employee_id ||
@@ -572,7 +525,7 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
 }
 
 export function saveServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
-  localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(staff));
+  memoryStaffRecords = staff;
 }
 
 export function saveOrUpdateServiceStaffRecord(staff: Omit<ServiceStaffMemberRecord, 'id' | 'created_at'> & { id?: string }): ServiceStaffMemberRecord {
@@ -701,32 +654,34 @@ export async function verifyAndApproveComplaint(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Approved';
-    comp.priority = priority;
-    comp.department_name = departmentName;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    logActivity(complaintId, adminName, 'Verified & Approved Complaint', prevStatus, 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'approved',
-      title: 'Complaint Verified & Approved',
-      message: `Your complaint ${comp.complaint_number} has been verified and approved for ${departmentName} dispatch.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Approved', adminName, `Approved & routed to ${departmentName}`);
-    return true;
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('complaints')
+        .update({
+          status: 'Approved',
+          priority,
+          department_name: departmentName,
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
+    } catch (e) {}
   }
-  return false;
+
+  logActivity(complaintId, adminName, 'Verified & Approved Complaint', 'Submitted', 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'approved',
+    title: 'Complaint Verified & Approved',
+    message: `Your complaint ${complaintId} has been verified and approved for ${departmentName} dispatch.`
+  });
+
+  broadcastComplaintChange(complaintId, 'Submitted', 'Approved', adminName, `Approved & routed to ${departmentName}`);
+  return true;
 }
 
 export async function changeDepartmentRouting(
@@ -734,31 +689,33 @@ export async function changeDepartmentRouting(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.department_name = departmentName;
-    comp.status = 'Department Assigned';
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    logActivity(complaintId, adminName, 'Re-routed Department', prevStatus, 'Department Assigned', `Department updated to ${departmentName}`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'department_assigned',
-      title: 'Department Assigned',
-      message: `Complaint ${comp.complaint_number} routed to ${departmentName}.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
-    return true;
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('complaints')
+        .update({
+          department_name: departmentName,
+          status: 'Department Assigned',
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
+    } catch (e) {}
   }
-  return false;
+
+  logActivity(complaintId, adminName, 'Re-routed Department', 'Submitted', 'Department Assigned', `Department updated to ${departmentName}`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'department_assigned',
+    title: 'Department Assigned',
+    message: `Complaint ${complaintId} routed to ${departmentName}.`
+  });
+
+  broadcastComplaintChange(complaintId, 'Submitted', 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
+  return true;
 }
 
 export async function assignStaffToTask(
@@ -809,44 +766,31 @@ export async function assignStaffToTask(
     } catch (e) {}
   }
 
-  // 3. LocalStorage persistence
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.assigned_staff_id = staffId;
-    comp.assigned_staff_name = staffName;
-    comp.status = 'Staff Assigned';
-    comp.sla_deadline = slaDeadline;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
+  // 3. Activity log & notification
+  logActivity(complaintId, adminName, 'Assigned Field Staff', 'Submitted', 'Staff Assigned', `Dispatched to ${staffName} with ${slaHours}h SLA deadline`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'staff_assigned',
+    title: 'Field Officer Dispatched',
+    message: `Field officer ${staffName} assigned to repair ${complaintId}.`
+  });
 
-    logActivity(complaintId, adminName, 'Assigned Field Staff', prevStatus, 'Staff Assigned', `Dispatched to ${staffName} with ${slaHours}h SLA deadline`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'Field Officer Dispatched',
-      message: `Field officer ${staffName} assigned to repair ${comp.complaint_number}.`
-    });
+  pushNotification({
+    user_id: staffId,
+    role: 'service_staff',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'staff_assigned',
+    title: 'New Maintenance Task Dispatched',
+    message: `Task ${complaintId} assigned to you with ${slaHours}h SLA deadline.`
+  });
 
-    pushNotification({
-      user_id: staffId,
-      role: 'service_staff',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'New Maintenance Task Dispatched',
-      message: `Task ${comp.complaint_number} assigned to you with ${slaHours}h SLA deadline.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Staff Assigned', adminName, `Assigned to staff ${staffName}`);
-    return true;
-  }
-  return false;
+  broadcastComplaintChange(complaintId, 'Submitted', 'Staff Assigned', adminName, `Assigned to staff ${staffName}`);
+  return true;
 }
 
 export async function escalateComplaint(
@@ -854,43 +798,99 @@ export async function escalateComplaint(
   escalationTarget: string = 'Senior Department Officer',
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    logActivity(
-      complaintId,
-      adminName,
-      `Escalated to ${escalationTarget}`,
-      comp.status,
-      comp.status,
-      `SLA Breach Escalation: High priority notice dispatched to ${escalationTarget}`
-    );
+  logActivity(
+    complaintId,
+    adminName,
+    `Escalated to ${escalationTarget}`,
+    'In Progress',
+    'Escalated',
+    `SLA Breach Escalation: High priority notice dispatched to ${escalationTarget}`
+  );
 
-    pushNotification({
-      user_id: comp.assigned_staff_id || 'admin-group',
-      role: comp.assigned_staff_id ? 'service_staff' : 'city_admin',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'sla_breached',
-      title: `ESCALATION: ${comp.complaint_number}`,
-      message: `Complaint ${comp.complaint_number} has been escalated to ${escalationTarget} due to SLA breach.`
+  pushNotification({
+    user_id: 'admin-group',
+    role: 'city_admin',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'sla_breached',
+    title: `ESCALATION: ${complaintId}`,
+    message: `Complaint ${complaintId} has been escalated to ${escalationTarget} due to SLA breach.`
+  });
+
+  broadcastComplaintChange(complaintId, 'In Progress', 'In Progress', adminName, `Escalated to ${escalationTarget}`);
+  return true;
+}
+
+// In-memory activity logs cache (PostgreSQL complaint_status_history is authoritative)
+let memoryActivityLogs: ComplaintActivityLog[] = [];
+
+try {
+  localStorage.removeItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
+} catch (e) {}
+
+export async function fetchComplaintActivityLogs(complaintId: string): Promise<ComplaintActivityLog[]> {
+  if (!complaintId) return [];
+
+  // 1. Try Backend API first (/api/complaints/:id/history)
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/history`, {
+      headers: getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {})
     });
-
-    broadcastComplaintChange(comp.id, comp.status, comp.status, adminName, `Escalated to ${escalationTarget}`);
-    return true;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.history)) {
+        const mapped: ComplaintActivityLog[] = data.history.map((h: any) => ({
+          id: String(h.id),
+          complaint_id: String(h.complaint_id),
+          actor_name: h.updated_by || 'System',
+          action: h.remark || `Status: ${h.status}`,
+          previous_status: undefined,
+          new_status: h.status,
+          notes: h.remark,
+          created_at: h.created_at || new Date().toISOString()
+        }));
+        memoryActivityLogs = memoryActivityLogs.filter(l => l.complaint_id !== complaintId).concat(mapped);
+        return mapped;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend fetchComplaintActivityLogs error:', err);
   }
-  return false;
+
+  // 2. Try Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase
+        .from('complaint_status_history')
+        .select('*')
+        .eq('complaint_id', complaintId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const mapped: ComplaintActivityLog[] = data.map((h: any) => ({
+          id: String(h.id),
+          complaint_id: String(h.complaint_id),
+          actor_name: h.updated_by || 'System',
+          action: h.remark || `Status: ${h.status}`,
+          previous_status: undefined,
+          new_status: h.status,
+          notes: h.remark,
+          created_at: h.created_at || new Date().toISOString()
+        }));
+        memoryActivityLogs = memoryActivityLogs.filter(l => l.complaint_id !== complaintId).concat(mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch complaint history error:', err);
+    }
+  }
+
+  return memoryActivityLogs.filter(l => l.complaint_id === complaintId);
 }
 
 export function getComplaintActivityLogs(complaintId: string): ComplaintActivityLog[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
-  if (data) {
-    try {
-      const all: ComplaintActivityLog[] = JSON.parse(data);
-      return all.filter((l) => l.complaint_id === complaintId);
-    } catch (e) {}
-  }
-  return [];
+  return memoryActivityLogs.filter((l) => l.complaint_id === complaintId);
 }
 
 export function logActivity(
@@ -901,9 +901,7 @@ export function logActivity(
   newStatus: any,
   notes?: string
 ) {
-  const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
-  const all: ComplaintActivityLog[] = data ? JSON.parse(data) : [];
-  all.unshift({
+  const newLog: ComplaintActivityLog = {
     id: 'log-' + Date.now(),
     complaint_id: complaintId,
     actor_name: actorName,
@@ -912,8 +910,8 @@ export function logActivity(
     new_status: newStatus,
     notes,
     created_at: new Date().toISOString()
-  });
-  localStorage.setItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY, JSON.stringify(all));
+  };
+  memoryActivityLogs.unshift(newLog);
 }
 
 export interface DepartmentHeadSummary {

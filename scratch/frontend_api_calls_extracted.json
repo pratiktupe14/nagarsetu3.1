@@ -1,0 +1,387 @@
+[
+  {
+    "file": "src/components/LiveGoogleMap.tsx",
+    "line": 95,
+    "text": "script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;"
+  },
+  {
+    "file": "src/config/apiConfig.ts",
+    "line": 22,
+    "text": "return mainApi ? `${mainApi}/api/ai` : 'https://nagarsetu-backend-api.vercel.app/api/ai';"
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "line": 265,
+    "text": "const res = await fetch(`${getApiUrl()}/api/auth/me`, {"
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "line": 303,
+    "text": "console.warn('Authoritative backend /api/auth/me check note:', backendErr);"
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "line": 503,
+    "text": "const res = await fetch(`${getApiUrl()}/api/auth/login`, {"
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "line": 534,
+    "text": "response = await fetch(`${getApiUrl()}/api/auth/login`, {"
+  },
+  {
+    "file": "src/context/AuthContext.tsx",
+    "line": 775,
+    "text": "response = await fetch(`${getApiUrl()}/api/auth/register`, {"
+  },
+  {
+    "file": "src/pages/citizen/TrackComplaintPage.tsx",
+    "line": 130,
+    "text": "const response = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(lookupKey)}/history`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 192,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 246,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 263,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 277,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 290,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 303,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 730,
+    "text": "// 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 737,
+    "text": "let res = await fetch(`${getApiUrl()}/api/department/assign`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 743,
+    "text": "await fetch(`${getApiUrl()}/api/officer/assign`, {"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 834,
+    "text": "// 1. Try Backend API first (/api/complaints/:id/history)"
+  },
+  {
+    "file": "src/services/adminService.ts",
+    "line": 837,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/history`, {"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 138,
+    "text": "* GET /api/ai/health"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 143,
+    "text": "const endpoint = baseUrl ? `${baseUrl}/api/ai/health` : '/api/ai/health';"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 144,
+    "text": "const res = await fetch(endpoint);"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 187,
+    "text": "const response = await fetch(file);"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 406,
+    "text": "* 1. Calls Express Backend API (/api/ai/analyze) on port 5000"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 413,
+    "text": "const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 416,
+    "text": "const res = await fetch(endpoint, {"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 457,
+    "text": "const res = await fetch(`${getAiServiceUrl()}/analyze`, {"
+  },
+  {
+    "file": "src/services/aiVisionService.ts",
+    "line": 512,
+    "text": "// Layer 1: Call Express Backend API (/api/ai/analyze on port 5000)"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 48,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements`, {"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 67,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}/read`, {"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 83,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements/admin/all`, {"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 115,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements`, {"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 142,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}`, {"
+  },
+  {
+    "file": "src/services/announcementService.ts",
+    "line": 159,
+    "text": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 106,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 145,
+    "text": "apiUrl: `${getApiUrl()}/api/complaints`,"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 166,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/my`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 220,
+    "text": "const res = await fetch(`${getApiUrl()}/api/staff/tasks`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 232,
+    "text": "console.error('Backend /api/staff/tasks fetch error:', err);"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 250,
+    "text": "const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 274,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(idOrNumber)}`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 395,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/submit`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 477,
+    "text": "const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 486,
+    "text": "await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 535,
+    "text": "await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 583,
+    "text": "await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 664,
+    "text": "const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetParam)}/resolve`;"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 665,
+    "text": "const apiRes = await fetch(targetApiUrl, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 769,
+    "text": "const resolvedTargetUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(complaintId)}/resolve`;"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 845,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/feedback`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 988,
+    "text": "const apiRes = await fetch(`${getApiUrl()}/api/department/assign`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 1081,
+    "text": "const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 1154,
+    "text": "const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
+  },
+  {
+    "file": "src/services/complaintService.ts",
+    "line": 1258,
+    "text": "const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE', headers });"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 222,
+    "text": "const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 442,
+    "text": "const loginRes = await fetch(`${getApiUrl()}/api/auth/login`, {"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 460,
+    "text": "fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }),"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 461,
+    "text": "fetch(`${getApiUrl()}/api/admin/departments`, { headers }),"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 462,
+    "text": "fetch(`${getApiUrl()}/api/complaints`, { headers })"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 479,
+    "text": "apiUrl: `${getApiUrl()}/api/admin/department-heads`,"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 525,
+    "text": "const apiStaffRes = await fetch(`${getApiUrl()}/api/department/staff`, { headers });"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 676,
+    "text": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads`, {"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 879,
+    "text": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}`, {"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 921,
+    "text": "await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/deactivate`, {"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 955,
+    "text": "await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/reactivate`, {"
+  },
+  {
+    "file": "src/services/departmentService.ts",
+    "line": 999,
+    "text": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headIdOrDeptId}`, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 149,
+    "text": "const res = await fetch(url, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 185,
+    "text": "const getBackendMapsUrl = () => `${getApiUrl()}/api/maps`;"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 186,
+    "text": "const getPythonMapsUrl = () => `${getApiUrl()}/api/maps/google-maps`;"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 199,
+    "text": "const res = await fetch(`${getBackendMapsUrl()}/reverse-geocode`, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 212,
+    "text": "const pyRes = await fetch(`${getPythonMapsUrl()}/reverse-geocode`, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 246,
+    "text": "const res = await fetch(`${getBackendMapsUrl()}/directions`, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 289,
+    "text": "const res = await fetch(`${getBackendMapsUrl()}/geocode`, {"
+  },
+  {
+    "file": "src/services/locationService.ts",
+    "line": 315,
+    "text": "const response = await fetch(url, {"
+  },
+  {
+    "file": "src/services/notificationService.ts",
+    "line": 35,
+    "text": "const res = await fetch(`${getApiUrl()}/api/notifications/my`, {"
+  },
+  {
+    "file": "src/services/notificationService.ts",
+    "line": 120,
+    "text": "fetch(`${getApiUrl()}/api/notifications/mark-read`, {"
+  },
+  {
+    "file": "src/services/notificationService.ts",
+    "line": 152,
+    "text": "fetch(`${getApiUrl()}/api/notifications/mark-read`, {"
+  }
+]

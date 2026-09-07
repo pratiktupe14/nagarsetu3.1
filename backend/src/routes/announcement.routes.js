@@ -14,7 +14,7 @@ async function resolveUserDepartment(req) {
   let userDeptName = req.user.department_name || '';
 
   if (!userDeptId || !userDeptName) {
-    const uRes = await query('SELECT department_id, role FROM users WHERE id = $1 OR email = $2', [req.user.id, req.user.email]);
+    const uRes = await query('SELECT department_id, role FROM users WHERE CAST(id AS TEXT) = $1 OR email = $2', [String(req.user.id), req.user.email]);
     if (uRes.rows.length > 0) {
       userDeptId = uRes.rows[0].department_id || userDeptId;
     }
@@ -22,9 +22,9 @@ async function resolveUserDepartment(req) {
     const dhRes = await query(
       `SELECT dh.department_id, d.name as department_name 
        FROM department_heads dh 
-       LEFT JOIN departments d ON d.id = dh.department_id 
-       WHERE dh.user_id = $1 OR dh.email = $2`,
-      [req.user.id, req.user.email]
+       LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) OR d.code = CAST(dh.department_id AS TEXT)) 
+       WHERE CAST(dh.user_id AS TEXT) = $1 OR dh.email = $2`,
+      [String(req.user.id), req.user.email]
     );
     if (dhRes.rows.length > 0) {
       userDeptId = dhRes.rows[0].department_id || userDeptId;
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
                CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END as is_read,
                r.read_at
         FROM announcements a
-        LEFT JOIN announcement_reads r ON r.announcement_id = a.id AND r.user_id = $1
+        LEFT JOIN announcement_reads r ON CAST(r.announcement_id AS TEXT) = CAST(a.id AS TEXT) AND r.user_id = $1
         WHERE a.status != 'Archived'
         ORDER BY a.published_at DESC, a.created_at DESC
       `;
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
                CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END as is_read,
                r.read_at
         FROM announcements a
-        LEFT JOIN announcement_reads r ON r.announcement_id = a.id AND r.user_id = $1
+        LEFT JOIN announcement_reads r ON CAST(r.announcement_id AS TEXT) = CAST(a.id AS TEXT) AND r.user_id = $1
         WHERE a.is_published = 1
           AND (a.status IS NULL OR a.status = 'Published')
           AND (a.published_at IS NULL OR a.published_at <= CURRENT_TIMESTAMP)
@@ -80,12 +80,12 @@ router.get('/', async (req, res) => {
             OR (a.target_audience = 'all_dept_heads' AND $2 = 'department_head')
             OR (a.target_audience = 'all_staff' AND $2 = 'service_staff')
             OR (a.target_role = $2)
-            OR (a.department_id IS NOT NULL AND a.department_id = $3)
+            OR (a.department_id IS NOT NULL AND CAST(a.department_id AS TEXT) = $3)
             OR (a.department_name IS NOT NULL AND LOWER(a.department_name) LIKE LOWER($4))
           )
         ORDER BY a.published_at DESC, a.created_at DESC
       `;
-      params = [userId, userRole, userDeptId || -1, cleanDeptName];
+      params = [userId, userRole, String(userDeptId || -1), cleanDeptName];
     }
 
     const result = await query(sql, params);
@@ -221,13 +221,13 @@ router.post('/', requireRole(['admin', 'city_admin', 'department_head']), async 
 
         if (isDeptHead) {
           if (finalTargetRole === 'service_staff') {
-            notifSql += ` AND role = 'service_staff' AND department_id = $1`;
-            notifParams.push(finalDeptId);
+            notifSql += ` AND role = 'service_staff' AND CAST(department_id AS TEXT) = $1`;
+            notifParams.push(String(finalDeptId));
           } else if (finalTargetRole === 'citizen') {
             notifSql += ` AND role = 'citizen'`;
           } else {
-            notifSql += ` AND department_id = $1`;
-            notifParams.push(finalDeptId);
+            notifSql += ` AND CAST(department_id AS TEXT) = $1`;
+            notifParams.push(String(finalDeptId));
           }
         } else {
           if (finalTargetAudience === 'all_citizens') {
@@ -237,8 +237,8 @@ router.post('/', requireRole(['admin', 'city_admin', 'department_head']), async 
           } else if (finalTargetAudience === 'all_staff') {
             notifSql += ` AND role = 'service_staff'`;
           } else if (finalTargetType === 'department' && finalDeptId) {
-            notifSql += ` AND department_id = $1`;
-            notifParams.push(finalDeptId);
+            notifSql += ` AND CAST(department_id AS TEXT) = $1`;
+            notifParams.push(String(finalDeptId));
           }
         }
 

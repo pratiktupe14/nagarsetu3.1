@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead
+  markAllNotificationsAsRead, syncNotificationsFromBackend
 } from '../services/notificationService';
 import { NotificationItem, NotificationType } from '../types/database.types';
 import { subscribeToRealtimeComplaints } from '../services/realtimeService';
@@ -44,6 +44,13 @@ export const NotificationCenter: React.FC = () => {
     const list = getNotificationsForRole(user?.id, role);
     setNotifications(list);
     setUnreadCount(getUnreadNotificationCount(user?.id, role));
+
+    // Authoritative sync from PostgreSQL backend
+    syncNotificationsFromBackend().then(() => {
+      const updated = getNotificationsForRole(user?.id, role);
+      setNotifications(updated);
+      setUnreadCount(getUnreadNotificationCount(user?.id, role));
+    }).catch(() => {});
   }, [user, role]);
 
   useEffect(() => {

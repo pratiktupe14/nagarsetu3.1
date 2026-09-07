@@ -1,0 +1,223 @@
+=== LOCALSTORAGE MATCHES (101) ===
+components/DashboardLayout.tsx:19 | const saved = localStorage.getItem('nagarsetu_sidebar_collapsed');
+components/DashboardLayout.tsx:26 | localStorage.setItem('nagarsetu_sidebar_collapsed', String(next));
+components/ProtectedRoute.tsx:35 | const token = localStorage.getItem('nagarsetu_token');
+components/ProtectedRoute.tsx:42 | localStorage.removeItem('nagarsetu_token');
+components/ProtectedRoute.tsx:43 | localStorage.removeItem('nagarsetu_user');
+components/Sidebar.tsx:356 | localStorage.removeItem('nagarsetu_user');
+config/apiConfig.ts:26 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+context/AuthContext.tsx:230 | const cached = localStorage.getItem('nagarsetu_user');
+context/AuthContext.tsx:238 | localStorage.setItem('nagarsetu_user', JSON.stringify(resolved));
+context/AuthContext.tsx:262 | const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+context/AuthContext.tsx:290 | localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+context/AuthContext.tsx:296 | localStorage.removeItem('nagarsetu_token');
+context/AuthContext.tsx:297 | localStorage.removeItem('nagarsetu_user');
+context/AuthContext.tsx:380 | localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
+context/AuthContext.tsx:458 | localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+context/AuthContext.tsx:511 | localStorage.setItem('nagarsetu_token', data.token);
+context/AuthContext.tsx:523 | localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
+context/AuthContext.tsx:575 | localStorage.setItem('nagarsetu_token', data.token);
+context/AuthContext.tsx:576 | localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+context/AuthContext.tsx:654 | localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
+context/AuthContext.tsx:678 | localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+context/AuthContext.tsx:685 | localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
+context/AuthContext.tsx:720 | localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+context/AuthContext.tsx:729 | localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
+context/AuthContext.tsx:739 | localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+context/AuthContext.tsx:760 | localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
+context/AuthContext.tsx:806 | localStorage.setItem('nagarsetu_token', data.token);
+context/AuthContext.tsx:807 | localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));
+context/AuthContext.tsx:858 | localStorage.setItem('nagarsetu_user', JSON.stringify(newCitizen));
+context/AuthContext.tsx:878 | localStorage.removeItem('nagarsetu_user');
+context/AuthContext.tsx:879 | localStorage.removeItem('nagarsetu_token');
+context/LanguageContext.tsx:27 | const savedLocal = localStorage.getItem('nagarsetu_lang') as SupportedLanguage;
+context/LanguageContext.tsx:40 | localStorage.setItem('nagarsetu_lang', userLang);
+context/LanguageContext.tsx:49 | localStorage.setItem('nagarsetu_lang', newLang);
+context/LanguageContext.tsx:56 | localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+pages/admin/AdminSettingsPage.tsx:46 | const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_admin_lang') || 'en');
+pages/admin/AdminSettingsPage.tsx:62 | const cachedLang = localStorage.getItem('nagarsetu_admin_lang');
+pages/admin/AdminSettingsPage.tsx:72 | localStorage.setItem('nagarsetu_admin_lang', language);
+pages/citizen/CitizenSettingsPage.tsx:22 | const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_language') || 'en');
+pages/citizen/CitizenSettingsPage.tsx:34 | Number(localStorage.getItem('nagarsetu_default_radius')) || 500
+pages/citizen/CitizenSettingsPage.tsx:55 | localStorage.setItem('nagarsetu_language', language);
+pages/citizen/CitizenSettingsPage.tsx:56 | localStorage.setItem('nagarsetu_default_radius', String(defaultRadius));
+pages/citizen/CitizenSettingsPage.tsx:293 | localStorage.setItem('nagarsetu_default_radius', String(val));
+pages/citizen/TrackComplaintPage.tsx:129 | const token = localStorage.getItem('nagarsetu_token');
+pages/departmentHead/DepartmentHeadPortal.tsx:618 | localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+pages/LoginPage.tsx:88 | const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
+pages/staff/StaffSettingsPage.tsx:58 | (localStorage.getItem('nagarsetu_staff_lang') as 'en' | 'hi' | 'mr') ||
+pages/staff/StaffSettingsPage.tsx:117 | localStorage.setItem('nagarsetu_staff_lang', newLang);
+services/adminService.ts:106 | const data = localStorage.getItem(LOCAL_STORAGE_DEPARTMENTS_KEY);
+services/adminService.ts:112 | localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(DEFAULT_MUNICIPAL_DEPARTMENTS));
+services/adminService.ts:117 | localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(depts));
+services/adminService.ts:377 | const data = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);
+services/adminService.ts:386 | localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(DEFAULT_SERVICE_STAFF));
+services/adminService.ts:515 | localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(staff));
+services/adminService.ts:719 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/adminService.ts:812 | const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
+services/adminService.ts:830 | const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
+services/adminService.ts:842 | localStorage.setItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY, JSON.stringify(all));
+services/aiVisionService.ts:110 | const raw = localStorage.getItem(AI_ANALYSIS_CACHE_KEY);
+services/aiVisionService.ts:121 | localStorage.setItem(AI_ANALYSIS_CACHE_KEY, JSON.stringify(cache));
+services/announcementService.ts:37 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+services/complaintService.ts:49 | const legacyData = localStorage.getItem(key);
+services/complaintService.ts:51 | localStorage.removeItem(key);
+services/complaintService.ts:57 | const data = localStorage.getItem(LOCAL_STORAGE_COMPLAINTS_KEY);
+services/complaintService.ts:75 | localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(clean));
+services/complaintService.ts:178 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:232 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:261 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:288 | const token = localStorage.getItem('nagarsetu_token');
+services/complaintService.ts:328 | // Insert new complaint into Supabase & LocalStorage
+services/complaintService.ts:408 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:491 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:549 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:597 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:676 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:858 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:953 | const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+services/complaintService.ts:956 | localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(drafts));
+services/complaintService.ts:960 | const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+services/complaintService.ts:965 | localStorage.removeItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+services/complaintService.ts:1002 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1095 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1168 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1260 | // 1. Clear LocalStorage cached complaints
+services/complaintService.ts:1263 | localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);
+services/complaintService.ts:1264 | LEGACY_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));
+services/complaintService.ts:1269 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/departmentService.ts:221 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/departmentService.ts:440 | let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/departmentService.ts:452 | localStorage.setItem('nagarsetu_token', token);
+services/departmentService.ts:524 | const token = localStorage.getItem('nagarsetu_token');
+services/departmentService.ts:679 | const token = localStorage.getItem('nagarsetu_token');
+services/locationService.ts:170 | const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
+services/locationService.ts:181 | localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
+services/notificationService.ts:8 | const data = localStorage.getItem(LOCAL_STORAGE_NOTIFS_KEY);
+services/notificationService.ts:18 | localStorage.setItem(LOCAL_STORAGE_NOTIFS_KEY, JSON.stringify(notifs));
+services/notificationService.ts:25 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/notificationService.ts:80 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/notificationService.ts:113 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/profileService.ts:6 | const data = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY);
+services/profileService.ts:16 | localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles));
+
+=== SESSIONSTORAGE MATCHES (24) ===
+config/apiConfig.ts:26 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+context/AuthContext.tsx:262 | const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+context/AuthContext.tsx:298 | sessionStorage.removeItem('nagarsetu_token');
+context/AuthContext.tsx:299 | sessionStorage.removeItem('nagarsetu_user');
+services/adminService.ts:719 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/announcementService.ts:37 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+services/complaintService.ts:178 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:232 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:261 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:408 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:491 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:549 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:597 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:676 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:858 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1002 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1095 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1168 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/complaintService.ts:1269 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/departmentService.ts:221 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/departmentService.ts:440 | let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/notificationService.ts:25 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/notificationService.ts:80 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+services/notificationService.ts:113 | const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+
+=== DEMO MATCHES (36) ===
+components/DashboardHeader.tsx:53 | {/* DEMO ROLE SWITCHER DROPDOWN */}
+components/DashboardHeader.tsx:96 | ? (user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')
+components/Navbar.tsx:109 | {/* Demo Role Selector */}
+components/Navbar.tsx:153 | ? (user.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')
+context/AuthContext.tsx:189 | id: 'demo-admin-id-202',
+context/AuthContext.tsx:207 | id: 'demo-head-id-404',
+context/AuthContext.tsx:219 | export const DEMO_USERS = DEFAULT_ROLE_USERS;
+context/AuthContext.tsx:660 | const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+context/AuthContext.tsx:661 | const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
+context/AuthContext.tsx:662 | const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
+context/AuthContext.tsx:663 | const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
+context/AuthContext.tsx:669 | password === demoAdminPass ||
+context/AuthContext.tsx:670 | password === demoUserPass ||
+context/AuthContext.tsx:671 | password === demoHeadPass ||
+context/AuthContext.tsx:672 | password === demoStaffPass
+context/AuthContext.tsx:674 | console.info('Supabase auth failed for demo account, using demo session fallback.');
+pages/admin/AdminPortal.tsx:683 | [DEMO AI ENGINE]
+pages/citizen/CitizenPortal.tsx:165 | {t('welcome')}, {user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}
+pages/citizen/CitizenSettingsPage.tsx:477 | <span className="font-bold text-gray-900 font-outfit text-sm">{user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}</span>
+pages/LoginPage.tsx:30 | const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+pages/LoginPage.tsx:31 | const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
+pages/LoginPage.tsx:32 | const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'nagarsetu@123';
+pages/LoginPage.tsx:33 | const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'password123';
+pages/LoginPage.tsx:40 | setPassword(demoAdminPass);
+pages/LoginPage.tsx:43 | setPassword(demoHeadPass);
+pages/LoginPage.tsx:46 | setPassword(demoStaffPass);
+pages/LoginPage.tsx:80 | setErrorMsg('Invalid OTP. Please enter 123456 for demo verification.');
+pages/LoginPage.tsx:277 | {/* Citizen Registration Link & Demo Account Badge */}
+pages/LoginPage.tsx:283 | <span>Demo Account: <strong className="font-bold">8788562103</strong></span>
+services/adminService.ts:320 | export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
+services/adminService.ts:323 | // 0. Primary Demo Staff — Ramesh Kumar (36th Staff)
+services/complaintService.ts:27 | * Identifies if a complaint object is a demo/fake record
+types/database.types.ts:34 | export type AIMode = 'demo' | 'production';
+utils/i18n.ts:85 | demoAccounts: "Pre-seeded Demo Login Accounts",
+utils/i18n.ts:480 | demoAccounts: "डेमो लॉगिन खाते",
+utils/i18n.ts:875 | demoAccounts: "डेमो लॉगिन खाती",
+
+=== FALLBACK MATCHES (55) ===
+components/LiveGoogleMap.tsx:79 | console.warn('Google Maps API Key not configured. Enabling fallback map viewer.');
+components/LiveGoogleMap.tsx:102 | console.warn('Failed to load Google Maps JS SDK. Using fallback map viewer.');
+components/LiveGoogleMap.tsx:277 | // 5. FALLBACK VIEW (Leaflet / OpenStreetMap with CartoDB Voyager Light Tiles)
+components/Sidebar.tsx:118 | // Fallback
+components/Sidebar.tsx:317 | // Ignore fallback errors
+context/AuthContext.tsx:674 | console.info('Supabase auth failed for demo account, using demo session fallback.');
+context/LanguageContext.tsx:98 | // Fallback safe dummy context if used outside provider during initialization
+pages/admin/AdminOverdueComplaintsPage.tsx:120 | // Default fallback 24h from created_at
+pages/admin/AdminOverdueComplaintsPage.tsx:121 | const fallbackDeadline = new Date(c.created_at).getTime() + 24 * 3600000;
+pages/admin/AdminOverdueComplaintsPage.tsx:122 | const diffMs = Date.now() - fallbackDeadline;
+pages/citizen/ReportIssuePage.tsx:103 | console.warn('GPS detection failed, fallback to Nashik Center pin');
+pages/citizen/ReportIssuePage.tsx:269 | console.warn('Primary image upload fallback triggered:', uploadErr);
+pages/citizen/ReportIssuePage.tsx:367 | ? '🟡 AI Service Quota Limit (Manual Fallback Ready)'
+pages/citizen/TrackComplaintPage.tsx:141 | // Fallback silent
+pages/staff/StaffTaskMapPage.tsx:584 | /* 21. MISSING LOCATION FALLBACK */
+services/adminService.ts:717 | // 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)
+services/adminService.ts:737 | console.warn('Backend assignStaffToTask error fallback:', e);
+services/adminService.ts:946 | // Calculate Complaints Metrics for department using department_id & text match fallback
+services/adminService.ts:1051 | // Fallback: Direct database updates if RPC not executed yet
+services/adminService.ts:1102 | // Fallback direct update
+services/aiVisionService.ts:293 | const fallbackSeed = typeof imageInput === 'string' && imageInput.length > 5
+services/aiVisionService.ts:297 | dHash: fallbackSeed.padStart(16, '0'),
+services/aiVisionService.ts:401 | return file; // Fallback to original file on failure
+services/aiVisionService.ts:614 | const fallbackCategory: CivicCategory = 'Road Damage / Pothole';
+services/aiVisionService.ts:615 | const meta = VALID_TAXONOMY_MAP[fallbackCategory];
+services/aiVisionService.ts:617 | const fallbackResult: AIVisionResult = {
+services/aiVisionService.ts:621 | category: fallbackCategory,
+services/aiVisionService.ts:640 | setAnalysisCache(imageHash, fallbackResult);
+services/aiVisionService.ts:641 | return fallbackResult;
+services/complaintService.ts:104 | // Persistent Base64 Data URL fallback to prevent temporary blob expiration across reloads
+services/complaintService.ts:113 | // Fetch all complaints from Supabase with real geocoding fallback
+services/complaintService.ts:133 | console.warn('Express backend getAllComplaints fallback:', err);
+services/complaintService.ts:149 | console.warn('Supabase getAllComplaints fallback:', err);
+services/complaintService.ts:299 | console.warn('Express backend getComplaintById fallback note:', backendErr);
+services/complaintService.ts:316 | console.warn('Supabase getComplaintById fallback:', err);
+services/complaintService.ts:401 | console.warn('Supabase createComplaint insert fallback:', err);
+services/complaintService.ts:703 | console.warn('Backend resolve task API fallback:', apiErr);
+services/complaintService.ts:1023 | console.warn('Backend assign task API fallback:', apiErr);
+services/complaintService.ts:1117 | console.warn('Backend rework task API fallback:', apiErr);
+services/complaintService.ts:1190 | console.warn('Backend verify task API fallback:', apiErr);
+services/departmentService.ts:219 | // Backend API fallback
+services/departmentService.ts:292 | // 3. Fallback match by Category & Title taxonomy (AI Routing)
+services/departmentService.ts:492 | // 2. Fallback / Merge with Supabase
+services/departmentService.ts:573 | // Calculate Real Staff Count for department from Express API, profiles, or fallback staff records
+services/departmentService.ts:574 | const fallbackStaffRecords = getAllServiceStaffRecords();
+services/departmentService.ts:576 | const matchedFallbackStaff = fallbackStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
+services/departmentService.ts:807 | // 5. Fallback Direct Database Upserts
+services/departmentService.ts:978 | // Fallback: get target head record
+services/locationService.ts:243 | const fallbackUrl = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=${mode}`;
+services/locationService.ts:263 | navigation_url: data.navigation_url || fallbackUrl,
+services/locationService.ts:270 | return { navigation_url: fallbackUrl };
+services/locationService.ts:308 | // 2. OpenStreetMap Nominatim Fallback - Search address cleanly without hardcoding any location!
+services/locationService.ts:631 | * Only attempts fallback geocoding if coordinates are completely missing (null/NaN).
+services/locationService.ts:670 | // Only attempt fallback geocoding if coordinates are completely missing (null/NaN)
+services/notificationService.ts:52 | console.warn('Backend notifications sync fallback:', err);

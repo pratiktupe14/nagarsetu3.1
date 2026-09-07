@@ -2,7 +2,6 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Complaint } from '../types/database.types';
 import { pushNotification } from './notificationService';
 import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
-import { getAllServiceStaffRecords } from './adminService';
 
 export interface MunicipalDepartment {
   id: string;
@@ -560,20 +559,17 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       return pDept.code === deptCode || String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id;
     });
 
-    const officialFallback = OFFICIAL_DEPARTMENT_HEAD_FALLBACKS[deptCode];
-    const hasActiveHead = Boolean(activeHeadRow && (activeHeadRow.status || '').toLowerCase() === 'active') || Boolean(headProf) || Boolean(officialFallback);
-    const headName = activeHeadRow?.name || headProf?.full_name || headProf?.name || officialFallback?.headName || (hasActiveHead ? 'Department Head' : 'Unassigned');
-    const headEmail = activeHeadRow?.email || headProf?.email || officialFallback?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'N/A');
-    const headPhone = activeHeadRow?.phone || headProf?.mobile || officialFallback?.phone || (hasActiveHead ? '+91 98220 00000' : 'N/A');
-    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || officialFallback?.employeeId || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
+    const hasActiveHead = Boolean(activeHeadRow && (activeHeadRow.status || '').toLowerCase() === 'active') || Boolean(headProf);
+    const headName = activeHeadRow?.name || headProf?.full_name || headProf?.name || (hasActiveHead ? 'Department Head' : 'Unassigned');
+    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'N/A');
+    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? '+91 98220 00000' : 'N/A');
+    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
 
     const designation = activeHeadRow?.designation || (hasActiveHead ? 'Department Head' : 'Unassigned');
     const status: 'Active' | 'Inactive' | 'No Active Head' = hasActiveHead ? 'Active' : 'No Active Head';
 
-    // Calculate Real Staff Count for department from Express API, profiles, or fallback staff records
-    const fallbackStaffRecords = getAllServiceStaffRecords();
+    // Calculate Real Staff Count for department strictly from Express API or profiles (PostgreSQL authoritative source)
     const matchedApiStaff = apiStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
-    const matchedFallbackStaff = fallbackStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
 
     const profDeptStaff = profiles
       .filter((p) => (p.role === 'service_staff' || p.role === 'staff') && isStaffInDepartment(p, deptId, deptCode, deptName))
@@ -591,7 +587,7 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
         created_at: p.created_at || new Date().toISOString()
       }));
 
-    const deptStaff = matchedApiStaff.length > 0 ? matchedApiStaff : (profDeptStaff.length > 0 ? profDeptStaff : matchedFallbackStaff);
+    const deptStaff = matchedApiStaff.length > 0 ? matchedApiStaff : profDeptStaff;
     const totalStaff = deptStaff.length;
     const activeStaff = deptStaff.filter((s: any) => {
       const st = String(s.status || '').toLowerCase();

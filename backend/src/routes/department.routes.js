@@ -67,18 +67,35 @@ router.get('/complaints', authenticateToken, requireRole(['department_head', 'ad
     let sql = `
       SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
-      LEFT JOIN feedback f ON f.complaint_id = c.id
+      LEFT JOIN departments d ON (
+        CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
+        OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+        OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+        OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+        OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+        OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+        OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+      )
+      LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE 1=1
     `;
     const params = [];
 
     if (!isAdmin) {
-      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
-      params.push(userDeptId || -1, String(userDeptId || -1));
+      sql += ` AND (
+        CAST(c.department_id AS TEXT) = $1
+        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
+        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($2))
+      )`;
+      params.push(String(userDeptId || -1), String(userDeptName || '').slice(0, 3));
     } else if (req.query.department_id) {
-      sql += ` AND (c.department_id = $1 OR CAST(c.department_id AS TEXT) = $2)`;
-      params.push(req.query.department_id, String(req.query.department_id));
+      sql += ` AND (
+        CAST(c.department_id AS TEXT) = $1
+        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
+        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($1))
+      )`;
+      params.push(String(req.query.department_id));
     }
 
     sql += ` ORDER BY c.created_at DESC`;
@@ -272,14 +289,26 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
     let sql = `
       SELECT fs.id, fs.user_id, fs.name, fs.phone as mobile, fs.email, fs.employee_id, fs.department_id, d.name as department_name, d.code as department_code
       FROM field_staff fs
-      LEFT JOIN departments d ON fs.department_id = d.id
+      LEFT JOIN departments d ON (
+        CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+        OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
+        OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+        OR (CAST(fs.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
+        OR (CAST(fs.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
+        OR (CAST(fs.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
+        OR (CAST(fs.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
+        OR (CAST(fs.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+      )
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
     const params = [];
 
     if (!isAdmin) {
-      sql += ` AND fs.department_id = $1`;
-      params.push(userDeptId || -1);
+      sql += ` AND (
+        CAST(fs.department_id AS TEXT) = $1
+        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
+      )`;
+      params.push(String(userDeptId || -1));
     }
 
     sql += ` ORDER BY fs.name ASC`;
@@ -539,7 +568,11 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     let staffRes = await query(
       `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status, d.name as department_name, d.code as department_code 
        FROM field_staff fs 
-       LEFT JOIN departments d ON fs.department_id = d.id
+       LEFT JOIN departments d ON (
+         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
+         OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
+       )
        WHERE CAST(fs.user_id AS TEXT) = $1 
           OR fs.employee_id = $1 
           OR CAST(fs.id AS TEXT) = $1

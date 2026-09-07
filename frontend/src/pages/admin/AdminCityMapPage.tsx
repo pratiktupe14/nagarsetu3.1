@@ -8,8 +8,10 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getAllServiceStaffRecords, formatSlaRemainingTime,
-  getMunicipalDepartments, ServiceStaffMemberRecord
+  getMunicipalDepartments, ServiceStaffMemberRecord,
+  fetchDepartmentStaffApi
 } from '../../services/adminService';
+import { getDepartments } from '../../services/departmentService';
 import { calculateHotspotClusters } from '../../services/analyticsService';
 import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
@@ -92,6 +94,7 @@ export const AdminCityMapPage: React.FC = () => {
   const navigate = useNavigate();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [staffRecords, setStaffRecords] = useState<ServiceStaffMemberRecord[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,11 +120,14 @@ export const AdminCityMapPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getAllComplaints();
+      const [list, _staffRes, depts] = await Promise.all([
+        getAllComplaints(),
+        fetchDepartmentStaffApi().catch(() => null),
+        getDepartments().catch(() => [])
+      ]);
       setComplaints(list);
-
-      const staff = getAllServiceStaffRecords();
-      setStaffRecords(staff);
+      setStaffRecords(getAllServiceStaffRecords());
+      setDepartments(depts);
 
       // Auto-recenter to first valid complaint coordinate if available
       const validCoordComp = list.find((c) => !!c.latitude && !!c.longitude && !isNaN(Number(c.latitude)));
@@ -146,7 +152,15 @@ export const AdminCityMapPage: React.FC = () => {
   }, [loadData]));
 
   // Unique Department & Ward Options
-  const municipalDepartments = useMemo(() => getMunicipalDepartments(), []);
+  const municipalDepartments = useMemo(() => {
+    if (departments.length > 0) {
+      return departments.map((d) => ({
+        id: d.id,
+        name: d.name || d.department_name
+      }));
+    }
+    return getMunicipalDepartments();
+  }, [departments]);
 
   const wardOptions = useMemo(() => {
     const set = new Set<string>();

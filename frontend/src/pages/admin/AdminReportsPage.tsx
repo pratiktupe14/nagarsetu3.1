@@ -5,8 +5,10 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getMunicipalDepartments, getAllServiceStaffRecords,
+  fetchDepartmentStaffApi,
   formatSlaRemainingTime, MunicipalDepartmentRecord, ServiceStaffMemberRecord
 } from '../../services/adminService';
+import { getDepartments } from '../../services/departmentService';
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -110,13 +112,51 @@ export const AdminReportsPage: React.FC = () => {
     }
   ]);
 
-  // Load Complaints Data
+  const [municipalDepartments, setMunicipalDepartments] = useState<MunicipalDepartmentRecord[]>(() => getMunicipalDepartments());
+  const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>(() => getAllServiceStaffRecords());
+
+  // Load Complaints, Departments, and Staff from PostgreSQL
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getAllComplaints();
+      const [list, depts, staffRes] = await Promise.all([
+        getAllComplaints(),
+        getDepartments().catch(() => []),
+        fetchDepartmentStaffApi().catch(() => ({ staff: [] }))
+      ]);
       setComplaints(list);
+      if (depts && depts.length > 0) {
+        setMunicipalDepartments(depts.map(d => ({
+          id: d.id,
+          name: d.name,
+          code: d.code,
+          department_head: 'Department Head',
+          contact_number: '+91 98220 00000',
+          email: 'head@nagarsetu.gov.in',
+          description: d.description || '',
+          status: 'Active' as const,
+          created_at: new Date().toISOString()
+        })));
+      }
+      if (staffRes?.staff && staffRes.staff.length > 0) {
+        setStaffMembers(staffRes.staff.map((s: any) => ({
+          id: String(s.id),
+          name: s.name,
+          employee_id: s.employee_id || `STF-${s.id}`,
+          department_name: s.department_name || 'Municipal Department',
+          role: s.designation || 'Service Staff',
+          status: ((s.status || 'Active').toLowerCase() === 'active' ? 'Available' : 'Offline') as 'Available' | 'Offline',
+          contact_number: s.mobile || s.contact_number || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.created_at || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString(),
+          active_tasks: s.active_tasks || 0,
+          completed_tasks: s.completed_tasks || 0,
+          overdue_tasks: s.overdue_tasks || 0
+        })));
+      }
     } catch (e) {
       console.error(e);
       setError('Unable to load report data.');
@@ -132,10 +172,6 @@ export const AdminReportsPage: React.FC = () => {
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
-
-  // Reference Data
-  const municipalDepartments = useMemo(() => getMunicipalDepartments(), []);
-  const staffMembers = useMemo(() => getAllServiceStaffRecords(), []);
 
   const wardOptions = useMemo(() => {
     const set = new Set<string>();

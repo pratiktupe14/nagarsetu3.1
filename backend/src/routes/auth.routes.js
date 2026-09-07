@@ -361,10 +361,10 @@ router.get('/me', authenticateToken, async (req, res) => {
       `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
               d.name as department_name, d.code as department_code
        FROM users u
-       LEFT JOIN departments d ON u.department_id = d.id
-       WHERE u.id = ? OR CAST(u.id AS TEXT) = ?
+       LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
+       WHERE CAST(u.id AS TEXT) = ? OR LOWER(COALESCE(u.email, '')) = LOWER(?)
        LIMIT 1`,
-      [userId, String(userId)]
+      [String(userId), String(req.user.email || '')]
     );
 
     if (!userRes.rows || userRes.rows.length === 0) {
@@ -382,27 +382,38 @@ router.get('/me', authenticateToken, async (req, res) => {
       const dhRes = await query(
         `SELECT dh.department_id, d.name as dept_name, d.code as dept_code 
          FROM department_heads dh 
-         LEFT JOIN departments d ON d.id = dh.department_id 
-         WHERE dh.user_id = ? OR LOWER(dh.email) = LOWER(?)`,
-        [u.id, u.email || '']
+         LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) OR d.code = CAST(dh.department_id AS TEXT))
+         WHERE CAST(dh.user_id AS TEXT) = ? OR LOWER(dh.email) = LOWER(?)`,
+        [String(u.id), u.email || '']
       );
       if (dhRes.rows && dhRes.rows.length > 0) {
         departmentId = String(dhRes.rows[0].department_id);
         departmentName = dhRes.rows[0].dept_name;
         departmentCode = dhRes.rows[0].dept_code;
       }
-    } else if (!departmentId && userRole === 'service_staff') {
+    } else if (!departmentId && (userRole === 'service_staff' || userRole === 'staff' || userRole === 'field_staff')) {
       const fsRes = await query(
         `SELECT fs.department_id, d.name as dept_name, d.code as dept_code 
          FROM field_staff fs 
-         LEFT JOIN departments d ON d.id = fs.department_id 
-         WHERE fs.user_id = ? OR LOWER(fs.email) = LOWER(?) OR fs.employee_id = ?`,
-        [u.id, u.email || '', u.employee_id || '']
+         LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT) OR d.code = CAST(fs.department_id AS TEXT))
+         WHERE CAST(fs.user_id AS TEXT) = ? OR LOWER(fs.email) = LOWER(?) OR fs.employee_id = ?`,
+        [String(u.id), u.email || '', u.employee_id || '']
       );
       if (fsRes.rows && fsRes.rows.length > 0) {
         departmentId = String(fsRes.rows[0].department_id);
         departmentName = fsRes.rows[0].dept_name;
         departmentCode = fsRes.rows[0].dept_code;
+      }
+    }
+
+    if (departmentId && (!departmentName || !departmentCode)) {
+      const dCheck = await query(
+        `SELECT id, name, code FROM departments WHERE CAST(id AS TEXT) = ? OR code = ? LIMIT 1`,
+        [String(departmentId), String(departmentId)]
+      );
+      if (dCheck.rows && dCheck.rows.length > 0) {
+        departmentName = dCheck.rows[0].name;
+        departmentCode = dCheck.rows[0].code;
       }
     }
 

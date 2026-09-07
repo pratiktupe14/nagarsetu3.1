@@ -3,8 +3,9 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getMunicipalDepartments, getAllServiceStaffRecords,
-  formatSlaRemainingTime
+  formatSlaRemainingTime, MunicipalDepartmentRecord
 } from '../../services/adminService';
+import { getDepartments } from '../../services/departmentService';
 import {
   exportComplaintsToCSV, calculateHotspotClusters, HotspotCluster
 } from '../../services/analyticsService';
@@ -56,13 +57,31 @@ export const AdminAnalyticsPage: React.FC = () => {
   const [wardFilter, setWardFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
 
-  // Load Complaints Data
+  const [municipalDepartments, setMunicipalDepartments] = useState<MunicipalDepartmentRecord[]>(() => getMunicipalDepartments());
+
+  // Load Complaints and Department Data from PostgreSQL
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getAllComplaints();
+      const [list, depts] = await Promise.all([
+        getAllComplaints(),
+        getDepartments().catch(() => [])
+      ]);
       setComplaints(list);
+      if (depts && depts.length > 0) {
+        setMunicipalDepartments(depts.map(d => ({
+          id: d.id,
+          name: d.name,
+          code: d.code,
+          department_head: 'Department Head',
+          contact_number: '+91 98220 00000',
+          email: 'head@nagarsetu.gov.in',
+          description: d.description || '',
+          status: 'Active' as const,
+          created_at: new Date().toISOString()
+        })));
+      }
     } catch (e) {
       console.error(e);
       setError('Unable to load analytics.');
@@ -79,9 +98,6 @@ export const AdminAnalyticsPage: React.FC = () => {
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
-
-  // Departments List
-  const municipalDepartments = useMemo(() => getMunicipalDepartments(), []);
 
   // Wards List
   const wardOptions = useMemo(() => {

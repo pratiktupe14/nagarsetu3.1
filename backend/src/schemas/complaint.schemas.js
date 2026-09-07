@@ -3,7 +3,7 @@ const Joi = require('joi');
 const createComplaintSchema = {
   body: Joi.object({
     complaint_number: Joi.string().max(100).allow('', null).optional(),
-    photo_url: Joi.string().required(),
+    photo_url: Joi.string().allow('', null).optional().default(''),
     category: Joi.string().min(2).max(100).required(),
     title: Joi.string().min(3).max(200).required(),
     description: Joi.string().max(2000).allow('', null).optional(),

@@ -21,7 +21,18 @@ import {
   CIVIC_CATEGORIES,
   CivicCategory
 } from '../../services/aiVisionService';
-import { createComplaint, uploadComplaintImage, generateComplaintNumber, saveOfflineDraft, getStoredComplaints } from '../../services/complaintService';
+import {
+  createComplaint,
+  uploadComplaintImage,
+  generateComplaintNumber,
+  saveOfflineDraft,
+  clearOfflineDrafts,
+  getOfflineDrafts,
+  getAllComplaints,
+  HttpError,
+  AuthError,
+  isNetworkError
+} from '../../services/complaintService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
@@ -77,10 +88,28 @@ export const ReportIssuePage: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
 
-  // Initial AI Health & Location Check
+  // Initial AI Health & Location Check & Resume Offline Draft if present
   React.useEffect(() => {
     checkAiHealth().then(setAiHealth).catch(() => setAiHealth({ reachable: false, configured: false, model: 'Offline' }));
     requestFreshLocation();
+
+    try {
+      const drafts = getOfflineDrafts();
+      if (drafts && drafts.length > 0) {
+        const latest = drafts[0];
+        if (latest) {
+          if (latest.category) setCategory(latest.category as CivicCategory);
+          if (latest.title) setTitle(latest.title);
+          if (latest.description) setDescription(latest.description);
+          if (latest.priority) setPriority(latest.priority);
+          if (latest.department) setDepartment(latest.department);
+          if (latest.lat != null && !isNaN(Number(latest.lat))) setLat(Number(latest.lat));
+          if (latest.lng != null && !isNaN(Number(latest.lng))) setLng(Number(latest.lng));
+          if (latest.locationAddress) setLocationAddress(latest.locationAddress);
+          if (latest.photoPreviewUrl) setPhotoPreviewUrl(latest.photoPreviewUrl);
+        }
+      }
+    } catch (e) {}
   }, []);
 
   // Request Fresh Live GPS Location
@@ -236,10 +265,14 @@ export const ReportIssuePage: React.FC = () => {
     setAdditionalPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const runDuplicateCheck = (checkLat: number, checkLng: number) => {
-    const existing = getStoredComplaints();
-    const dups = findDuplicateComplaints(checkLat, checkLng, existing, 100);
-    setNearbyDuplicates(dups);
+  const runDuplicateCheck = async (checkLat: number, checkLng: number) => {
+    try {
+      const existing = await getAllComplaints();
+      const dups = findDuplicateComplaints(checkLat, checkLng, existing, 100);
+      setNearbyDuplicates(dups);
+    } catch {
+      setNearbyDuplicates([]);
+    }
   };
 
   const handleSaveDraft = () => {
@@ -316,14 +349,29 @@ export const ReportIssuePage: React.FC = () => {
       };
 
       const created = await createComplaint(newComplaintData);
+      clearOfflineDrafts();
       setShowReviewModal(false);
       navigate('/citizen/success', { state: { complaint: created } });
-    } catch (err) {
-      console.error(err);
-      saveOfflineDraft({
-        category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
-      });
-      toast.info('Network issue detected. Complaint saved to offline drafts on your device.');
+    } catch (err: any) {
+      console.error('Complaint submission error:', err);
+
+      if (isNetworkError(err)) {
+        // True network failure: fetch threw before receiving an HTTP response, or browser offline
+        saveOfflineDraft({
+          category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
+        });
+        toast.info('Network issue detected. Complaint saved to offline drafts on your device.');
+      } else if (err instanceof AuthError || err.isAuthError || err.status === 401 || err.status === 403) {
+        // Authentication or authorization error
+        toast.error(err.message || 'Authentication required. Please log in again.');
+      } else if (err instanceof HttpError || err.isHttpError || err.status) {
+        // HTTP response received (400, 404, 409, 422, 500, 502, 503, etc.)
+        const detailStr = err.data?.details && Array.isArray(err.data.details) ? ` (${err.data.details.join(', ')})` : '';
+        toast.error(`${err.message || 'Server error processing complaint.'}${detailStr}`);
+      } else {
+        // Other unexpected client-side error
+        toast.error(err.message || 'Failed to submit complaint. Please verify your details.');
+      }
     } finally {
       setSubmitting(false);
     }
