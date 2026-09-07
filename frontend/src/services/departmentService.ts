@@ -576,7 +576,7 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       .map((p) => ({
         id: p.id,
         name: p.full_name || p.name || 'Staff Member',
-        employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
+        employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
         department_name: deptName,
         role: 'Service Staff',
         status: p.status || 'Available',

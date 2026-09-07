@@ -48,15 +48,15 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     setLang(newLang);
     localStorage.setItem('nagarsetu_lang', newLang);
 
-    // Save to user object in AuthContext and Supabase if authenticated user
+    // Save to database via authoritative API and synchronize profiles
     if (user && user.id) {
-      if (user.language_pref !== newLang) {
-        user.language_pref = newLang;
-        const updatedUser = { ...user, language_pref: newLang };
-        localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
-      }
-
-      if (isSupabaseConfigured()) {
+      if (auth?.updateUserProfile) {
+        try {
+          await auth.updateUserProfile({ language_pref: newLang });
+        } catch (err) {
+          console.warn('Could not persist preferred_language to API profile:', err);
+        }
+      } else if (isSupabaseConfigured()) {
         try {
           await supabase
             .from('profiles')

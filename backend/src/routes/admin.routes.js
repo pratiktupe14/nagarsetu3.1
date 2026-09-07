@@ -8,6 +8,7 @@ const {
   updateUserSchema,
   createDeptHeadSchema,
   createDepartmentSchema,
+  updateDepartmentSchema,
   assignStaffSchema,
   reassignComplaintSchema
 } = require('../schemas/admin.schemas');
@@ -154,12 +155,124 @@ router.get('/departments', async (req, res) => {
 
 router.post('/departments', validateInput(createDepartmentSchema), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const result = await query(`INSERT INTO departments (name, description) VALUES (?, ?)`, [name, description || '']);
-    return res.status(201).json({ message: 'Department created', id: result.rows[0].id });
+    const { name, code, description } = req.body;
+    const cleanCode = code ? String(code).trim().toUpperCase() : String(name).slice(0, 3).toUpperCase();
+
+    // Check duplicate
+    const existing = await query(
+      `SELECT id FROM departments WHERE LOWER(name) = LOWER(?) OR (code IS NOT NULL AND UPPER(code) = UPPER(?)) LIMIT 1`,
+      [name.trim(), cleanCode]
+    );
+    if (existing.rows && existing.rows.length > 0) {
+      return res.status(409).json({ error: 'A department with this name or code already exists' });
+    }
+
+    const result = await query(
+      `INSERT INTO departments (name, code, description) VALUES (?, ?, ?)`,
+      [name.trim(), cleanCode, description || '']
+    );
+
+    const newId = (result.rows && result.rows[0]?.id) || null;
+    let readBack = null;
+    if (newId) {
+      const rb = await query(`SELECT * FROM departments WHERE id = ? LIMIT 1`, [newId]);
+      readBack = rb.rows[0];
+    } else {
+      const rb = await query(`SELECT * FROM departments WHERE LOWER(name) = LOWER(?) LIMIT 1`, [name.trim()]);
+      readBack = rb.rows[0];
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Department created successfully',
+      department: readBack
+    });
   } catch (err) {
     console.error('Create department error:', err);
-    return res.status(500).json({ error: 'Failed to create department' });
+    return res.status(500).json({ error: 'Failed to create department: ' + (err.message || 'Server error') });
+  }
+});
+
+router.put('/departments/:id', validateInput(updateDepartmentSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, code, description } = req.body;
+
+    const existingRes = await query(`SELECT * FROM departments WHERE CAST(id AS TEXT) = ? LIMIT 1`, [String(id)]);
+    if (!existingRes.rows || existingRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+    const current = existingRes.rows[0];
+
+    const updatedName = name !== undefined ? String(name).trim() : current.name;
+    const updatedCode = code !== undefined ? String(code).trim().toUpperCase() : current.code;
+    const updatedDesc = description !== undefined ? description : current.description;
+
+    // Check duplicate on other records
+    if (name || code) {
+      const dupCheck = await query(
+        `SELECT id FROM departments 
+         WHERE (LOWER(name) = LOWER(?) OR (code IS NOT NULL AND UPPER(code) = UPPER(?))) 
+           AND CAST(id AS TEXT) != ? 
+         LIMIT 1`,
+        [updatedName, updatedCode, String(id)]
+      );
+      if (dupCheck.rows && dupCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'Another department already uses this name or code' });
+      }
+    }
+
+    await query(
+      `UPDATE departments SET name = ?, code = ?, description = ? WHERE CAST(id AS TEXT) = ?`,
+      [updatedName, updatedCode, updatedDesc, String(id)]
+    );
+
+    const readBack = await query(`SELECT * FROM departments WHERE CAST(id AS TEXT) = ? LIMIT 1`, [String(id)]);
+
+    return res.json({
+      success: true,
+      message: 'Department updated successfully',
+      department: readBack.rows[0]
+    });
+  } catch (err) {
+    console.error('Update department error:', err);
+    return res.status(500).json({ error: 'Failed to update department: ' + (err.message || 'Server error') });
+  }
+});
+
+router.delete('/departments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existingRes = await query(`SELECT * FROM departments WHERE CAST(id AS TEXT) = ? LIMIT 1`, [String(id)]);
+    if (!existingRes.rows || existingRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Department not found' });
+    }
+    const dept = existingRes.rows[0];
+
+    // Check if active complaints exist for this department
+    const compCheck = await query(
+      `SELECT COUNT(*) as count FROM complaints 
+       WHERE (CAST(department_id AS TEXT) = ? OR (department_id IS NOT NULL AND UPPER(department_id) = UPPER(?)))
+         AND status NOT IN ('Resolved', 'Rejected')`,
+      [String(id), dept.code || '']
+    );
+    const activeCount = parseInt(compCheck.rows[0]?.count || 0, 10);
+    if (activeCount > 0) {
+      return res.status(400).json({
+        error: `Cannot delete department with ${activeCount} active complaint(s). Reassign them first.`
+      });
+    }
+
+    await query(`DELETE FROM departments WHERE CAST(id AS TEXT) = ?`, [String(id)]);
+
+    return res.json({
+      success: true,
+      message: `Department '${dept.name}' deleted successfully`
+    });
+  } catch (err) {
+    console.error('Delete department error:', err);
+    return res.status(500).json({ error: 'Failed to delete department: ' + (err.message || 'Server error') });
   }
 });
 

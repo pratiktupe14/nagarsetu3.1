@@ -2,50 +2,60 @@ const bcrypt = require('bcryptjs');
 
 async function seedDefaultUsers(query) {
   try {
-    // Purge Rahul Sharma (Citizen) demo account if present
+    // Purge legacy demo account if present
     await query(`DELETE FROM users WHERE mobile = '9876543210' OR LOWER(email) = 'rahul@citizen.nagarsetu.gov.in'`).catch(() => {});
 
-    const resCount = await query(`SELECT COUNT(*) as count FROM users`);
-    if (resCount.rows && resCount.rows[0].count === 0) {
-      console.log('Seeding default demo users (Citizen, Officer, Staff, Admin)...');
-      const salt = await bcrypt.genSalt(10);
-      const userPass = process.env.DEMO_USER_PASSWORD || 'password123';
-      const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      const defaultHash = await bcrypt.hash(userPass, salt);
-      const adminHash = await bcrypt.hash(adminPass, salt);
+    const userSalt = await bcrypt.genSalt(10);
+    const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+    const adminHash = await bcrypt.hash(adminPass, userSalt);
+    const staffPass = 'nagarsetu@123';
+    const staffHash = await bcrypt.hash(staffPass, userSalt);
 
-      const usersToSeed = [
-        { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en', passHash: defaultHash },
-        { name: 'Ramesh Kumar (Field Staff)', mobile: '9876543212', email: 'staff@nagarsetu.gov.in', role: 'staff', lang: 'en', passHash: defaultHash },
-        { name: 'Municipal Admin', mobile: '9876543213', email: 'admin@nagarsetu.gov.in', role: 'admin', lang: 'en', passHash: adminHash }
-      ];
-
-      for (const u of usersToSeed) {
-        await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [u.name, u.mobile, u.email, u.passHash, u.role, 'active', u.lang]
-        );
-      }
-      console.log('Default demo users seeded successfully.');
+    // 1. Ensure Municipal Admin exists idempotently
+    const adminCheck = await query(`SELECT * FROM users WHERE email = 'admin@nagarsetu.gov.in'`);
+    if (!adminCheck.rows || adminCheck.rows.length === 0) {
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'active', 'en']
+      );
+      console.log('Municipal Admin user added.');
     } else {
-      // Ensure Municipal Admin exists even if DB already has other users
-      const adminCheck = await query(`SELECT * FROM users WHERE email = 'admin@nagarsetu.gov.in'`);
-      if (!adminCheck.rows || adminCheck.rows.length === 0) {
-        const salt = await bcrypt.genSalt(10);
-        const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-        const adminHash = await bcrypt.hash(adminPass, salt);
-        await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'active', 'en']
-        );
-        console.log('Municipal Admin user added.');
-      }
+      await query(
+        `UPDATE users SET password_hash = ?, role = 'admin', status = 'active' WHERE email = 'admin@nagarsetu.gov.in'`,
+        [adminHash]
+      );
+      console.log('Municipal Admin user updated idempotently.');
     }
 
-    // Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently with valid bcrypt password_hash
+    // 2. Ensure Staff demo account exists idempotently
+    const staffCheck = await query(`SELECT * FROM users WHERE email = 'staff@nagarsetu.gov.in'`);
+    if (!staffCheck.rows || staffCheck.rows.length === 0) {
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status, language_pref) VALUES (?, ?, ?, ?, 'service_staff', 1, 'STF-001', 'active', 'en')`,
+        ['Ramesh Kumar (Field Staff)', '9876543212', 'staff@nagarsetu.gov.in', staffHash]
+      );
+      console.log('Staff user added.');
+    } else {
+      await query(
+        `UPDATE users SET password_hash = ?, role = 'service_staff', department_id = COALESCE(department_id, 1), status = 'active' WHERE email = 'staff@nagarsetu.gov.in'`,
+        [staffHash]
+      );
+      console.log('Staff user updated idempotently.');
+    }
+
+    // 3. Ensure Officer demo account exists idempotently
+    const officerHash = await bcrypt.hash('password123', userSalt);
+    const officerCheck = await query(`SELECT * FROM users WHERE email = 'officer@nagarsetu.gov.in'`);
+    if (!officerCheck.rows || officerCheck.rows.length === 0) {
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'officer', 'active', 'en')`,
+        ['Inspector V. K. Patil (Officer)', '9876543211', 'officer@nagarsetu.gov.in', officerHash]
+      );
+    }
+
+    // 4. Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently with valid bcrypt password_hash
     const citizenPass = '8788562103';
-    const citizenSalt = await bcrypt.genSalt(10);
-    const citizenHash = await bcrypt.hash(citizenPass, citizenSalt);
+    const citizenHash = await bcrypt.hash(citizenPass, userSalt);
     const citizenEmail = 'citizen8788@nagarsetu.gov.in';
 
     const citizenCheck = await query(`SELECT id FROM users WHERE mobile = '8788562103' OR LOWER(email) = ? OR name = 'Demo Citizen' OR name = 'Citizen User'`, [citizenEmail]);
@@ -65,9 +75,8 @@ async function seedDefaultUsers(query) {
       console.log(`Citizen demo account (8788562103) created with DB User ID: ${newId}`);
     }
 
-    // Ensure corresponding profile record exists in profiles table for UUID referential integrity
+    // 5. Ensure corresponding profile record exists in profiles table for UUID referential integrity
     try {
-      const crypto = require('crypto');
       const pCheck = await query(`SELECT id FROM profiles WHERE mobile = '8788562103' OR LOWER(email) = ? LIMIT 1`, [citizenEmail]);
       if (!pCheck.rows || pCheck.rows.length === 0) {
         const citizenProfileUuid = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';

@@ -306,4 +306,56 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
   }
 });
 
+/**
+ * POST /api/staff/task/:id/progress
+ * Add field progress note / work update to complaint_status_history
+ */
+router.post(['/task/:id/progress', '/tasks/:id/progress'], async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const { note } = req.body;
+    if (!note || !String(note).trim()) {
+      return res.status(400).json({ error: 'Progress note is required' });
+    }
+
+    const targetIdNum = parseInt(String(targetId), 10);
+    const compRes = await query(
+      `SELECT id, status, complaint_number, department_id, assigned_staff_id 
+       FROM complaints 
+       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+      [isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+    );
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+    const staffName = req.user.name || 'Field Staff';
+
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        complaint.id,
+        complaint.status,
+        String(note).trim(),
+        'Field Work Progress Update',
+        staffName
+      ]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Progress note recorded successfully in database',
+      complaint_id: complaint.id,
+      note: String(note).trim(),
+      updated_by: staffName,
+      created_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Add progress note error:', err);
+    return res.status(500).json({ error: 'Failed to record progress note: ' + (err.message || 'Server error') });
+  }
+});
+
 module.exports = router;

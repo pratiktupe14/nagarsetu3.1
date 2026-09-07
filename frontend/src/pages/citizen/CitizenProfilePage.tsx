@@ -2,22 +2,42 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LanguageSelector } from '../../components/LanguageSelector';
-import { User, Smartphone, Mail, MapPin, Globe, CheckCircle2, Save, ShieldCheck } from 'lucide-react';
+import { User, Smartphone, Mail, MapPin, Globe, CheckCircle2, Save, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 
 export const CitizenProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
 
-  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [fullName, setFullName] = useState(user?.full_name || user?.name || '');
   const [mobile, setMobile] = useState(user?.mobile || '');
   const [email, setEmail] = useState(user?.email || '');
   const [address, setAddress] = useState(user?.address || '');
   const [langPref, setLangPref] = useState(user?.language_pref || 'en');
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (!updateUserProfile) return;
+    setLoading(true);
+    setError(null);
+    setSaved(false);
+
+    try {
+      await updateUserProfile({
+        full_name: fullName.trim(),
+        mobile: mobile.trim(),
+        email: email.trim(),
+        address: address.trim(),
+        language_pref: langPref
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save profile changes. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,19 +71,28 @@ export const CitizenProfilePage: React.FC = () => {
           
           {saved && (
             <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Profile updated successfully!</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Profile updated and saved to database successfully!</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSave} className="space-y-5 text-xs">
             <div>
-              <label className="block font-bold text-gray-700 mb-1">Full Name</label>
+              <label htmlFor="profile-full-name" className="block font-bold text-gray-700 mb-1">Full Name</label>
               <div className="relative">
                 <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                 <input
+                  id="profile-full-name"
                   type="text"
                   required
+                  autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-3 py-2.5 text-xs text-gray-900 focus:border-emerald-500 font-semibold min-h-[44px]"
@@ -73,12 +102,14 @@ export const CitizenProfilePage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Mobile Number</label>
+                <label htmlFor="profile-mobile" className="block font-bold text-gray-700 mb-1">Mobile Number</label>
                 <div className="relative">
                   <Smartphone className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                   <input
+                    id="profile-mobile"
                     type="tel"
                     required
+                    autoComplete="tel"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-3 py-2.5 text-xs text-gray-900 focus:border-emerald-500 min-h-[44px]"
@@ -87,12 +118,14 @@ export const CitizenProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Email Address</label>
+                <label htmlFor="profile-email" className="block font-bold text-gray-700 mb-1">Email Address</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                   <input
+                    id="profile-email"
                     type="email"
                     required
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-3 py-2.5 text-xs text-gray-900 focus:border-emerald-500 min-h-[44px]"
@@ -102,11 +135,13 @@ export const CitizenProfilePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-bold text-gray-700 mb-1">Residential Address</label>
+              <label htmlFor="profile-address" className="block font-bold text-gray-700 mb-1">Residential Address</label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                 <input
+                  id="profile-address"
                   type="text"
+                  autoComplete="street-address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full bg-white border border-gray-300 rounded-xl pl-10 pr-3 py-2.5 text-xs text-gray-900 focus:border-emerald-500 min-h-[44px]"
@@ -120,10 +155,20 @@ export const CitizenProfilePage: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px]"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all min-h-[44px] cursor-pointer disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
-              <span>Save Profile Changes</span>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving to Database...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Save Profile Changes</span>
+                </>
+              )}
             </button>
           </form>
 

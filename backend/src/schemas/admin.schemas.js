@@ -63,6 +63,18 @@ const reassignComplaintSchema = {
 const createDepartmentSchema = {
   body: Joi.object({
     name: Joi.string().min(2).max(150).trim().required(),
+    code: Joi.string().min(2).max(20).trim().uppercase().allow('', null).optional(),
+    description: Joi.string().max(500).allow('', null).optional()
+  })
+};
+
+const updateDepartmentSchema = {
+  params: Joi.object({
+    id: idSchema.required()
+  }),
+  body: Joi.object({
+    name: Joi.string().min(2).max(150).trim().optional(),
+    code: Joi.string().min(2).max(20).trim().uppercase().allow('', null).optional(),
     description: Joi.string().max(500).allow('', null).optional()
   })
 };
@@ -72,6 +84,7 @@ module.exports = {
   updateUserSchema,
   createDeptHeadSchema,
   createDepartmentSchema,
+  updateDepartmentSchema,
   assignStaffSchema,
   reassignComplaintSchema
 };

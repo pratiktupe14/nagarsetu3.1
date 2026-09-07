@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export const AdminSettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, updateUserProfile } = useAuth();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -63,21 +63,36 @@ export const AdminSettingsPage: React.FC = () => {
     if (cachedLang) setLanguage(cachedLang);
   }, []);
 
+  const [saving, setSaving] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
   // Save Settings Function
-  const handleSaveSettings = (e?: React.FormEvent) => {
+  const handleSaveSettings = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaveErrorMsg(null);
+    setSaving(true);
 
-    // Save language preference
-    localStorage.setItem('nagarsetu_admin_lang', language);
-
-    // Show soft success feedback
-    setSaveSuccessMsg('✓ Settings saved successfully.');
-    setTimeout(() => setSaveSuccessMsg(null), 3500);
+    try {
+      if (updateUserProfile) {
+        await updateUserProfile({
+          full_name: fullName.trim(),
+          email: email.trim(),
+          mobile: mobile.trim(),
+          language_pref: language
+        });
+      }
+      localStorage.setItem('nagarsetu_admin_lang', language);
+      setSaveSuccessMsg('✓ Admin profile & settings saved to database successfully.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to save admin settings.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Update Password Function
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveErrorMsg(null);
 
@@ -94,11 +109,21 @@ export const AdminSettingsPage: React.FC = () => {
       return;
     }
 
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setSaveSuccessMsg('✓ Password updated successfully.');
-    setTimeout(() => setSaveSuccessMsg(null), 3500);
+    setUpdatingPassword(true);
+    try {
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
+      }
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setSaveSuccessMsg('✓ Password updated and verified in database successfully.');
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to update password. Please check your current password.');
+    } finally {
+      setUpdatingPassword(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -588,9 +613,10 @@ export const AdminSettingsPage: React.FC = () => {
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition-colors"
+                      disabled={updatingPassword}
+                      className="px-4 py-2 bg-emerald-600 disabled:bg-emerald-400 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
                     >
-                      Update Password
+                      {updatingPassword ? 'Updating Password in Database...' : 'Update Password'}
                     </button>
                   </div>
 

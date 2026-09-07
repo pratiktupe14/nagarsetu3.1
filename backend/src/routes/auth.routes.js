@@ -174,12 +174,10 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     let isMatch = false;
     if (user.password_hash) {
-      isMatch = await bcrypt.compare(password, user.password_hash);
-      if (!isMatch && (user.mobile === '8788562103' || user.email === 'citizen8788@nagarsetu.gov.in')) {
-        isMatch = (password === '8788562103' || password === 'password123');
-      }
-      if (!isMatch && (user.role === 'department_head' || (user.email && user.email.toLowerCase().includes('nagarsetu.gov.in')))) {
-        isMatch = (password === 'nagarsetu@123' || password === 'nagarsetu123' || password === 'head123' || password === 'password123' || password === 'staff123');
+      if (user.password_hash.startsWith('$2')) {
+        isMatch = await bcrypt.compare(password, user.password_hash);
+      } else {
+        isMatch = (password === user.password_hash);
       }
     }
 
@@ -457,6 +455,219 @@ router.get('/me', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Fetch /api/auth/me database error:', err);
     return res.status(500).json({ error: 'Failed to retrieve user profile from database' });
+  }
+});
+
+/**
+ * PUT /api/auth/profile
+ * Authoritative user profile update (Citizen, Field Staff, Department Head, Admin)
+ */
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, fullName, mobile, email, address, language_pref } = req.body;
+
+    const cleanName = (fullName || name || '').trim();
+    const cleanMobile = mobile ? normalizeMobile(mobile) : null;
+    const cleanEmail = email && String(email).trim() !== '' ? String(email).trim().toLowerCase() : null;
+    const cleanLang = language_pref ? String(language_pref).trim() : null;
+
+    // Check if user exists
+    const userCheck = await query(`SELECT * FROM users WHERE CAST(id AS TEXT) = ?`, [String(userId)]);
+    if (!userCheck.rows || userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const currentUser = userCheck.rows[0];
+
+    // Check email uniqueness if email is being changed
+    if (cleanEmail && cleanEmail !== (currentUser.email || '').toLowerCase()) {
+      const emailCheck = await query(`SELECT id FROM users WHERE LOWER(email) = ? AND CAST(id AS TEXT) != ?`, [cleanEmail, String(userId)]);
+      if (emailCheck.rows && emailCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Email is already in use by another account' });
+      }
+    }
+
+    // Check mobile uniqueness if mobile is being changed
+    if (cleanMobile && cleanMobile !== currentUser.mobile) {
+      const mobCheck = await query(`SELECT id FROM users WHERE mobile = ? AND CAST(id AS TEXT) != ?`, [cleanMobile, String(userId)]);
+      if (mobCheck.rows && mobCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Mobile number is already in use by another account' });
+      }
+    }
+
+    const updatedName = cleanName || currentUser.name;
+    const updatedMobile = cleanMobile || currentUser.mobile;
+    const updatedEmail = cleanEmail !== null ? cleanEmail : currentUser.email;
+    const updatedLang = cleanLang || currentUser.language_pref || 'en';
+
+    await query(
+      `UPDATE users 
+       SET name = ?, mobile = ?, email = ?, language_pref = ? 
+       WHERE CAST(id AS TEXT) = ?`,
+      [updatedName, updatedMobile, updatedEmail, updatedLang, String(userId)]
+    );
+
+    // Sync profiles table (for UUID referential integrity)
+    try {
+      await query(
+        `UPDATE profiles 
+         SET full_name = ?, mobile = ?, email = ?, language_pref = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE (mobile IS NOT NULL AND mobile = ?) 
+            OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)`,
+        [updatedName, updatedMobile, updatedEmail, updatedLang, updatedMobile, (updatedEmail || '').toLowerCase()]
+      );
+    } catch (pErr) {
+      console.warn('[PROFILE SYNC NOTE]:', pErr.message);
+    }
+
+    // Read back updated user
+    const readBack = await query(
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
+              d.name as department_name, d.code as department_code
+       FROM users u
+       LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
+       WHERE CAST(u.id AS TEXT) = ?
+       LIMIT 1`,
+      [String(userId)]
+    );
+
+    const u = readBack.rows[0];
+    const userRole = u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role);
+
+    const userObj = {
+      id: u.id,
+      name: u.name,
+      full_name: u.name,
+      mobile: u.mobile,
+      email: u.email,
+      role: userRole,
+      department_id: u.department_id ? String(u.department_id) : null,
+      department_name: u.department_name || null,
+      department_code: u.department_code || null,
+      employee_id: u.employee_id || null,
+      designation: u.designation || null,
+      status: u.status || 'active',
+      language_pref: u.language_pref || 'en'
+    };
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: userObj
+    });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile: ' + (err.message || 'Server error') });
+  }
+});
+
+/**
+ * POST /api/auth/change-password
+ * Secure authenticated password change
+ */
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+
+    // Retrieve user and password hash
+    const userRes = await query(`SELECT id, password_hash FROM users WHERE CAST(id AS TEXT) = ?`, [String(userId)]);
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentHash = userRes.rows[0].password_hash || '';
+    let isMatch = false;
+    if (currentHash) {
+      if (currentHash.startsWith('$2')) {
+        isMatch = await bcrypt.compare(currentPassword, currentHash);
+      } else {
+        isMatch = (currentPassword === currentHash);
+      }
+    }
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect current password' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const newHash = await bcrypt.hash(newPassword, salt);
+
+    await query(`UPDATE users SET password_hash = ? WHERE CAST(id AS TEXT) = ?`, [newHash, String(userId)]);
+
+    // Read back check
+    const verifyRes = await query(`SELECT id, password_hash FROM users WHERE CAST(id AS TEXT) = ?`, [String(userId)]);
+    if (!verifyRes.rows || verifyRes.rows[0].password_hash !== newHash) {
+      return res.status(500).json({ error: 'Password update verification failed' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (err) {
+    console.error('Change password error:', err);
+    return res.status(500).json({ error: 'Failed to update password: ' + (err.message || 'Server error') });
+  }
+});
+
+/**
+ * POST /api/auth/refresh
+ * Refresh active JWT token for seamless session continuation
+ */
+router.post('/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRes = await query(
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
+              d.name as department_name, d.code as department_code
+       FROM users u
+       LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
+       WHERE CAST(u.id AS TEXT) = ?
+       LIMIT 1`,
+      [String(userId)]
+    );
+
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User record not found' });
+    }
+
+    const u = userRes.rows[0];
+    const userRole = u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role);
+
+    const userObj = {
+      id: u.id,
+      name: u.name,
+      full_name: u.name,
+      mobile: u.mobile,
+      email: u.email,
+      role: userRole,
+      department_id: u.department_id ? String(u.department_id) : null,
+      department_name: u.department_name || null,
+      department_code: u.department_code || null,
+      employee_id: u.employee_id || null,
+      designation: u.designation || null,
+      status: u.status || 'active',
+      language_pref: u.language_pref || 'en'
+    };
+
+    const newToken = generateToken(userObj);
+
+    return res.json({
+      success: true,
+      token: newToken,
+      user: userObj
+    });
+  } catch (err) {
+    console.error('Session refresh error:', err);
+    return res.status(500).json({ error: 'Failed to refresh session' });
   }
 });
 

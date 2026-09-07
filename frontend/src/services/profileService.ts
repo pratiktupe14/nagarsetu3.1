@@ -1,13 +1,19 @@
+/**
+ * @deprecated Legacy in-memory profile service.
+ * All authoritative profile mutations and retrievals now route directly through:
+ * - Backend API: PUT /api/auth/profile and GET /api/auth/me
+ * - Frontend: useAuth().updateUserProfile() in AuthContext.tsx
+ * PostgreSQL users & profiles tables are the single source of truth.
+ */
 import { UserProfile } from '../types/database.types';
 
-const LOCAL_STORAGE_PROFILES_KEY = 'nagarsetu_user_profiles_v3';
+// Purge legacy local storage if present
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('nagarsetu_user_profiles_v3');
+  } catch (e) {}
+}
 
-// Purge legacy storage
-try {
-  localStorage.removeItem(LOCAL_STORAGE_PROFILES_KEY);
-} catch (e) {}
-
-// In-memory runtime cache (PostgreSQL users & profiles are authoritative)
 let memoryProfiles: UserProfile[] = [];
 
 export function getStoredProfiles(): UserProfile[] {

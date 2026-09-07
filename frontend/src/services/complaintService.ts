@@ -582,6 +582,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
 export async function acceptStaffTask(complaintId: string): Promise<boolean> {
   const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
   // 1. Try Express backend API first
   try {
@@ -594,8 +595,10 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
       },
       body: JSON.stringify({ status: 'Accepted' })
     });
-    if (!apiRes.ok) {
-      await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    } else {
+      const fallbackRes = await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -603,6 +606,9 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
         },
         body: JSON.stringify({ status: 'Accepted' })
       });
+      if (fallbackRes.ok) {
+        dbWriteVerified = true;
+      }
     }
   } catch (apiErr) {
     console.warn('Backend acceptStaffTask API note:', apiErr);
@@ -618,8 +624,15 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
       } else {
         supaQuery = supaQuery.eq('complaint_number', targetIdStr);
       }
-      await supaQuery;
-    } catch (e) {}
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase acceptStaffTask note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to accept task ${targetIdStr}: Server could not verify status update.`);
   }
 
   // 3. Broadcast and notify
@@ -640,11 +653,12 @@ export async function acceptStaffTask(complaintId: string): Promise<boolean> {
 
 export async function startStaffTravel(complaintId: string): Promise<boolean> {
   const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
   // 1. Try Express backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -652,6 +666,9 @@ export async function startStaffTravel(complaintId: string): Promise<boolean> {
       },
       body: JSON.stringify({ status: 'On the Way' })
     });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
   } catch (apiErr) {
     console.warn('Backend startStaffTravel API note:', apiErr);
   }
@@ -666,8 +683,15 @@ export async function startStaffTravel(complaintId: string): Promise<boolean> {
       } else {
         supaQuery = supaQuery.eq('complaint_number', targetIdStr);
       }
-      await supaQuery;
-    } catch (e) {}
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase startStaffTravel note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to update travel status for task ${targetIdStr}.`);
   }
 
   // 3. Broadcast and notify
@@ -688,11 +712,12 @@ export async function startStaffTravel(complaintId: string): Promise<boolean> {
 
 export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: string): Promise<boolean> {
   const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
   // 1. Try Express backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -703,6 +728,9 @@ export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: s
         ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {})
       })
     });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
   } catch (apiErr) {
     console.warn('Backend startStaffWork API note:', apiErr);
   }
@@ -721,8 +749,15 @@ export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: s
       } else {
         supaQuery = supaQuery.eq('complaint_number', targetIdStr);
       }
-      await supaQuery;
-    } catch (e) {}
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase startStaffWork note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to commence work for task ${targetIdStr}.`);
   }
 
   // 3. Broadcast and notify
@@ -903,23 +938,89 @@ export async function submitStaffResolution(
   return true;
 }
 
+export async function addStaffTaskProgressNote(complaintId: string | number, note: string): Promise<boolean> {
+  const token = localStorage.getItem('nagarsetu_token');
+  const targetIdStr = String(complaintId).replace(/^CMP-/, '');
+  const url = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/progress`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ note: note.trim() })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || 'Failed to record progress note in database');
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error('addStaffTaskProgressNote error:', err);
+    throw err;
+  }
+}
+
 export async function reviewResolutionAdmin(
   complaintId: string,
   approve: boolean,
   rejectionReason?: string
 ): Promise<boolean> {
   const newStatus = approve ? 'Resolved' : 'Reopened';
+  let dbWriteVerified = false;
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        status: newStatus,
+        verified_by_name: 'City Administration',
+        ...(rejectionReason ? { rework_reason: rejectionReason, reason: rejectionReason } : {})
+      })
+    });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
+  } catch (apiErr) {
+    console.warn('Backend reviewResolutionAdmin error:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      let supaQuery = supabase
         .from('complaints')
         .update({
           status: newStatus,
-          ...(rejectionReason ? { admin_rejection_reason: rejectionReason } : {}),
+          ...(rejectionReason ? { admin_rejection_reason: rejectionReason, rework_reason: rejectionReason } : {}),
           updated_at: new Date().toISOString()
-        })
-        .eq('id', complaintId);
-    } catch (e) {}
+        });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', complaintId);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', complaintId);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase reviewResolutionAdmin error:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to update complaint status to ${newStatus}. Please check server connectivity.`);
   }
 
   // Broadcast and notify
@@ -985,13 +1086,69 @@ export async function submitComplaintFeedback(complaintId: string, rating: numbe
 }
 
 export async function reopenComplaint(complaintId: string, reason: string): Promise<boolean> {
+  let dbWriteVerified = false;
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/reopen`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ reason })
+    });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    } else {
+      // Fallback to department verify if available
+      const deptRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          complaint_id: complaintId,
+          status: 'Reopened',
+          rework_reason: reason
+        })
+      });
+      if (deptRes.ok) {
+        dbWriteVerified = true;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Backend reopenComplaint error:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      let supaQuery = supabase
         .from('complaints')
-        .update({ status: 'Reopened', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
-    } catch (e) {}
+        .update({
+          status: 'Reopened',
+          rework_reason: reason,
+          admin_rejection_reason: reason,
+          updated_at: new Date().toISOString()
+        });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', complaintId);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', complaintId);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase reopenComplaint error:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error('Failed to reopen complaint: Server rejected status update.');
   }
 
   pushNotification({

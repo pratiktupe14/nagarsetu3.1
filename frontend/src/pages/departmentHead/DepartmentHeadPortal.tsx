@@ -261,7 +261,7 @@ const formatRelativeTimestamp = (isoDateString: string) => {
 };
 
 export const DepartmentHeadPortal: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile, changePassword } = useAuth();
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
   const { toast, showRichFeedback } = useNotification();
   const location = useLocation();
@@ -280,7 +280,8 @@ export const DepartmentHeadPortal: React.FC = () => {
   const isStaffDetailView = currentPath.startsWith('/department-head/staff/');
   const isMapView = currentPath === '/department-head/map' || currentPath === '/department/map';
   const isNotifView = currentPath === '/department-head/notifications';
-  const isProfileView = currentPath === '/department-head/profile';
+  const isSettingsView = currentPath === '/department-head/settings';
+  const isProfileView = currentPath === '/department-head/profile' || isSettingsView;
 
   // Map Controls State
   const [mapCenter, setMapCenter] = useState<[number, number] | null>([20.0059, 73.7898]);
@@ -595,7 +596,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
-  // Profile Update Handler (Real Supabase + Local Storage Update)
+  // Profile Update Handler (Authoritative PostgreSQL Database Update via Express API)
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
       toast.warning('Full Name cannot be empty.');
@@ -606,19 +607,16 @@ export const DepartmentHeadPortal: React.FC = () => {
     setProfileSuccessMsg(null);
 
     try {
-      if (isSupabaseConfigured() && user?.id) {
-        await supabase.from('profiles').update({
+      if (updateUserProfile) {
+        await updateUserProfile({
           full_name: editName.trim(),
           mobile: editPhone.trim()
-        }).eq('id', user.id);
+        });
       }
 
-      // Update cached local user
-      const updatedUser = { ...user, full_name: editName.trim(), mobile: editPhone.trim() };
-      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
-
       setIsEditingProfile(false);
-      toast.success('Profile updated successfully.');
+      setProfileSuccessMsg('Profile updated and saved to database successfully.');
+      toast.success('Profile updated and saved to database successfully.');
       await loadData();
     } catch (err: any) {
       console.error('Error updating profile:', err);
@@ -628,11 +626,15 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
-  // Change Password Handler (Supabase Auth)
+  // Change Password Handler (Authoritative PostgreSQL Database Update via Express API)
   const handleExecuteChangePassword = async () => {
     setPasswordError(null);
     setPasswordSuccess(null);
 
+    if (!currentPassword) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
       setPasswordError('New password must be at least 6 characters long.');
       return;
@@ -644,12 +646,11 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     setChangingPassword(true);
     try {
-      if (isSupabaseConfigured()) {
-        const { error: authErr } = await supabase.auth.updateUser({ password: newPassword });
-        if (authErr) throw authErr;
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
       }
 
-      setPasswordSuccess('Password updated successfully.');
+      setPasswordSuccess('Password updated and verified in database successfully.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -659,7 +660,7 @@ export const DepartmentHeadPortal: React.FC = () => {
       }, 2000);
     } catch (err: any) {
       console.error(err);
-      setPasswordError(err.message || 'Failed to update password.');
+      setPasswordError(err.message || 'Failed to update password. Please check your current password.');
     } finally {
       setChangingPassword(false);
     }
@@ -1027,7 +1028,7 @@ export const DepartmentHeadPortal: React.FC = () => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const numMatch = c.complaint_number.toLowerCase().includes(q);
-        const taskIdMatch = `task-${c.id.slice(0, 6)}`.includes(q);
+        const taskIdMatch = `task-${String(c.id).slice(0, 6)}`.includes(q);
         const titleMatch = c.title.toLowerCase().includes(q);
         const catMatch = c.category.toLowerCase().includes(q);
         const locMatch = (c.location_address || '').toLowerCase().includes(q);
@@ -1101,7 +1102,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'SLA Due Date'];
     const rows = targetList.map((c) => [
-      `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
+      `"TASK-${String(c.id).slice(0, 6).toUpperCase()}"`,
       `"${c.complaint_number}"`,
       `"${(c.title || '').replace(/"/g, '""')}"`,
       `"${(c.category || '').replace(/"/g, '""')}"`,
@@ -1502,7 +1503,7 @@ export const DepartmentHeadPortal: React.FC = () => {
           <div className="space-y-6">
 
             {/* 5 NOTIFICATION SUMMARY CARDS (REAL SUPABASE DATA) */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Notifications</span>
                 <span className="text-2xl font-extrabold text-gray-900 font-mono block">{notifMetrics.total}</span>
@@ -3509,7 +3510,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-gray-900 font-outfit">{stf.name}</span>
-                          <span className="text-[10px] font-mono text-gray-500">({stf.employee_id || stf.id.slice(0, 8)})</span>
+                          <span className="text-[10px] font-mono text-gray-500">({stf.employee_id || String(stf.id).slice(0, 8)})</span>
                           <span className={`text-[9px] px-1.5 py-0.2 rounded border ${wlBadge}`}>{wlStatus}</span>
                         </div>
                         <span className="font-mono text-xs font-extrabold text-gray-900">{activeCount} Tasks</span>
@@ -3594,7 +3595,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-4 font-mono text-gray-600 font-bold">{stf.employee_id || `STF-${stf.id.slice(0, 6)}`}</td>
+                            <td className="py-3 px-4 font-mono text-gray-600 font-bold">{stf.employee_id || `STF-${String(stf.id).slice(0, 6)}`}</td>
                             <td className="py-3 px-4">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
                                 stf.status === 'Available' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
@@ -4530,6 +4531,17 @@ export const DepartmentHeadPortal: React.FC = () => {
               )}
 
               <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Current Password *</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password..."
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">New Password *</label>
                   <input

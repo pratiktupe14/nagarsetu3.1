@@ -15,6 +15,9 @@ interface AuthContextType {
   registerCitizen: (fullName: string, mobile: string, email: string, password?: string) => Promise<boolean>;
   switchRole: (role: UserRole) => void;
   logout: () => Promise<void>;
+  updateUserProfile: (data: Partial<UserProfile>) => Promise<UserProfile>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  refreshSession: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -705,7 +708,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (dhRow) {
           const dhUser: UserProfile = {
-            id: dhRow.user_id || `dh-${dhRow.id.slice(0, 8)}`,
+            id: dhRow.user_id || `dh-${String(dhRow.id).slice(0, 8)}`,
             full_name: dhRow.name,
             email: cleanEmail,
             mobile: dhRow.phone || '',
@@ -880,6 +883,114 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  const updateUserProfile = async (payload: Partial<UserProfile>): Promise<UserProfile> => {
+    try {
+      const token = localStorage.getItem('nagarsetu_token');
+      const response = await fetch(`${getApiUrl()}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: payload.full_name || payload.name,
+          mobile: payload.mobile,
+          email: payload.email,
+          language_pref: payload.language_pref,
+          address: payload.address
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to update profile');
+      }
+
+      const resData = await response.json();
+      const updatedUser: UserProfile = {
+        ...(user || ({} as UserProfile)),
+        ...resData.user,
+        full_name: resData.user?.name || resData.user?.full_name || payload.full_name || payload.name || user?.full_name || '',
+        name: resData.user?.name || resData.user?.full_name || payload.name || payload.full_name || user?.name || ''
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+
+      if (isSupabaseConfigured() && user?.id) {
+        try {
+          await supabase.from('profiles').update({
+            full_name: updatedUser.full_name,
+            mobile: updatedUser.mobile,
+            email: updatedUser.email,
+            language_pref: updatedUser.language_pref
+          }).eq('id', user.id);
+        } catch (sErr) {
+          console.warn('[SUPABASE_PROFILE_SYNC_NOTE]:', sErr);
+        }
+      }
+
+      return updatedUser;
+    } catch (err: any) {
+      console.error('updateUserProfile error:', err);
+      throw err;
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    const token = localStorage.getItem('nagarsetu_token');
+    const response = await fetch(`${getApiUrl()}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || 'Failed to update password');
+    }
+  };
+
+  const refreshSession = async (): Promise<UserProfile | null> => {
+    try {
+      const token = localStorage.getItem('nagarsetu_token');
+      if (!token) return user;
+
+      const response = await fetch(`${getApiUrl()}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) return user;
+
+      const resData = await response.json();
+      if (resData.token) {
+        localStorage.setItem('nagarsetu_token', resData.token);
+      }
+      if (resData.user) {
+        const refreshed: UserProfile = {
+          ...(user || ({} as UserProfile)),
+          ...resData.user,
+          full_name: resData.user.name || resData.user.full_name || user?.full_name || '',
+          name: resData.user.name || resData.user.full_name || user?.name || ''
+        };
+        setUser(refreshed);
+        localStorage.setItem('nagarsetu_user', JSON.stringify(refreshed));
+        return refreshed;
+      }
+      return user;
+    } catch (e) {
+      console.warn('refreshSession error:', e);
+      return user;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col justify-center items-center p-6 text-center space-y-4">
@@ -910,7 +1021,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loginWithOtp,
         registerCitizen,
         switchRole,
-        logout
+        logout,
+        updateUserProfile,
+        changePassword,
+        refreshSession
       }}
     >
       {children}

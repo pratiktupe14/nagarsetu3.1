@@ -594,7 +594,7 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
-      safeAddColumn('users', 'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+      safeAddColumn('users', 'updated_at DATETIME');
       safeAddColumn('field_staff', 'user_id INTEGER');
       safeAddColumn('field_staff', 'department_id INTEGER');
       safeAddColumn('field_staff', 'status TEXT DEFAULT "active"');

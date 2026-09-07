@@ -79,6 +79,7 @@ export interface AIVisionResult {
 export interface UserProfile {
   id: string;
   full_name: string;
+  name?: string;
   mobile?: string;
   email: string;
   role: UserRole;

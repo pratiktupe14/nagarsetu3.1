@@ -541,6 +541,50 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
+
+// Reopen a complaint (Citizen owner or Admin)
+router.post('/:id/reopen', authenticateToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const targetId = req.params.id;
+
+    const checkSql = `SELECT id, complaint_number, citizen_id, status FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`;
+    const checkRes = await query(checkSql, [targetId, targetId, targetId]);
+
+    if (!checkRes.rows || checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = checkRes.rows[0];
+    if (req.user && req.user.role === 'citizen') {
+      const citizenProfileId = await resolveCitizenProfileId(req.user);
+      const isOwner = (citizenProfileId && String(complaint.citizen_id) === String(citizenProfileId)) ||
+                      String(complaint.citizen_id) === String(req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied: You can only reopen your own complaints.' });
+      }
+    }
+
+    const reworkReason = reason || 'Citizen reopened the issue';
+    await query(
+      `UPDATE complaints SET status = 'Reopened', rework_reason = ?, admin_rejection_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [reworkReason, reworkReason, complaint.id]
+    );
+
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+      [complaint.id, 'Reopened', reworkReason, 'Citizen Request', req.user.name || 'Citizen']
+    ).catch(() => {});
+
+    await notifyStatusChange(complaint.id, 'Reopened', complaint.citizen_id).catch(() => {});
+
+    return res.json({ success: true, message: 'Complaint reopened successfully' });
+  } catch (err) {
+    console.error('Reopen complaint error:', err);
+    return res.status(500).json({ error: 'Failed to reopen complaint' });
+  }
+});
+
 // Purge/remove all complaints and associated records (Admin Only)
 router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
   try {

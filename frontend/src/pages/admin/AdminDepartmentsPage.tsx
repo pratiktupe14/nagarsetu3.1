@@ -5,6 +5,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getMunicipalDepartments, saveOrUpdateMunicipalDepartment,
+  saveMunicipalDepartmentApi, deleteMunicipalDepartmentApi,
   getDepartmentStaffRoster, formatSlaRemainingTime, MunicipalDepartmentRecord
 } from '../../services/adminService';
 import { Complaint } from '../../types/database.types';
@@ -388,17 +389,19 @@ export const AdminDepartmentsPage: React.FC = () => {
 
     setSubmittingForm(true);
     try {
-      const saved = saveOrUpdateMunicipalDepartment({
+      const saved = await saveMunicipalDepartmentApi({
         id: editingDept?.id,
         ...formData
       });
 
-      setToastMessage(editingDept ? `Department '${saved.name}' updated successfully.` : `New Department '${saved.name}' created.`);
+      setToastMessage(editingDept ? `Department '${saved.name}' updated in database.` : `New Department '${saved.name}' created in database.`);
       setShowAddEditModal(false);
-      loadData();
+      await loadData();
       setTimeout(() => setToastMessage(null), 4000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setToastMessage(`Error: ${e.message || 'Failed to save department'}`);
+      setTimeout(() => setToastMessage(null), 5000);
     } finally {
       setSubmittingForm(false);
     }

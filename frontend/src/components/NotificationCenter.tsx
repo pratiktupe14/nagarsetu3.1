@@ -80,10 +80,13 @@ export const NotificationCenter: React.FC = () => {
     setIsOpen(false);
     if (!complaintId) return;
 
-    if (role === 'city_admin') {
+    const roleStr = String(role);
+    if (roleStr === 'city_admin' || roleStr === 'admin') {
       navigate('/admin/portal');
-    } else if (role === 'service_staff') {
-      navigate('/staff/portal');
+    } else if (roleStr === 'department_head') {
+      navigate(`/department-head/complaints?id=${complaintId}`);
+    } else if (roleStr === 'service_staff' || roleStr === 'staff') {
+      navigate('/staff/tasks');
     } else {
       navigate(`/citizen/complaint/${complaintId}`);
     }

@@ -7,7 +7,7 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
-import { getStaffTasks, submitStaffResolution } from '../../services/complaintService';
+import { getStaffTasks, submitStaffResolution, addStaffTaskProgressNote } from '../../services/complaintService';
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import { formatSlaRemainingTime, logActivity } from '../../services/adminService';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
@@ -88,7 +88,7 @@ export const StaffInProgressTasksPage: React.FC = () => {
   const { toast } = useNotification();
 
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -252,6 +252,7 @@ export const StaffInProgressTasksPage: React.FC = () => {
 
     setSubmittingProgressNote(true);
     try {
+      await addStaffTaskProgressNote(selectedTask.id, progressNote.trim());
       logActivity(
         selectedTask.id,
         staffName,
@@ -260,11 +261,12 @@ export const StaffInProgressTasksPage: React.FC = () => {
         selectedTask.status,
         progressNote.trim()
       );
+      toast.success('Progress note recorded to database successfully.');
       setProgressNote('');
       await loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Unable to add progress note.');
+      toast.error(err.message || 'Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }

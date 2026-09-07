@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const StaffSettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, updateUserProfile } = useAuth();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -20,7 +20,7 @@ export const StaffSettingsPage: React.FC = () => {
   >('profile');
 
   // Dynamic Staff Identity & Department
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
     [user?.department_id, user?.department_name]
@@ -82,13 +82,22 @@ export const StaffSettingsPage: React.FC = () => {
   };
 
   // Handle Profile Save
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!updateUserProfile) return;
     setSaving(true);
-    setTimeout(() => {
+    try {
+      await updateUserProfile({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        mobile: mobile.trim()
+      });
+      showSaveToast('Profile settings saved to database successfully.');
+    } catch (err: any) {
+      showSaveToast(`Error: ${err.message || 'Failed to save profile'}`);
+    } finally {
       setSaving(false);
-      showSaveToast('Profile settings saved successfully.');
-    }, 400);
+    }
   };
 
   // Handle Notification Preferences Save
@@ -119,7 +128,7 @@ export const StaffSettingsPage: React.FC = () => {
   };
 
   // Handle Password Update
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(null);
@@ -138,14 +147,20 @@ export const StaffSettingsPage: React.FC = () => {
     }
 
     setUpdatingPassword(true);
-    setTimeout(() => {
-      setUpdatingPassword(false);
-      setPasswordSuccess('Password updated successfully.');
+    try {
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
+      }
+      setPasswordSuccess('Password updated successfully in database.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       showSaveToast('Account security password updated.');
-    }, 600);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password. Verify your current password.');
+    } finally {
+      setUpdatingPassword(false);
+    }
   };
 
   // Handle Logout Execution
