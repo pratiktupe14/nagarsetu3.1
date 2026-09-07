@@ -129,7 +129,21 @@ async function resolveCitizenProfileId(user) {
     console.warn('[RESOLVE CITIZEN PROFILE ERROR]:', pErr.message);
   }
 
-  return null;
+  // 4. Auto-create/sync a profile in profiles table for referential integrity
+  try {
+    const crypto = require('crypto');
+    const newUuid = (crypto.randomUUID && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : '00000000-0000-4000-8000-' + crypto.randomBytes(6).toString('hex');
+    await query(
+      `INSERT INTO profiles (id, full_name, mobile, email, role, language_pref, status) VALUES (?, ?, ?, ?, 'citizen', 'en', 'active')`,
+      [newUuid, dbUser.name || 'Citizen User', rawMobile || cleanMobile, cleanEmail]
+    );
+    return newUuid;
+  } catch (cErr) {
+    // Fallback directly to user.id
+    return String(user.id);
+  }
 }
 
 async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
