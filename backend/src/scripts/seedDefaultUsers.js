@@ -64,6 +64,22 @@ async function seedDefaultUsers(query) {
       const newId = insRes.rows[0].id;
       console.log(`Citizen demo account (8788562103) created with DB User ID: ${newId}`);
     }
+
+    // Ensure corresponding profile record exists in profiles table for UUID referential integrity
+    try {
+      const crypto = require('crypto');
+      const pCheck = await query(`SELECT id FROM profiles WHERE mobile = '8788562103' OR LOWER(email) = ? LIMIT 1`, [citizenEmail]);
+      if (!pCheck.rows || pCheck.rows.length === 0) {
+        const citizenProfileUuid = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
+        await query(
+          `INSERT INTO profiles (id, full_name, mobile, email, role, language_pref, status) VALUES (?, ?, ?, ?, 'citizen', 'en', 'active')`,
+          [citizenProfileUuid, 'Pratik Dilip Tupe', '8788562103', citizenEmail]
+        );
+        console.log('Citizen demo profile created in profiles table for Pratik Dilip Tupe:', citizenProfileUuid);
+      }
+    } catch (pErr) {
+      console.warn('[SEED PROFILE WARN]:', pErr.message);
+    }
   } catch (err) {
     console.error('Error seeding default users:', err);
   }

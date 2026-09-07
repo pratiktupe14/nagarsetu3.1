@@ -79,6 +79,59 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
   }
 });
 
+async function resolveCitizenProfileId(user) {
+  if (!user) return null;
+
+  // 1. Direct UUID check if user.id is already a UUID
+  const idStr = String(user.id || '').trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
+  if (isUuid) {
+    try {
+      const directCheck = await query(`SELECT id FROM profiles WHERE id = ? LIMIT 1`, [idStr]);
+      if (directCheck.rows && directCheck.rows.length > 0) {
+        return directCheck.rows[0].id;
+      }
+    } catch (e) {}
+  }
+
+  // 2. Fetch authoritative user record from users table to get verified mobile and email
+  let dbUser = user;
+  try {
+    const userRes = await query(`SELECT id, name, mobile, email, role FROM users WHERE id = ? LIMIT 1`, [user.id]);
+    if (userRes.rows && userRes.rows.length > 0) {
+      dbUser = userRes.rows[0];
+    }
+  } catch (uErr) {}
+
+  const rawMobile = String(dbUser.mobile || user.mobile || '').trim();
+  const digitsOnly = rawMobile.replace(/\D/g, '');
+  const cleanMobile = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+  const cleanEmail = String(dbUser.email || user.email || '').trim().toLowerCase();
+
+  // 3. Resolve profile UUID via existing mobile or email relationship
+  try {
+    const profileRes = await query(
+      `SELECT id FROM profiles 
+       WHERE (
+         (mobile IS NOT NULL AND mobile != '' AND (
+           mobile = ? OR mobile = ? OR mobile LIKE ? OR REPLACE(mobile, ' ', '') LIKE ?
+         ))
+         OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)
+       )
+       ORDER BY created_at DESC LIMIT 1`,
+      [rawMobile, cleanMobile, `%${cleanMobile}%`, `%${cleanMobile}%`, cleanEmail || '']
+    );
+
+    if (profileRes.rows && profileRes.rows.length > 0) {
+      return profileRes.rows[0].id;
+    }
+  } catch (pErr) {
+    console.warn('[RESOLVE CITIZEN PROFILE ERROR]:', pErr.message);
+  }
+
+  return null;
+}
+
 async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
   // Authoritative taxonomy lookup using normalized category
   const normalizedCategory = normalizeCategory(categoryInput || titleInput);
@@ -105,25 +158,40 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
   if (inputStr) {
     const numericId = parseInt(inputStr, 10);
     if (!isNaN(numericId) && numericId > 0) {
-      const idRes = await query(`SELECT id FROM departments WHERE id = ? LIMIT 1`, [numericId]);
+      const idRes = await query(`SELECT id FROM departments WHERE CAST(id AS TEXT) = ? LIMIT 1`, [String(numericId)]);
       if (idRes.rows && idRes.rows.length > 0) {
         return idRes.rows[0].id;
       }
     }
-    const flexRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) OR UPPER(name) LIKE UPPER(?) LIMIT 1`, [inputStr, `%${inputStr}%`]);
+    const flexRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) OR UPPER(name) LIKE UPPER(?) OR CAST(id AS TEXT) = ? LIMIT 1`, [inputStr, `%${inputStr}%`, inputStr]);
     if (flexRes.rows && flexRes.rows.length > 0) {
       return flexRes.rows[0].id;
     }
   }
 
-  // Fallback to PWD (id 1) if database has entries
-  const defaultRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
-  return defaultRes.rows?.[0]?.id || 1;
+  // Fallback to PWD if database has entries
+  const defaultRes = await query(`SELECT id FROM departments WHERE code = 'PWD' OR UPPER(name) LIKE '%PUBLIC WORKS%' ORDER BY id ASC LIMIT 1`);
+  if (defaultRes.rows && defaultRes.rows.length > 0) {
+    return defaultRes.rows[0].id;
+  }
+  const anyDept = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
+  return anyDept.rows?.[0]?.id || 1;
 }
 
 // Step 2: Final Complaint Submission
 router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
+    // 1. Authenticate user
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // 2. Resolve profile UUID for authenticated user
+    const citizenProfileId = await resolveCitizenProfileId(req.user);
+    if (!citizenProfileId) {
+      return res.status(404).json({ error: 'Citizen profile not found' });
+    }
+
     const {
       complaint_number,
       photo_url,
@@ -153,7 +221,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     const finalDeptId = await resolveDepartmentId(department_id, normalizedCategory, title);
 
     if (!finalDeptId) {
-      return res.status(400).json({ error: 'Validation Error: Unable to resolve a valid municipal department for this complaint.' });
+      return res.status(400).json({ error: 'Invalid complaint data: Unable to resolve a valid municipal department.' });
     }
 
     const confidenceVal = typeof ai_confidence === 'number' ? ai_confidence : 0.90;
@@ -172,7 +240,7 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     const result = await query(insertSql, [
       finalComplaintNumber,
-      req.user.id,
+      citizenProfileId,
       photo_url || '',
       normalizedCategory,
       title || `${normalizedCategory} Defect`,
@@ -180,8 +248,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       priority,
       initialStatus,
       finalDeptId,
-      latitude,
-      longitude,
+      typeof latitude === 'number' ? latitude : (parseFloat(latitude) || 0),
+      typeof longitude === 'number' ? longitude : (parseFloat(longitude) || 0),
       location_source || 'manual_pin',
       location_address || '',
       duplicate_of_id || null,
@@ -198,14 +266,23 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     const complaintId = result.rows[0].id;
 
+    // 6. Read the inserted complaint back from PostgreSQL to verify authoritative persistence
+    const readBackRes = await query(
+      `SELECT c.*, d.name as department_name, d.code as department_code 
+       FROM complaints c 
+       LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(c.department_id AS TEXT)
+       WHERE CAST(c.id AS TEXT) = ? OR c.complaint_number = ? LIMIT 1`,
+      [String(complaintId), String(finalComplaintNumber)]
+    );
+
+    const persistedComplaint = readBackRes.rows && readBackRes.rows.length > 0 ? readBackRes.rows[0] : null;
+    if (!persistedComplaint) {
+      console.error(`Read-back verification failed: Complaint #${complaintId} (${finalComplaintNumber}) was not found in storage.`);
+      return res.status(500).json({ error: 'Unable to save complaint to the database' });
+    }
+
     // Fetch department name for status history
-    let deptName = 'Municipal Triage Queue';
-    try {
-      const deptNameRes = await query(`SELECT name FROM departments WHERE id = ?`, [finalDeptId]);
-      if (deptNameRes.rows && deptNameRes.rows.length > 0) {
-        deptName = deptNameRes.rows[0].name;
-      }
-    } catch (dErr) {}
+    const deptName = persistedComplaint.department_name || 'Municipal Triage Queue';
 
     // Record initial status history
     try {
@@ -215,37 +292,49 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaintId, initialStatus, remarkText, deptName, 'NAGARSETU AI Router']
+        [String(persistedComplaint.id), initialStatus, remarkText, deptName, 'NAGARSETU AI Router']
       );
     } catch (hErr) {
       console.warn('Failed to record initial status history:', hErr.message);
     }
 
     // Send initial submission notification
-    await notifyStatusChange(complaintId, initialStatus, req.user.id);
+    await notifyStatusChange(persistedComplaint.id, initialStatus, citizenProfileId).catch(nErr => console.warn('Notification notice:', nErr.message));
 
     return res.status(201).json({
       success: true,
       message: 'Complaint submitted successfully',
-      complaint_id: complaintId,
+      complaint_id: persistedComplaint.id,
       complaint: {
-        id: complaintId,
-        complaint_number: finalComplaintNumber,
-        category: normalizedCategory,
-        specific_issue: ai_specific_issue || normalizeSpecificIssue(null, normalizedCategory),
-        urgency: ai_urgency || priority,
-        confidence: confidenceVal,
+        id: persistedComplaint.id,
+        complaint_number: persistedComplaint.complaint_number,
+        citizen_id: persistedComplaint.citizen_id,
+        category: persistedComplaint.category,
+        title: persistedComplaint.title,
+        description: persistedComplaint.description,
+        priority: persistedComplaint.priority,
+        latitude: persistedComplaint.latitude,
+        longitude: persistedComplaint.longitude,
+        location_address: persistedComplaint.location_address,
+        photo_before_url: persistedComplaint.photo_before_url,
+        specific_issue: persistedComplaint.ai_specific_issue || normalizeSpecificIssue(null, persistedComplaint.category),
+        urgency: persistedComplaint.ai_urgency || persistedComplaint.priority,
+        confidence: persistedComplaint.ai_confidence || confidenceVal,
         department: {
-          id: finalDeptId,
+          id: persistedComplaint.department_id,
           name: deptName
         },
-        status: initialStatus,
-        needs_manual_verification: isLowConfidence
+        status: persistedComplaint.status,
+        needs_manual_verification: isLowConfidence,
+        created_at: persistedComplaint.created_at
       }
     });
   } catch (err) {
-    console.error('Submit complaint error:', err);
-    return res.status(500).json({ error: 'Failed to submit complaint' });
+    console.error('Submit complaint database error:', err);
+    return res.status(500).json({
+      error: 'Unable to save complaint to the database',
+      details: err.message || 'Database error occurred during submission'
+    });
   }
 });
 
@@ -296,8 +385,9 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
 
     // Server-side Data Isolation based on Role
     if (authUser && authUser.role === 'citizen') {
-      sql += ` AND (CAST(c.citizen_id AS TEXT) = ?)`;
-      params.push(String(authUser.id));
+      const citizenProfileId = await resolveCitizenProfileId(authUser);
+      sql += ` AND (CAST(c.citizen_id AS TEXT) = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
+      params.push(String(citizenProfileId || ''), String(authUser.id));
     } else if (authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
@@ -349,15 +439,16 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
 // Get user's complaint history
 router.get('/my', authenticateToken, async (req, res) => {
   try {
+    const citizenProfileId = await resolveCitizenProfileId(req.user);
     const sql = `
       SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
       FROM complaints c
       ${DEPT_JOIN_SQL}
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
-      WHERE CAST(c.citizen_id AS TEXT) = ?
+      WHERE CAST(c.citizen_id AS TEXT) = ? OR CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [String(req.user.id)]);
+    const result = await query(sql, [String(citizenProfileId || ''), String(req.user.id)]);
     return res.json({ complaints: result.rows });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
@@ -370,11 +461,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const sql = `
       SELECT c.*, d.name as department_name, d.code as department_code,
-             u.name as citizen_name, u.mobile as citizen_mobile,
+             COALESCE(p.full_name, u.name) as citizen_name,
+             COALESCE(p.mobile, u.mobile) as citizen_mobile,
              f.rating, f.comment as feedback_comment, f.created_at as feedback_created_at
-      FROM complaints c
+         FROM complaints c
       ${DEPT_JOIN_SQL}
-      LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT)
+      LEFT JOIN profiles p ON CAST(c.citizen_id AS TEXT) = CAST(p.id AS TEXT)
+      LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT) OR (p.mobile IS NOT NULL AND u.mobile = p.mobile)
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE CAST(c.id AS TEXT) = ? OR c.complaint_number = ?
     `;
@@ -387,8 +480,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // IDOR Authorization Guard: Citizens can ONLY view their own complaints
     if (req.user && req.user.role === 'citizen') {
-      if (String(complaint.citizen_id) !== String(req.user.id)) {
-        return res.status(403).json({ error: 'Access denied: You are not authorized to view this complaint.' });
+      const citizenProfileId = await resolveCitizenProfileId(req.user);
+      const isOwner = (citizenProfileId && String(complaint.citizen_id) === String(citizenProfileId)) ||
+                      String(complaint.citizen_id) === String(req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Citizen access denied: You are not authorized to view this complaint.' });
       }
     }
 
@@ -424,8 +520,13 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     }
 
     const complaint = checkRes.rows[0];
-    if (req.user && req.user.role === 'citizen' && String(complaint.citizen_id) !== String(req.user.id)) {
-      return res.status(403).json({ error: 'Access denied: You are not authorized to submit feedback for this complaint.' });
+    if (req.user && req.user.role === 'citizen') {
+      const citizenProfileId = await resolveCitizenProfileId(req.user);
+      const isOwner = (citizenProfileId && String(complaint.citizen_id) === String(citizenProfileId)) ||
+                      String(complaint.citizen_id) === String(req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Citizen access denied: You are not authorized to submit feedback for this complaint.' });
+      }
     }
 
     const insertSql = `

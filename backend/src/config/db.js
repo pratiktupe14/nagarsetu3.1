@@ -173,6 +173,21 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 1b. Profiles table (for UUID referential integrity)
+    await safeCreateTable(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name TEXT,
+        mobile TEXT,
+        email TEXT,
+        role TEXT DEFAULT 'citizen',
+        language_pref TEXT DEFAULT 'en',
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 2. Users table (department_id is TEXT without rigid FK to support both UUID & integer schemas)
     await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS users (
@@ -615,6 +630,20 @@ function createTablesSqlite() {
           name TEXT NOT NULL,
           code TEXT,
           description TEXT
+        );
+      `);
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS profiles (
+          id TEXT PRIMARY KEY,
+          full_name TEXT,
+          mobile TEXT,
+          email TEXT,
+          role TEXT DEFAULT 'citizen',
+          language_pref TEXT DEFAULT 'en',
+          status TEXT DEFAULT 'active',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
 

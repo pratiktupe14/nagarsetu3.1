@@ -153,10 +153,51 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
     }
   }
 
-  // Persistent Base64 Data URL fallback to prevent temporary blob expiration across reloads
+  // Optimize & Compress client-side to prevent Vercel 4.5MB serverless request limit violations
   return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(URL.createObjectURL(file));
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.75);
+            resolve(compressed);
+            return;
+          }
+        } catch (canvasErr) {
+          console.warn('Canvas image compression note:', canvasErr);
+        }
+        resolve(e.target?.result as string);
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
     reader.onerror = () => resolve(URL.createObjectURL(file));
     reader.readAsDataURL(file);
   });
@@ -500,7 +541,10 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        const msg = errData.error || errData.message || (errData.details ? errData.details.join(', ') : '') || `Failed to submit complaint to backend service (HTTP ${res.status})`;
+        if (res.status === 401) {
+          throw new AuthError('Session expired. Please sign in again.');
+        }
+        const msg = errData.error || errData.message || (errData.details ? errData.details.join(', ') : '') || `Failed to submit complaint (HTTP ${res.status})`;
         throw new HttpError(res.status, msg, errData);
       }
     } else {

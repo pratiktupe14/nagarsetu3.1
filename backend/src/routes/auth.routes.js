@@ -46,6 +46,24 @@ router.post('/register', validateInput(registerSchema), async (req, res) => {
     const userObj = { id: newUserId, name: name.trim(), mobile: cleanMobile, email: cleanEmail, role, language_pref };
     const token = generateToken(userObj);
 
+    // Create corresponding profile record for UUID referential integrity
+    try {
+      const crypto = require('crypto');
+      const pCheck = await query(
+        `SELECT id FROM profiles WHERE (mobile IS NOT NULL AND mobile = ?) OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?) LIMIT 1`,
+        [cleanMobile, cleanEmail || '']
+      );
+      if (!pCheck.rows || pCheck.rows.length === 0) {
+        const newProfileUuid = crypto.randomUUID();
+        await query(
+          `INSERT INTO profiles (id, full_name, mobile, email, role, language_pref, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`,
+          [newProfileUuid, name.trim(), cleanMobile, cleanEmail, role, language_pref]
+        );
+      }
+    } catch (pErr) {
+      console.warn('[REGISTRATION PROFILE SYNC NOTE]:', pErr.message);
+    }
+
     if (res.clearAuthAttempts) res.clearAuthAttempts();
 
     return res.status(201).json({

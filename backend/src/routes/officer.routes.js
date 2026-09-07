@@ -16,11 +16,14 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
     const { department_id, priority, status, search } = req.query;
 
     let sql = `
-      SELECT c.*, d.name as department_name, u.name as citizen_name, u.mobile as citizen_mobile
-      FROM complaints c
-      LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR c.department_id = d.code)
-      LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT)
-      WHERE 1=1
+      SELECT c.*, d.name as department_name,
+             COALESCE(p.full_name, u.name) as citizen_name,
+             COALESCE(p.mobile, u.mobile) as citizen_mobile
+       FROM complaints c
+       LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR c.department_id = d.code)
+       LEFT JOIN profiles p ON CAST(c.citizen_id AS TEXT) = CAST(p.id AS TEXT)
+       LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT) OR (p.mobile IS NOT NULL AND u.mobile = p.mobile)
+       WHERE 1=1
     `;
     const params = [];
 

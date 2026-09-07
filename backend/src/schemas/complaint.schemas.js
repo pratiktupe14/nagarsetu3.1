@@ -8,12 +8,13 @@ const createComplaintSchema = {
     title: Joi.string().min(3).max(200).required(),
     description: Joi.string().max(2000).allow('', null).optional(),
     priority: Joi.string().valid('Low', 'Medium', 'High', 'Critical').default('Medium'),
+    department: Joi.string().max(100).allow('', null).optional(),
     department_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
-    latitude: Joi.number().min(-90).max(90).required(),
-    longitude: Joi.number().min(-180).max(180).required(),
+    latitude: Joi.number().min(-90).max(90).allow(null).optional().default(0),
+    longitude: Joi.number().min(-180).max(180).allow(null).optional().default(0),
     location_source: Joi.string().allow('', null).optional(),
     location_address: Joi.string().max(500).allow('', null).optional(),
-    duplicate_of_id: Joi.number().integer().positive().allow(null).optional(),
+    duplicate_of_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow(null).optional(),
     ai_category: Joi.string().max(150).allow('', null).optional(),
     ai_specific_issue: Joi.string().max(150).allow('', null).optional(),
     ai_confidence: Joi.number().min(0).max(1).allow(null).optional(),
@@ -48,7 +49,7 @@ const updateStatusSchema = {
     department: Joi.string().max(150).allow('', null).optional()
   }),
   params: Joi.object({
-    id: Joi.number().integer().positive().required()
+    id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).required()
   })
 };
 
