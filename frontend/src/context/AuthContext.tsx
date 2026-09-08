@@ -755,7 +755,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               name: fullName.trim(),
               mobile: mobile.trim(),
               email: email && email.trim() !== '' ? email.trim() : undefined,
-              password: password || 'password123',
+              password: password ? password.trim() : undefined,
               role: 'citizen'
             })
           });

@@ -25,7 +25,8 @@ const assignStaffSchema = {
   body: Joi.object({
     complaint_id: idSchema.required(),
     staff_id: idSchema.required(),
-    remark: Joi.string().max(500).allow('', null).optional()
+    remark: Joi.string().max(500).allow('', null).optional(),
+    notes: Joi.string().max(500).allow('', null).optional()
   })
 };
 

@@ -30,10 +30,10 @@ router.get('/analytics', async (req, res) => {
     const totalSql = `SELECT COUNT(*) as total FROM complaints`;
     const totalRes = await query(totalSql);
 
-    const resolvedSql = `SELECT COUNT(*) as resolved FROM complaints WHERE status = 'Resolved'`;
+    const resolvedSql = `SELECT COUNT(*) as resolved FROM complaints WHERE CAST(status AS TEXT) = 'Resolved'`;
     const resolvedRes = await query(resolvedSql);
 
-    const pendingSql = `SELECT COUNT(*) as pending FROM complaints WHERE status IN ('Submitted', 'Verified', 'Assigned', 'In Progress')`;
+    const pendingSql = `SELECT COUNT(*) as pending FROM complaints WHERE CAST(status AS TEXT) IN ('Submitted', 'Verified', 'Assigned', 'In Progress')`;
     const pendingRes = await query(pendingSql);
 
     const categorySql = `SELECT category, COUNT(*) as count FROM complaints GROUP BY category`;
@@ -41,7 +41,7 @@ router.get('/analytics', async (req, res) => {
 
     const deptSql = `
       SELECT d.name as department_name, COUNT(c.id) as total_complaints,
-             SUM(CASE WHEN c.status = 'Resolved' THEN 1 ELSE 0 END) as resolved_count
+             SUM(CASE WHEN CAST(c.status AS TEXT) = 'Resolved' THEN 1 ELSE 0 END) as resolved_count
       FROM departments d
       LEFT JOIN complaints c ON (
         CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
@@ -57,12 +57,16 @@ router.get('/analytics', async (req, res) => {
     `;
     const deptRes = await query(deptSql);
 
+    const totalComplaints = parseInt(totalRes.rows[0]?.total || 0, 10);
+    const resolvedComplaints = parseInt(resolvedRes.rows[0]?.resolved || 0, 10);
+    const pendingComplaints = parseInt(pendingRes.rows[0]?.pending || 0, 10);
+
     return res.json({
       metrics: {
-        total_complaints: totalRes.rows[0].total || 0,
-        resolved_complaints: resolvedRes.rows[0].resolved || 0,
-        pending_complaints: pendingRes.rows[0].pending || 0,
-        resolution_rate: totalRes.rows[0].total > 0 ? Math.round((resolvedRes.rows[0].resolved / totalRes.rows[0].total) * 100) : 0
+        total_complaints: totalComplaints,
+        resolved_complaints: resolvedComplaints,
+        pending_complaints: pendingComplaints,
+        resolution_rate: totalComplaints > 0 ? Math.round((resolvedComplaints / totalComplaints) * 100) : 0
       },
       by_category: categoryRes.rows,
       by_department: deptRes.rows

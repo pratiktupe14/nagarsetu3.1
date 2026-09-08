@@ -233,7 +233,7 @@ router.get('/complaints', authenticateToken, requireRole(['department_head', 'ad
  * GET /api/department/staff
  * Fetch service staff for authenticated Department Head (or all for Admin)
  */
-router.get('/staff', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
     const { userDeptId, userDeptName } = await resolveUserDepartment(req);
     const userRole = req.user.role || 'citizen';
@@ -284,7 +284,15 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
                 AND (CAST(c.status AS TEXT) = 'Overdue' OR (CAST(c.status AS TEXT) NOT IN ('Resolved', 'Rejected') AND c.sla_deadline IS NOT NULL AND c.sla_deadline < CURRENT_TIMESTAMP))
               ) AS overdue_tasks
       FROM field_staff fs
-      LEFT JOIN departments d ON CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+      LEFT JOIN departments d ON (
+        CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+        OR (CAST(fs.department_id AS TEXT) = '1' AND (d.code = 'PWD' OR CAST(d.id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8'))
+        OR (CAST(fs.department_id AS TEXT) = '2' AND (d.code = 'SAN' OR CAST(d.id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22'))
+        OR (CAST(fs.department_id AS TEXT) = '3' AND (d.code = 'WTR' OR CAST(d.id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb'))
+        OR (CAST(fs.department_id AS TEXT) = '4' AND (d.code = 'DRN' OR CAST(d.id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354'))
+        OR (CAST(fs.department_id AS TEXT) = '5' AND (d.code = 'ELE' OR CAST(d.id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3'))
+        OR (CAST(fs.department_id AS TEXT) = '6' AND (d.code = 'TRF' OR CAST(d.id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae'))
+      )
       LEFT JOIN users u ON CAST(fs.user_id AS TEXT) = CAST(u.id AS TEXT)
       WHERE 1=1
     `;
@@ -293,8 +301,29 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
 
     // Department Isolation for Department Head
     if (!isAdmin) {
-      sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
-      params.push(String(userDeptId || -1));
+      const isPwd = ['1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD'].includes(String(userDeptId));
+      const isSan = ['2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN'].includes(String(userDeptId));
+      const isWtr = ['3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR'].includes(String(userDeptId));
+      const isDrn = ['4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN'].includes(String(userDeptId));
+      const isEle = ['5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE'].includes(String(userDeptId));
+      const isTrf = ['6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF'].includes(String(userDeptId));
+
+      if (isPwd) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') OR fs.employee_id LIKE 'PWD%' OR (d.id IS NOT NULL AND (d.code = 'PWD' OR CAST(d.id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8')))`;
+      } else if (isSan) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') OR fs.employee_id LIKE 'SAN%' OR (d.id IS NOT NULL AND (d.code = 'SAN' OR CAST(d.id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22')))`;
+      } else if (isWtr) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') OR fs.employee_id LIKE 'WTR%' OR (d.id IS NOT NULL AND (d.code = 'WTR' OR CAST(d.id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb')))`;
+      } else if (isDrn) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') OR fs.employee_id LIKE 'DRN%' OR (d.id IS NOT NULL AND (d.code = 'DRN' OR CAST(d.id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354')))`;
+      } else if (isEle) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') OR fs.employee_id LIKE 'ELE%' OR (d.id IS NOT NULL AND (d.code = 'ELE' OR CAST(d.id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3')))`;
+      } else if (isTrf) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') OR fs.employee_id LIKE 'TRF%' OR (d.id IS NOT NULL AND (d.code = 'TRF' OR CAST(d.id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae')))`;
+      } else {
+        sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
+        params.push(String(userDeptId || -1));
+      }
     } else if (req.query.department_id) {
       let deptFilterId = req.query.department_id;
       const codeToIdMap = {
@@ -413,12 +442,19 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
       LEFT JOIN departments d ON (
         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
-        OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
-        OR (CAST(fs.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
-        OR (CAST(fs.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
-        OR (CAST(fs.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
-        OR (CAST(fs.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
-        OR (CAST(fs.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
+        OR (CAST(fs.department_id AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8') AND d.code = 'PWD')
+        OR (CAST(fs.department_id AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22') AND d.code = 'SAN')
+        OR (CAST(fs.department_id AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb') AND d.code = 'WTR')
+        OR (CAST(fs.department_id AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354') AND d.code = 'DRN')
+        OR (CAST(fs.department_id AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3') AND d.code = 'ELE')
+        OR (CAST(fs.department_id AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae') AND d.code = 'TRF')
+        OR (fs.employee_id LIKE 'PWD-%' AND d.code = 'PWD')
+        OR (fs.employee_id LIKE 'SAN-%' AND d.code = 'SAN')
+        OR (fs.employee_id LIKE 'WTR-%' AND d.code = 'WTR')
+        OR (fs.employee_id LIKE 'DRN-%' AND d.code = 'DRN')
+        OR (fs.employee_id LIKE 'ELE-%' AND d.code = 'ELE')
+        OR (fs.employee_id LIKE 'TRF-%' AND d.code = 'TRF')
+        OR (fs.employee_id = 'STF-001' AND d.code = 'PWD')
       )
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
@@ -428,6 +464,13 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
       sql += ` AND (
         CAST(fs.department_id AS TEXT) = $1
         OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
+        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($1))
+        OR (CAST($1 AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') AND (d.code = 'PWD' OR fs.employee_id LIKE 'PWD-%' OR fs.department_id = '1' OR fs.employee_id = 'STF-001'))
+        OR (CAST($1 AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') AND (d.code = 'SAN' OR fs.employee_id LIKE 'SAN-%' OR fs.department_id = '2'))
+        OR (CAST($1 AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') AND (d.code = 'WTR' OR fs.employee_id LIKE 'WTR-%' OR fs.department_id = '3'))
+        OR (CAST($1 AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') AND (d.code = 'DRN' OR fs.employee_id LIKE 'DRN-%' OR fs.department_id = '4'))
+        OR (CAST($1 AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') AND (d.code = 'ELE' OR fs.employee_id LIKE 'ELE-%' OR fs.department_id = '5'))
+        OR (CAST($1 AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') AND (d.code = 'TRF' OR fs.employee_id LIKE 'TRF-%' OR fs.department_id = '6'))
       )`;
       params.push(String(userDeptId || -1));
     }
@@ -752,36 +795,61 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     const canonicalId = complaint.id;
 
+    const isUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
+    const safeAssignedBy = isUuid(req.user.id) ? req.user.id : null;
+
     // 5. Update Complaint in Database by exact canonical primary key ID
-    const updateRes = await query(
-      `UPDATE complaints
-       SET assigned_staff_id = $1,
-           assigned_staff_name = $2,
-           assigned_staff_email = $3,
-           assigned_by = $4,
-           assigned_by_name = $5,
-           status = $6,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 OR CAST(id AS TEXT) = $8 OR complaint_number = $8
-       RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at`,
-      [
-        assignedStaffId,
-        assignedStaffName,
-        assignedStaffEmail,
-        req.user.id,
-        req.user.name || 'Department Head',
-        'Staff Assigned',
-        isNaN(parseInt(String(canonicalId), 10)) ? 0 : parseInt(String(canonicalId), 10),
-        String(complaint.complaint_number || canonicalId)
-      ]
-    );
+    let updateRes = null;
+    try {
+      updateRes = await query(
+        `UPDATE complaints
+         SET assigned_staff_id = $1,
+             assigned_staff_name = $2,
+             assigned_staff_email = $3,
+             assigned_by = $4,
+             assigned_by_name = $5,
+             status = $6,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE CAST(id AS TEXT) = $7 OR complaint_number = $7
+         RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at`,
+        [
+          assignedStaffId,
+          assignedStaffName,
+          assignedStaffEmail,
+          safeAssignedBy,
+          req.user.name || 'Department Head',
+          'Staff Assigned',
+          String(canonicalId)
+        ]
+      );
+    } catch (uErr) {
+      updateRes = await query(
+        `UPDATE complaints
+         SET assigned_staff_id = $1,
+             assigned_staff_name = $2,
+             assigned_staff_email = $3,
+             assigned_by_name = $4,
+             status = $5,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE CAST(id AS TEXT) = $6 OR complaint_number = $6
+         RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
+        [
+          assignedStaffId,
+          assignedStaffName,
+          assignedStaffEmail,
+          req.user.name || 'Department Head',
+          'Staff Assigned',
+          String(canonicalId)
+        ]
+      );
+    }
 
     // 6. Direct Database Read-Back Verification from Primary Storage
     const verifyRes = await query(
       `SELECT id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at
        FROM complaints
-       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
-      [isNaN(parseInt(String(canonicalId), 10)) ? 0 : parseInt(String(canonicalId), 10), String(complaint.complaint_number || canonicalId)]
+       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [String(canonicalId)]
     );
 
     if (!verifyRes.rows || verifyRes.rows.length === 0) {

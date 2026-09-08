@@ -332,6 +332,15 @@ async function createTablesPostgres() {
     await safeAddPgCol('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
     await safeAddPgCol('complaints', 'support_count INTEGER DEFAULT 0');
 
+    // Safe column type normalization for PostgreSQL
+    try { await pgPool.query('ALTER TABLE complaints ALTER COLUMN assigned_by DROP NOT NULL;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE complaints ALTER COLUMN assigned_by TYPE TEXT USING assigned_by::TEXT;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE complaints ALTER COLUMN assigned_staff_id TYPE TEXT USING assigned_staff_id::TEXT;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE complaints ALTER COLUMN verified_by TYPE TEXT USING verified_by::TEXT;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE assignments ALTER COLUMN complaint_id TYPE TEXT USING complaint_id::TEXT;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE assignments ALTER COLUMN staff_id TYPE TEXT USING staff_id::TEXT;'); } catch (e) {}
+    try { await pgPool.query('ALTER TABLE assignments ALTER COLUMN assigned_by TYPE TEXT USING assigned_by::TEXT;'); } catch (e) {}
+
     // 6. Assignments table
     await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS assignments (

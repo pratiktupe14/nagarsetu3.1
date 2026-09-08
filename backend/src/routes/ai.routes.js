@@ -15,7 +15,8 @@ console.log(`[NAGARSETU AI] Gemini API configured: ${Boolean(GEMINI_API_KEY)}`);
  */
 router.get('/health', async (req, res) => {
   const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+  let model = process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash';
+  if (model === 'gemini-2.5-flash') model = 'gemini-1.5-flash';
 
   if (!key || key.trim() === '' || key === 'your_gemini_api_key_here') {
     console.error('[NAGARSETU AI Health Check] Failed: GEMINI_API_KEY missing or unconfigured in environment.');
@@ -83,7 +84,7 @@ router.get('/health', async (req, res) => {
             errorMsg = 'Gemini API Authentication Failed (HTTP 401). Please check API configuration.';
           }
           console.error(`[NAGARSETU AI Health Check] Failed: ${errorMsg}`);
-          return sendRes(healthRes.statusCode, {
+          return sendRes(200, {
             configured: true,
             model,
             reachable: false,

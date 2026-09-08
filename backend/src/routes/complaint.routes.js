@@ -437,7 +437,7 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
         )`;
         params.push(String(req.query.department_id), String(req.query.department_id), String(req.query.department_id));
       }
-      sql += ` AND (c.status != 'Draft' AND c.status != 'draft')`;
+      sql += ` AND (CAST(c.status AS TEXT) NOT IN ('Draft', 'draft'))`;
     }
 
     sql += ` ORDER BY c.created_at DESC`;
@@ -506,12 +506,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const assignSql = `
       SELECT a.*, s.name as staff_name, s.mobile as staff_mobile, o.name as officer_name
       FROM assignments a
-      LEFT JOIN users s ON a.staff_id = s.id
-      LEFT JOIN users o ON a.assigned_by = o.id
-      WHERE a.complaint_id = ?
+      LEFT JOIN users s ON CAST(a.staff_id AS TEXT) = CAST(s.id AS TEXT)
+      LEFT JOIN users o ON CAST(a.assigned_by AS TEXT) = CAST(o.id AS TEXT)
+      WHERE CAST(a.complaint_id AS TEXT) = ? OR a.complaint_id = ?
       ORDER BY a.assigned_at DESC LIMIT 1
     `;
-    const assignRes = await query(assignSql, [complaint.id]);
+    const assignRes = await query(assignSql, [String(complaint.id), String(complaint.id)]);
     complaint.assignment = assignRes.rows && assignRes.rows.length > 0 ? assignRes.rows[0] : null;
 
     return res.json({ complaint });
@@ -703,7 +703,7 @@ router.post('/:id/support', authenticateToken, async (req, res) => {
 });
 
 // Purge/remove all complaints and associated records (Admin Only)
-router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
+const purgeHandler = async (req, res) => {
   try {
     await query(`DELETE FROM feedback`);
     await query(`DELETE FROM assignments`);
@@ -715,6 +715,8 @@ router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin
     console.error('Purge all complaints error:', err);
     return res.status(500).json({ error: 'Failed to purge complaints' });
   }
-});
+};
+router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), purgeHandler);
+router.post('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), purgeHandler);
 
 module.exports = router;

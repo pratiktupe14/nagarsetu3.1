@@ -84,8 +84,8 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     const compRes = await query(
       `SELECT id, citizen_id, complaint_number, department_id, assigned_staff_id, assigned_staff_email 
        FROM complaints 
-       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
-      [isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [String(targetId)]
     );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
@@ -116,8 +116,8 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     }
 
     await query(
-      `UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR CAST(id AS TEXT) = $3 OR complaint_number = $3`,
-      [status, isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+      `UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+      [status, String(targetId)]
     );
 
     await query(
@@ -199,6 +199,22 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     const userRole = req.user.role || 'service_staff';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
+    const isDeptMatch = (deptA, deptB) => {
+      if (!deptA || !deptB) return true;
+      if (String(deptA) === String(deptB)) return true;
+      const pwdGroup = ['1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD'];
+      const sanGroup = ['2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN'];
+      const wtrGroup = ['3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR'];
+      const drnGroup = ['4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN'];
+      const eleGroup = ['5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE'];
+      const trfGroup = ['6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF'];
+      const mntGroup = ['7', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'MNT'];
+      for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
+        if (g.includes(String(deptA)) && g.includes(String(deptB))) return true;
+      }
+      return false;
+    };
+
     if (!isAdmin) {
       let userDeptId = req.user.department_id;
       if (!userDeptId) {
@@ -206,7 +222,7 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
         if (fsCheck.rows && fsCheck.rows.length > 0) userDeptId = fsCheck.rows[0].department_id;
       }
 
-      const isSameDept = userDeptId && complaint.department_id && String(userDeptId) === String(complaint.department_id);
+      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
       const isAssignedToUser = (
         (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(req.user.id)) ||
         (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
@@ -228,8 +244,7 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
              additional_notes = $4, 
              status = $5, 
              updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $6 
-            OR CAST(id AS TEXT) = $6 
+         WHERE CAST(id AS TEXT) = $6 
             OR complaint_number = $7`,
         [photoAfterUrl, workPerformed, materialsUsed, additionalNotes, 'Resolution Submitted', primaryKeyId, complaintNum]
       );
@@ -243,8 +258,7 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     const verifyRes = await query(
       `SELECT id, complaint_number, status, photo_after_url, work_performed, materials_used, assigned_staff_id, assigned_staff_email, assigned_staff_name, department_id, updated_at 
        FROM complaints 
-       WHERE id = $1 
-          OR CAST(id AS TEXT) = $1 
+       WHERE CAST(id AS TEXT) = $1 
           OR complaint_number = $2`,
       [primaryKeyId, complaintNum]
     );
@@ -286,8 +300,8 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     ).catch(err => console.warn('[STAFF RESOLVE HISTORY WARN]', err.message));
 
     await query(
-      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 OR staff_id = $2)`,
-      [primaryKeyId, req.user.id]
+      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 OR CAST(staff_id AS TEXT) = $2)`,
+      [primaryKeyId, String(req.user.id)]
     ).catch(err => console.warn('[STAFF ASSIGNMENT UPDATE WARN]', err.message));
 
     await notifyStatusChange(complaint.id, 'Resolution Submitted', complaint.citizen_id).catch(err => console.warn('[STAFF RESOLVE NOTIFICATION WARN]', err.message));
@@ -322,8 +336,8 @@ router.post(['/task/:id/progress', '/tasks/:id/progress'], async (req, res) => {
     const compRes = await query(
       `SELECT id, status, complaint_number, department_id, assigned_staff_id 
        FROM complaints 
-       WHERE id = $1 OR CAST(id AS TEXT) = $2 OR complaint_number = $2`,
-      [isNaN(targetIdNum) ? 0 : targetIdNum, String(targetId)]
+       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [String(targetId)]
     );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });

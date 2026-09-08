@@ -71,7 +71,8 @@ Respond ONLY with a valid JSON object matching this exact structure:
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+  let model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash';
+  if (model === 'gemini-2.5-flash') model = 'gemini-1.5-flash';
 
   console.log(`[NAGARSETU AI] Calling Gemini Vision API with model: ${model}`);
 
