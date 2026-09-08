@@ -283,6 +283,7 @@ async function createTablesPostgres() {
         ai_model TEXT,
         ai_analyzed_at TIMESTAMP,
         needs_manual_verification INTEGER DEFAULT 0,
+        support_count INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -329,6 +330,7 @@ async function createTablesPostgres() {
     await safeAddPgCol('complaints', 'ai_model TEXT');
     await safeAddPgCol('complaints', 'ai_analyzed_at TIMESTAMP');
     await safeAddPgCol('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
+    await safeAddPgCol('complaints', 'support_count INTEGER DEFAULT 0');
 
     // 6. Assignments table
     await safeCreateTable(`
@@ -685,6 +687,7 @@ function createTablesSqlite() {
           ai_model TEXT,
           ai_analyzed_at DATETIME,
           needs_manual_verification INTEGER DEFAULT 0,
+          support_count INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (citizen_id) REFERENCES users(id),
@@ -779,6 +782,7 @@ function createTablesSqlite() {
       safeAddSqliteColumn('announcements', "created_by_role TEXT DEFAULT 'city_admin'");
       safeAddSqliteColumn('announcements', 'expires_at DATETIME');
       safeAddSqliteColumn('departments', 'code TEXT');
+      safeAddSqliteColumn('complaints', 'support_count INTEGER DEFAULT 0');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS announcement_reads (

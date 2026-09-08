@@ -437,66 +437,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
     updated_at: new Date().toISOString()
   };
 
-  if (isSupabaseConfigured()) {
-    try {
-      const SUPABASE_DEPT_MAP: Record<string, string> = {
-        PWD: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
-        SAN: '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
-        WTR: 'ead370cc-459c-44f0-899f-8a97f0928beb',
-        DRN: 'ee73cb82-cc47-4333-b7d6-4491353c1354',
-        ELE: '31842723-23ac-490b-912b-9f6d9afbdfb3',
-        TRF: 'ae5e4d0c-996f-4d81-9528-d642664c93ae'
-      };
-
-      let resolvedDeptUuid = newComplaint.department_id;
-      if (!resolvedDeptUuid || !isValidUuid(resolvedDeptUuid)) {
-        const deptNameStr = (newComplaint.department_name || '').toLowerCase();
-        const catStr = (newComplaint.category || '').toLowerCase();
-
-        if (deptNameStr.includes('water') || catStr.includes('water')) resolvedDeptUuid = SUPABASE_DEPT_MAP.WTR;
-        else if (deptNameStr.includes('sanitation') || deptNameStr.includes('waste') || catStr.includes('garbage') || catStr.includes('waste')) resolvedDeptUuid = SUPABASE_DEPT_MAP.SAN;
-        else if (deptNameStr.includes('drain') || deptNameStr.includes('sewag') || catStr.includes('drain') || catStr.includes('sewag')) resolvedDeptUuid = SUPABASE_DEPT_MAP.DRN;
-        else if (deptNameStr.includes('electric') || deptNameStr.includes('light') || catStr.includes('electric') || catStr.includes('light')) resolvedDeptUuid = SUPABASE_DEPT_MAP.ELE;
-        else if (deptNameStr.includes('traffic') || catStr.includes('traffic')) resolvedDeptUuid = SUPABASE_DEPT_MAP.TRF;
-        else if (deptNameStr.includes('public works') || deptNameStr.includes('pwd') || catStr.includes('road') || catStr.includes('pothole')) resolvedDeptUuid = SUPABASE_DEPT_MAP.PWD;
-      }
-
-      const dbPayload: Record<string, any> = {
-        complaint_number: newComplaint.complaint_number,
-        photo_before_url: newComplaint.photo_before_url,
-        category: newComplaint.category,
-        title: newComplaint.title,
-        description: newComplaint.description,
-        priority: newComplaint.priority || 'Medium',
-        status: newComplaint.status || 'Submitted',
-        department_id: resolvedDeptUuid || null,
-        latitude: newComplaint.latitude,
-        longitude: newComplaint.longitude,
-        location_source: newComplaint.location_source,
-        location_address: newComplaint.location_address
-      };
-
-      if (isValidUuid(newComplaint.citizen_id)) {
-        dbPayload.citizen_id = newComplaint.citizen_id;
-      }
-
-      const { data, error } = await supabase
-        .from('complaints')
-        .insert([dbPayload])
-        .select()
-        .single();
-
-      if (!error && data) {
-        newComplaint.id = data.id;
-        if (data.department_id) newComplaint.department_id = data.department_id;
-      }
-    } catch (err) {
-      console.warn('Supabase createComplaint insert fallback:', err);
-    }
-  }
-
-
-  // Sync with Express backend API
+  // Authoritative write via Express backend API
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
@@ -1166,6 +1107,22 @@ export async function reopenComplaint(complaintId: string, reason: string): Prom
 }
 
 export async function supportDuplicateComplaint(complaintId: string): Promise<number> {
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/support`, {
+      method: 'POST',
+      headers: getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {})
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data.support_count === 'number') {
+        return data.support_count;
+      }
+    }
+  } catch (e) {
+    console.warn('supportDuplicateComplaint API call failed, attempting fallback:', e);
+  }
+
   let count = 1;
   if (isSupabaseConfigured()) {
     try {

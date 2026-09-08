@@ -599,6 +599,109 @@ router.post('/:id/reopen', authenticateToken, async (req, res) => {
   }
 });
 
+// Update complaint status (Admin / City Admin / Department Head)
+const handleStatusUpdate = async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const { status, remarks, rejection_reason, priority, department_name, department_id } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    const compRes = await query(
+      `SELECT * FROM complaints WHERE CAST(id AS TEXT) = ? OR complaint_number = ? LIMIT 1`,
+      [String(complaintId), String(complaintId)]
+    );
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+
+    const updateParams = [status, new Date().toISOString()];
+    let updateSql = `UPDATE complaints SET status = ?, updated_at = ?`;
+
+    if (priority) {
+      updateSql += `, priority = ?`;
+      updateParams.push(priority);
+    }
+
+    if (department_id || department_name) {
+      const resolvedDept = await resolveDepartmentId(department_id, null, department_name);
+      if (resolvedDept) {
+        updateSql += `, department_id = ?`;
+        updateParams.push(resolvedDept);
+      }
+    }
+
+    if (rejection_reason) {
+      updateSql += `, admin_rejection_reason = ?`;
+      updateParams.push(rejection_reason);
+    }
+    updateSql += ` WHERE id = ?`;
+    updateParams.push(complaint.id);
+
+    await query(updateSql, updateParams);
+
+    // Record auditable status history
+    await query(
+      `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        complaint.id,
+        status,
+        remarks || `Status updated to ${status} by ${req.user.role}`,
+        complaint.department_id || 'Administration',
+        req.user.name || req.user.role
+      ]
+    ).catch(() => {});
+
+    await notifyStatusChange(complaint.id, status, complaint.citizen_id).catch(() => {});
+
+    const updatedRes = await query(`SELECT * FROM complaints WHERE id = ?`, [complaint.id]);
+    return res.json({
+      success: true,
+      message: `Complaint status updated to ${status}`,
+      complaint: updatedRes.rows[0]
+    });
+  } catch (err) {
+    console.error('Update complaint status error:', err);
+    return res.status(500).json({ error: 'Failed to update complaint status' });
+  }
+};
+
+router.patch('/:id/status', authenticateToken, requireRole(['admin', 'city_admin', 'department_head']), handleStatusUpdate);
+router.put('/:id/status', authenticateToken, requireRole(['admin', 'city_admin', 'department_head']), handleStatusUpdate);
+
+// Citizen duplicate issue support / upvote (atomic persistent counter)
+router.post('/:id/support', authenticateToken, async (req, res) => {
+  try {
+    const complaintId = req.params.id;
+    const compRes = await query(
+      `SELECT * FROM complaints WHERE CAST(id AS TEXT) = ? OR complaint_number = ? LIMIT 1`,
+      [String(complaintId), String(complaintId)]
+    );
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+    const complaint = compRes.rows[0];
+
+    await query(
+      `UPDATE complaints SET support_count = COALESCE(support_count, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [complaint.id]
+    );
+
+    const updatedRes = await query(`SELECT support_count FROM complaints WHERE id = ?`, [complaint.id]);
+    const count = updatedRes.rows && updatedRes.rows[0] ? updatedRes.rows[0].support_count : 1;
+
+    return res.json({ success: true, message: 'Issue supported successfully', support_count: count });
+  } catch (err) {
+    console.error('Support complaint error:', err);
+    return res.status(500).json({ error: 'Failed to support issue' });
+  }
+});
+
 // Purge/remove all complaints and associated records (Admin Only)
 router.delete('/purge-all', authenticateToken, requireRole(['admin', 'city_admin']), async (req, res) => {
   try {

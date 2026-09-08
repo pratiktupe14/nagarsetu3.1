@@ -33,7 +33,8 @@ const otpRequestSchema = {
 const otpVerifySchema = {
   body: Joi.object({
     mobile: Joi.string().pattern(mobileRegex).required(),
-    otp: Joi.string().length(6).required()
+    otp: Joi.string().length(6).required(),
+    name: Joi.string().min(2).max(100).trim().optional()
   })
 };
 

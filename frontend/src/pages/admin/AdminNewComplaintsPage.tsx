@@ -19,14 +19,9 @@ import {
   Building2, Users, MapPin, X, Sparkles, Layers, Maximize2, ExternalLink, ShieldCheck
 } from 'lucide-react';
 
-const DEPARTMENT_OPTIONS = [
-  'Roads & Public Works',
-  'Sanitation & Solid Waste',
-  'Water Supply & Sewerage',
-  'Electrical & Lighting',
-  'Drainage & Stormwater',
-  'Traffic Management'
-];
+import { CANONICAL_DEPARTMENT_NAMES } from '../../services/departmentService';
+
+const DEPARTMENT_OPTIONS = CANONICAL_DEPARTMENT_NAMES;
 
 const CATEGORY_OPTIONS = [
   'Pothole',

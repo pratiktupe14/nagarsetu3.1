@@ -182,9 +182,9 @@ export function findServiceStaffByIdentifier(identifier: string): UserProfile | 
 export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   citizen: {
     id: 'citizen-user-id',
-    full_name: 'Pratik Dilip Tupe',
-    mobile: '8788562103',
-    email: 'pratik@citizen.nagarsetu.gov.in',
+    full_name: 'Citizen User',
+    mobile: '9876543210',
+    email: 'citizen@nagarsetu.gov.in',
     role: 'citizen',
     language_pref: 'en'
   },
@@ -497,29 +497,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Always fetch fresh backend token for the target role to maintain authorization synchronization
-    try {
-      let loginId = roleUser.email || roleUser.mobile;
-      if (!loginId) {
-        loginId = newRole === 'city_admin' ? '9876543213' : newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : newRole === 'service_staff' ? '9876543211' : '9876543210';
-      }
-      const loginPass = newRole === 'city_admin' ? 'NagarSetu@Admin2026!' : 'password123';
-      const res = await fetch(`${getApiUrl()}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.token && data.user) {
-          localStorage.setItem('nagarsetu_token', data.token);
-          if (data.user.role) {
-            const backendRole = data.user.role === 'admin' ? 'city_admin' : data.user.role;
-            roleUser = { ...roleUser, role: backendRole as UserRole, id: String(data.user.id || roleUser.id) };
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD;
+    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD;
+    if (demoAdminPass || demoUserPass) {
+      try {
+        let loginId = roleUser.email || roleUser.mobile;
+        if (!loginId) {
+          loginId = newRole === 'city_admin' ? '9876543213' : newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : newRole === 'service_staff' ? '9876543211' : '9876543210';
+        }
+        const loginPass = newRole === 'city_admin' ? demoAdminPass : demoUserPass;
+        if (loginPass) {
+          const res = await fetch(`${getApiUrl()}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.token && data.user) {
+              localStorage.setItem('nagarsetu_token', data.token);
+              if (data.user.role) {
+                const backendRole = data.user.role === 'admin' ? 'city_admin' : data.user.role;
+                roleUser = { ...roleUser, role: backendRole as UserRole, id: String(data.user.id || roleUser.id) };
+              }
+            }
           }
         }
+      } catch (e) {
+        console.warn('Role switch token sync notice:', e);
       }
-    } catch (e) {
-      console.warn('Role switch token sync notice:', e);
     }
 
     setUser(roleUser);
@@ -660,39 +666,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (error) {
           console.warn('Supabase signInWithPassword note:', error);
-          const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-          const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
-          const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
-          const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
-
-          if (
-            cleanEmail === 'admin@nagarsetu.gov.in' ||
-            cleanEmail.includes('admin') ||
-            targetRole === 'city_admin' ||
-            password === demoAdminPass ||
-            password === demoUserPass ||
-            password === demoHeadPass ||
-            password === demoStaffPass
-          ) {
-            console.info('Supabase auth failed for demo account, using demo session fallback.');
-            if (targetRole === 'service_staff') {
-              const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
-              setUser(staffUser);
-              localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
-              return true;
-            }
-            if (targetRole === 'department_head') {
-              const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
-              if (dhMatch) {
-                setUser(dhMatch);
-                localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
-                return true;
-              }
-              throw new Error("Department assignment could not be resolved. Please contact City Administration.");
-            }
-            switchRole(targetRole || 'city_admin');
-            return true;
-          }
           throw new Error(error.message || 'Authentication failed. Please check your credentials.');
         }
       }
@@ -886,7 +859,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateUserProfile = async (payload: Partial<UserProfile>): Promise<UserProfile> => {
     try {
       const token = localStorage.getItem('nagarsetu_token');
-      const response = await fetch(`${getApiUrl()}/auth/profile`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -939,7 +912,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
     const token = localStorage.getItem('nagarsetu_token');
-    const response = await fetch(`${getApiUrl()}/auth/change-password`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -959,7 +932,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = localStorage.getItem('nagarsetu_token');
       if (!token) return user;
 
-      const response = await fetch(`${getApiUrl()}/auth/refresh`, {
+      const response = await fetch(`${getApiUrl()}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

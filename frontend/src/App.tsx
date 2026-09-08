@@ -18,7 +18,7 @@ import { SubmissionSuccessPage } from './pages/citizen/SubmissionSuccessPage';
 import { ComplaintDetailPage } from './pages/citizen/ComplaintDetailPage';
 import { CitizenProfilePage } from './pages/citizen/CitizenProfilePage';
 import { CitizenSettingsPage } from './pages/citizen/CitizenSettingsPage';
-import { CitizenAnnouncementsPage } from './pages/citizen/CitizenAnnouncementsPage';
+import { CitizenNotificationsPage } from './pages/citizen/CitizenNotificationsPage';
 import { AnnouncementDetailPage } from './pages/citizen/AnnouncementDetailPage';
 import { CitizenWorkPage } from './pages/citizen/CitizenWorkPage';
 import { MaintenanceDetailPage } from './pages/citizen/MaintenanceDetailPage';
@@ -149,7 +149,7 @@ export default function App() {
               path="/citizen/notifications"
               element={
                 <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenPortal />
+                  <CitizenNotificationsPage />
                 </ProtectedRoute>
               }
             />
@@ -393,7 +393,7 @@ export default function App() {
             ))}
 
             {/* Service Staff Protected Routes */}
-            {['/staff/portal', '/staff/dashboard', '/staff/tasks', '/staff/profile'].map((path) => (
+            {['/staff/portal', '/staff/dashboard', '/staff/tasks'].map((path) => (
               <Route
                 key={path}
                 path={path}
@@ -462,14 +462,17 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/staff/settings"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffSettingsPage />
-                </ProtectedRoute>
-              }
-            />
+            {['/staff/settings', '/staff/profile'].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <ProtectedRoute allowedRoles={['service_staff']}>
+                    <StaffSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+            ))}
 
             <Route
               path="/department-head/staff"

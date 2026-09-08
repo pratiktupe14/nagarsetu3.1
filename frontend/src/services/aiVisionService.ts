@@ -611,24 +611,23 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
     errorMessage = 'Backend server is offline or unreachable.';
   }
 
-  const fallbackCategory: CivicCategory = 'Road Damage / Pothole';
-  const meta = VALID_TAXONOMY_MAP[fallbackCategory];
-
   const fallbackResult: AIVisionResult = {
     mode: 'production',
     analysis_id: crypto.randomUUID(),
     image_hash: imageHash,
-    category: fallbackCategory,
-    issue_type: meta.defaultTitle,
-    confidence: 0.85,
-    confidence_level: 'High',
-    priority: meta.defaultPriority,
-    department: meta.department,
-    title: meta.defaultTitle,
-    description: 'Civic issue detected visually by image feature extraction engine. Please verify or edit details as needed.',
-    is_available: true,
+    category: 'Other Civic Issue',
+    issue_type: 'Manual Selection Required',
+    confidence: 0,
+    confidence_level: 'Low',
+    priority: 'Medium',
+    department: 'Maintenance Department',
+    title: '',
+    description: '',
+    error_code: errorCode,
+    error_message: errorMessage,
+    is_available: false,
     visual_features: visualFeatures,
-    detected_objects: ['asphalt_crater', 'road_damage', 'surface_defect'],
+    detected_objects: [],
     quality_check: {
       isUsable: true,
       brightness: visualFeatures.brightness,
@@ -637,6 +636,5 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
     analysis_time_ms: Math.round(endTime - startTime)
   };
 
-  setAnalysisCache(imageHash, fallbackResult);
   return fallbackResult;
 }

@@ -33,18 +33,25 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   // 2. Redirect to /login if user is unauthenticated or token expired
   const token = localStorage.getItem('nagarsetu_token');
-  if (token) {
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          localStorage.removeItem('nagarsetu_token');
-          localStorage.removeItem('nagarsetu_user');
-          return <Navigate to="/login" state={{ from: location }} replace />;
-        }
+  if (!token) {
+    localStorage.removeItem('nagarsetu_user');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('nagarsetu_token');
+        localStorage.removeItem('nagarsetu_user');
+        return <Navigate to="/login" state={{ from: location }} replace />;
       }
-    } catch (e) {}
+    }
+  } catch (e) {
+    localStorage.removeItem('nagarsetu_token');
+    localStorage.removeItem('nagarsetu_user');
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (!user || !user.role) {

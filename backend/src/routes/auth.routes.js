@@ -99,67 +99,27 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
-    // Fallback: If user not found in users table, check department_heads or field_staff table
+    // Fallback: If user not found in users table by direct identifier, check if linked via department_heads or field_staff
     if (!user) {
       const dhFallback = await query(
-        `SELECT dh.*, d.name as dept_name, d.code as dept_code 
-         FROM department_heads dh 
-         LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
+        `SELECT u.* FROM department_heads dh 
+         JOIN users u ON (CAST(u.id AS TEXT) = CAST(dh.user_id AS TEXT) OR LOWER(u.email) = LOWER(dh.email))
          WHERE LOWER(dh.email) = ? OR dh.phone = ? OR dh.phone LIKE ? OR dh.phone LIKE ?
          ORDER BY dh.id DESC LIMIT 1`,
         [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`]
       );
       if (dhFallback.rows && dhFallback.rows.length > 0) {
-        const dh = dhFallback.rows[0];
-        const salt = await bcrypt.genSalt(10);
-        const newHash = await bcrypt.hash(password, salt);
-        const insUser = await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,
-          [dh.name, dh.phone || '', cleanIdentifier, newHash, dh.department_id, dh.employee_id || '', dh.status || 'active']
-        );
-        const newUserId = insUser.rows[0].id;
-        user = {
-          id: newUserId,
-          name: dh.name,
-          mobile: dh.phone || '',
-          email: cleanIdentifier,
-          password_hash: newHash,
-          role: 'department_head',
-          department_id: dh.department_id,
-          employee_id: dh.employee_id || '',
-          status: dh.status || 'active',
-          language_pref: 'en'
-        };
+        user = dhFallback.rows[0];
       } else {
         const fsFallback = await query(
-          `SELECT fs.*, d.name as dept_name, d.code as dept_code 
-           FROM field_staff fs 
-           LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT) 
+          `SELECT u.* FROM field_staff fs 
+           JOIN users u ON (CAST(u.id AS TEXT) = CAST(fs.user_id AS TEXT) OR LOWER(u.email) = LOWER(fs.email))
            WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.phone LIKE ? OR fs.phone LIKE ? OR fs.employee_id = ? 
            ORDER BY fs.id DESC LIMIT 1`,
           [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`, rawInput]
         );
         if (fsFallback.rows && fsFallback.rows.length > 0) {
-          const fs = fsFallback.rows[0];
-          const salt = await bcrypt.genSalt(10);
-          const newHash = await bcrypt.hash(password, salt);
-          const insUser = await query(
-            `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'service_staff', ?, ?, ?)`,
-            [fs.name, fs.phone || '', cleanIdentifier, newHash, fs.department_id, fs.employee_id || '', fs.status || 'active']
-          );
-          const newUserId = insUser.rows[0].id;
-          user = {
-            id: newUserId,
-            name: fs.name,
-            mobile: fs.phone || '',
-            email: cleanIdentifier,
-            password_hash: newHash,
-            role: 'service_staff',
-            department_id: fs.department_id,
-            employee_id: fs.employee_id || '',
-            status: fs.status || 'active',
-            language_pref: 'en'
-          };
+          user = fsFallback.rows[0];
         }
       }
     }
@@ -345,13 +305,14 @@ router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
 // OTP Verify (Simulated)
 router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   try {
-    const { mobile, otp } = req.body;
+    const { mobile, otp, name } = req.body;
     if (otp !== '123456') {
       return res.status(400).json({ error: 'Invalid OTP code' });
     }
 
-    const sql = `SELECT * FROM users WHERE mobile = ?`;
-    const resUser = await query(sql, [mobile]);
+    const cleanMobile = normalizeMobile(mobile);
+    const sql = `SELECT * FROM users WHERE mobile = ? OR mobile = ?`;
+    const resUser = await query(sql, [cleanMobile, mobile]);
     
     if (resUser.rows && resUser.rows.length > 0) {
       const user = resUser.rows[0];
@@ -360,8 +321,23 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
       if (res.clearAuthAttempts) res.clearAuthAttempts();
       return res.json({ message: 'OTP verified successfully', token, user: userObj });
     } else {
+      // Auto-register citizen on first verified OTP
+      const citizenName = (name && String(name).trim()) || 'Citizen User';
+      const salt = await bcrypt.genSalt(10);
+      const defaultHash = await bcrypt.hash(Math.random().toString(36), salt);
+      const citizenEmail = `${cleanMobile}@citizen.nagarsetu.gov.in`;
+
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, language_pref, status) VALUES (?, ?, ?, ?, 'citizen', 'en', 'active')`,
+        [citizenName, cleanMobile, citizenEmail, defaultHash]
+      );
+
+      const createdRes = await query(`SELECT * FROM users WHERE mobile = ? LIMIT 1`, [cleanMobile]);
+      const newUser = createdRes.rows[0];
+      const userObj = { id: newUser.id, name: newUser.name, mobile: newUser.mobile, email: newUser.email, role: 'citizen', language_pref: 'en' };
+      const token = generateToken(userObj);
       if (res.clearAuthAttempts) res.clearAuthAttempts();
-      return res.json({ verified: true, needsRegistration: true, message: 'OTP verified. Please complete profile.' });
+      return res.json({ message: 'OTP verified successfully', token, user: userObj });
     }
   } catch (err) {
     console.error('OTP verify error:', err);

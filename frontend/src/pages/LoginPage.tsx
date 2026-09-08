@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types/database.types';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { getApiUrl } from '../config/apiConfig';
 import { Shield, User, Building2, Wrench, Smartphone, Mail, Lock, ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -15,7 +16,7 @@ export const LoginPage: React.FC = () => {
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('citizen');
   const [identifier, setIdentifier] = useState('8788562103');
-  const [password, setPassword] = useState('8788562103');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [useOtp, setUseOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
@@ -27,14 +28,14 @@ export const LoginPage: React.FC = () => {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg('');
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
-    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'nagarsetu@123';
-    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'password123';
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
+    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || '';
+    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || '';
+    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || '';
 
     if (role === 'citizen') {
       setIdentifier('8788562103');
-      setPassword('8788562103');
+      setPassword(demoUserPass);
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
       setPassword(demoAdminPass);
@@ -59,14 +60,27 @@ export const LoginPage: React.FC = () => {
     }
   }, [location.search]);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier || identifier.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile number.');
       return;
     }
-    setOtpSent(true);
     setErrorMsg('');
+    try {
+      const res = await fetch(`${getApiUrl()}/api/auth/otp-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: identifier.trim() })
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to send OTP');
+      }
+      setOtpSent(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Unable to send OTP');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,9 +90,22 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (useOtp && selectedRole === 'citizen') {
-        if (otpCode !== '123456') {
-          setErrorMsg('Invalid OTP. Please enter 123456 for demo verification.');
-          setLoading(false);
+        const res = await fetch(`${getApiUrl()}/api/auth/otp-verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile: identifier.trim(), otp: otpCode.trim() })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Invalid OTP code');
+        }
+        if (data.token && data.user) {
+          localStorage.setItem('nagarsetu_token', data.token);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(data.user));
+          navigate('/citizen/portal');
+          return;
+        } else if (data.needsRegistration) {
+          navigate('/register?mobile=' + encodeURIComponent(identifier.trim()));
           return;
         }
       }

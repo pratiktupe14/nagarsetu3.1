@@ -162,7 +162,7 @@ export const CitizenPortal: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              {t('welcome')}, {user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe'}
+              {t('welcome')}, {user?.full_name || (user as any)?.name || 'Citizen'}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
               {t('tagline')}

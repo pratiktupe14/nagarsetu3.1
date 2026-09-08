@@ -78,6 +78,16 @@ export const TARGET_MUNICIPAL_DEPARTMENTS = [
   { code: 'MNT', name: 'Maintenance Department' }
 ];
 
+export const CANONICAL_DEPARTMENT_NAMES = [
+  'Public Works Department (PWD)',
+  'Sanitation & Waste Management (SAN)',
+  'Water Supply & Sewerage Board (WTR)',
+  'Drainage & Sewage Department (DRN)',
+  'Electrical & Street Lighting (ELE)',
+  'Traffic Management Department (TRF)',
+  'Maintenance Department (MNT)'
+] as const;
+
 export interface ResolvedDepartment {
   id: string;
   code: string;
@@ -436,49 +446,39 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
   // 1. Try Express Backend API
   try {
-    let token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    if (!token) {
-      try {
-        const loginRes = await fetch(`${getApiUrl()}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobileOrEmail: '9876543213', password: 'NagarSetu@Admin2026!' })
-        });
-        if (loginRes.ok) {
-          const lData = await loginRes.json();
-          if (lData.token) {
-            token = lData.token;
-            localStorage.setItem('nagarsetu_token', token);
-          }
-        }
-      } catch (lErr) {}
-    }
-
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
 
-    const [dhRes, deptRes, compRes] = await Promise.all([
-      fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }),
-      fetch(`${getApiUrl()}/api/admin/departments`, { headers }),
+    const requests: Promise<Response>[] = [
+      fetch(`${getApiUrl()}/api/departments`, { headers }),
       fetch(`${getApiUrl()}/api/complaints`, { headers })
-    ]);
-
-    if (dhRes.ok) {
-      const dhData = await dhRes.json();
-      if (dhData.department_heads) deptHeads = dhData.department_heads;
+    ];
+    if (token) {
+      requests.push(fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }));
     }
-    if (deptRes.ok) {
+
+    const responses = await Promise.all(requests);
+    const deptRes = responses[0];
+    const compRes = responses[1];
+    const dhRes = token && responses[2] ? responses[2] : null;
+
+    if (deptRes && deptRes.ok) {
       const deptData = await deptRes.json();
       if (deptData.departments) departments = deptData.departments;
     }
-    if (compRes.ok) {
+    if (compRes && compRes.ok) {
       const compData = await compRes.json();
       if (compData.complaints) complaints = compData.complaints;
+    }
+    if (dhRes && dhRes.ok) {
+      const dhData = await dhRes.json();
+      if (dhData.department_heads) deptHeads = dhData.department_heads;
     }
 
     console.log('[ADMIN DATA SYNC]', {
       apiUrl: `${getApiUrl()}/api/admin/department-heads`,
       fetchTime: new Date().toISOString(),
-      responseStatus: dhRes.status,
+      responseStatus: dhRes ? dhRes.status : 200,
       databaseRecordCount: deptHeads.length,
       lastUpdatedRecord: deptHeads[0]?.created_at || 'N/A',
       localCacheUsed: false,

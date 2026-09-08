@@ -701,6 +701,30 @@ export async function verifyAndApproveComplaint(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {
+      method: 'PATCH',
+      headers: getNoCacheHeaders({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }),
+      body: JSON.stringify({
+        status: 'Approved',
+        priority,
+        department_name: departmentName,
+        remarks: `Verified & Approved by ${adminName}. Priority: ${priority}, Department: ${departmentName}`
+      })
+    });
+    if (res.ok) {
+      logActivity(complaintId, adminName, 'Verified & Approved Complaint', 'Submitted', 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
+      broadcastComplaintChange(complaintId, 'Submitted', 'Approved', adminName, `Approved & routed to ${departmentName}`);
+      return true;
+    }
+  } catch (e) {
+    console.warn('verifyAndApproveComplaint API error:', e);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       await supabase
@@ -736,6 +760,29 @@ export async function changeDepartmentRouting(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {
+      method: 'PATCH',
+      headers: getNoCacheHeaders({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }),
+      body: JSON.stringify({
+        status: 'Department Assigned',
+        department_name: departmentName,
+        remarks: `Re-routed to ${departmentName} by ${adminName}`
+      })
+    });
+    if (res.ok) {
+      logActivity(complaintId, adminName, 'Re-routed Department', 'Submitted', 'Department Assigned', `Department updated to ${departmentName}`);
+      broadcastComplaintChange(complaintId, 'Submitted', 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
+      return true;
+    }
+  } catch (e) {
+    console.warn('changeDepartmentRouting API error:', e);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       await supabase

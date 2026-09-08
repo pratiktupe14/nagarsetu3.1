@@ -8,7 +8,8 @@ import { resolveDepartmentInfo } from '../services/departmentService';
 import {
   Home, FileText, PlusCircle, MapPin, Bell, User, Settings, HelpCircle, Info,
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
-  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone
+  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone,
+  Wrench
 } from 'lucide-react';
 
 export function getDepartmentHeadPortalLabel(
@@ -165,6 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { label: t('trackComplaint'), path: '/citizen/track', icon: Activity },
         { label: t('reportComplaint'), path: '/citizen/report', icon: PlusCircle },
         { label: t('nearbyIssues'), path: '/citizen/nearby', icon: MapPin },
+        { label: 'Civic Works', path: '/citizen/work', icon: Wrench },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell }
       ]
     },
@@ -172,7 +174,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: t('accountMenu'),
       items: [
         { label: t('announcements'), path: '/citizen/announcements', icon: Megaphone },
-        { label: t('notifications'), path: '/citizen/notifications', icon: Bell },
         { label: t('profile'), path: '/citizen/profile', icon: User },
         { label: t('settings'), path: '/citizen/settings', icon: Settings }
       ]
@@ -541,6 +542,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onToggleCollapse}
           className="absolute -right-3 top-20 bg-white border border-gray-200 rounded-full p-1 text-gray-500 hover:text-emerald-600 shadow-sm transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center"
           title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -556,6 +558,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-extrabold text-sm text-gray-900 font-outfit">NAGARSETU Navigation</span>
               <button
                 onClick={onMobileClose}
+                aria-label="Close navigation menu"
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />

@@ -35,6 +35,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           onClick={onMobileMenuOpen}
           className="md:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           title="Open Menu"
+          aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -93,8 +94,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <div>
             <span className="text-xs font-bold text-gray-900 block leading-tight">
               {activeRole === 'citizen' 
-                ? (user?.full_name && user.full_name !== 'Demo Citizen' && user.full_name !== 'Citizen User' ? user.full_name : 'Pratik Dilip Tupe')
-                : (user?.full_name && user.full_name !== 'Department Head' ? user.full_name : 'Rahul Kumar')}
+                ? (user?.full_name || (user as any)?.name || 'Citizen')
+                : (user?.full_name || (user as any)?.name || 'Officer')}
             </span>
             <span className="text-[10px] text-gray-500 font-medium block capitalize">
               {activeRole === 'citizen' || user?.department_name === 'Unassigned Department' || !user?.department_name

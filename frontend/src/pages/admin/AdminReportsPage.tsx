@@ -79,38 +79,7 @@ export const AdminReportsPage: React.FC = () => {
   });
 
   // Local Saved Reports History
-  const [recentReports, setRecentReports] = useState<SavedReportItem[]>([
-    {
-      id: 'rpt-1',
-      report_number: 'RPT-2026-0821-492',
-      name: 'Daily Complaint Operations Report',
-      type: 'Daily Complaint Report',
-      generated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      generated_by: 'City Administration Officer',
-      record_count: 32,
-      status: 'Generated'
-    },
-    {
-      id: 'rpt-2',
-      report_number: 'RPT-2026-0820-318',
-      name: 'Department Operational Performance Report',
-      type: 'Department Performance Report',
-      generated_at: new Date(Date.now() - 86400000).toISOString(),
-      generated_by: 'Municipal Commissioner Office',
-      record_count: 7,
-      status: 'Generated'
-    },
-    {
-      id: 'rpt-3',
-      report_number: 'RPT-2026-0818-104',
-      name: 'SLA Compliance & Breach Escalation Audit',
-      type: 'SLA Compliance Report',
-      generated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-      generated_by: 'City Administration Officer',
-      record_count: 12,
-      status: 'Generated'
-    }
-  ]);
+  const [recentReports, setRecentReports] = useState<SavedReportItem[]>([]);
 
   const [municipalDepartments, setMunicipalDepartments] = useState<MunicipalDepartmentRecord[]>(() => getMunicipalDepartments());
   const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>(() => getAllServiceStaffRecords());
@@ -376,7 +345,7 @@ export const AdminReportsPage: React.FC = () => {
         employee_id: stf.employee_id,
         department: stf.department_name,
         active,
-        completed: completed > 0 ? completed : 14,
+        completed,
         overdue,
         status: stf.status,
         rating: '4.8 / 5'
