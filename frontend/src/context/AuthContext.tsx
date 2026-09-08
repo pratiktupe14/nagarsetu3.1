@@ -623,7 +623,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
-          password: password || 'nagarsetu123'
+          password: password
         });
 
         if (!error && data?.user) {
@@ -724,17 +724,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const loginWithOtp = async (mobile: string): Promise<boolean> => {
-    const citizenUser: UserProfile = {
-      id: 'citizen-' + mobile.slice(-4),
-      full_name: 'Citizen User',
-      mobile,
-      email: `${mobile}@citizen.nagarsetu.gov.in`,
-      role: 'citizen'
-    };
-    setUser(citizenUser);
-    localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
-    return true;
+  const loginWithOtp = async (mobile: string, otp: string = '123456'): Promise<boolean> => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/auth/otp-verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: mobile.trim(), otp: otp.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.token && data.user) {
+        const citizenUser: UserProfile = {
+          id: String(data.user.id),
+          full_name: data.user.name || 'Citizen User',
+          mobile: data.user.mobile || mobile,
+          email: data.user.email || `${mobile}@citizen.nagarsetu.gov.in`,
+          role: 'citizen',
+          language_pref: data.user.language_pref || 'en'
+        };
+        setUser(citizenUser);
+        localStorage.setItem('nagarsetu_token', data.token);
+        localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
+        return true;
+      }
+      throw new Error(data.error || 'Invalid OTP code');
+    } catch (e: any) {
+      console.warn('Backend OTP verification error:', e.message);
+      throw e;
+    }
   };
 
   const registerCitizen = async (
