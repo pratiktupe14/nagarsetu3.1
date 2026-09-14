@@ -1088,7 +1088,11 @@ export async function changeStaffPasswordByDepartmentHead(
   newPassword: string,
   confirmPassword?: string
 ): Promise<{ success: boolean; message: string }> {
-  const token = sessionStorage.getItem('auth_token') || localStorage.getItem('token');
+  const token =
+    localStorage.getItem('nagarsetu_token') ||
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('nagarsetu_token') ||
+    sessionStorage.getItem('auth_token');
   const response = await fetch(`${getApiUrl()}/api/department/staff/${encodeURIComponent(staffId)}/change-password`, {
     method: 'POST',
     headers: {
