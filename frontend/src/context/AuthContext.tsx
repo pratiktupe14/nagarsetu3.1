@@ -497,7 +497,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Always fetch fresh backend token for the target role to maintain authorization synchronization
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD;
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'admin@123';
     const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD;
     if (demoAdminPass || demoUserPass) {
       try {

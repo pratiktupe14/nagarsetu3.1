@@ -15,7 +15,7 @@ test('BUG-005: login endpoint must sanitize formatted mobile numbers (+91, space
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mobileOrEmail: '+91 98765 43213',
-        password: 'NagarSetu@Admin2026!'
+        password: process.env.DEMO_ADMIN_PASSWORD || 'admin@123'
       })
     });
 

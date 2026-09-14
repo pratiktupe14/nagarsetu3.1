@@ -6,7 +6,7 @@ async function seedDefaultUsers(query) {
     await query(`DELETE FROM users WHERE mobile = '9876543210' OR LOWER(email) = 'rahul@citizen.nagarsetu.gov.in'`).catch(() => {});
 
     const userSalt = await bcrypt.genSalt(10);
-    const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+    const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'admin@123';
     const adminHash = await bcrypt.hash(adminPass, userSalt);
     const staffPass = 'nagarsetu@123';
     const staffHash = await bcrypt.hash(staffPass, userSalt);

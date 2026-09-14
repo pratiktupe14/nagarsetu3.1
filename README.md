@@ -71,4 +71,4 @@ npm run dev
 | **Citizen** | *(Register via `/register`)* | *(Self-created)* | Report Issue & My Complaints |
 | **Municipal Officer** | `9876543211` | `password123` | Command Center Dashboard |
 | **Field Maintenance Staff** | `9876543212` | `password123` | Assigned Tasks & Resolution Upload |
-| **Municipal Admin** | `9876543213` | `password123` | Executive Analytics & Hotspot Map |
+| **Municipal Admin** | `9876543213` / `admin@nagarsetu.gov.in` | `admin@123` | Executive Analytics & Hotspot Map |
