@@ -500,7 +500,7 @@ async function runAcceptanceSuite() {
   console.log('\n--- PHASE 5: City Admin ---');
   const adminLoginRes = await request('POST', '/api/auth/login', {}, {
     mobileOrEmail: 'admin@nagarsetu.gov.in',
-    password: 'NagarSetu@Admin2026!'
+    password: process.env.DEMO_ADMIN_PASSWORD || 'admin@123'
   });
   recordResult(
     'Admin',

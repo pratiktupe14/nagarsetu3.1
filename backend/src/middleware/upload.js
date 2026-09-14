@@ -98,7 +98,13 @@ function uploadSingleImage(fieldName) {
   return (req, res, next) => {
     upload.single(fieldName)(req, res, async (err) => {
       if (err) {
-        return next(err);
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: `File size exceeds maximum allowed limit (${Math.round(MAX_FILE_SIZE / (1024 * 1024))}MB max)` });
+          }
+          return res.status(400).json({ error: `File upload error: ${err.message}` });
+        }
+        return res.status(400).json({ error: err.message || 'File upload failed' });
       }
 
       if (req.file && req.file.buffer) {

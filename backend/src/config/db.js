@@ -64,7 +64,8 @@ function initDatabase() {
       }
     }
 
-    const shouldBePostgres = isVercel || isProduction || DB_TYPE === 'postgres' || Boolean(dbUrl);
+    const currentDbType = (process.env.DB_TYPE || DB_TYPE || '').toLowerCase();
+    const shouldBePostgres = currentDbType === 'sqlite' ? false : (isVercel || isProduction || currentDbType === 'postgres' || Boolean(dbUrl));
 
     const onInitDone = async () => {
       resolve();
@@ -534,6 +535,7 @@ function setupSqlite(resolve, reject) {
         return reject ? reject(err) : null;
       }
       console.log('Using local SQLite database at:', dbPath);
+      useSqlite = true;
       createTablesSqlite().then(resolve).catch(reject);
     });
   } catch (err) {
@@ -871,7 +873,18 @@ async function query(sql, params = []) {
         sqliteDb.run(sqliteSql, sqliteParams, function (err) {
           if (err) return reject(err);
           const lastId = this.lastID;
-          const rows = (lastId !== undefined && lastId !== null && lastId !== 0) ? [{ id: lastId }] : [];
+          let returnedId = null;
+
+          if (trimmedUpper.startsWith('INSERT')) {
+            const uuidParam = (sqliteParams || []).find(p => typeof p === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p));
+            if (uuidParam) {
+              returnedId = uuidParam;
+            } else if (lastId !== undefined && lastId !== null && lastId !== 0) {
+              returnedId = lastId;
+            }
+          }
+
+          const rows = returnedId !== null ? [{ id: returnedId }] : [];
           resolve({ rows, rowCount: this.changes || 0 });
         });
       }

@@ -49,6 +49,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, titl
         <DashboardHeader
           title={title}
           onMobileMenuOpen={() => setMobileOpen(true)}
+          isMobileMenuOpen={mobileOpen}
         />
 
         {/* MAIN PAGE CONTENT */}

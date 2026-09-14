@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
@@ -10,20 +11,23 @@ import {
 interface DashboardHeaderProps {
   title?: string;
   onMobileMenuOpen: () => void;
+  isMobileMenuOpen?: boolean;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   title = 'Dashboard',
-  onMobileMenuOpen
+  onMobileMenuOpen,
+  isMobileMenuOpen = false
 }) => {
   const { user, role, switchRole } = useAuth();
+  const navigate = useNavigate();
   const activeRole: UserRole = role || user?.role || 'citizen';
 
   const handleRoleSwitch = async (targetRole: UserRole) => {
     await switchRole(targetRole);
-    if (targetRole === 'citizen') window.location.href = '/citizen/portal';
-    if (targetRole === 'city_admin') window.location.href = '/admin/portal';
-    if (targetRole === 'service_staff') window.location.href = '/staff/portal';
+    if (targetRole === 'citizen') navigate('/citizen/portal');
+    if (targetRole === 'city_admin') navigate('/admin/portal');
+    if (targetRole === 'service_staff') navigate('/staff/portal');
   };
 
   return (
@@ -36,6 +40,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           className="md:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           title="Open Menu"
           aria-label="Open navigation menu"
+          aria-expanded={isMobileMenuOpen}
         >
           <Menu className="w-5 h-5" />
         </button>

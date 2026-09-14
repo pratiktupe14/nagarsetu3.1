@@ -191,12 +191,6 @@ router.get('/complaints', authenticateToken, requireRole(['department_head', 'ad
       LEFT JOIN departments d ON (
         CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
         OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
-        OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
-        OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
-        OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
-        OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
-        OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
-        OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
       )
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE 1=1
@@ -286,12 +280,7 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
       FROM field_staff fs
       LEFT JOIN departments d ON (
         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
-        OR (CAST(fs.department_id AS TEXT) = '1' AND (d.code = 'PWD' OR CAST(d.id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8'))
-        OR (CAST(fs.department_id AS TEXT) = '2' AND (d.code = 'SAN' OR CAST(d.id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22'))
-        OR (CAST(fs.department_id AS TEXT) = '3' AND (d.code = 'WTR' OR CAST(d.id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb'))
-        OR (CAST(fs.department_id AS TEXT) = '4' AND (d.code = 'DRN' OR CAST(d.id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354'))
-        OR (CAST(fs.department_id AS TEXT) = '5' AND (d.code = 'ELE' OR CAST(d.id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3'))
-        OR (CAST(fs.department_id AS TEXT) = '6' AND (d.code = 'TRF' OR CAST(d.id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae'))
+        OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
       )
       LEFT JOIN users u ON CAST(fs.user_id AS TEXT) = CAST(u.id AS TEXT)
       WHERE 1=1
@@ -301,25 +290,25 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
 
     // Department Isolation for Department Head
     if (!isAdmin) {
-      const isPwd = ['1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD'].includes(String(userDeptId));
-      const isSan = ['2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN'].includes(String(userDeptId));
-      const isWtr = ['3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR'].includes(String(userDeptId));
-      const isDrn = ['4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN'].includes(String(userDeptId));
-      const isEle = ['5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE'].includes(String(userDeptId));
-      const isTrf = ['6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF'].includes(String(userDeptId));
+      const isPwd = ['1', 'PWD'].includes(String(userDeptId));
+      const isSan = ['2', 'SAN'].includes(String(userDeptId));
+      const isWtr = ['3', 'WTR'].includes(String(userDeptId));
+      const isDrn = ['4', 'DRN'].includes(String(userDeptId));
+      const isEle = ['5', 'ELE'].includes(String(userDeptId));
+      const isTrf = ['6', 'TRF'].includes(String(userDeptId));
 
       if (isPwd) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') OR fs.employee_id LIKE 'PWD%' OR (d.id IS NOT NULL AND (d.code = 'PWD' OR CAST(d.id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', 'PWD') OR fs.employee_id LIKE 'PWD%' OR (d.id IS NOT NULL AND d.code = 'PWD'))`;
       } else if (isSan) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') OR fs.employee_id LIKE 'SAN%' OR (d.id IS NOT NULL AND (d.code = 'SAN' OR CAST(d.id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('2', 'SAN') OR fs.employee_id LIKE 'SAN%' OR (d.id IS NOT NULL AND d.code = 'SAN'))`;
       } else if (isWtr) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') OR fs.employee_id LIKE 'WTR%' OR (d.id IS NOT NULL AND (d.code = 'WTR' OR CAST(d.id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('3', 'WTR') OR fs.employee_id LIKE 'WTR%' OR (d.id IS NOT NULL AND d.code = 'WTR'))`;
       } else if (isDrn) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') OR fs.employee_id LIKE 'DRN%' OR (d.id IS NOT NULL AND (d.code = 'DRN' OR CAST(d.id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('4', 'DRN') OR fs.employee_id LIKE 'DRN%' OR (d.id IS NOT NULL AND d.code = 'DRN'))`;
       } else if (isEle) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') OR fs.employee_id LIKE 'ELE%' OR (d.id IS NOT NULL AND (d.code = 'ELE' OR CAST(d.id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('5', 'ELE') OR fs.employee_id LIKE 'ELE%' OR (d.id IS NOT NULL AND d.code = 'ELE'))`;
       } else if (isTrf) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') OR fs.employee_id LIKE 'TRF%' OR (d.id IS NOT NULL AND (d.code = 'TRF' OR CAST(d.id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae')))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('6', 'TRF') OR fs.employee_id LIKE 'TRF%' OR (d.id IS NOT NULL AND d.code = 'TRF'))`;
       } else {
         sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
         params.push(String(userDeptId || -1));
@@ -442,19 +431,6 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
       LEFT JOIN departments d ON (
         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
-        OR (CAST(fs.department_id AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8') AND d.code = 'PWD')
-        OR (CAST(fs.department_id AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22') AND d.code = 'SAN')
-        OR (CAST(fs.department_id AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb') AND d.code = 'WTR')
-        OR (CAST(fs.department_id AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354') AND d.code = 'DRN')
-        OR (CAST(fs.department_id AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3') AND d.code = 'ELE')
-        OR (CAST(fs.department_id AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae') AND d.code = 'TRF')
-        OR (fs.employee_id LIKE 'PWD-%' AND d.code = 'PWD')
-        OR (fs.employee_id LIKE 'SAN-%' AND d.code = 'SAN')
-        OR (fs.employee_id LIKE 'WTR-%' AND d.code = 'WTR')
-        OR (fs.employee_id LIKE 'DRN-%' AND d.code = 'DRN')
-        OR (fs.employee_id LIKE 'ELE-%' AND d.code = 'ELE')
-        OR (fs.employee_id LIKE 'TRF-%' AND d.code = 'TRF')
-        OR (fs.employee_id = 'STF-001' AND d.code = 'PWD')
       )
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
@@ -465,12 +441,6 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
         CAST(fs.department_id AS TEXT) = $1
         OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
         OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($1))
-        OR (CAST($1 AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') AND (d.code = 'PWD' OR fs.employee_id LIKE 'PWD-%' OR fs.department_id = '1' OR fs.employee_id = 'STF-001'))
-        OR (CAST($1 AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') AND (d.code = 'SAN' OR fs.employee_id LIKE 'SAN-%' OR fs.department_id = '2'))
-        OR (CAST($1 AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') AND (d.code = 'WTR' OR fs.employee_id LIKE 'WTR-%' OR fs.department_id = '3'))
-        OR (CAST($1 AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') AND (d.code = 'DRN' OR fs.employee_id LIKE 'DRN-%' OR fs.department_id = '4'))
-        OR (CAST($1 AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') AND (d.code = 'ELE' OR fs.employee_id LIKE 'ELE-%' OR fs.department_id = '5'))
-        OR (CAST($1 AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') AND (d.code = 'TRF' OR fs.employee_id LIKE 'TRF-%' OR fs.department_id = '6'))
       )`;
       params.push(String(userDeptId || -1));
     }
@@ -735,7 +705,6 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
        LEFT JOIN departments d ON (
          CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
          OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
-         OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
        )
        WHERE CAST(fs.user_id AS TEXT) = $1 
           OR fs.employee_id = $1 
@@ -831,7 +800,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
              assigned_by_name = $4,
              status = $5,
              updated_at = CURRENT_TIMESTAMP
-         WHERE CAST(id AS TEXT) = $6 OR complaint_number = $6
+         WHERE CAST(id AS TEXT) = $6 OR complaint_number = $7
          RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
         [
           assignedStaffId,
@@ -839,6 +808,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
           assignedStaffEmail,
           req.user.name || 'Department Head',
           'Staff Assigned',
+          String(canonicalId),
           String(canonicalId)
         ]
       );
@@ -848,8 +818,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const verifyRes = await query(
       `SELECT id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at
        FROM complaints
-       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
-      [String(canonicalId)]
+       WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`,
+      [String(canonicalId), String(canonicalId)]
     );
 
     if (!verifyRes.rows || verifyRes.rows.length === 0) {

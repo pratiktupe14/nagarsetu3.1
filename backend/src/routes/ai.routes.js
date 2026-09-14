@@ -126,7 +126,21 @@ router.get('/health', async (req, res) => {
  * POST /api/ai/analyze
  * Accepts uploaded photo file and returns Gemini 2.5 Flash structured classification
  */
-router.post('/analyze', uploadSingleImage('photo'), async (req, res) => {
+const handleImageUpload = (req, res, next) => {
+  uploadSingleImage('photo')(req, res, (err) => {
+    if (err) {
+      console.error('[NAGARSETU AI] Multer upload error:', err.message);
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_IMAGE',
+        message: err.message || 'Failed to upload photo. File type or size may be unsupported.'
+      });
+    }
+    next();
+  });
+};
+
+router.post('/analyze', handleImageUpload, async (req, res) => {
   const reqTime = new Date().toISOString();
   console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
 

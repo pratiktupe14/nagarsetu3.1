@@ -46,15 +46,9 @@ router.get(['/dashboard', '/complaints'], validateInput(officerDashboardSchema),
     if (targetDeptId) {
       sql += ` AND (
         CAST(c.department_id AS TEXT) = ? 
-        OR d.code = ? 
-        OR (CAST(? AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') AND (d.code = 'PWD' OR CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8'))
-        OR (CAST(? AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') AND (d.code = 'SAN' OR CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22'))
-        OR (CAST(? AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') AND (d.code = 'WTR' OR CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb'))
-        OR (CAST(? AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') AND (d.code = 'DRN' OR CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354'))
-        OR (CAST(? AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') AND (d.code = 'ELE' OR CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3'))
-        OR (CAST(? AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') AND (d.code = 'TRF' OR CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae'))
+        OR UPPER(d.code) = UPPER(?)
       )`;
-      params.push(String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId));
+      params.push(String(targetDeptId), String(targetDeptId));
     }
     if (priority) {
       sql += ` AND c.priority = ?`;
@@ -89,19 +83,6 @@ router.get('/staff-list', async (req, res) => {
       LEFT JOIN departments d ON (
         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT) 
         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
-        OR (CAST(fs.department_id AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8') AND d.code = 'PWD')
-        OR (CAST(fs.department_id AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22') AND d.code = 'SAN')
-        OR (CAST(fs.department_id AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb') AND d.code = 'WTR')
-        OR (CAST(fs.department_id AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354') AND d.code = 'DRN')
-        OR (CAST(fs.department_id AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3') AND d.code = 'ELE')
-        OR (CAST(fs.department_id AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae') AND d.code = 'TRF')
-        OR (fs.employee_id LIKE 'PWD-%' AND d.code = 'PWD')
-        OR (fs.employee_id LIKE 'SAN-%' AND d.code = 'SAN')
-        OR (fs.employee_id LIKE 'WTR-%' AND d.code = 'WTR')
-        OR (fs.employee_id LIKE 'DRN-%' AND d.code = 'DRN')
-        OR (fs.employee_id LIKE 'ELE-%' AND d.code = 'ELE')
-        OR (fs.employee_id LIKE 'TRF-%' AND d.code = 'TRF')
-        OR (fs.employee_id = 'STF-001' AND d.code = 'PWD')
       )
       WHERE LOWER(COALESCE(fs.status, 'active')) = 'active'
     `;
@@ -123,14 +104,8 @@ router.get('/staff-list', async (req, res) => {
           CAST(fs.department_id AS TEXT) = ?
           OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = ?)
           OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER(?))
-          OR (CAST(? AS TEXT) IN ('1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD') AND (d.code = 'PWD' OR fs.employee_id LIKE 'PWD-%' OR fs.department_id = '1' OR fs.employee_id = 'STF-001'))
-          OR (CAST(? AS TEXT) IN ('2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN') AND (d.code = 'SAN' OR fs.employee_id LIKE 'SAN-%' OR fs.department_id = '2'))
-          OR (CAST(? AS TEXT) IN ('3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR') AND (d.code = 'WTR' OR fs.employee_id LIKE 'WTR-%' OR fs.department_id = '3'))
-          OR (CAST(? AS TEXT) IN ('4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN') AND (d.code = 'DRN' OR fs.employee_id LIKE 'DRN-%' OR fs.department_id = '4'))
-          OR (CAST(? AS TEXT) IN ('5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE') AND (d.code = 'ELE' OR fs.employee_id LIKE 'ELE-%' OR fs.department_id = '5'))
-          OR (CAST(? AS TEXT) IN ('6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF') AND (d.code = 'TRF' OR fs.employee_id LIKE 'TRF-%' OR fs.department_id = '6'))
         )`;
-        params.push(String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId), String(targetDeptId));
+        params.push(String(targetDeptId), String(targetDeptId), String(targetDeptId));
       }
     }
 
@@ -245,13 +220,13 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     const isDeptMatch = (deptA, deptB, empId = '') => {
       if (!deptA || !deptB) return true;
       if (String(deptA) === String(deptB)) return true;
-      const pwdGroup = ['1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD'];
-      const sanGroup = ['2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN'];
-      const wtrGroup = ['3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR'];
-      const drnGroup = ['4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN'];
-      const eleGroup = ['5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE'];
-      const trfGroup = ['6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF'];
-      const mntGroup = ['7', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'MNT'];
+      const pwdGroup = ['1', 'PWD'];
+      const sanGroup = ['2', 'SAN'];
+      const wtrGroup = ['3', 'WTR'];
+      const drnGroup = ['4', 'DRN'];
+      const eleGroup = ['5', 'ELE'];
+      const trfGroup = ['6', 'TRF'];
+      const mntGroup = ['7', 'MNT'];
       for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
         if (g.includes(String(deptA)) && (g.includes(String(deptB)) || (empId && empId.startsWith(g[2])))) return true;
       }

@@ -1,122 +1,124 @@
 const fs = require('fs');
 const path = require('path');
 
-const rootDir = path.resolve(__dirname, '..');
-const frontendDir = path.join(rootDir, 'frontend', 'src');
-const backendDir = path.join(rootDir, 'backend', 'src');
+const BACKEND_SRC = path.join(__dirname, '../backend/src');
+const FRONTEND_SRC = path.join(__dirname, '../frontend/src');
 
-function getAllFiles(dirPath, arrayOfFiles = []) {
-  const files = fs.readdirSync(dirPath);
-  files.forEach((file) => {
-    const fullPath = path.join(dirPath, file);
-    if (fs.statSync(fullPath).isDirectory()) {
-      arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+function getFiles(dir, exts = ['.js', '.ts', '.tsx', '.jsx']) {
+  let results = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir);
+  list.forEach(file => {
+    const filePath = path.join(dir, file);
+    const stat = fs.statSync(filePath);
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getFiles(filePath, exts));
     } else {
-      arrayOfFiles.push(fullPath);
+      if (exts.some(ext => file.endsWith(ext))) {
+        results.push(filePath);
+      }
     }
   });
-  return arrayOfFiles;
+  return results;
 }
 
-const frontendFiles = getAllFiles(frontendDir);
-const backendFiles = getAllFiles(backendDir);
+const backendFiles = getFiles(BACKEND_SRC);
+const frontendFiles = getFiles(FRONTEND_SRC);
 
-console.log('=== DEEP AUDIT SCAN ===');
+console.log('====================================================');
+console.log('DEEP COMPREHENSIVE AUDIT SCAN (PART 2)');
+console.log('====================================================\n');
 
-// 1. Scan Frontend API Endpoints Called
-console.log('\n--- 1. Frontend API Call Scan ---');
-const frontendEndpoints = new Map();
-frontendFiles.forEach(file => {
-  if (!file.endsWith('.ts') && !file.endsWith('.tsx') && !file.endsWith('.js')) return;
+// 1. REPEATED POSITIONAL PARAMETERS IN SQL QUERIES
+console.log('--- 1. SQL QUERIES WITH REPEATED POSITIONAL PARAMETERS ---');
+backendFiles.forEach(file => {
   const content = fs.readFileSync(file, 'utf8');
-  const relPath = path.relative(rootDir, file);
+  const rel = path.relative(path.join(__dirname, '..'), file);
   
-  // match '/api/...' or `/api/...` or axios/fetch calls
-  const matches = content.match(/\/api\/[a-zA-Z0-9_\-\/${}:]+/g) || [];
-  matches.forEach(m => {
-    // clean up quotes or template interpolations
-    const cleaned = m.replace(/['"`]/g, '');
-    if (!frontendEndpoints.has(cleaned)) {
-      frontendEndpoints.set(cleaned, []);
-    }
-    frontendEndpoints.get(cleaned).push(relPath);
-  });
-});
-
-console.log(`Found ${frontendEndpoints.size} unique /api/ endpoints referenced in frontend:`);
-for (const [ep, files] of frontendEndpoints.entries()) {
-  console.log(`  ${ep} -> referenced in ${files.length} file(s)`);
-}
-
-// 2. Scan Backend Route Endpoints
-console.log('\n--- 2. Backend Express Routes Scan ---');
-const backendRoutes = [];
-const routeFiles = getAllFiles(path.join(backendDir, 'routes'));
-
-routeFiles.forEach(file => {
-  const content = fs.readFileSync(file, 'utf8');
-  const relPath = path.relative(rootDir, file);
-  const basename = path.basename(file, '.routes.js');
-  
-  // Determine base prefix from app.js mounts
-  let prefix = '/api/' + basename;
-  if (basename === 'complaint') prefix = '/api/complaints';
-  if (basename === 'department') prefix = '/api/departments';
-  if (basename === 'announcement') prefix = '/api/announcements';
-  if (basename === 'notification') prefix = '/api/notifications';
-
-  const routeRegex = /router\.(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/gi;
-  let match;
-  while ((match = routeRegex.exec(content)) !== null) {
-    const method = match[1].toUpperCase();
-    const routePath = match[2];
-    const fullPath = routePath === '/' ? prefix : (prefix + routePath).replace('//', '/');
-    backendRoutes.push({ method, fullPath, file: relPath, rawPath: routePath });
-  }
-});
-
-console.log(`Found ${backendRoutes.length} backend endpoints:`);
-backendRoutes.forEach(r => {
-  console.log(`  ${r.method.padEnd(6)} ${r.fullPath} (${r.file})`);
-});
-
-// 3. Scan for Buttons with Dummy/Broken Actions in Frontend
-console.log('\n--- 3. Dummy / Broken Buttons & Links Scan ---');
-frontendFiles.forEach(file => {
-  if (!file.endsWith('.tsx')) return;
-  const content = fs.readFileSync(file, 'utf8');
-  const relPath = path.relative(rootDir, file);
+  // Find SQL templates with $N
   const lines = content.split('\n');
-
-  lines.forEach((line, i) => {
-    // href="#" or to="#"
-    if (line.includes('href="#"') || line.includes('to="#"') || line.includes('to=""') || line.includes('href=""')) {
-      console.log(`[BROKEN LINK] ${relPath}:${i + 1} -> ${line.trim()}`);
-    }
-    // onClick alert or dummy toast or alert('...')
-    if (line.includes('alert(') || line.includes('alert `')) {
-      console.log(`[BROWSER ALERT IN PRODUCTION UI] ${relPath}:${i + 1} -> ${line.trim()}`);
-    }
-    // handle click placeholder
-    if (line.includes('console.log(') && (line.includes('click') || line.includes('submit') || line.includes('Button') || line.includes('handle'))) {
-      console.log(`[CONSOLE LOG HANDLER] ${relPath}:${i + 1} -> ${line.trim()}`);
-    }
-  });
-});
-
-// 4. Scan Frontend vs Backend Auth / Token storage
-console.log('\n--- 4. Token & Auth Storage Scan ---');
-frontendFiles.forEach(file => {
-  const content = fs.readFileSync(file, 'utf8');
-  const relPath = path.relative(rootDir, file);
-  const lines = content.split('\n');
-  lines.forEach((line, i) => {
-    if (line.includes('localStorage.getItem') || line.includes('localStorage.setItem')) {
-      if (line.includes('token') || line.includes('auth') || line.includes('user')) {
-        console.log(`[LOCAL STORAGE AUTH] ${relPath}:${i + 1} -> ${line.trim()}`);
+  lines.forEach((line, lineIdx) => {
+    const matches = line.match(/\$\d+/g);
+    if (matches && matches.length > 1) {
+      const counts = {};
+      matches.forEach(m => counts[m] = (counts[m] || 0) + 1);
+      const repeated = Object.keys(counts).filter(m => counts[m] > 1);
+      if (repeated.length > 0 && !rel.includes('announcement.routes.js')) {
+        console.log(`[SQL REPEATED PARAM] ${rel}:${lineIdx + 1}`);
+        console.log(`  Repeated params: ${repeated.join(', ')}`);
+        console.log(`  Line: ${line.trim()}`);
       }
     }
   });
 });
 
-console.log('\n=== DEEP AUDIT SCAN COMPLETE ===');
+// Check multi-line SQL string queries in backend routes
+backendFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(path.join(__dirname, '..'), file);
+
+  const queryBlocks = content.match(/query\s*\(\s*`[^`]+`/g) || [];
+  queryBlocks.forEach(block => {
+    const params = block.match(/\$\d+/g) || [];
+    const counts = {};
+    params.forEach(p => counts[p] = (counts[p] || 0) + 1);
+    const repeated = Object.keys(counts).filter(p => counts[p] > 1);
+    if (repeated.length > 0 && !rel.includes('announcement.routes.js')) {
+      console.log(`[SQL BLOCK REPEATED PARAM] ${rel}`);
+      console.log(`  Repeated params: ${repeated.join(', ')}`);
+      console.log(`  Block snippet: ${block.substring(0, 120).replace(/\s+/g, ' ')}...`);
+    }
+  });
+});
+
+// 2. HARDCODED IDS / FALLBACKS IN BACKEND ROUTES
+console.log('\n--- 2. HARDCODED UUIDs / IDs IN BACKEND ROUTES ---');
+backendFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(path.join(__dirname, '..'), file);
+  if (rel.includes('routes')) {
+    const hardcodedUuids = content.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || [];
+    if (hardcodedUuids.length > 0) {
+      console.log(`[HARDCODED UUID IN ROUTE] ${rel}: ${hardcodedUuids.join(', ')}`);
+    }
+  }
+});
+
+// 3. MULTER ERROR HANDLING IN FILE UPLOAD ROUTES
+console.log('\n--- 3. MULTER UNHANDLED ERROR IN FILE UPLOAD ROUTES ---');
+backendFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(path.join(__dirname, '..'), file);
+
+  if ((content.includes('multer') || content.includes('upload.')) && rel.includes('routes')) {
+    if (!content.includes('MulterError') && !content.includes('err.code')) {
+      console.log(`[MULTER UNHANDLED ERROR ROUTE] ${rel}`);
+    }
+  }
+});
+
+// 4. STORAGE KEY INCONSISTENCIES IN FRONTEND
+console.log('\n--- 4. STORAGE KEY INCONSISTENCIES IN FRONTEND ---');
+frontendFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(path.join(__dirname, '..'), file);
+
+  const keys = content.match(/localStorage\.(?:getItem|setItem|removeItem)\(['"]([^'"]+)['"]/g) || [];
+  keys.forEach(k => {
+    const key = k.match(/['"]([^'"]+)['"]/)[1];
+    if (key.includes('token') && key !== 'nagarsetu_token') {
+      console.log(`[TOKEN KEY INCONSISTENCY] ${rel}: key = '${key}'`);
+    }
+  });
+});
+
+// 5. ENVIRONMENT VARIABLES AND CONFIGURATION
+console.log('\n--- 5. CONFIG & ENV VARIABLE CHECK ---');
+const envExamplePath = path.join(__dirname, '../.env.example');
+const rootEnvPath = path.join(__dirname, '../.env');
+console.log(`.env.example exists: ${fs.existsSync(envExamplePath)}`);
+console.log(`.env exists: ${fs.existsSync(rootEnvPath)}`);
+
+console.log('\n====================================================');
+console.log('AUDIT SCAN COMPLETE');
+console.log('====================================================');

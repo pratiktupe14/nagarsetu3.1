@@ -22,12 +22,21 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   longitude,
   locationSource
 }) => {
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const sourceLabel = locationSource === 'live_gps' ? 'Live GPS Location' : locationSource === 'exif_gps' ? 'Photo EXIF GPS' : 'Manual Pin Drop';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans" role="dialog" aria-modal="true" aria-label="Location Details">
       <div className="max-w-2xl w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-xl space-y-4">
         
         {/* MODAL HEADER */}

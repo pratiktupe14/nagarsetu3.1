@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -154,6 +154,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      if (document.activeElement instanceof HTMLElement) {
+        triggerRef.current = document.activeElement;
+      }
+
+      const timer = setTimeout(() => {
+        if (drawerRef.current) {
+          const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusables.length > 0) {
+            focusables[0].focus();
+          }
+        }
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onMobileClose();
+          return;
+        }
+
+        if (e.key === 'Tab' && drawerRef.current) {
+          const focusables = Array.from(
+            drawerRef.current.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+          ).filter((el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
+
+          if (focusables.length === 0) return;
+
+          const firstEl = focusables[0];
+          const lastEl = focusables[focusables.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstEl) {
+            e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else if (triggerRef.current) {
+      const elToFocus = triggerRef.current;
+      triggerRef.current = null;
+      setTimeout(() => {
+        if (elToFocus && typeof elToFocus.focus === 'function') {
+          elToFocus.focus();
+        } else {
+          const toggleBtn = document.querySelector<HTMLElement>('button[aria-label="Open navigation menu"]');
+          toggleBtn?.focus();
+        }
+      }, 50);
+    }
+  }, [mobileOpen, onMobileClose]);
 
   const activeRole: UserRole = role || user?.role || 'citizen';
 
@@ -550,10 +618,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* MOBILE DRAWER SIDEBAR */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Mobile Navigation">
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs" onClick={onMobileClose} />
 
-          <div className="relative flex-1 max-w-xs w-full bg-white h-full shadow-xl flex flex-col z-10 font-sans">
+          <div ref={drawerRef} className="relative flex-1 max-w-xs w-full bg-white h-full shadow-xl flex flex-col z-10 font-sans">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
               <span className="font-extrabold text-sm text-gray-900 font-outfit">NAGARSETU Navigation</span>
               <button

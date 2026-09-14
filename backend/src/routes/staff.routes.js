@@ -20,7 +20,6 @@ router.get('/tasks', async (req, res) => {
        LEFT JOIN departments d ON (
          CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT)
          OR UPPER(d.code) = UPPER(CAST(fs.department_id AS TEXT))
-         OR (CAST(fs.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
        )
        WHERE CAST(fs.user_id AS TEXT) = CAST($1 AS TEXT) OR LOWER(fs.email) = LOWER($2) OR fs.employee_id = $3
        LIMIT 1`,
@@ -40,12 +39,6 @@ router.get('/tasks', async (req, res) => {
       LEFT JOIN departments d ON (
         CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT)
         OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
-        OR (CAST(c.department_id AS TEXT) = '8ed9f760-1314-427c-a515-c2a54d6df6d8' AND d.code = 'PWD')
-        OR (CAST(c.department_id AS TEXT) = '9cabc1f2-fd10-48dd-a5cb-01d05197de22' AND d.code = 'SAN')
-        OR (CAST(c.department_id AS TEXT) = 'ead370cc-459c-44f0-899f-8a97f0928beb' AND d.code = 'WTR')
-        OR (CAST(c.department_id AS TEXT) = 'ee73cb82-cc47-4333-b7d6-4491353c1354' AND d.code = 'DRN')
-        OR (CAST(c.department_id AS TEXT) = '31842723-23ac-490b-912b-9f6d9afbdfb3' AND d.code = 'ELE')
-        OR (CAST(c.department_id AS TEXT) = 'ae5e4d0c-996f-4d81-9528-d642664c93ae' AND d.code = 'TRF')
       )
       WHERE (
         CAST(c.assigned_staff_id AS TEXT) = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2 OR CAST(c.assigned_staff_id AS TEXT) = $3
@@ -84,8 +77,8 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     const compRes = await query(
       `SELECT id, citizen_id, complaint_number, department_id, assigned_staff_id, assigned_staff_email 
        FROM complaints 
-       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
-      [String(targetId)]
+       WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`,
+      [String(targetId), String(targetId)]
     );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
@@ -116,8 +109,8 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
     }
 
     await query(
-      `UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE CAST(id AS TEXT) = $2 OR complaint_number = $2`,
-      [status, String(targetId)]
+      `UPDATE complaints SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`,
+      [status, String(targetId), String(targetId)]
     );
 
     await query(
@@ -202,13 +195,13 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     const isDeptMatch = (deptA, deptB) => {
       if (!deptA || !deptB) return true;
       if (String(deptA) === String(deptB)) return true;
-      const pwdGroup = ['1', '8ed9f760-1314-427c-a515-c2a54d6df6d8', 'PWD'];
-      const sanGroup = ['2', '9cabc1f2-fd10-48dd-a5cb-01d05197de22', 'SAN'];
-      const wtrGroup = ['3', 'ead370cc-459c-44f0-899f-8a97f0928beb', 'WTR'];
-      const drnGroup = ['4', 'ee73cb82-cc47-4333-b7d6-4491353c1354', 'DRN'];
-      const eleGroup = ['5', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'ELE'];
-      const trfGroup = ['6', 'ae5e4d0c-996f-4d81-9528-d642664c93ae', 'TRF'];
-      const mntGroup = ['7', '31842723-23ac-490b-912b-9f6d9afbdfb3', 'MNT'];
+      const pwdGroup = ['1', 'PWD'];
+      const sanGroup = ['2', 'SAN'];
+      const wtrGroup = ['3', 'WTR'];
+      const drnGroup = ['4', 'DRN'];
+      const eleGroup = ['5', 'ELE'];
+      const trfGroup = ['6', 'TRF'];
+      const mntGroup = ['7', 'MNT'];
       for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
         if (g.includes(String(deptA)) && g.includes(String(deptB))) return true;
       }
@@ -336,8 +329,8 @@ router.post(['/task/:id/progress', '/tasks/:id/progress'], async (req, res) => {
     const compRes = await query(
       `SELECT id, status, complaint_number, department_id, assigned_staff_id 
        FROM complaints 
-       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
-      [String(targetId)]
+       WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`,
+      [String(targetId), String(targetId)]
     );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });

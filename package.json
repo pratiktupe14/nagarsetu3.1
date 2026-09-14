@@ -4,6 +4,7 @@
   "description": "NAGARSETU - AI-Powered Civic Issue Reporting Web Application",
   "scripts": {
     "dev": "node start-dev.js",
+    "test": "node scratch/test_security_isolation.js",
     "start:backend": "cd backend && npm start",
     "start:ai": "cd ai_service && python main.py",
     "start:frontend": "cd frontend && npm run dev"
