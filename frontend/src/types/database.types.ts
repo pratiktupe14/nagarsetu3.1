@@ -91,6 +91,7 @@ export interface UserProfile {
   address?: string;
   language_pref?: string;
   status?: 'Active' | 'Inactive' | 'active' | 'inactive';
+  must_change_password?: boolean;
   created_at?: string;
 }
 

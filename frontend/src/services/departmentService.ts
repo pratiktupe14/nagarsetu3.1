@@ -1083,3 +1083,26 @@ export async function deleteDepartmentHead(headIdOrDeptId: string, performedByUs
   return backendSuccess || true;
 }
 
+export async function changeStaffPasswordByDepartmentHead(
+  staffId: string,
+  newPassword: string,
+  confirmPassword?: string
+): Promise<{ success: boolean; message: string }> {
+  const token = sessionStorage.getItem('auth_token') || localStorage.getItem('token');
+  const response = await fetch(`${getApiUrl()}/api/department/staff/${encodeURIComponent(staffId)}/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ newPassword, confirmPassword })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to update staff password');
+  }
+
+  return data;
+}
+

@@ -2,6 +2,7 @@ import React, { useState, useEffect, ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { DashboardHeader } from './DashboardHeader';
 import { Footer } from './Footer';
+import { ForcePasswordChangeModal } from './ForcePasswordChangeModal';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -30,6 +31,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, titl
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col">
+      <ForcePasswordChangeModal />
       
       {/* REUSABLE SIDEBAR */}
       <Sidebar

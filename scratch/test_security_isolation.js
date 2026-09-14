@@ -38,7 +38,11 @@ function request(port, method, path, headers = {}, body = null) {
 
 async function run() {
   console.log('=== STRICT SECURITY & ISOLATION AUDIT ===\n');
+  process.env.FORCE_PASSWORD_RESET = 'true';
   const { server, port } = await startServer();
+  await require('../backend/src/scripts/seedDemoDepartmentHeads')();
+  await require('../backend/src/scripts/seedServiceStaff')();
+  delete process.env.FORCE_PASSWORD_RESET;
 
   try {
     // 1. Citizen A vs Citizen B Isolation
@@ -97,19 +101,33 @@ async function run() {
 
     // 2. PWD Head vs Electrical (ELE) Complaints Isolation
     console.log('\n2. Testing PWD Head vs ELE Complaints Isolation...');
-    // Log in PWD Head
+    // Log in PWD Head & clear mandatory password change requirement
     const pwdLogin = await request(port, 'POST', '/api/auth/login', {}, {
       mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in',
-      password: 'password123'
+      password: 'rahul@123'
     });
-    const pwdToken = pwdLogin.data.token;
+    let pwdToken = pwdLogin.data.token;
+    if (pwdLogin.data.user && pwdLogin.data.user.must_change_password) {
+      const pwdPassChange = await request(port, 'POST', '/api/auth/change-password', { Authorization: `Bearer ${pwdToken}` }, {
+        currentPassword: 'rahul@123',
+        newPassword: 'rahul@secpass123'
+      });
+      pwdToken = pwdPassChange.data.token || pwdToken;
+    }
 
-    // Log in ELE Head
+    // Log in ELE Head & clear mandatory password change requirement
     const eleLogin = await request(port, 'POST', '/api/auth/login', {}, {
       mobileOrEmail: 'aditya.joshi@nagarsetu.gov.in',
-      password: 'password123'
+      password: 'aditya@123'
     });
-    const eleToken = eleLogin.data.token;
+    let eleToken = eleLogin.data.token;
+    if (eleLogin.data.user && eleLogin.data.user.must_change_password) {
+      const elePassChange = await request(port, 'POST', '/api/auth/change-password', { Authorization: `Bearer ${eleToken}` }, {
+        currentPassword: 'aditya@123',
+        newPassword: 'aditya@secpass123'
+      });
+      eleToken = elePassChange.data.token || eleToken;
+    }
 
     // Submit an ELE complaint
     const eleComp = await request(port, 'POST', '/api/complaints/submit', { Authorization: `Bearer ${tokenA}` }, {
@@ -179,19 +197,34 @@ async function run() {
 
     // 5. Field Staff cannot access or update another staff member's tasks
     console.log("\n5. Testing Field Staff Task Isolation & Update Guard...");
-    // Log in Staff 1 (PWD)
+    // Log in Staff 1 (PWD) & clear mandatory password change requirement
     const staff1Login = await request(port, 'POST', '/api/auth/login', {}, {
       mobileOrEmail: 'staff@nagarsetu.gov.in', // Ramesh Kumar (PWD)
-      password: 'password123'
+      password: 'staff@123'
     });
-    const staff1Token = staff1Login.data.token;
+    let staff1Token = staff1Login.data.token;
+    if (staff1Login.data.user && staff1Login.data.user.must_change_password) {
+      const staff1PassChange = await request(port, 'POST', '/api/auth/change-password', { Authorization: `Bearer ${staff1Token}` }, {
+        currentPassword: 'staff@123',
+        newPassword: 'staff1@secpass123'
+      });
+      staff1Token = staff1PassChange.data.token || staff1Token;
+    }
 
-    // Log in Staff 2 (ELE)
+    // Log in Staff 2 (ELE) & clear mandatory password change requirement
+    const eleFirstName = (eleStaff.name || '').split(' ')[0].toLowerCase();
     const staff2Login = await request(port, 'POST', '/api/auth/login', {}, {
       mobileOrEmail: eleStaff.email,
-      password: 'password123'
+      password: `${eleFirstName}@123`
     });
-    const staff2Token = staff2Login.data.token;
+    let staff2Token = staff2Login.data.token;
+    if (staff2Login.data.user && staff2Login.data.user.must_change_password) {
+      const staff2PassChange = await request(port, 'POST', '/api/auth/change-password', { Authorization: `Bearer ${staff2Token}` }, {
+        currentPassword: `${eleFirstName}@123`,
+        newPassword: 'staff2@secpass123'
+      });
+      staff2Token = staff2PassChange.data.token || staff2Token;
+    }
 
     // Assign compAId to Staff 1
     await request(port, 'POST', '/api/department/assign', { Authorization: `Bearer ${pwdToken}` }, {

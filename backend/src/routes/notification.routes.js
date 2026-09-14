@@ -26,7 +26,7 @@ router.get(['/', '/my'], async (req, res) => {
       FROM notifications n
       LEFT JOIN complaints c ON (CAST(n.complaint_id AS TEXT) = CAST(c.id AS TEXT) OR CAST(n.complaint_id AS TEXT) = c.complaint_number)
       ${whereClause}
-      ORDER BY n.created_at DESC
+      ORDER BY COALESCE(n.sent_at, n.id) DESC
       LIMIT 50
     `;
     const result = await query(sql, params);

@@ -28,7 +28,7 @@ export const LoginPage: React.FC = () => {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg('');
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'admin@123';
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
     const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || '';
     const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || '';
     const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || '';

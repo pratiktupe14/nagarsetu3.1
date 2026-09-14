@@ -296,9 +296,10 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
       const isDrn = ['4', 'DRN'].includes(String(userDeptId));
       const isEle = ['5', 'ELE'].includes(String(userDeptId));
       const isTrf = ['6', 'TRF'].includes(String(userDeptId));
+      const isMnt = ['7', 'MNT'].includes(String(userDeptId));
 
       if (isPwd) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', 'PWD') OR fs.employee_id LIKE 'PWD%' OR (d.id IS NOT NULL AND d.code = 'PWD'))`;
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', 'PWD') OR fs.employee_id LIKE 'PWD%' OR fs.employee_id = 'STF-001' OR (d.id IS NOT NULL AND d.code = 'PWD'))`;
       } else if (isSan) {
         sql += ` AND (CAST(fs.department_id AS TEXT) IN ('2', 'SAN') OR fs.employee_id LIKE 'SAN%' OR (d.id IS NOT NULL AND d.code = 'SAN'))`;
       } else if (isWtr) {
@@ -309,6 +310,8 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
         sql += ` AND (CAST(fs.department_id AS TEXT) IN ('5', 'ELE') OR fs.employee_id LIKE 'ELE%' OR (d.id IS NOT NULL AND d.code = 'ELE'))`;
       } else if (isTrf) {
         sql += ` AND (CAST(fs.department_id AS TEXT) IN ('6', 'TRF') OR fs.employee_id LIKE 'TRF%' OR (d.id IS NOT NULL AND d.code = 'TRF'))`;
+      } else if (isMnt) {
+        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('7', 'MNT') OR fs.employee_id LIKE 'MNT%' OR (d.id IS NOT NULL AND d.code = 'MNT'))`;
       } else {
         sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
         params.push(String(userDeptId || -1));
@@ -970,6 +973,133 @@ router.post('/verify', authenticateToken, requireRole(['department_head', 'admin
   } catch (err) {
     console.error('Verify complaint error:', err);
     return res.status(500).json({ error: 'Failed to verify complaint' });
+  }
+});
+
+/**
+ * POST /api/department/staff/:id/change-password
+ * Department Head changes password for a field staff member in their department
+ */
+router.post('/staff/:id/change-password', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+  try {
+    const targetIdStr = String(req.params.id || '').trim();
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({ error: 'New password is required' });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'New password and confirm password do not match' });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Helper for department code normalization
+    const normDept = (d) => {
+      const s = String(d || '').trim().toLowerCase();
+      if (s === '1' || s.includes('pwd') || s.includes('road') || s.includes('public works')) return '1';
+      if (s === '2' || s.includes('san') || s.includes('waste') || s.includes('garbage')) return '2';
+      if (s === '3' || s.includes('wtr') || s.includes('water') || s.includes('sewerage board')) return '3';
+      if (s === '4' || s.includes('drn') || s.includes('drain') || s.includes('sewage')) return '4';
+      if (s === '5' || s.includes('ele') || s.includes('electric') || s.includes('light')) return '5';
+      if (s === '6' || s.includes('trf') || s.includes('traffic')) return '6';
+      if (s === '7' || s.includes('mnt') || s.includes('maint')) return '7';
+      return s.toUpperCase();
+    };
+
+    // 1. Resolve target user and target department
+    let targetUser = null;
+
+    const fsRes = await query(
+      `SELECT fs.id as field_staff_id, fs.department_id as fs_dept_id, fs.employee_id as fs_emp_id,
+              u.id as user_id, u.name, u.email, u.role, u.department_id as u_dept_id, u.employee_id as u_emp_id
+       FROM field_staff fs
+       JOIN users u ON (u.id = fs.user_id OR CAST(u.id AS TEXT) = CAST(fs.user_id AS TEXT) OR LOWER(u.email) = LOWER(fs.email))
+       WHERE CAST(fs.id AS TEXT) = $1 OR CAST(fs.user_id AS TEXT) = $1 OR CAST(u.id AS TEXT) = $1 OR fs.employee_id = $1 OR u.employee_id = $1
+       LIMIT 1`,
+      [targetIdStr]
+    ).catch(() => ({ rows: [] }));
+
+    if (fsRes.rows && fsRes.rows.length > 0) {
+      const row = fsRes.rows[0];
+      targetUser = {
+        id: row.user_id,
+        name: row.name,
+        email: row.email,
+        role: row.role || 'service_staff',
+        department_id: row.u_dept_id || row.fs_dept_id
+      };
+    } else {
+      const userRes = await query(
+        `SELECT id, name, email, role, department_id FROM users WHERE CAST(id AS TEXT) = $1 OR employee_id = $1 LIMIT 1`,
+        [targetIdStr]
+      ).catch(() => ({ rows: [] }));
+
+      if (userRes.rows && userRes.rows.length > 0) {
+        const uRow = userRes.rows[0];
+        targetUser = {
+          id: uRow.id,
+          name: uRow.name,
+          email: uRow.email,
+          role: uRow.role,
+          department_id: uRow.department_id
+        };
+      }
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    // 2. Role Check: target user must be field staff / service_staff
+    const isServiceStaff = ['service_staff', 'field_staff'].includes(targetUser.role);
+    if (!isServiceStaff) {
+      return res.status(400).json({ error: 'Target account must be a field staff member' });
+    }
+
+    // 3. Department Isolation Check for Department Head
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    if (!isAdmin) {
+      const { userDeptId } = await resolveUserDepartment(req);
+      const requesterDeptNorm = normDept(userDeptId);
+      const targetDeptNorm = normDept(targetUser.department_id);
+
+      if (!requesterDeptNorm || !targetDeptNorm || requesterDeptNorm !== targetDeptNorm) {
+        return res.status(403).json({ error: 'Forbidden: Department Head can only change passwords for staff within their own department' });
+      }
+    }
+
+    // 4. Hash new password with bcrypt
+    const salt = await bcrypt.genSalt(10);
+    const newHash = await bcrypt.hash(newPassword, salt);
+
+    // 5. Authoritative DB Update (sets must_change_password = 1 so reset acts as temporary credential)
+    await query(`UPDATE users SET password_hash = $1, must_change_password = 1 WHERE CAST(id AS TEXT) = $2`, [newHash, String(targetUser.id)]);
+
+    // 6. Read back check to verify persistence
+    const verifyRes = await query(`SELECT id, password_hash, must_change_password FROM users WHERE CAST(id AS TEXT) = $1`, [String(targetUser.id)]);
+    if (!verifyRes.rows || verifyRes.rows.length === 0 || verifyRes.rows[0].password_hash !== newHash) {
+      return res.status(500).json({ error: 'Failed to update staff password in database' });
+    }
+
+    // 7. Audit log event
+    await query(
+      `INSERT INTO audit_logs (actor_user_id, target_user_id, action) VALUES ($1, $2, $3)`,
+      [String(req.user.id), String(targetUser.id), 'PASSWORD_CHANGED_BY_DEPARTMENT_HEAD']
+    ).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Staff password for ${targetUser.name} updated successfully`
+    });
+  } catch (err) {
+    console.error('Staff password change error:', err);
+    return res.status(500).json({ error: 'Failed to update staff password: ' + (err.message || 'Server error') });
   }
 });
 

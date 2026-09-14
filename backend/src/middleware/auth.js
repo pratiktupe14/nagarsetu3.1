@@ -36,11 +36,52 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, getJwtSecret(), (err, user) => {
+  jwt.verify(token, getJwtSecret(), async (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
     req.user = user;
+
+    // Central Route Guard: Reject protected business operations if mandatory password change is pending
+    const reqPath = String(req.path || req.originalUrl || '').toLowerCase();
+    const isAuthBypassPath = reqPath.endsWith('/change-password') ||
+                              reqPath.endsWith('/me') ||
+                              reqPath.endsWith('/refresh') ||
+                              reqPath.endsWith('/logout');
+
+    if (!isAuthBypassPath && user && user.id) {
+      try {
+        const { query } = require('../config/db');
+        const uRes = await query(
+          `SELECT must_change_password, role FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1`,
+          [String(user.id)]
+        ).catch(() => null);
+
+        if (uRes && uRes.rows && uRes.rows.length > 0) {
+          const dbUser = uRes.rows[0];
+          const uRole = dbUser.role || user.role;
+          const isTargetRole = ['department_head', 'service_staff', 'staff', 'field_staff'].includes(uRole);
+          const mustChange = Boolean(
+            dbUser.must_change_password === true ||
+            dbUser.must_change_password === 1 ||
+            dbUser.must_change_password === '1' ||
+            dbUser.must_change_password === 'true' ||
+            dbUser.must_change_password === 't'
+          );
+
+          if (isTargetRole && mustChange) {
+            return res.status(403).json({
+              error: 'Password change required',
+              must_change_password: true,
+              message: 'For security, you must change your temporary password before continuing.'
+            });
+          }
+        }
+      } catch (dbErr) {
+        // If DB query fails, continue to next middleware safely
+      }
+    }
+
     next();
   });
 }

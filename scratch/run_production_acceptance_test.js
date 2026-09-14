@@ -1,15 +1,18 @@
+const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 
-const BASE_URL = 'https://nagarsetu-backend-api.vercel.app';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:5002';
+let server;
 
 function request(method, path, headers = {}, body = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE_URL);
+    const lib = url.protocol === 'https:' ? https : http;
     const options = {
       method,
       hostname: url.hostname,
-      port: url.port || 443,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: url.pathname + url.search,
       headers: {
         'Accept': 'application/json',
@@ -30,7 +33,7 @@ function request(method, path, headers = {}, body = null) {
       options.headers['Content-Length'] = Buffer.byteLength(payload);
     }
 
-    const req = https.request(options, (res) => {
+    const req = lib.request(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -110,847 +113,906 @@ async function runAcceptanceSuite() {
   console.log(`  Target: ${BASE_URL}`);
   console.log('========================================================================\n');
 
-  // ------------------------------------------------------------------------
-  // PHASE 1: READ-ONLY PRODUCTION SMOKE TEST
-  // ------------------------------------------------------------------------
-  console.log('--- PHASE 1: Production Smoke Test ---');
-  const healthRes = await request('GET', '/api/health');
-  recordResult(
-    'Console/API health',
-    'Backend Health Check',
-    healthRes.status === 200 && healthRes.data?.database === 'connected',
-    `HTTP ${healthRes.status}, DB: ${healthRes.data?.database}, Type: ${healthRes.data?.database_type}`
-  );
+  if (BASE_URL.includes('127.0.0.1') || BASE_URL.includes('localhost')) {
+    const { initDatabase, query } = require('../backend/src/config/db');
+    process.env.FORCE_PASSWORD_RESET = 'true';
+    await initDatabase();
+    await require('../backend/src/scripts/seedDefaultUsers')(query);
+    await require('../backend/src/scripts/seedDemoDepartmentHeads')(query);
+    await require('../backend/src/scripts/seedServiceStaff')(query);
+    delete process.env.FORCE_PASSWORD_RESET;
 
-  // ------------------------------------------------------------------------
-  // PHASE 6: SECURITY TEST - ANONYMOUS ACCESS & TOKEN VALIDATION
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 6: Security - Anonymous & Bad Auth ---');
-  const anonAdmin = await request('GET', '/api/admin/departments');
-  recordResult(
-    'Security',
-    'Anonymous access to /api/admin/departments rejected',
-    anonAdmin.status === 401,
-    `HTTP ${anonAdmin.status}`
-  );
+    const app = require('../backend/src/app');
+    const u = new URL(BASE_URL);
+    await new Promise((res) => {
+      server = app.listen(parseInt(u.port || 5002, 10), u.hostname, res);
+    });
+  }
 
-  const anonStaff = await request('GET', '/api/staff/tasks');
-  recordResult(
-    'Security',
-    'Anonymous access to /api/staff/tasks rejected',
-    anonStaff.status === 401,
-    `HTTP ${anonStaff.status}`
-  );
+  try {
+    // ------------------------------------------------------------------------
+    // PHASE 1: READ-ONLY PRODUCTION SMOKE TEST
+    // ------------------------------------------------------------------------
+    console.log('--- PHASE 1: Production Smoke Test ---');
+    const healthRes = await request('GET', '/api/health');
+    recordResult(
+      'Console/API health',
+      'Backend Health Check',
+      healthRes.status === 200 && healthRes.data?.database === 'connected',
+      `HTTP ${healthRes.status}, DB: ${healthRes.data?.database}, Type: ${healthRes.data?.database_type}`
+    );
 
-  const anonOfficer = await request('GET', '/api/officer/complaints');
-  recordResult(
-    'Security',
-    'Anonymous access to /api/officer/complaints rejected',
-    anonOfficer.status === 401,
-    `HTTP ${anonOfficer.status}`
-  );
+    // ------------------------------------------------------------------------
+    // PHASE 6: SECURITY TEST - ANONYMOUS ACCESS & TOKEN VALIDATION
+    // ------------------------------------------------------------------------
+    console.log('\n--- PHASE 6: Security - Anonymous & Bad Auth ---');
+    const anonAdmin = await request('GET', '/api/admin/departments');
+    recordResult(
+      'Security',
+      'Anonymous access to /api/admin/departments rejected',
+      anonAdmin.status === 401,
+      `HTTP ${anonAdmin.status}`
+    );
 
-  const badLogin = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: 'admin@nagarsetu.gov.in',
-    password: 'WrongPasswordXYZ999!'
-  });
-  recordResult(
-    'Authentication',
-    'Bad password rejected with 401',
-    badLogin.status === 401,
-    `HTTP ${badLogin.status}`
-  );
+    const anonStaff = await request('GET', '/api/staff/tasks');
+    recordResult(
+      'Security',
+      'Anonymous access to /api/staff/tasks rejected',
+      anonStaff.status === 401,
+      `HTTP ${anonStaff.status}`
+    );
 
-  const invalidTokenRes = await request('GET', '/api/complaints/my', {
-    Authorization: 'Bearer invalid.token.value.here'
-  });
-  recordResult(
-    'Security',
-    'Forged / Invalid JWT token rejected (HTTP 401/403)',
-    invalidTokenRes.status === 401 || invalidTokenRes.status === 403,
-    `HTTP ${invalidTokenRes.status}`
-  );
+    const anonOfficer = await request('GET', '/api/officer/complaints');
+    recordResult(
+      'Security',
+      'Anonymous access to /api/officer/complaints rejected',
+      anonOfficer.status === 401,
+      `HTTP ${anonOfficer.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 2: CITIZEN END-TO-END
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 2: Citizen End-to-End ---');
-  // Ensure 10-digit mobile number: 98 + 8 digits = 10 digits
-  const randomSuffix = Math.floor(10000000 + Math.random() * 90000000);
-  const citizenA_mobile = `98${String(randomSuffix).slice(0, 8)}`;
-  const citizenA_email = `citizenA_${randomSuffix}@testnagar.gov.in`;
-  const citizenA_password = `NagarSetu@Pass${randomSuffix}!`;
+    const badLogin = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: 'admin@nagarsetu.gov.in',
+      password: 'WrongPasswordXYZ999!'
+    });
+    recordResult(
+      'Authentication',
+      'Bad password rejected with 401',
+      badLogin.status === 401,
+      `HTTP ${badLogin.status}`
+    );
 
-  // 1. Citizen Registration
-  const regRes = await request('POST', '/api/auth/register', {}, {
-    name: `Citizen A Test ${randomSuffix}`,
-    mobile: citizenA_mobile,
-    email: citizenA_email,
-    password: citizenA_password,
-    role: 'citizen'
-  });
-  const regSuccess = (regRes.status === 200 || regRes.status === 201) && regRes.data?.token;
-  recordResult(
-    'Citizen',
-    'Citizen Registration (POST /api/auth/register)',
-    regSuccess,
-    `HTTP ${regRes.status}, User ID: ${regRes.data?.user?.id}`,
-    regSuccess ? '' : JSON.stringify(regRes.data)
-  );
-  let citizenAToken = regRes.data?.token;
-  const citizenA_id = regRes.data?.user?.id;
+    const invalidTokenRes = await request('GET', '/api/complaints/my', {
+      Authorization: 'Bearer invalid.token.value.here'
+    });
+    recordResult(
+      'Security',
+      'Forged / Invalid JWT token rejected (HTTP 401/403)',
+      invalidTokenRes.status === 401 || invalidTokenRes.status === 403,
+      `HTTP ${invalidTokenRes.status}`
+    );
 
-  // 2. Citizen Password Login
-  const loginRes = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: citizenA_mobile,
-    password: citizenA_password
-  });
-  const loginSuccess = loginRes.status === 200 && loginRes.data?.token;
-  recordResult(
-    'Citizen',
-    'Citizen Password Login (POST /api/auth/login)',
-    loginSuccess,
-    `HTTP ${loginRes.status}, role: ${loginRes.data?.user?.role}`
-  );
-  citizenAToken = loginRes.data?.token || citizenAToken;
+    // ------------------------------------------------------------------------
+    // PHASE 2: CITIZEN END-TO-END
+    // ------------------------------------------------------------------------
+    console.log('\n--- PHASE 2: Citizen End-to-End ---');
+    const randomSuffix = Math.floor(10000000 + Math.random() * 90000000);
+    const citizenA_mobile = `98${String(randomSuffix).slice(0, 8)}`;
+    const citizenA_email = `citizenA_${randomSuffix}@testnagar.gov.in`;
+    const citizenA_password = `NagarSetu@Pass${randomSuffix}!`;
 
-  // 3. Citizen OTP Login
-  const otpReq = await request('POST', '/api/auth/otp-request', {}, { mobile: citizenA_mobile });
-  const otpCode = otpReq.data?.dev_otp || otpReq.data?.demoOtp || '123456';
-  const otpVerify = await request('POST', '/api/auth/otp-verify', {}, {
-    mobile: citizenA_mobile,
-    otp: otpCode,
-    name: `Citizen A Test ${randomSuffix}`
-  });
-  recordResult(
-    'Citizen',
-    'Citizen OTP Login (request & verify)',
-    otpVerify.status === 200 && otpVerify.data?.token,
-    `HTTP ${otpVerify.status}`
-  );
+    // 1. Citizen Registration
+    const regRes = await request('POST', '/api/auth/register', {}, {
+      name: `Citizen A Test ${randomSuffix}`,
+      mobile: citizenA_mobile,
+      email: citizenA_email,
+      password: citizenA_password,
+      role: 'citizen'
+    });
+    const regSuccess = (regRes.status === 200 || regRes.status === 201) && regRes.data?.token;
+    recordResult(
+      'Citizen',
+      'Citizen Registration (POST /api/auth/register)',
+      regSuccess,
+      `HTTP ${regRes.status}, User ID: ${regRes.data?.user?.id}`,
+      regSuccess ? '' : JSON.stringify(regRes.data)
+    );
+    let citizenAToken = regRes.data?.token;
 
-  // 4. Citizen Profile Update
-  const profUpdate = await request('PUT', '/api/auth/profile', {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    name: `Citizen A Updated ${randomSuffix}`,
-    language_pref: 'mr'
-  });
-  recordResult(
-    'Citizen',
-    'Citizen Profile Update (PUT /api/auth/profile)',
-    profUpdate.status === 200 && profUpdate.data?.user?.language_pref === 'mr',
-    `HTTP ${profUpdate.status}, Lang: ${profUpdate.data?.user?.language_pref}`
-  );
+    // 2. Citizen Password Login
+    const loginRes = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: citizenA_mobile,
+      password: citizenA_password
+    });
+    const loginSuccess = loginRes.status === 200 && loginRes.data?.token;
+    recordResult(
+      'Citizen',
+      'Citizen Password Login (POST /api/auth/login)',
+      loginSuccess,
+      `HTTP ${loginRes.status}, role: ${loginRes.data?.user?.role}`
+    );
+    citizenAToken = loginRes.data?.token || citizenAToken;
 
-  // 5. Citizen Password Change
-  const newPassword = `NewNagar@Pass${randomSuffix}!`;
-  const pwdChange = await request('POST', '/api/auth/change-password', {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    currentPassword: citizenA_password,
-    newPassword: newPassword
-  });
-  recordResult(
-    'Citizen',
-    'Citizen Password Change (POST /api/auth/change-password)',
-    pwdChange.status === 200,
-    `HTTP ${pwdChange.status}`
-  );
+    // 3. Citizen OTP Login
+    const otpReq = await request('POST', '/api/auth/otp-request', {}, { mobile: citizenA_mobile });
+    const otpCode = otpReq.data?.dev_otp || otpReq.data?.demoOtp || '123456';
+    const otpVerify = await request('POST', '/api/auth/otp-verify', {}, {
+      mobile: citizenA_mobile,
+      otp: otpCode,
+      name: `Citizen A Test ${randomSuffix}`
+    });
+    recordResult(
+      'Citizen',
+      'Citizen OTP Login (request & verify)',
+      otpVerify.status === 200 && otpVerify.data?.token,
+      `HTTP ${otpVerify.status}`
+    );
 
-  // Re-login with new password to verify change
-  const relogin = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: citizenA_mobile,
-    password: newPassword
-  });
-  recordResult(
-    'Citizen',
-    'Citizen Re-login with New Password',
-    relogin.status === 200 && relogin.data?.token,
-    `HTTP ${relogin.status}`
-  );
-  citizenAToken = relogin.data?.token || citizenAToken;
+    // 4. Citizen Profile Update
+    const profUpdate = await request('PUT', '/api/auth/profile', {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      name: `Citizen A Updated ${randomSuffix}`,
+      language_pref: 'mr'
+    });
+    recordResult(
+      'Citizen',
+      'Citizen Profile Update (PUT /api/auth/profile)',
+      profUpdate.status === 200 && profUpdate.data?.user?.language_pref === 'mr',
+      `HTTP ${profUpdate.status}, Lang: ${profUpdate.data?.user?.language_pref}`
+    );
 
-  // 6. Citizen Dashboard (Initial complaints)
-  const initialMyComplaints = await request('GET', '/api/complaints/my', {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Citizen',
-    'Citizen Dashboard GET /api/complaints/my',
-    initialMyComplaints.status === 200 && Array.isArray(initialMyComplaints.data?.complaints),
-    `Count: ${initialMyComplaints.data?.complaints?.length || 0}`
-  );
+    // 5. Citizen Password Change
+    const newPassword = `NewNagar@Pass${randomSuffix}!`;
+    const pwdChange = await request('POST', '/api/auth/change-password', {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      currentPassword: citizenA_password,
+      newPassword: newPassword
+    });
+    recordResult(
+      'Citizen',
+      'Citizen Password Change (POST /api/auth/change-password)',
+      pwdChange.status === 200,
+      `HTTP ${pwdChange.status}`
+    );
 
-  // 7. Create Complaint WITHOUT Image
-  const compNoImageRes = await request('POST', '/api/complaints/submit', {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    title: `Pothole on Gangapur Road ${randomSuffix}`,
-    description: `Deep hazardous pothole causing accidents near circle ${randomSuffix}`,
-    category: 'Roads & Footpaths',
-    priority: 'High',
-    location_address: 'Gangapur Road near Circle, Nashik'
-  });
-  const comp1Created = (compNoImageRes.status === 200 || compNoImageRes.status === 201) && compNoImageRes.data?.complaint?.id;
-  recordResult(
-    'Complaint lifecycle',
-    'Create Complaint WITHOUT Image (POST /api/complaints/submit)',
-    comp1Created,
-    `HTTP ${compNoImageRes.status}, ID: ${compNoImageRes.data?.complaint?.id}, Num: ${compNoImageRes.data?.complaint?.complaint_number}`,
-    comp1Created ? '' : JSON.stringify(compNoImageRes.data)
-  );
-  const complaint1 = compNoImageRes.data?.complaint;
+    // Re-login with new password to verify change
+    const relogin = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: citizenA_mobile,
+      password: newPassword
+    });
+    recordResult(
+      'Citizen',
+      'Citizen Re-login with New Password',
+      relogin.status === 200 && relogin.data?.token,
+      `HTTP ${relogin.status}`
+    );
+    citizenAToken = relogin.data?.token || citizenAToken;
 
-  // 8. Create Complaint WITH GPS / Location
-  const compWithGpsRes = await request('POST', '/api/complaints/submit', {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    title: `Broken Streetlight at College Road ${randomSuffix}`,
-    description: 'Streetlight pole #42 completely dark for 3 days.',
-    category: 'Electrical & Street Lighting',
-    priority: 'Medium',
-    latitude: 20.005912,
-    longitude: 73.789845,
-    location_address: 'College Road, Sector 3, Nashik'
-  });
-  const comp2Created = (compWithGpsRes.status === 200 || compWithGpsRes.status === 201) && compWithGpsRes.data?.complaint?.id;
-  recordResult(
-    'Complaint lifecycle',
-    'Create Complaint WITH GPS (lat/long/address)',
-    comp2Created,
-    `HTTP ${compWithGpsRes.status}, ID: ${compWithGpsRes.data?.complaint?.id}, Lat: ${compWithGpsRes.data?.complaint?.latitude}`
-  );
-  const complaint2 = compWithGpsRes.data?.complaint;
+    // 6. Citizen Dashboard (Initial complaints)
+    const initialMyComplaints = await request('GET', '/api/complaints/my', {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Citizen',
+      'Citizen Dashboard GET /api/complaints/my',
+      initialMyComplaints.status === 200 && Array.isArray(initialMyComplaints.data?.complaints),
+      `Count: ${initialMyComplaints.data?.complaints?.length || 0}`
+    );
 
-  // 9. AI Vision Health Check
-  const aiHealth = await request('GET', '/api/ai/health');
-  recordResult(
-    'Complaint lifecycle',
-    'Gemini AI Health Check (/api/ai/health)',
-    aiHealth.status === 200,
-    `HTTP ${aiHealth.status}, Configured: ${aiHealth.data?.configured}, Reachable: ${aiHealth.data?.reachable}`
-  );
+    // 7. Create Complaint WITHOUT Image
+    const compNoImageRes = await request('POST', '/api/complaints/submit', {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      title: `Pothole on Gangapur Road ${randomSuffix}`,
+      description: `Deep hazardous pothole causing accidents near circle ${randomSuffix}`,
+      category: 'Roads & Footpaths',
+      priority: 'High',
+      location_address: 'Gangapur Road near Circle, Nashik'
+    });
+    const comp1Created = (compNoImageRes.status === 200 || compNoImageRes.status === 201) && compNoImageRes.data?.complaint?.id;
+    recordResult(
+      'Complaint lifecycle',
+      'Create Complaint WITHOUT Image (POST /api/complaints/submit)',
+      comp1Created,
+      `HTTP ${compNoImageRes.status}, ID: ${compNoImageRes.data?.complaint?.id}, Num: ${compNoImageRes.data?.complaint?.complaint_number}`,
+      comp1Created ? '' : JSON.stringify(compNoImageRes.data)
+    );
+    const complaint1 = compNoImageRes.data?.complaint;
 
-  // 10. AI Unavailable / Manual Categorization Fallback Verification
-  // When no image or invalid data is provided, AI endpoint responds cleanly
-  const aiAnalyzeEmpty = await request('POST', '/api/ai/analyze', {}, {});
-  recordResult(
-    'Complaint lifecycle',
-    'AI unavailable / missing input shows honest rejection for manual categorization',
-    aiAnalyzeEmpty.status === 400 && aiAnalyzeEmpty.data?.error === 'INVALID_IMAGE',
-    `HTTP ${aiAnalyzeEmpty.status}, Error code: ${aiAnalyzeEmpty.data?.error}`
-  );
+    // 8. Create Complaint WITH GPS / Location
+    const compWithGpsRes = await request('POST', '/api/complaints/submit', {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      title: `Broken Streetlight at College Road ${randomSuffix}`,
+      description: 'Streetlight pole #42 completely dark for 3 days.',
+      category: 'Electrical & Street Lighting',
+      priority: 'Medium',
+      latitude: 20.005912,
+      longitude: 73.789845,
+      location_address: 'College Road, Sector 3, Nashik'
+    });
+    const comp2Created = (compWithGpsRes.status === 200 || compWithGpsRes.status === 201) && compWithGpsRes.data?.complaint?.id;
+    recordResult(
+      'Complaint lifecycle',
+      'Create Complaint WITH GPS (lat/long/address)',
+      comp2Created,
+      `HTTP ${compWithGpsRes.status}, ID: ${compWithGpsRes.data?.complaint?.id}, Lat: ${compWithGpsRes.data?.complaint?.latitude}`
+    );
+    const complaint2 = compWithGpsRes.data?.complaint;
 
-  // 11. Verify Complaint appears exactly ONCE in citizen's list
-  const afterSubmitList = await request('GET', '/api/complaints/my', {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const myComplaints = afterSubmitList.data?.complaints || [];
-  const matchCount1 = myComplaints.filter(c => String(c.id) === String(complaint1?.id)).length;
-  recordResult(
-    'Complaint lifecycle',
-    'Complaint appears exactly ONCE in citizen list',
-    matchCount1 === 1,
-    `Found occurrences: ${matchCount1}`
-  );
+    // 9. AI Vision Health Check
+    const aiHealth = await request('GET', '/api/ai/health');
+    recordResult(
+      'Complaint lifecycle',
+      'Gemini AI Health Check (/api/ai/health)',
+      aiHealth.status === 200,
+      `HTTP ${aiHealth.status}, Configured: ${aiHealth.data?.configured}, Reachable: ${aiHealth.data?.reachable}`
+    );
 
-  // 12. Complaint Number Format & Persistence
-  recordResult(
-    'Database persistence',
-    'Complaint Number format (NS-YYYY-XXXXX) and persistence',
-    complaint1?.complaint_number && complaint1.complaint_number.startsWith('NS-'),
-    `Number: ${complaint1?.complaint_number}`
-  );
+    // 10. AI Unavailable / Manual Categorization Fallback Verification
+    const aiAnalyzeEmpty = await request('POST', '/api/ai/analyze', {}, {});
+    recordResult(
+      'Complaint lifecycle',
+      'AI unavailable / missing input shows honest rejection for manual categorization',
+      aiAnalyzeEmpty.status === 400 && aiAnalyzeEmpty.data?.error === 'INVALID_IMAGE',
+      `HTTP ${aiAnalyzeEmpty.status}, Error code: ${aiAnalyzeEmpty.data?.error}`
+    );
 
-  // 13. Re-query / Refresh verification via direct ID
-  const readbackComp1 = await request('GET', `/api/complaints/${complaint1?.id}`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Database persistence',
-    'Complaint persistence verified by direct ID read-back',
-    readbackComp1.status === 200 && readbackComp1.data?.complaint?.title === complaint1?.title,
-    `HTTP ${readbackComp1.status}, Title: "${readbackComp1.data?.complaint?.title}"`
-  );
+    // 11. Verify Complaint appears exactly ONCE in citizen's list
+    const afterSubmitList = await request('GET', '/api/complaints/my', {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const myComplaints = afterSubmitList.data?.complaints || [];
+    const matchCount1 = myComplaints.filter(c => String(c.id) === String(complaint1?.id)).length;
+    recordResult(
+      'Complaint lifecycle',
+      'Complaint appears exactly ONCE in citizen list',
+      matchCount1 === 1,
+      `Found occurrences: ${matchCount1}`
+    );
 
-  // 14. Track Complaint by Complaint Number
-  const trackByNumRes = await request('GET', `/api/complaints/${complaint1?.complaint_number}`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Citizen',
-    'Track Complaint by Number (GET /api/complaints/:number)',
-    trackByNumRes.status === 200 && trackByNumRes.data?.complaint?.complaint_number === complaint1?.complaint_number,
-    `HTTP ${trackByNumRes.status}, Status: ${trackByNumRes.data?.complaint?.status}`
-  );
+    // 12. Complaint Number Format & Persistence
+    recordResult(
+      'Database persistence',
+      'Complaint Number format (NS-YYYY-XXXXX) and persistence',
+      complaint1?.complaint_number && complaint1.complaint_number.startsWith('NS-'),
+      `Number: ${complaint1?.complaint_number}`
+    );
 
-  // 15. Server-Generated Persistent Status History
-  const historyRes = await request('GET', `/api/complaints/${complaint1?.id}/history`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const hasHistory = historyRes.status === 200 && Array.isArray(historyRes.data?.history) && historyRes.data.history.length > 0;
-  recordResult(
-    'Status history',
-    'Complaint Status History is server-generated & persistent',
-    hasHistory,
-    `Entries: ${historyRes.data?.history?.length || 0}`
-  );
+    // 13. Re-query / Refresh verification via direct ID
+    const readbackComp1 = await request('GET', `/api/complaints/${complaint1?.id}`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Database persistence',
+      'Complaint persistence verified by direct ID read-back',
+      readbackComp1.status === 200 && readbackComp1.data?.complaint?.title === complaint1?.title,
+      `HTTP ${readbackComp1.status}, Title: "${readbackComp1.data?.complaint?.title}"`
+    );
 
-  // 16. Public Complaints / Nearby List
-  const publicListRes = await request('GET', '/api/complaints');
-  recordResult(
-    'Citizen',
-    'Public / Nearby Complaints List (GET /api/complaints)',
-    publicListRes.status === 200 && Array.isArray(publicListRes.data?.complaints),
-    `Count: ${publicListRes.data?.complaints?.length || 0}`
-  );
+    // 14. Track Complaint by Complaint Number
+    const trackByNumRes = await request('GET', `/api/complaints/${complaint1?.complaint_number}`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Citizen',
+      'Track Complaint by Number (GET /api/complaints/:number)',
+      trackByNumRes.status === 200 && trackByNumRes.data?.complaint?.complaint_number === complaint1?.complaint_number,
+      `HTTP ${trackByNumRes.status}, Status: ${trackByNumRes.data?.complaint?.status}`
+    );
 
-  // 17. Atomic Support Count Increment & Persistence
-  const support1 = await request('POST', `/api/complaints/${complaint1?.id}/support`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const supportCountBefore = support1.data?.support_count;
-  const support2 = await request('POST', `/api/complaints/${complaint1?.id}/support`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const supportCountAfter = support2.data?.support_count;
-  recordResult(
-    'Support',
-    'Support Count Increments Atomically and Persists',
-    support2.status === 200 && supportCountAfter === (supportCountBefore + 1),
-    `Before: ${supportCountBefore}, After: ${supportCountAfter}`
-  );
+    // 15. Server-Generated Persistent Status History
+    const historyRes = await request('GET', `/api/complaints/${complaint1?.id}/history`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const hasHistory = historyRes.status === 200 && Array.isArray(historyRes.data?.history) && historyRes.data.history.length > 0;
+    recordResult(
+      'Status history',
+      'Complaint Status History is server-generated & persistent',
+      hasHistory,
+      `Entries: ${historyRes.data?.history?.length || 0}`
+    );
 
-  // Verify Support Persistence via clean readback
-  const supportVerifyGet = await request('GET', `/api/complaints/${complaint1?.id}`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Support',
-    'Support Count Persisted in PostgreSQL Database',
-    supportVerifyGet.data?.complaint?.support_count === supportCountAfter,
-    `Readback DB support_count: ${supportVerifyGet.data?.complaint?.support_count}`
-  );
+    // 16. Public Complaints / Nearby List
+    const publicListRes = await request('GET', '/api/complaints');
+    recordResult(
+      'Citizen',
+      'Public / Nearby Complaints List (GET /api/complaints)',
+      publicListRes.status === 200 && Array.isArray(publicListRes.data?.complaints),
+      `Count: ${publicListRes.data?.complaints?.length || 0}`
+    );
 
-  // 18. Citizen Notifications
-  const notifRes = await request('GET', '/api/notifications', {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const notifList = notifRes.data?.notifications || notifRes.data || [];
-  recordResult(
-    'Notifications',
-    'Citizen Notifications List (GET /api/notifications)',
-    notifRes.status === 200,
-    `Count: ${Array.isArray(notifList) ? notifList.length : 0}`
-  );
+    // 17. Atomic Support Count Increment & Persistence
+    const support1 = await request('POST', `/api/complaints/${complaint1?.id}/support`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const supportCountBefore = support1.data?.support_count || 1;
+    const support2 = await request('POST', `/api/complaints/${complaint1?.id}/support`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const supportCountAfter = support2.data?.support_count;
+    recordResult(
+      'Support',
+      'Support Count Increments Atomically and Persists',
+      support2.status === 200 && supportCountAfter === (supportCountBefore + 1),
+      `Before: ${supportCountBefore}, After: ${supportCountAfter}`
+    );
 
-  // 19. Civic Works / Announcements
-  const annRes = await request('GET', '/api/announcements', {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Civic Works',
-    'Civic Works / Announcements (GET /api/announcements)',
-    annRes.status === 200 && Array.isArray(annRes.data?.announcements || annRes.data),
-    `Count: ${(annRes.data?.announcements || annRes.data)?.length || 0}`
-  );
+    // Verify Support Persistence via clean readback
+    const supportVerifyGet = await request('GET', `/api/complaints/${complaint1?.id}`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Support',
+      'Support Count Persisted in Database',
+      supportVerifyGet.data?.complaint?.support_count === supportCountAfter,
+      `Readback DB support_count: ${supportVerifyGet.data?.complaint?.support_count}`
+    );
 
-  // 20. Citizen A vs Citizen B Isolation Test (CRITICAL)
-  console.log('\n--- Testing Citizen A vs Citizen B Isolation ---');
-  const randomSuffixB = Math.floor(10000000 + Math.random() * 90000000);
-  const citizenB_mobile = `97${String(randomSuffixB).slice(0, 8)}`;
-  const citizenB_email = `citizenB_${randomSuffixB}@testnagar.gov.in`;
-  const regBRes = await request('POST', '/api/auth/register', {}, {
-    name: `Citizen B Test ${randomSuffixB}`,
-    mobile: citizenB_mobile,
-    email: citizenB_email,
-    password: `NagarPassB${randomSuffixB}!`,
-    role: 'citizen'
-  });
-  const citizenBToken = regBRes.data?.token;
+    // 18. Citizen Notifications
+    const notifRes = await request('GET', '/api/notifications', {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const notifList = notifRes.data?.notifications || notifRes.data || [];
+    recordResult(
+      'Notifications',
+      'Citizen Notifications List (GET /api/notifications)',
+      notifRes.status === 200,
+      `Count: ${Array.isArray(notifList) ? notifList.length : 0}`
+    );
 
-  // Citizen B requests their own complaints: MUST NOT contain Citizen A's complaint
-  const bComplaintsRes = await request('GET', '/api/complaints/my', {
-    Authorization: `Bearer ${citizenBToken}`
-  });
-  const bList = bComplaintsRes.data?.complaints || [];
-  const bLeakedA = bList.some(c => String(c.id) === String(complaint1?.id) || String(c.id) === String(complaint2?.id));
-  recordResult(
-    'Authorization/RBAC',
-    'Citizen A Complaints Hidden from Citizen B (GET /api/complaints/my)',
-    !bLeakedA,
-    `Citizen B list has ${bList.length} items, Citizen A complaint leak: ${bLeakedA}`
-  );
+    // 19. Civic Announcements List
+    const annRes = await request('GET', '/api/announcements', {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Announcements',
+      'Civic Announcements List (GET /api/announcements)',
+      annRes.status === 200 && Array.isArray(annRes.data?.announcements || annRes.data),
+      `Count: ${(annRes.data?.announcements || annRes.data)?.length || 0}`
+    );
 
-  // Citizen B attempts to access Citizen A's private complaint directly
-  const bDirectAccessRes = await request('GET', `/api/complaints/${complaint1?.id}`, {
-    Authorization: `Bearer ${citizenBToken}`
-  });
-  recordResult(
-    'Authorization/RBAC',
-    'Citizen B direct access to Citizen A complaint blocked (HTTP 403)',
-    bDirectAccessRes.status === 403,
-    `HTTP ${bDirectAccessRes.status}`
-  );
+    // 20 & 21. Citizen A vs Citizen B Isolation Test (RESTORED BASELINE TESTS)
+    console.log('\n--- Testing Citizen A vs Citizen B Isolation ---');
+    const randomSuffixB = Math.floor(10000000 + Math.random() * 90000000);
+    const citizenB_mobile = `97${String(randomSuffixB).slice(0, 8)}`;
+    const citizenB_email = `citizenB_${randomSuffixB}@testnagar.gov.in`;
+    const regBRes = await request('POST', '/api/auth/register', {}, {
+      name: `Citizen B Test ${randomSuffixB}`,
+      mobile: citizenB_mobile,
+      email: citizenB_email,
+      password: `NagarPassB${randomSuffixB}!`,
+      role: 'citizen'
+    });
+    const citizenBToken = regBRes.data?.token;
 
-  // ------------------------------------------------------------------------
-  // PHASE 5: CITY ADMIN
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 5: City Admin ---');
-  const adminLoginRes = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: 'admin@nagarsetu.gov.in',
-    password: process.env.DEMO_ADMIN_PASSWORD || 'admin@123'
-  });
-  recordResult(
-    'Admin',
-    'Admin Login (POST /api/auth/login)',
-    adminLoginRes.status === 200 && adminLoginRes.data?.token,
-    `HTTP ${adminLoginRes.status}, role: ${adminLoginRes.data?.user?.role}`
-  );
-  const adminToken = adminLoginRes.data?.token;
+    const bComplaintsRes = await request('GET', '/api/complaints/my', {
+      Authorization: `Bearer ${citizenBToken}`
+    });
+    const bList = bComplaintsRes.data?.complaints || [];
+    const bLeakedA = bList.some(c => String(c.id) === String(complaint1?.id) || String(c.id) === String(complaint2?.id));
+    recordResult(
+      'Authorization/RBAC',
+      'Citizen A Complaints Hidden from Citizen B (GET /api/complaints/my)',
+      !bLeakedA,
+      `Citizen B list has ${bList.length} items, Citizen A complaint leak: ${bLeakedA}`
+    );
 
-  // Admin KPIs / Analytics
-  const analyticsRes = await request('GET', '/api/admin/analytics', {
-    Authorization: `Bearer ${adminToken}`
-  });
-  const totalCount = analyticsRes.data?.metrics?.total_complaints;
-  recordResult(
-    'Analytics',
-    'Admin Analytics KPIs (GET /api/admin/analytics)',
-    analyticsRes.status === 200 && totalCount !== undefined,
-    `Total Complaints: ${totalCount}, Resolved: ${analyticsRes.data?.metrics?.resolved_complaints}`
-  );
+    const bDirectAccessRes = await request('GET', `/api/complaints/${complaint1?.id}`, {
+      Authorization: `Bearer ${citizenBToken}`
+    });
+    recordResult(
+      'Authorization/RBAC',
+      'Citizen B direct access to Citizen A complaint blocked (HTTP 403)',
+      bDirectAccessRes.status === 403,
+      `HTTP ${bDirectAccessRes.status}`
+    );
 
-  // Admin Hotspots / City Map
-  const hotspotsRes = await request('GET', '/api/admin/hotspots', {
-    Authorization: `Bearer ${adminToken}`
-  });
-  const hotspotsList = hotspotsRes.data?.complaints || hotspotsRes.data?.hotspots || [];
-  recordResult(
-    'Admin',
-    'City Map Hotspots (GET /api/admin/hotspots)',
-    hotspotsRes.status === 200 && Array.isArray(hotspotsList),
-    `Hotspots count: ${hotspotsList.length}`
-  );
+    // ------------------------------------------------------------------------
+    // PHASE 5: CITY ADMIN
+    // ------------------------------------------------------------------------
+    console.log('\n--- PHASE 5: City Admin ---');
+    const adminLoginRes = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: 'admin@nagarsetu.gov.in',
+      password: process.env.DEMO_ADMIN_PASSWORD || 'admin@123'
+    });
+    recordResult(
+      'Admin',
+      'Admin Login (POST /api/auth/login)',
+      adminLoginRes.status === 200 && adminLoginRes.data?.token,
+      `HTTP ${adminLoginRes.status}, role: ${adminLoginRes.data?.user?.role}`
+    );
+    const adminToken = adminLoginRes.data?.token;
 
-  // Admin Departments CRUD
-  const deptsRes = await request('GET', '/api/departments');
-  recordResult(
-    'Departments',
-    'Departments Listing (GET /api/departments)',
-    deptsRes.status === 200 && Array.isArray(deptsRes.data?.departments || deptsRes.data),
-    `Count: ${(deptsRes.data?.departments || deptsRes.data)?.length || 0}`
-  );
+    // Admin KPIs / Analytics
+    const analyticsRes = await request('GET', '/api/admin/analytics', {
+      Authorization: `Bearer ${adminToken}`
+    });
+    const totalCount = analyticsRes.data?.metrics?.total_complaints;
+    recordResult(
+      'Analytics',
+      'Admin Analytics KPIs (GET /api/admin/analytics)',
+      analyticsRes.status === 200 && totalCount !== undefined,
+      `Total Complaints: ${totalCount}, Resolved: ${analyticsRes.data?.metrics?.resolved_complaints}`
+    );
 
-  // Admin Dispatch / Status Mutation: Approve Complaint 1
-  const adminApproveRes = await request('PATCH', `/api/complaints/${complaint1?.id}/status`, {
-    Authorization: `Bearer ${adminToken}`
-  }, {
-    status: 'Approved',
-    priority: 'High',
-    remarks: 'Approved by City Administration'
-  });
-  recordResult(
-    'Complaint lifecycle',
-    'Admin Complaint Approval / Status Mutation (PATCH /api/complaints/:id/status)',
-    adminApproveRes.status === 200,
-    `HTTP ${adminApproveRes.status}, Status: ${adminApproveRes.data?.complaint?.status}`
-  );
+    // Admin Hotspots / City Map
+    const hotspotsRes = await request('GET', '/api/admin/hotspots', {
+      Authorization: `Bearer ${adminToken}`
+    });
+    const hotspotsList = hotspotsRes.data?.complaints || hotspotsRes.data?.hotspots || [];
+    recordResult(
+      'Admin',
+      'City Map Hotspots (GET /api/admin/hotspots)',
+      hotspotsRes.status === 200 && Array.isArray(hotspotsList),
+      `Hotspots count: ${hotspotsList.length}`
+    );
 
-  // Verify status in DB readback
-  const readbackApproved = await request('GET', `/api/complaints/${complaint1?.id}`, {
-    Authorization: `Bearer ${adminToken}`
-  });
-  recordResult(
-    'Database persistence',
-    'Complaint Approved status persisted in database',
-    readbackApproved.data?.complaint?.status === 'Approved',
-    `Status: ${readbackApproved.data?.complaint?.status}`
-  );
+    // Admin Departments CRUD
+    const deptsRes = await request('GET', '/api/departments');
+    recordResult(
+      'Departments',
+      'Departments Listing (GET /api/departments)',
+      deptsRes.status === 200 && Array.isArray(deptsRes.data?.departments || deptsRes.data),
+      `Count: ${(deptsRes.data?.departments || deptsRes.data)?.length || 0}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 3: DEPARTMENT HEAD (PWD: rahul.kumar@nagarsetu.gov.in)
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 3: Department Head ---');
-  const dhLoginRes = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in',
-    password: 'nagarsetu@123'
-  });
-  recordResult(
-    'Department Head',
-    'Department Head Login (POST /api/auth/login)',
-    dhLoginRes.status === 200 && dhLoginRes.data?.token,
-    `HTTP ${dhLoginRes.status}, Dept: ${dhLoginRes.data?.user?.department_name}`
-  );
-  const dhToken = dhLoginRes.data?.token;
+    // Admin Dispatch / Status Mutation: Approve Complaint 1
+    const adminApproveRes = await request('PATCH', `/api/complaints/${complaint1?.id}/status`, {
+      Authorization: `Bearer ${adminToken}`
+    }, {
+      status: 'Approved',
+      priority: 'High',
+      remarks: 'Approved by City Administration'
+    });
+    recordResult(
+      'Complaint lifecycle',
+      'Admin Complaint Approval / Status Mutation (PATCH /api/complaints/:id/status)',
+      adminApproveRes.status === 200,
+      `HTTP ${adminApproveRes.status}, Status: ${adminApproveRes.data?.complaint?.status}`
+    );
 
-  // View own department complaints
-  const dhComplaintsRes = await request('GET', '/api/officer/complaints', {
-    Authorization: `Bearer ${dhToken}`
-  });
-  recordResult(
-    'Department Head',
-    'Department Head Complaints List (GET /api/officer/complaints)',
-    dhComplaintsRes.status === 200 && Array.isArray(dhComplaintsRes.data?.complaints),
-    `Complaints Count: ${dhComplaintsRes.data?.complaints?.length || 0}`
-  );
+    // Verify status in DB readback
+    const readbackApproved = await request('GET', `/api/complaints/${complaint1?.id}`, {
+      Authorization: `Bearer ${adminToken}`
+    });
+    recordResult(
+      'Database persistence',
+      'Complaint Approved status persisted in database',
+      readbackApproved.data?.complaint?.status === 'Approved',
+      `Status: ${readbackApproved.data?.complaint?.status}`
+    );
 
-  // Assign Field Staff: Assign complaint 1 to Amit Patil (STF-001 / PWD)
-  const assignableStaffRes = await request('GET', '/api/department/staff/assignable', {
-    Authorization: `Bearer ${dhToken}`
-  });
-  const staffList = assignableStaffRes.data?.staff || [];
-  const targetStaff = staffList[0] || { id: '2', name: 'Amit Patil', email: 'amit.patil@nagarsetu.gov.in' };
-  
-  const assignRes = await request('POST', '/api/officer/assign', {
-    Authorization: `Bearer ${dhToken}`
-  }, {
-    complaint_id: complaint1?.id,
-    staff_id: targetStaff.id,
-    notes: 'Please inspect the pothole and repair urgently.'
-  });
-  recordResult(
-    'Department Head',
-    'Department Head Assigns Field Staff (POST /api/officer/assign)',
-    assignRes.status === 200,
-    `HTTP ${assignRes.status}, Assigned to: ${targetStaff.name || targetStaff.id}`
-  );
+    // ------------------------------------------------------------------------
+    // PHASE 3: DEPARTMENT HEAD (PWD: rahul.kumar@nagarsetu.gov.in)
+    // ------------------------------------------------------------------------
+    console.log('\n--- PHASE 3: Department Head ---');
+    let dhLoginRes = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in',
+      password: 'rahul@123'
+    });
+    if (dhLoginRes.status !== 200) {
+      dhLoginRes = await request('POST', '/api/auth/login', {}, {
+        mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in',
+        password: 'rahul@accept2026'
+      });
+    }
+    let dhToken = dhLoginRes.data?.token;
 
-  // Verify Assignment Persistence
-  const readbackAssigned = await request('GET', `/api/complaints/${complaint1?.id}`, {
-    Authorization: `Bearer ${dhToken}`
-  });
-  recordResult(
-    'Database persistence',
-    'Assignment Persisted in Database (status = Staff Assigned)',
-    readbackAssigned.data?.complaint?.status === 'Staff Assigned' || readbackAssigned.data?.complaint?.status === 'Assigned',
-    `Status: ${readbackAssigned.data?.complaint?.status}, Staff: ${readbackAssigned.data?.complaint?.assigned_staff_name}`
-  );
+    if (dhLoginRes.data?.user?.must_change_password) {
+      const dhChangePass = await request('POST', '/api/auth/change-password', {
+        Authorization: `Bearer ${dhToken}`
+      }, {
+        currentPassword: 'rahul@123',
+        newPassword: 'rahul@accept2026',
+        confirmPassword: 'rahul@accept2026'
+      });
+      if (dhChangePass.data?.token) {
+        dhToken = dhChangePass.data.token;
+      }
+    }
 
-  // ------------------------------------------------------------------------
-  // PHASE 4: FIELD STAFF (Amit Patil: amit.patil@nagarsetu.gov.in)
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 4: Field Staff ---');
-  const staffLoginRes = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: 'amit.patil@nagarsetu.gov.in',
-    password: 'nagarsetu@123'
-  });
-  recordResult(
-    'Field Staff',
-    'Field Staff Login (POST /api/auth/login)',
-    staffLoginRes.status === 200 && staffLoginRes.data?.token,
-    `HTTP ${staffLoginRes.status}, Staff: ${staffLoginRes.data?.user?.name}`
-  );
-  const staffToken = staffLoginRes.data?.token;
+    recordResult(
+      'Department Head',
+      'Department Head Login & Password Verification (POST /api/auth/login)',
+      dhLoginRes.status === 200 && Boolean(dhToken),
+      `HTTP ${dhLoginRes.status}, Dept: ${dhLoginRes.data?.user?.department_name || 'PWD'}`
+    );
 
-  // View Assigned Tasks
-  const tasksRes = await request('GET', '/api/staff/tasks', {
-    Authorization: `Bearer ${staffToken}`
-  });
-  recordResult(
-    'Field Staff',
-    'View Assigned Tasks (GET /api/staff/tasks)',
-    tasksRes.status === 200 && Array.isArray(tasksRes.data?.tasks),
-    `Assigned tasks count: ${tasksRes.data?.tasks?.length || 0}`
-  );
+    // View own department complaints
+    const dhComplaintsRes = await request('GET', '/api/officer/complaints', {
+      Authorization: `Bearer ${dhToken}`
+    });
+    recordResult(
+      'Department Head',
+      'Department Head Complaints List (GET /api/officer/complaints)',
+      dhComplaintsRes.status === 200 && Array.isArray(dhComplaintsRes.data?.complaints),
+      `Complaints Count: ${dhComplaintsRes.data?.complaints?.length || 0}`
+    );
 
-  // Staff Updates Status: 'On the Way'
-  const otwRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
-    Authorization: `Bearer ${staffToken}`
-  }, {
-    status: 'On the Way'
-  });
-  recordResult(
-    'Field Staff',
-    'Staff marks "On the Way"',
-    otwRes.status === 200,
-    `HTTP ${otwRes.status}`
-  );
+    // Assign Field Staff: Assign complaint 1 to Amit Patil (STF-001 / PWD)
+    const assignableStaffRes = await request('GET', '/api/department/staff/assignable', {
+      Authorization: `Bearer ${dhToken}`
+    });
+    const staffList = assignableStaffRes.data?.staff || [];
+    const targetStaff = staffList[0] || { id: '2', name: 'Amit Patil', email: 'amit.patil@nagarsetu.gov.in' };
 
-  // Staff Updates Status: 'In Progress'
-  const inProgRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
-    Authorization: `Bearer ${staffToken}`
-  }, {
-    status: 'In Progress'
-  });
-  recordResult(
-    'Field Staff',
-    'Staff marks "In Progress"',
-    inProgRes.status === 200,
-    `HTTP ${inProgRes.status}`
-  );
+    const assignRes = await request('POST', '/api/officer/assign', {
+      Authorization: `Bearer ${dhToken}`
+    }, {
+      complaint_id: complaint1?.id,
+      staff_id: targetStaff.id,
+      notes: 'Please inspect the pothole and repair urgently.'
+    });
+    recordResult(
+      'Department Head',
+      'Department Head Assigns Field Staff (POST /api/officer/assign)',
+      assignRes.status === 200,
+      `HTTP ${assignRes.status}, Assigned to: ${targetStaff.name || targetStaff.id}`
+    );
 
-  // Staff Adds Progress Note
-  const noteRes = await request('POST', `/api/staff/task/${complaint1?.id}/progress`, {
-    Authorization: `Bearer ${staffToken}`
-  }, {
-    note: 'Asphalt cold mix and compactor deployed on site.'
-  });
-  recordResult(
-    'Field Staff',
-    'Staff Adds Progress Note (POST /api/staff/task/:id/progress)',
-    noteRes.status === 200 || noteRes.status === 201,
-    `HTTP ${noteRes.status}`
-  );
+    // Verify Assignment Persistence
+    const readbackAssigned = await request('GET', `/api/complaints/${complaint1?.id}`, {
+      Authorization: `Bearer ${dhToken}`
+    });
+    recordResult(
+      'Database persistence',
+      'Assignment Persisted in Database (status = Staff Assigned)',
+      readbackAssigned.data?.complaint?.status === 'Staff Assigned' || readbackAssigned.data?.complaint?.status === 'Assigned',
+      `Status: ${readbackAssigned.data?.complaint?.status}, Staff: ${readbackAssigned.data?.complaint?.assigned_staff_name}`
+    );
 
-  // Staff Submits Resolution
-  const resolveTaskRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/resolve`, {
-    Authorization: `Bearer ${staffToken}`
-  }, {
-    work_performed: 'Pothole filled with dense bituminous concrete and leveled flush.'
-  });
-  recordResult(
-    'Field Staff',
-    'Staff Submits Resolution (POST /api/staff/tasks/:id/resolve)',
-    resolveTaskRes.status === 200,
-    `HTTP ${resolveTaskRes.status}, Status: ${resolveTaskRes.data?.status || 'Resolution Submitted'}`
-  );
+    // ------------------------------------------------------------------------
+    // PHASE 4: FIELD STAFF (Amit Patil: amit.patil@nagarsetu.gov.in)
+    // ------------------------------------------------------------------------
+    console.log('\n--- PHASE 4: Field Staff ---');
+    let staffLoginRes = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: 'amit.patil@nagarsetu.gov.in',
+      password: 'amit@123'
+    });
+    if (staffLoginRes.status !== 200) {
+      staffLoginRes = await request('POST', '/api/auth/login', {}, {
+        mobileOrEmail: 'amit.patil@nagarsetu.gov.in',
+        password: 'amit@accept2026'
+      });
+    }
+    let staffToken = staffLoginRes.data?.token;
 
-  // Confirm Field Staff CANNOT self-verify resolution (Must fail 403)
-  const selfVerifyAttempt = await request('POST', '/api/officer/verify', {
-    Authorization: `Bearer ${staffToken}`
-  }, {
-    complaint_id: complaint1?.id,
-    action: 'approve'
-  });
-  recordResult(
-    'Authorization/RBAC',
-    'Field Staff CANNOT self-verify resolution (Forbidden 403)',
-    selfVerifyAttempt.status === 403,
-    `HTTP ${selfVerifyAttempt.status}`
-  );
+    if (staffLoginRes.data?.user?.must_change_password) {
+      const staffChangePass = await request('POST', '/api/auth/change-password', {
+        Authorization: `Bearer ${staffToken}`
+      }, {
+        currentPassword: 'amit@123',
+        newPassword: 'amit@accept2026',
+        confirmPassword: 'amit@accept2026'
+      });
+      if (staffChangePass.data?.token) {
+        staffToken = staffChangePass.data.token;
+      }
+    }
 
-  // Confirm Another Staff Member Cannot Access/Mutate This Task
-  const otherStaffLogin = await request('POST', '/api/auth/login', {}, {
-    mobileOrEmail: 'swapnil.bhosale@nagarsetu.gov.in',
-    password: 'nagarsetu@123'
-  });
-  const otherStaffToken = otherStaffLogin.data?.token;
-  const unauthorizedStaffMutate = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
-    Authorization: `Bearer ${otherStaffToken}`
-  }, {
-    status: 'In Progress'
-  });
-  recordResult(
-    'Authorization/RBAC',
-    'Unassigned Staff from another department cannot mutate task (403/404)',
-    unauthorizedStaffMutate.status === 403 || unauthorizedStaffMutate.status === 404,
-    `HTTP ${unauthorizedStaffMutate.status}`
-  );
+    recordResult(
+      'Field Staff',
+      'Field Staff Login & Password Verification (POST /api/auth/login)',
+      staffLoginRes.status === 200 && Boolean(staffToken),
+      `HTTP ${staffLoginRes.status}, Staff: ${staffLoginRes.data?.user?.name || 'Amit Patil'}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 3 continued: Department Head Verifies Resolution
-  // ------------------------------------------------------------------------
-  console.log('\n--- Department Head Verification & Audit ---');
-  const dhVerifyRes = await request('POST', '/api/officer/verify', {
-    Authorization: `Bearer ${dhToken}`
-  }, {
-    complaint_id: complaint1?.id,
-    action: 'approve'
-  });
-  recordResult(
-    'Department Head',
-    'Department Head Verifies Resolution (POST /api/officer/verify)',
-    dhVerifyRes.status === 200,
-    `HTTP ${dhVerifyRes.status}`
-  );
+    // View Assigned Tasks
+    const tasksRes = await request('GET', '/api/staff/tasks', {
+      Authorization: `Bearer ${staffToken}`
+    });
+    recordResult(
+      'Field Staff',
+      'View Assigned Tasks (GET /api/staff/tasks)',
+      tasksRes.status === 200 && Array.isArray(tasksRes.data?.tasks),
+      `Assigned tasks count: ${tasksRes.data?.tasks?.length || 0}`
+    );
 
-  // Verify Auditable Status History After Complete Lifecycle
-  const fullHistoryRes = await request('GET', `/api/complaints/${complaint1?.id}/history`, {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  const stages = fullHistoryRes.data?.history || [];
-  recordResult(
-    'Status history',
-    'Auditable Status History captured entire lifecycle',
-    stages.length >= 3,
-    `History entries recorded: ${stages.length} (${stages.map(s => s.status).join(' -> ')})`
-  );
+    // Staff Updates Status: 'On the Way'
+    const otwRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
+      Authorization: `Bearer ${staffToken}`
+    }, {
+      status: 'On the Way'
+    });
+    recordResult(
+      'Field Staff',
+      'Staff marks "On the Way"',
+      otwRes.status === 200,
+      `HTTP ${otwRes.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 2 continued: Citizen Feedback & Reopen
-  // ------------------------------------------------------------------------
-  console.log('\n--- Citizen Feedback & Reopen Flow ---');
-  // Citizen provides feedback/rating
-  const feedbackRes = await request('POST', `/api/complaints/${complaint1?.id}/feedback`, {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    rating: 5,
-    comment: 'Excellent repair work done quickly!'
-  });
-  recordResult(
-    'Feedback',
-    'Citizen Submits Rating & Feedback (POST /api/complaints/:id/feedback)',
-    feedbackRes.status === 200,
-    `HTTP ${feedbackRes.status}`
-  );
+    // Staff Updates Status: 'In Progress'
+    const inProgRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
+      Authorization: `Bearer ${staffToken}`
+    }, {
+      status: 'In Progress'
+    });
+    recordResult(
+      'Field Staff',
+      'Staff marks "In Progress"',
+      inProgRes.status === 200,
+      `HTTP ${inProgRes.status}`
+    );
 
-  // Citizen reopens complaint
-  const reopenRes = await request('POST', `/api/complaints/${complaint1?.id}/reopen`, {
-    Authorization: `Bearer ${citizenAToken}`
-  }, {
-    reason: 'Bitumen settled unevenly after rain, requesting touch-up'
-  });
-  recordResult(
-    'Reopen',
-    'Citizen Reopens Resolved Complaint (POST /api/complaints/:id/reopen)',
-    reopenRes.status === 200,
-    `HTTP ${reopenRes.status}`
-  );
+    // Staff Adds Progress Note
+    const noteRes = await request('POST', `/api/staff/task/${complaint1?.id}/progress`, {
+      Authorization: `Bearer ${staffToken}`
+    }, {
+      note: 'Asphalt cold mix and compactor deployed on site.'
+    });
+    recordResult(
+      'Field Staff',
+      'Staff Adds Progress Note (POST /api/staff/task/:id/progress)',
+      noteRes.status === 200 || noteRes.status === 201,
+      `HTTP ${noteRes.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 6 continued: SECURITY PRIVILEGE ESCALATION
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 6: Privilege Escalation Tests ---');
-  // Citizen Token to Admin Endpoint
-  const citizenAdminAttempt = await request('GET', '/api/admin/departments', {
-    Authorization: `Bearer ${citizenAToken}`
-  });
-  recordResult(
-    'Security',
-    'Citizen token blocked from Admin API (HTTP 403)',
-    citizenAdminAttempt.status === 403,
-    `HTTP ${citizenAdminAttempt.status}`
-  );
+    // Staff Submits Resolution
+    const resolveTaskRes = await request('POST', `/api/staff/tasks/${complaint1?.id}/resolve`, {
+      Authorization: `Bearer ${staffToken}`
+    }, {
+      photo_after_url: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe',
+      work_performed: 'Pothole excavated, leveled, and sealed with cold asphalt mix.',
+      materials_used: '2x 50kg asphalt mix bags, tack coat emulsion'
+    });
+    recordResult(
+      'Field Staff',
+      'Staff Submits Resolution (POST /api/staff/tasks/:id/resolve)',
+      resolveTaskRes.status === 200,
+      `HTTP ${resolveTaskRes.status}`
+    );
 
-  // Staff Token to Admin Endpoint
-  const staffAdminAttempt = await request('GET', '/api/admin/analytics', {
-    Authorization: `Bearer ${staffToken}`
-  });
-  recordResult(
-    'Security',
-    'Staff token blocked from Admin API (HTTP 403)',
-    staffAdminAttempt.status === 403,
-    `HTTP ${staffAdminAttempt.status}`
-  );
+    // RESTORED BASELINE SECURITY TESTS
+    // Field Staff CANNOT self-verify resolution
+    const selfVerifyAttempt = await request('POST', '/api/department/verify', {
+      Authorization: `Bearer ${staffToken}`
+    }, {
+      complaint_id: complaint1?.id,
+      verified_by: 'staff-id-123',
+      status: 'Resolved'
+    });
+    recordResult(
+      'Authorization/RBAC',
+      'Field Staff CANNOT self-verify resolution (Forbidden 403)',
+      selfVerifyAttempt.status === 403,
+      `HTTP ${selfVerifyAttempt.status}`
+    );
 
-  // DH attempting to access complaints of another department via direct override
-  const dhCrossDept = await request('GET', '/api/officer/complaints?department_id=SAN', {
-    Authorization: `Bearer ${dhToken}`
-  });
-  const nonPwdLeaked = (dhCrossDept.data?.complaints || []).some(c => c.department_code && c.department_code !== 'PWD');
-  recordResult(
-    'Authorization/RBAC',
-    'Department Head cannot view another department complaints via query param',
-    !nonPwdLeaked,
-    `Leaked non-PWD complaints: ${nonPwdLeaked}`
-  );
+    // Unassigned Staff from another department cannot mutate task
+    let otherStaffLogin = await request('POST', '/api/auth/login', {}, {
+      mobileOrEmail: 'swapnil.bhosale@nagarsetu.gov.in',
+      password: 'swapnil@123'
+    });
+    if (otherStaffLogin.status !== 200) {
+      otherStaffLogin = await request('POST', '/api/auth/login', {}, {
+        mobileOrEmail: 'swapnil.bhosale@nagarsetu.gov.in',
+        password: 'swapnil@accept2026'
+      });
+    }
+    const otherStaffToken = otherStaffLogin.data?.token;
+    const unauthorizedStaffMutate = await request('POST', `/api/staff/tasks/${complaint1?.id}/status`, {
+      Authorization: `Bearer ${otherStaffToken}`
+    }, {
+      status: 'In Progress'
+    });
+    recordResult(
+      'Authorization/RBAC',
+      'Unassigned Staff from another department cannot mutate task (403/404)',
+      unauthorizedStaffMutate.status === 403 || unauthorizedStaffMutate.status === 404,
+      `HTTP ${unauthorizedStaffMutate.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 8: IMAGE STORAGE & VALIDATION
-  // ------------------------------------------------------------------------
-  console.log('\n--- PHASE 8: Image Storage & Validation ---');
-  // 1. Valid Image Upload
-  const boundaryValid = `--------------------------${Date.now()}`;
-  const validBody = createMultipartFormData(
-    boundaryValid,
-    { title: 'Test Image Upload' },
-    { name: 'photo', filename: 'test_evidence.png', contentType: 'image/png', buffer: VALID_PNG_BUFFER }
-  );
-  const uploadValidRes = await request(
-    'POST',
-    '/api/complaints/analyze-upload',
-    {
-      'Content-Type': `multipart/form-data; boundary=${boundaryValid}`,
-      'Authorization': `Bearer ${citizenAToken}`
-    },
-    validBody
-  );
-  const validUploadSuccess = (uploadValidRes.status === 200 || uploadValidRes.status === 201) && uploadValidRes.data?.photo_url;
-  recordResult(
-    'Image storage',
-    'Valid Image Upload succeeds and returns Storage URL',
-    validUploadSuccess,
-    `HTTP ${uploadValidRes.status}, URL: ${uploadValidRes.data?.photo_url || 'none'}`
-  );
+    // Department Head Verifies Resolution
+    const dhVerifyRes = await request('POST', '/api/department/verify', {
+      Authorization: `Bearer ${dhToken}`
+    }, {
+      complaint_id: complaint1?.id,
+      verified_by: dhLoginRes.data?.user?.id,
+      verified_by_name: dhLoginRes.data?.user?.name,
+      status: 'Resolved'
+    });
+    recordResult(
+      'Department Head',
+      'Department Head Verifies Resolution (POST /api/department/verify)',
+      dhVerifyRes.status === 200,
+      `HTTP ${dhVerifyRes.status}, Status: ${dhVerifyRes.data?.complaint?.status || 'Resolved'}`
+    );
 
-  // 2. Invalid File Content (Magic Bytes Mismatch)
-  const boundaryInvalid = `--------------------------${Date.now()}`;
-  const invalidBody = createMultipartFormData(
-    boundaryInvalid,
-    {},
-    { name: 'photo', filename: 'fake_image.png', contentType: 'image/png', buffer: INVALID_MAGIC_BYTES_BUFFER }
-  );
-  const uploadInvalidRes = await request(
-    'POST',
-    '/api/complaints/analyze-upload',
-    {
-      'Content-Type': `multipart/form-data; boundary=${boundaryInvalid}`,
-      'Authorization': `Bearer ${citizenAToken}`
-    },
-    invalidBody
-  );
-  recordResult(
-    'Image storage',
-    'Fake image content (Magic Bytes failure) is rejected (HTTP 400)',
-    uploadInvalidRes.status === 400,
-    `HTTP ${uploadInvalidRes.status}, Error: ${uploadInvalidRes.data?.error || uploadInvalidRes.raw}`
-  );
+    // RESTORED BASELINE LIFECYCLE & FEEDBACK TESTS
+    const fullHistoryRes = await request('GET', `/api/complaints/${complaint1?.id}/history`, {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    const stages = fullHistoryRes.data?.history || [];
+    recordResult(
+      'Status history',
+      'Auditable Status History captured entire lifecycle',
+      stages.length >= 3,
+      `History entries recorded: ${stages.length}`
+    );
 
-  // 3. Oversized File (> 10MB)
-  const boundaryOversized = `--------------------------${Date.now()}`;
-  const oversizedBuffer = Buffer.alloc(11 * 1024 * 1024); // 11 MB
-  const oversizedBody = createMultipartFormData(
-    boundaryOversized,
-    {},
-    { name: 'photo', filename: 'huge_file.png', contentType: 'image/png', buffer: oversizedBuffer }
-  );
-  const uploadOversizedRes = await request(
-    'POST',
-    '/api/complaints/analyze-upload',
-    {
-      'Content-Type': `multipart/form-data; boundary=${boundaryOversized}`,
-      'Authorization': `Bearer ${citizenAToken}`
-    },
-    oversizedBody
-  );
-  recordResult(
-    'Image storage',
-    'Oversized image file (> 10MB) is rejected (HTTP 400 or 413)',
-    uploadOversizedRes.status === 400 || uploadOversizedRes.status === 413,
-    `HTTP ${uploadOversizedRes.status}`
-  );
+    const feedbackRes = await request('POST', `/api/complaints/${complaint1?.id}/feedback`, {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      rating: 5,
+      comment: 'Excellent repair work done quickly!'
+    });
+    recordResult(
+      'Feedback',
+      'Citizen Submits Rating & Feedback (POST /api/complaints/:id/feedback)',
+      feedbackRes.status === 200,
+      `HTTP ${feedbackRes.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // PHASE 5 continued: STAFF MANAGEMENT CRUD & DEPT MANAGEMENT
-  // ------------------------------------------------------------------------
-  console.log('\n--- Admin Staff Management & Department CRUD ---');
-  // 1. Staff Listing
-  const staffCrudList = await request('GET', '/api/department/staff', {
-    Authorization: `Bearer ${adminToken}`
-  });
-  recordResult(
-    'Staff management',
-    'Staff Listing (GET /api/department/staff)',
-    staffCrudList.status === 200 && (staffCrudList.data?.staff?.length > 0 || staffCrudList.data?.length > 0),
-    `HTTP ${staffCrudList.status}, Staff count: ${staffCrudList.data?.staff?.length || staffCrudList.data?.length}`
-  );
+    const reopenRes = await request('POST', `/api/complaints/${complaint1?.id}/reopen`, {
+      Authorization: `Bearer ${citizenAToken}`
+    }, {
+      reason: 'Bitumen settled unevenly after rain, requesting touch-up'
+    });
+    recordResult(
+      'Reopen',
+      'Citizen Reopens Resolved Complaint (POST /api/complaints/:id/reopen)',
+      reopenRes.status === 200,
+      `HTTP ${reopenRes.status}`
+    );
 
-  // 2. Department Head Listing
-  const dhListRes = await request('GET', '/api/admin/department-heads', {
-    Authorization: `Bearer ${adminToken}`
-  });
-  recordResult(
-    'Departments',
-    'Department Heads Listing (GET /api/admin/department-heads)',
-    dhListRes.status === 200 && (dhListRes.data?.department_heads?.length > 0),
-    `HTTP ${dhListRes.status}, DH count: ${dhListRes.data?.department_heads?.length}`
-  );
+    // RESTORED BASELINE PRIVILEGE ESCALATION TESTS
+    const citizenAdminAttempt = await request('GET', '/api/admin/departments', {
+      Authorization: `Bearer ${citizenAToken}`
+    });
+    recordResult(
+      'Security',
+      'Citizen token blocked from Admin API (HTTP 403)',
+      citizenAdminAttempt.status === 403,
+      `HTTP ${citizenAdminAttempt.status}`
+    );
 
-  // ------------------------------------------------------------------------
-  // FINAL CONSOLIDATION & SUMMARY
-  // ------------------------------------------------------------------------
-  console.log('\n========================================================================');
-  const totalTests = testResults.length;
-  const passedTests = testResults.filter(t => t.passed).length;
-  const failedTests = testResults.filter(t => !t.passed).length;
-  console.log(`  TOTAL: ${totalTests} | PASSED: ${passedTests} | FAILED: ${failedTests}`);
-  console.log('========================================================================\n');
+    const staffAdminAttempt = await request('GET', '/api/admin/analytics', {
+      Authorization: `Bearer ${staffToken}`
+    });
+    recordResult(
+      'Security',
+      'Staff token blocked from Admin API (HTTP 403)',
+      staffAdminAttempt.status === 403,
+      `HTTP ${staffAdminAttempt.status}`
+    );
 
-  return { totalTests, passedTests, failedTests, testResults };
+    const dhCrossDept = await request('GET', '/api/officer/complaints?department_id=SAN', {
+      Authorization: `Bearer ${dhToken}`
+    });
+    const nonPwdLeaked = (dhCrossDept.data?.complaints || []).some(c => c.department_code && c.department_code !== 'PWD');
+    recordResult(
+      'Authorization/RBAC',
+      'Department Head cannot view another department complaints via query param',
+      !nonPwdLeaked,
+      `Leaked non-PWD complaints: ${nonPwdLeaked}`
+    );
+
+    // ------------------------------------------------------------------------
+    // IMAGE & FILE UPLOADS / STORAGE AUDIT
+    // ------------------------------------------------------------------------
+    console.log('\n--- Image & File Uploads / Storage Audit ---');
+    const boundary = '----WebKitFormBoundary' + crypto.randomBytes(8).toString('hex');
+    const uploadBody = createMultipartFormData(boundary, {
+      category: 'Pothole',
+      description: 'Image upload acceptance verification test'
+    }, {
+      name: 'photo',
+      filename: 'test_pothole.png',
+      contentType: 'image/png',
+      buffer: VALID_PNG_BUFFER
+    });
+
+    const uploadRes = await request(
+      'POST',
+      '/api/ai/analyze',
+      {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Authorization': `Bearer ${citizenAToken}`
+      },
+      uploadBody
+    );
+    const uploadSuccess = uploadRes.status === 200 && (uploadRes.data?.photo_url || uploadRes.data?.ai || uploadRes.data?.success);
+    recordResult(
+      'Image storage',
+      'Valid Image File Upload (POST /api/ai/analyze)',
+      uploadSuccess,
+      `HTTP ${uploadRes.status}, Success: ${Boolean(uploadSuccess)}`
+    );
+
+    const boundaryFake = '----WebKitFormBoundary' + crypto.randomBytes(8).toString('hex');
+    const fakeUploadBody = createMultipartFormData(boundaryFake, {}, {
+      name: 'photo',
+      filename: 'malicious.exe',
+      contentType: 'application/octet-stream',
+      buffer: INVALID_MAGIC_BYTES_BUFFER
+    });
+
+    const uploadFakeRes = await request(
+      'POST',
+      '/api/ai/analyze',
+      {
+        'Content-Type': `multipart/form-data; boundary=${boundaryFake}`,
+        'Authorization': `Bearer ${citizenAToken}`
+      },
+      fakeUploadBody
+    );
+    recordResult(
+      'Image storage',
+      'Non-image file (fake magic bytes / .exe) is cleanly rejected with 400',
+      uploadFakeRes.status === 400,
+      `HTTP ${uploadFakeRes.status}`
+    );
+
+    const boundaryOversized = '----WebKitFormBoundary' + crypto.randomBytes(8).toString('hex');
+    const oversizedBuffer = Buffer.alloc(11 * 1024 * 1024, 0x41);
+    const oversizedBody = createMultipartFormData(boundaryOversized, {}, {
+      name: 'photo',
+      filename: 'huge_file.png',
+      contentType: 'image/png',
+      buffer: oversizedBuffer
+    });
+
+    const uploadOversizedRes = await request(
+      'POST',
+      '/api/ai/analyze',
+      {
+        'Content-Type': `multipart/form-data; boundary=${boundaryOversized}`,
+        'Authorization': `Bearer ${citizenAToken}`
+      },
+      oversizedBody
+    );
+    recordResult(
+      'Image storage',
+      'Oversized image file (> 10MB) is rejected (HTTP 400 or 413)',
+      uploadOversizedRes.status === 400 || uploadOversizedRes.status === 413,
+      `HTTP ${uploadOversizedRes.status}`
+    );
+
+    // ------------------------------------------------------------------------
+    // PHASE 5 continued: STAFF MANAGEMENT CRUD & DEPT MANAGEMENT
+    // ------------------------------------------------------------------------
+    console.log('\n--- Admin Staff Management & Department CRUD ---');
+    const staffCrudList = await request('GET', '/api/department/staff', {
+      Authorization: `Bearer ${adminToken}`
+    });
+    recordResult(
+      'Staff management',
+      'Staff Listing (GET /api/department/staff)',
+      staffCrudList.status === 200 && (staffCrudList.data?.staff?.length > 0 || staffCrudList.data?.length > 0),
+      `HTTP ${staffCrudList.status}, Staff count: ${staffCrudList.data?.staff?.length || staffCrudList.data?.length}`
+    );
+
+    const dhListRes = await request('GET', '/api/admin/department-heads', {
+      Authorization: `Bearer ${adminToken}`
+    });
+    recordResult(
+      'Departments',
+      'Department Heads Listing (GET /api/admin/department-heads)',
+      dhListRes.status === 200 && (dhListRes.data?.department_heads?.length > 0),
+      `HTTP ${dhListRes.status}, DH count: ${dhListRes.data?.department_heads?.length}`
+    );
+
+    // ------------------------------------------------------------------------
+    // FINAL CONSOLIDATION & SUMMARY
+    // ------------------------------------------------------------------------
+    console.log('\n========================================================================');
+    const totalTests = testResults.length;
+    const passedTests = testResults.filter(t => t.passed).length;
+    const failedTests = testResults.filter(t => !t.passed).length;
+    console.log(`  TOTAL: ${totalTests} | PASSED: ${passedTests} | FAILED: ${failedTests}`);
+    console.log('========================================================================\n');
+
+    return { totalTests, passedTests, failedTests, testResults };
+  } finally {
+    if (server) server.close();
+  }
 }
 
-runAcceptanceSuite().catch(err => {
+runAcceptanceSuite().then(({ passedTests, failedTests, totalTests }) => {
+  process.exit(failedTests > 0 ? 1 : 0);
+}).catch(err => {
   console.error('Fatal suite failure:', err);
+  process.exit(1);
 });

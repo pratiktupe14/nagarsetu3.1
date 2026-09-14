@@ -117,16 +117,18 @@ async function seed7DemoDepartmentHeads(queryFn) {
     }
 
     // 2. Seed 7 official active Department Heads idempotently
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(DEMO_PASSWORD, salt);
-
     for (const dMeta of OFFICIAL_DEPARTMENTS) {
       const cleanEmail = dMeta.email.toLowerCase();
       const targetDeptId = deptIdMap[dMeta.code];
 
+      // Compute individual initial password for this department head
+      const firstName = dMeta.headName.split(' ')[0].toLowerCase();
+      const envPass = process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${dMeta.code}`] || process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
+      const initialPassword = envPass || `${firstName}@123`;
+
       // Check users table for existing account by email or mobile
       const userCheck = await q(
-        `SELECT id, email, password_hash FROM users WHERE LOWER(email) = ? OR mobile = ?`,
+        `SELECT id, email, password_hash, must_change_password FROM users WHERE LOWER(email) = ? OR mobile = ?`,
         [cleanEmail, dMeta.mobile]
       ).catch(() => ({ rows: [] }));
 
@@ -134,6 +136,33 @@ async function seed7DemoDepartmentHeads(queryFn) {
 
       if (userCheck.rows && userCheck.rows.length > 0) {
         userId = userCheck.rows[0].id;
+        const existingHash = userCheck.rows[0].password_hash;
+        
+        // Preserve existing password hash unless FORCE_PASSWORD_RESET=true, hash is missing/invalid, or hash matches initial provisioned password
+        let targetHash = existingHash;
+        let isInitialProvisionedPass = false;
+        if (existingHash && existingHash.startsWith('$2')) {
+          isInitialProvisionedPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
+          if (!isInitialProvisionedPass) {
+            isInitialProvisionedPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
+          }
+        }
+
+        let mustChangePassword = userCheck.rows[0].must_change_password;
+        if (isInitialProvisionedPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+          mustChangePassword = 1;
+        } else if (mustChangePassword === undefined || mustChangePassword === null) {
+          mustChangePassword = 0;
+        } else {
+          mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true') ? 1 : 0;
+        }
+
+        if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+          const salt = await bcrypt.genSalt(10);
+          targetHash = await bcrypt.hash(initialPassword, salt);
+          mustChangePassword = 1;
+        }
+
         await q(
           `UPDATE users
            SET name = ?,
@@ -143,15 +172,19 @@ async function seed7DemoDepartmentHeads(queryFn) {
                role = ?,
                department_id = ?,
                employee_id = ?,
-               status = ?
+               status = ?,
+               must_change_password = ?
            WHERE id = ?`,
-          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, 'department_head', targetDeptId, dMeta.employeeId, 'active', userId]
+          [dMeta.headName, dMeta.mobile, cleanEmail, targetHash, 'department_head', targetDeptId, dMeta.employeeId, 'active', mustChangePassword, userId]
         ).catch(() => {});
         console.log(`✓ Updated user account for ${dMeta.headName} (${cleanEmail}) -> Dept ${targetDeptId}`);
       } else {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(initialPassword, salt);
+
         const insUser = await q(
-          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, 'department_head', targetDeptId, dMeta.employeeId, 'active']
+          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status, must_change_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [dMeta.headName, dMeta.mobile, cleanEmail, passwordHash, 'department_head', targetDeptId, dMeta.employeeId, 'active', 1]
         ).catch(() => ({ rows: [] }));
         userId = insUser.rows?.[0]?.id || null;
         if (!userId) {

@@ -501,7 +501,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Always fetch fresh backend token for the target role to maintain authorization synchronization
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'admin@123';
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
     const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD;
     if (demoAdminPass || demoUserPass) {
       try {
@@ -582,7 +582,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               department_name: data.user.department_name || staffMatch?.department_name || resDept.fullName || resDept.name,
               department_code: data.user.department_code || resDept.code,
               employee_id: data.user.employee_id || staffMatch?.employee_id || undefined,
-              language_pref: data.user.language_pref || 'en'
+              language_pref: data.user.language_pref || 'en',
+              must_change_password: Boolean(data.user.must_change_password)
             };
             setUser(authenticatedUser);
             localStorage.setItem('nagarsetu_token', data.token);
@@ -954,7 +955,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
-    const token = localStorage.getItem('nagarsetu_token');
+    const token = sessionStorage.getItem('auth_token') || localStorage.getItem('token') || localStorage.getItem('nagarsetu_token');
     const response = await fetch(`${getApiUrl()}/api/auth/change-password`, {
       method: 'POST',
       headers: {
@@ -967,6 +968,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || errData.message || 'Failed to update password');
+    }
+
+    const resData = await response.json();
+    if (resData.token) {
+      localStorage.setItem('nagarsetu_token', resData.token);
+    }
+    if (user) {
+      const updatedUser: UserProfile = {
+        ...user,
+        ...(resData.user || {}),
+        must_change_password: false
+      };
+      setUser(updatedUser);
+      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
     }
   };
 

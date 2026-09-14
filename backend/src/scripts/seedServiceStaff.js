@@ -85,17 +85,47 @@ async function seedServiceStaff(queryFn) {
     const cleanEmail = item.email.toLowerCase();
     const deptId = deptMap[item.deptCode] || defaultDeptIdMap[item.deptCode] || 1;
 
+    const firstName = item.name.split(' ')[0].toLowerCase();
+    const envPass = process.env[`STAFF_INITIAL_PASSWORD_${item.employee_id.replace(/-/g, '_')}`] || process.env[`STAFF_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
+    const initialPassword = envPass || (cleanEmail === 'staff@nagarsetu.gov.in' ? 'staff@123' : `${firstName}@123`);
+
     let userId = null;
 
     // Check if user account already exists by email or employee_id
     const existing = await q(
-      `SELECT id, department_id, status FROM users WHERE LOWER(email) = $1 OR employee_id = $2`,
+      `SELECT id, department_id, password_hash, status, must_change_password FROM users WHERE LOWER(email) = $1 OR employee_id = $2`,
       [cleanEmail, item.employee_id]
     ).catch(() => ({ rows: [] }));
 
     if (existing.rows && existing.rows.length > 0) {
       const existingUser = existing.rows[0];
       userId = existingUser.id;
+      const existingHash = existingUser.password_hash;
+
+      let targetHash = existingHash;
+      let isInitialProvisionedPass = false;
+      if (existingHash && existingHash.startsWith('$2')) {
+        isInitialProvisionedPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
+        if (!isInitialProvisionedPass) {
+          isInitialProvisionedPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
+        }
+      }
+
+      let mustChangePassword = existingUser.must_change_password;
+      if (isInitialProvisionedPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+        mustChangePassword = 1;
+      } else if (mustChangePassword === undefined || mustChangePassword === null) {
+        mustChangePassword = 0;
+      } else {
+        mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true') ? 1 : 0;
+      }
+
+      if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+        const salt = await bcrypt.genSalt(10);
+        targetHash = await bcrypt.hash(initialPassword, salt);
+        mustChangePassword = 1;
+      }
+
       await q(
         `UPDATE users
          SET name = $1,
@@ -105,17 +135,21 @@ async function seedServiceStaff(queryFn) {
              department_id = $4,
              employee_id = $5,
              designation = 'Field Service Staff',
-             status = 'active'
-         WHERE id = $6`,
-        [item.name, item.mobile, passwordHash, deptId, item.employee_id, existingUser.id]
+             status = 'active',
+             must_change_password = $6
+         WHERE id = $7`,
+        [item.name, item.mobile, targetHash, deptId, item.employee_id, mustChangePassword, existingUser.id]
       ).catch(() => {});
       updatedCount++;
     } else {
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(initialPassword, salt);
+
       const insUser = await q(
         `INSERT INTO users 
-         (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [item.name, item.mobile, cleanEmail, passwordHash, 'service_staff', deptId, item.employee_id, 'Field Service Staff', 'active', 'en']
+         (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref, must_change_password)
+         VALUES ($1, $2, $3, $4, 'service_staff', $5, $6, 'Field Service Staff', 'active', 'en', 1)`,
+        [item.name, item.mobile, cleanEmail, passwordHash, deptId, item.employee_id]
       ).catch(() => ({ rows: [] }));
       userId = insUser.rows?.[0]?.id || null;
       if (!userId) {

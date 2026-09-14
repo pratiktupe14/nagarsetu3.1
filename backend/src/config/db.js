@@ -300,6 +300,7 @@ async function createTablesPostgres() {
     await safeAddPgCol('users', 'employee_id TEXT');
     await safeAddPgCol('users', "status TEXT DEFAULT 'active'");
     await safeAddPgCol('users', "language_pref TEXT DEFAULT 'en'");
+    await safeAddPgCol('users', 'must_change_password BOOLEAN DEFAULT false');
     await safeAddPgCol('users', 'updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     await safeAddPgCol('field_staff', 'user_id INTEGER');
     await safeAddPgCol('field_staff', 'department_id INTEGER');
@@ -478,6 +479,17 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 15. Audit logs table
+    await safeCreateTable(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        actor_user_id TEXT,
+        target_user_id TEXT,
+        action TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Seed default departments if table is empty
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
     if (parseInt(deptCheck.rows[0]?.count || 0, 10) === 0) {
@@ -607,6 +619,7 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
+      safeAddColumn('users', 'must_change_password INTEGER DEFAULT 0');
       safeAddColumn('users', 'updated_at DATETIME');
       safeAddColumn('field_staff', 'user_id INTEGER');
       safeAddColumn('field_staff', 'department_id INTEGER');
@@ -803,6 +816,16 @@ function createTablesSqlite() {
           read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(announcement_id, user_id),
           FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+        );
+      `);
+
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          actor_user_id TEXT,
+          target_user_id TEXT,
+          action TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
 

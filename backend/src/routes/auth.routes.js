@@ -80,9 +80,8 @@ router.post('/register', validateInput(registerSchema), async (req, res) => {
 // Login endpoint
 router.post('/login', validateInput(loginSchema), async (req, res) => {
   try {
-    const { mobileOrEmail, password } = req.body;
-
-    const rawInput = String(mobileOrEmail).trim();
+    const rawInput = String(req.body.mobileOrEmail || req.body.identifier || req.body.email || req.body.mobile || '').trim();
+    const password = req.body.password;
     const cleanIdentifier = rawInput.toLowerCase();
     const digitsOnly = extractDigits(rawInput);
     const normMobile = normalizeMobile(rawInput);
@@ -266,6 +265,13 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     }
 
     const userRole = user.role === 'admin' ? 'city_admin' : user.role;
+    const isMustChangePassword = Boolean(
+      user.must_change_password === true ||
+      user.must_change_password === 1 ||
+      user.must_change_password === '1' ||
+      user.must_change_password === 'true' ||
+      user.must_change_password === 't'
+    );
 
     const userObj = {
       id: user.id,
@@ -278,7 +284,8 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       department_code: departmentCode,
       employee_id: user.employee_id || null,
       status: user.status || 'active',
-      language_pref: user.language_pref
+      language_pref: user.language_pref,
+      must_change_password: isMustChangePassword
     };
 
     const token = generateToken(userObj);
@@ -350,7 +357,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRes = await query(
-      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref, u.must_change_password,
               d.name as department_name, d.code as department_code
        FROM users u
        LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
@@ -409,6 +416,14 @@ router.get('/me', authenticateToken, async (req, res) => {
       }
     }
 
+    const isMustChangePassword = Boolean(
+      u.must_change_password === true ||
+      u.must_change_password === 1 ||
+      u.must_change_password === '1' ||
+      u.must_change_password === 'true' ||
+      u.must_change_password === 't'
+    );
+
     const userObj = {
       id: u.id,
       name: u.name,
@@ -421,7 +436,8 @@ router.get('/me', authenticateToken, async (req, res) => {
       employee_id: u.employee_id || null,
       designation: u.designation || null,
       status: u.status || 'active',
-      language_pref: u.language_pref || 'en'
+      language_pref: u.language_pref || 'en',
+      must_change_password: isMustChangePassword
     };
 
     return res.json({
@@ -544,10 +560,18 @@ router.put('/profile', authenticateToken, async (req, res) => {
 router.post('/change-password', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'New password and confirm password do not match' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ error: 'New password cannot be the same as the current password' });
     }
 
     if (String(newPassword).length < 6) {
@@ -576,17 +600,59 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const newHash = await bcrypt.hash(newPassword, salt);
 
-    await query(`UPDATE users SET password_hash = ? WHERE CAST(id AS TEXT) = ?`, [newHash, String(userId)]);
+    await query(`UPDATE users SET password_hash = ?, must_change_password = 0 WHERE CAST(id AS TEXT) = ?`, [newHash, String(userId)]);
 
     // Read back check
-    const verifyRes = await query(`SELECT id, password_hash FROM users WHERE CAST(id AS TEXT) = ?`, [String(userId)]);
+    const verifyRes = await query(`SELECT id, password_hash, must_change_password FROM users WHERE CAST(id AS TEXT) = ?`, [String(userId)]);
     if (!verifyRes.rows || verifyRes.rows[0].password_hash !== newHash) {
       return res.status(500).json({ error: 'Password update verification failed' });
     }
 
+    // Record audit history
+    await query(
+      `INSERT INTO audit_logs (actor_user_id, target_user_id, action) VALUES (?, ?, ?)`,
+      [String(userId), String(userId), 'PASSWORD_CHANGED_BY_SELF']
+    ).catch(() => {});
+
+    // Fetch authoritative updated user record
+    const updatedRes = await query(
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref, u.must_change_password,
+              d.name as department_name, d.code as department_code
+       FROM users u
+       LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
+       WHERE CAST(u.id AS TEXT) = ?
+       LIMIT 1`,
+      [String(userId)]
+    );
+
+    let updatedUserObj = null;
+    let newToken = null;
+    if (updatedRes.rows && updatedRes.rows.length > 0) {
+      const u = updatedRes.rows[0];
+      const userRole = u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role);
+      updatedUserObj = {
+        id: u.id,
+        name: u.name,
+        mobile: u.mobile,
+        email: u.email,
+        role: userRole,
+        department_id: u.department_id ? String(u.department_id) : null,
+        department_name: u.department_name || null,
+        department_code: u.department_code || null,
+        employee_id: u.employee_id || null,
+        designation: u.designation || null,
+        status: u.status || 'active',
+        language_pref: u.language_pref || 'en',
+        must_change_password: false
+      };
+      newToken = generateToken(updatedUserObj);
+    }
+
     return res.json({
       success: true,
-      message: 'Password updated successfully'
+      message: 'Password updated successfully',
+      token: newToken,
+      user: updatedUserObj
     });
   } catch (err) {
     console.error('Change password error:', err);
@@ -602,7 +668,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userRes = await query(
-      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref,
+      `SELECT u.id, u.name, u.mobile, u.email, u.role, u.department_id, u.employee_id, u.designation, u.status, u.language_pref, u.must_change_password,
               d.name as department_name, d.code as department_code
        FROM users u
        LEFT JOIN departments d ON (CAST(u.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(u.department_id AS TEXT) = d.code)
@@ -617,6 +683,13 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     const u = userRes.rows[0];
     const userRole = u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role);
+    const isMustChangePassword = Boolean(
+      u.must_change_password === true ||
+      u.must_change_password === 1 ||
+      u.must_change_password === '1' ||
+      u.must_change_password === 'true' ||
+      u.must_change_password === 't'
+    );
 
     const userObj = {
       id: u.id,
@@ -631,7 +704,8 @@ router.post('/refresh', authenticateToken, async (req, res) => {
       employee_id: u.employee_id || null,
       designation: u.designation || null,
       status: u.status || 'active',
-      language_pref: u.language_pref || 'en'
+      language_pref: u.language_pref || 'en',
+      must_change_password: isMustChangePassword
     };
 
     const newToken = generateToken(userObj);
