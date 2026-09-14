@@ -19,8 +19,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const { user, role, switchRole } = useAuth();
   const activeRole: UserRole = role || user?.role || 'citizen';
 
-  const handleRoleSwitch = (targetRole: UserRole) => {
-    switchRole(targetRole);
+  const handleRoleSwitch = async (targetRole: UserRole) => {
+    await switchRole(targetRole);
     if (targetRole === 'citizen') window.location.href = '/citizen/portal';
     if (targetRole === 'city_admin') window.location.href = '/admin/portal';
     if (targetRole === 'service_staff') window.location.href = '/staff/portal';

@@ -209,9 +209,9 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   let responseStatus = 0;
   const startTime = new Date().toISOString();
 
-  // 1. Try Express Backend API first with no-cache headers
+  // 1. Try Express Backend API first with no-cache headers and scope=all
   try {
-    const res = await fetch(`${getApiUrl()}/api/complaints`, {
+    const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {
       headers: getNoCacheHeaders()
     });
     responseStatus = res.status;
@@ -245,12 +245,23 @@ export async function getAllComplaints(): Promise<Complaint[]> {
 
   // 3. DB state is authoritative when backend or Supabase query succeeds
   if (responseStatus === 200) {
-    const { repairedComplaints } = await auditAndRepairComplaintLocations(list);
-    const finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
+    let finalComplaints = list.filter((c) => !isDemoComplaint(c));
+
+    // Audit and repair locations with a non-blocking timeout so dashboard loads instantly
+    try {
+      const repairPromise = auditAndRepairComplaintLocations(finalComplaints);
+      const timeoutPromise = new Promise<{ repairedComplaints: Complaint[] }>((resolve) =>
+        setTimeout(() => resolve({ repairedComplaints: finalComplaints }), 1200)
+      );
+      const { repairedComplaints } = await Promise.race([repairPromise, timeoutPromise]);
+      finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
+    } catch (e) {
+      console.warn('Location audit skipped or timed out:', e);
+    }
 
     if (import.meta.env.DEV) {
       console.log('[ADMIN DATA SYNC]', {
-        apiUrl: `${getApiUrl()}/api/complaints`,
+        apiUrl: `${getApiUrl()}/api/complaints?scope=all`,
         fetchTime: startTime,
         responseStatus,
         databaseRecordCount: list.length,

@@ -655,24 +655,28 @@ export async function auditAndRepairComplaintLocations(
     } else if (address.length > 3) {
       // Only attempt fallback geocoding if coordinates are completely missing (null/NaN)
       mismatchedCount++;
-      const geoResult = await geocodeAddress(address);
-      if (geoResult) {
-        correctedCount++;
-        repairedComplaints[i] = {
-          ...c,
-          latitude: geoResult.latitude,
-          longitude: geoResult.longitude,
-          location_source: 'geocoded',
-          location_address: address || geoResult.formatted_address
-        };
-      } else {
-        locationUnavailableCount++;
-        repairedComplaints[i] = {
-          ...c,
-          location_address: address,
-          location_source: 'geocode_failed'
-        };
+      if (correctedCount < 3) {
+        try {
+          const geoResult = await geocodeAddress(address);
+          if (geoResult) {
+            correctedCount++;
+            repairedComplaints[i] = {
+              ...c,
+              latitude: geoResult.latitude,
+              longitude: geoResult.longitude,
+              location_source: 'geocoded',
+              location_address: address || geoResult.formatted_address
+            };
+            continue;
+          }
+        } catch (e) {}
       }
+      locationUnavailableCount++;
+      repairedComplaints[i] = {
+        ...c,
+        location_address: address,
+        location_source: 'geocode_failed'
+      };
     }
   }
 

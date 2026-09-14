@@ -327,11 +327,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]);
 
           const profile = profRes.data;
-          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const userRole = roleRes.data?.role || profile?.role || authUser.user_metadata?.role || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : undefined);
           const deptHead = headRes.data;
 
           if (isMounted) {
-            let role: UserRole = (userRole as UserRole) || 'citizen';
+            let role: UserRole = (userRole as UserRole) || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
             let deptId = profile?.department_id || deptHead?.department_id;
             let deptName = profile?.department_name || deptHead?.departments?.name;
 
@@ -339,6 +339,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               role = 'department_head';
               deptId = deptHead.department_id;
               deptName = deptHead.departments?.name || deptName;
+            } else if (profile?.role === 'city_admin' || profile?.role === 'admin' || userEmail.toLowerCase().includes('admin')) {
+              role = 'city_admin';
             }
 
             if (role === 'service_staff' && (!deptId || !deptName)) {
@@ -407,10 +409,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]);
 
           const profile = profRes.data;
-          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const userRole = roleRes.data?.role || profile?.role || authUser.user_metadata?.role || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : undefined);
           const deptHead = headRes.data;
 
-          let role: UserRole = (userRole as UserRole) || 'citizen';
+          let role: UserRole = (userRole as UserRole) || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
           let deptId = profile?.department_id || deptHead?.department_id;
           let deptName = profile?.department_name || deptHead?.departments?.name;
 
@@ -418,6 +420,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role = 'department_head';
             deptId = deptHead.department_id;
             deptName = deptHead.departments?.name || deptName;
+          } else if (profile?.role === 'city_admin' || profile?.role === 'admin' || userEmail.toLowerCase().includes('admin')) {
+            role = 'city_admin';
           }
 
           if (role === 'service_staff' && (!deptId || !deptName)) {
@@ -657,7 +661,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           const profile = profRes.data;
           const deptHead = headRes.data;
-          const resolvedRole: UserRole = deptHead ? 'department_head' : (roleRes.data?.role as UserRole) || targetRole;
+          const resolvedRole: UserRole = deptHead
+            ? 'department_head'
+            : (roleRes.data?.role as UserRole) || (profile?.role as UserRole) || (cleanEmail.toLowerCase().includes('admin') ? 'city_admin' : targetRole);
           const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
           let rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
           let rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;

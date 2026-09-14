@@ -22,8 +22,8 @@ export const Navbar: React.FC = () => {
     navigate('/');
   };
 
-  const handleRoleSwitch = (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
-    switchRole(targetRole);
+  const handleRoleSwitch = async (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
+    await switchRole(targetRole);
     if (targetRole === 'citizen') navigate('/citizen/portal');
     if (targetRole === 'city_admin') navigate('/admin/portal');
     if (targetRole === 'department_head') navigate('/department-head/portal');

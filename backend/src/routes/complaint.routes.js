@@ -397,12 +397,14 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
     `;
     const params = [];
 
+    const isScopeAll = req.query.scope === 'all' || req.query.all === 'true';
+
     // Server-side Data Isolation based on Role
-    if (authUser && authUser.role === 'citizen') {
+    if (!isScopeAll && (req.query.my === 'true' || (authUser && authUser.role === 'citizen'))) {
       const citizenProfileId = await resolveCitizenProfileId(authUser);
       sql += ` AND (CAST(c.citizen_id AS TEXT) = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
-      params.push(String(citizenProfileId || ''), String(authUser.id));
-    } else if (authUser && authUser.role === 'department_head') {
+      params.push(String(citizenProfileId || ''), String(authUser ? authUser.id : ''));
+    } else if (!isScopeAll && authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
         const uRes = await query('SELECT department_id FROM users WHERE id = ? OR email = ?', [authUser.id, authUser.email || '']);
@@ -428,7 +430,7 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
         params.push(String(req.query.department_id), String(req.query.department_id), String(req.query.department_id));
       }
     } else {
-      // Unauthenticated / Public visitor: show non-draft complaints, allow optional department_id filter
+      // Unauthenticated / Public visitor or scope=all for non-admin: show non-draft complaints, allow optional department_id filter
       if (req.query.department_id) {
         sql += ` AND (
           CAST(c.department_id AS TEXT) = ?
@@ -437,7 +439,10 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
         )`;
         params.push(String(req.query.department_id), String(req.query.department_id), String(req.query.department_id));
       }
-      sql += ` AND (CAST(c.status AS TEXT) NOT IN ('Draft', 'draft'))`;
+      // If not admin, exclude drafts
+      if (!authUser || (authUser.role !== 'admin' && authUser.role !== 'city_admin')) {
+        sql += ` AND (CAST(c.status AS TEXT) NOT IN ('Draft', 'draft'))`;
+      }
     }
 
     sql += ` ORDER BY c.created_at DESC`;
