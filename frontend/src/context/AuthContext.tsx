@@ -599,7 +599,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      const cleanEmail = cleanIdentifier.includes('@') ? cleanIdentifier.toLowerCase() : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
+      let cleanEmail = cleanIdentifier.includes('@')
+        ? cleanIdentifier.toLowerCase()
+        : (targetRole === 'city_admin' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin')
+          ? 'admin@nagarsetu.gov.in'
+          : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
+
+      if (isSupabaseConfigured() && !cleanIdentifier.includes('@') && cleanEmail !== 'admin@nagarsetu.gov.in') {
+        const rawDigits = cleanIdentifier.replace(/\D/g, '');
+        const norm = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+        try {
+          const { data: matchedProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .or(`mobile.eq.${cleanIdentifier},mobile.eq.${norm}`)
+            .maybeSingle();
+          if (matchedProfile?.email) {
+            cleanEmail = matchedProfile.email.toLowerCase();
+          }
+        } catch (e) {
+          // Keep default cleanEmail on lookup error
+        }
+      }
 
       if (isSupabaseConfigured()) {
         // Check if user has an inactive department_head assignment with no active assignment
