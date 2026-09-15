@@ -28,10 +28,10 @@ export const LoginPage: React.FC = () => {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg('');
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
-    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || '';
-    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || '';
-    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || '';
+    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'admin@123';
+    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || '8788562103';
+    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'rahul@123';
+    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'nagarsetu@123';
 
     if (role === 'citizen') {
       setIdentifier('8788562103');

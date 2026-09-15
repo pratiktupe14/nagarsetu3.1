@@ -138,29 +138,28 @@ async function seed7DemoDepartmentHeads(queryFn) {
         userId = userCheck.rows[0].id;
         const existingHash = userCheck.rows[0].password_hash;
         
-        // Preserve existing password hash unless FORCE_PASSWORD_RESET=true, hash is missing/invalid, or hash matches initial provisioned password
+        // Preserve existing password hash if valid, otherwise reset to initial provisioned password
         let targetHash = existingHash;
-        let isInitialProvisionedPass = false;
+        let isKnownValidPass = false;
         if (existingHash && existingHash.startsWith('$2')) {
-          isInitialProvisionedPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
-          if (!isInitialProvisionedPass) {
-            isInitialProvisionedPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
+          isKnownValidPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
+          if (!isKnownValidPass) {
+            isKnownValidPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
+          }
+          if (!isKnownValidPass) {
+            isKnownValidPass = await bcrypt.compare('password123', existingHash).catch(() => false);
           }
         }
 
         let mustChangePassword = userCheck.rows[0].must_change_password;
-        if (isInitialProvisionedPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
-          mustChangePassword = 1;
+        if (!isKnownValidPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+          const salt = await bcrypt.genSalt(10);
+          targetHash = await bcrypt.hash(initialPassword, salt);
+          mustChangePassword = 0;
         } else if (mustChangePassword === undefined || mustChangePassword === null) {
           mustChangePassword = 0;
         } else {
           mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true') ? 1 : 0;
-        }
-
-        if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
-          const salt = await bcrypt.genSalt(10);
-          targetHash = await bcrypt.hash(initialPassword, salt);
-          mustChangePassword = 1;
         }
 
         await q(
