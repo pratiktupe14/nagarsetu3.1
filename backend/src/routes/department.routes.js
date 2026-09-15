@@ -15,33 +15,76 @@ router.use((req, res, next) => {
 });
 
 /**
+ * Helper: Universal Department Normalization
+ */
+function normalizeDepartmentInfo(deptInput) {
+  if (!deptInput && deptInput !== 0) return { id: null, idStr: '', code: '', name: '' };
+  
+  const str = String(deptInput).trim().toLowerCase();
+  
+  if (str === '1' || str === 'pwd' || str.includes('pwd') || str.includes('road') || str.includes('public works') || str.includes('dept-1')) {
+    return { id: 1, idStr: '1', code: 'PWD', name: 'Public Works Department (PWD)' };
+  }
+  if (str === '2' || str === 'san' || str.includes('san') || str.includes('waste') || str.includes('sanitat') || str.includes('dept-2')) {
+    return { id: 2, idStr: '2', code: 'SAN', name: 'Sanitation & Solid Waste' };
+  }
+  if (str === '3' || str === 'wtr' || str.includes('wtr') || str.includes('water') || str.includes('sewerage') || str.includes('dept-3')) {
+    return { id: 3, idStr: '3', code: 'WTR', name: 'Water Supply & Sewerage' };
+  }
+  if (str === '4' || str === 'drn' || str.includes('drn') || str.includes('drain') || str.includes('sewage') || str.includes('dept-4')) {
+    return { id: 4, idStr: '4', code: 'DRN', name: 'Drainage & Stormwater' };
+  }
+  if (str === '5' || str === 'ele' || str.includes('ele') || str.includes('electric') || str.includes('light') || str.includes('dept-5')) {
+    return { id: 5, idStr: '5', code: 'ELE', name: 'Electrical & Street Lighting' };
+  }
+  if (str === '6' || str === 'trf' || str.includes('trf') || str.includes('traffic') || str.includes('dept-6')) {
+    return { id: 6, idStr: '6', code: 'TRF', name: 'Traffic & Transportation' };
+  }
+  if (str === '7' || str === 'mnt' || str.includes('mnt') || str.includes('maint') || str.includes('dept-7')) {
+    return { id: 7, idStr: '7', code: 'MNT', name: 'Maintenance Department' };
+  }
+  
+  return { id: deptInput, idStr: String(deptInput), code: String(deptInput).toUpperCase(), name: String(deptInput) };
+}
+
+/**
  * Helper: Resolve department ID and Name for current user
  */
 async function resolveUserDepartment(req) {
-  let userDeptId = req.user.department_id || null;
-  let userDeptName = req.user.department_name || '';
+  let userDeptId = req.user?.department_id || null;
+  let userDeptName = req.user?.department_name || '';
 
   if (!userDeptId || !userDeptName) {
-    const uRes = await query('SELECT department_id, role FROM users WHERE id = $1 OR email = $2', [req.user.id, req.user.email]);
-    if (uRes.rows.length > 0) {
-      userDeptId = uRes.rows[0].department_id || userDeptId;
-    }
+    if (req.user?.id || req.user?.email) {
+      const uRes = await query('SELECT department_id, role FROM users WHERE id = $1 OR email = $2', [req.user.id, req.user.email]);
+      if (uRes.rows.length > 0) {
+        userDeptId = uRes.rows[0].department_id || userDeptId;
+      }
 
-    const dhRes = await query(
-      `SELECT dh.department_id, d.name as department_name 
-       FROM department_heads dh 
-       LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
-       WHERE CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR dh.email = $2`,
-      [String(req.user.id), req.user.email]
-    );
-    if (dhRes.rows.length > 0) {
-      userDeptId = dhRes.rows[0].department_id || userDeptId;
-      userDeptName = dhRes.rows[0].department_name || userDeptName;
+      const dhRes = await query(
+        `SELECT dh.department_id, d.name as department_name 
+         FROM department_heads dh 
+         LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
+         WHERE CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR dh.email = $2`,
+        [String(req.user.id), req.user.email]
+      );
+      if (dhRes.rows.length > 0) {
+        userDeptId = dhRes.rows[0].department_id || userDeptId;
+        userDeptName = dhRes.rows[0].department_name || userDeptName;
+      }
     }
   }
 
-  return { userDeptId, userDeptName };
+  const norm = normalizeDepartmentInfo(userDeptId);
+  return {
+    userDeptId: norm.idStr || (userDeptId ? String(userDeptId) : ''),
+    userDeptName: norm.name || userDeptName || '',
+    userDeptCode: norm.code || '',
+    userDeptNumericId: norm.id || null,
+    norm
+  };
 }
+
 
 // Public or authenticated list of municipal departments
 router.get('/', async (req, res) => {
@@ -288,55 +331,37 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
 
     const params = [];
 
-    // Department Isolation for Department Head
+    // Determine target department filter
+    let targetDeptInput = null;
     if (!isAdmin) {
-      const isPwd = ['1', 'PWD'].includes(String(userDeptId));
-      const isSan = ['2', 'SAN'].includes(String(userDeptId));
-      const isWtr = ['3', 'WTR'].includes(String(userDeptId));
-      const isDrn = ['4', 'DRN'].includes(String(userDeptId));
-      const isEle = ['5', 'ELE'].includes(String(userDeptId));
-      const isTrf = ['6', 'TRF'].includes(String(userDeptId));
-      const isMnt = ['7', 'MNT'].includes(String(userDeptId));
-
-      if (isPwd) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('1', 'PWD') OR fs.employee_id LIKE 'PWD%' OR fs.employee_id = 'STF-001' OR (d.id IS NOT NULL AND d.code = 'PWD'))`;
-      } else if (isSan) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('2', 'SAN') OR fs.employee_id LIKE 'SAN%' OR (d.id IS NOT NULL AND d.code = 'SAN'))`;
-      } else if (isWtr) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('3', 'WTR') OR fs.employee_id LIKE 'WTR%' OR (d.id IS NOT NULL AND d.code = 'WTR'))`;
-      } else if (isDrn) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('4', 'DRN') OR fs.employee_id LIKE 'DRN%' OR (d.id IS NOT NULL AND d.code = 'DRN'))`;
-      } else if (isEle) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('5', 'ELE') OR fs.employee_id LIKE 'ELE%' OR (d.id IS NOT NULL AND d.code = 'ELE'))`;
-      } else if (isTrf) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('6', 'TRF') OR fs.employee_id LIKE 'TRF%' OR (d.id IS NOT NULL AND d.code = 'TRF'))`;
-      } else if (isMnt) {
-        sql += ` AND (CAST(fs.department_id AS TEXT) IN ('7', 'MNT') OR fs.employee_id LIKE 'MNT%' OR (d.id IS NOT NULL AND d.code = 'MNT'))`;
-      } else {
-        sql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = CAST($1 AS TEXT)))`;
-        params.push(String(userDeptId || -1));
-      }
+      targetDeptInput = userDeptId || req.query.department_id || null;
     } else if (req.query.department_id) {
-      let deptFilterId = req.query.department_id;
-      const codeToIdMap = {
-        PWD: 1, 'DEPT-1': 1, 'DEPT-PWD': 1,
-        SAN: 2, 'DEPT-2': 2, 'DEPT-SAN': 2,
-        WTR: 3, 'DEPT-3': 3, 'DEPT-WTR': 3,
-        DRN: 4, 'DEPT-4': 4, 'DEPT-DRN': 4,
-        ELE: 5, 'DEPT-5': 5, 'DEPT-ELE': 5,
-        TRF: 6, 'DEPT-6': 6, 'DEPT-TRF': 6,
-        MNT: 7, 'DEPT-7': 7, 'DEPT-MNT': 7
-      };
-      if (typeof deptFilterId === 'string') {
-        const cleanCode = deptFilterId.toUpperCase().split('-')[0].replace('DEPT', '').trim();
-        if (codeToIdMap[cleanCode]) {
-          deptFilterId = codeToIdMap[cleanCode];
-        } else if (codeToIdMap[deptFilterId.toUpperCase()]) {
-          deptFilterId = codeToIdMap[deptFilterId.toUpperCase()];
-        }
+      targetDeptInput = req.query.department_id;
+    }
+
+    if (targetDeptInput) {
+      const norm = normalizeDepartmentInfo(targetDeptInput);
+      const idx1 = params.length + 1;
+      const idx2 = params.length + 2;
+      const idx3 = params.length + 3;
+
+      if (norm.code === 'PWD') {
+        sql += ` AND (
+          CAST(fs.department_id AS TEXT) IN ($${idx1}, $${idx2})
+          OR UPPER(CAST(fs.department_id AS TEXT)) = $${idx2}
+          OR fs.employee_id LIKE $${idx3}
+          OR fs.employee_id = 'STF-001'
+          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2}))
+        )`;
+      } else {
+        sql += ` AND (
+          CAST(fs.department_id AS TEXT) IN ($${idx1}, $${idx2})
+          OR UPPER(CAST(fs.department_id AS TEXT)) = $${idx2}
+          OR fs.employee_id LIKE $${idx3}
+          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2}))
+        )`;
       }
-      sql += ` AND fs.department_id = $1`;
-      params.push(deptFilterId);
+      params.push(norm.idStr, norm.code, `${norm.code}%`);
     }
 
     if (filterStatus === 'active') {
@@ -390,12 +415,18 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
         FROM assignments a
         JOIN complaints c ON CAST(c.id AS TEXT) = CAST(a.complaint_id AS TEXT)
         JOIN field_staff fs ON (CAST(a.staff_id AS TEXT) = CAST(fs.id AS TEXT) OR CAST(a.staff_id AS TEXT) = CAST(fs.user_id AS TEXT))
+        LEFT JOIN departments d ON (CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT) OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code))
         WHERE CAST(c.status AS TEXT) IN ('Assigned', 'In Progress', 'Verified')
       `;
       let taskParams = [];
-      if (!isAdmin) {
-        taskSql += ` AND (CAST(fs.department_id AS TEXT) = CAST($1 AS TEXT) OR CAST(c.department_id AS TEXT) = CAST($1 AS TEXT))`;
-        taskParams.push(String(userDeptId || -1));
+      if (!isAdmin && userDeptId) {
+        const norm = normalizeDepartmentInfo(userDeptId);
+        taskSql += ` AND (
+          CAST(fs.department_id AS TEXT) IN ($1, $2)
+          OR CAST(c.department_id AS TEXT) IN ($1, $2)
+          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $1 OR UPPER(d.code) = $2))
+        )`;
+        taskParams.push(norm.idStr, norm.code);
       }
       const taskRes = await query(taskSql, taskParams);
       activeTasksCount = parseInt(taskRes.rows[0]?.active_tasks_count || 0, 10);
@@ -439,13 +470,15 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
     `;
     const params = [];
 
-    if (!isAdmin) {
+    if (!isAdmin && userDeptId) {
+      const norm = normalizeDepartmentInfo(userDeptId);
       sql += ` AND (
-        CAST(fs.department_id AS TEXT) = $1
-        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
-        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($1))
+        CAST(fs.department_id AS TEXT) IN ($1, $2)
+        OR UPPER(CAST(fs.department_id AS TEXT)) = $2
+        OR fs.employee_id LIKE $3
+        OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $1 OR UPPER(d.code) = $2))
       )`;
-      params.push(String(userDeptId || -1));
+      params.push(norm.idStr, norm.code, `${norm.code}%`);
     }
 
     sql += ` ORDER BY fs.name ASC`;
