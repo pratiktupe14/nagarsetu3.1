@@ -64,11 +64,24 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 4. ELE (Electrical & Street Lighting)
+  // 4. DRN (Drainage & Sewage Department) - ID 4
   if (
-    codeClean === '4' || codeClean === 'ele' ||
+    codeClean === '4' || codeClean === 'drn' ||
+    dName.includes('drainage') || dName.includes('sewage') ||
+    email.includes('drn') || email.includes('drainage') || email.includes('sanjay.more') || name.includes('sanjay more')
+  ) {
+    return {
+      mainTitle: 'DRAINAGE & SEWAGE',
+      subtitle: '(DRN) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'DRAINAGE & SEWAGE (DRN) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 5. ELE (Electrical & Street Lighting) - ID 5
+  if (
+    codeClean === '5' || codeClean === 'ele' ||
     dName.includes('electrical') || dName.includes('lighting') ||
-    email.includes('ele') || email.includes('electrical') || email.includes('aditya.joshi') || name.includes('aditya joshi')
+    email.includes('ele') || email.includes('electrical') || email.includes('kunal.kulkarni') || name.includes('kunal kulkarni')
   ) {
     return {
       mainTitle: 'ELECTRICAL & STREET LIGHTING',
@@ -77,9 +90,9 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 5. TRF (Traffic Management Department)
+  // 6. TRF (Traffic Management Department) - ID 6
   if (
-    codeClean === '5' || codeClean === 'trf' ||
+    codeClean === '6' || codeClean === 'trf' ||
     dName.includes('traffic') ||
     email.includes('trf') || email.includes('traffic') || email.includes('rohan.deshmukh') || name.includes('rohan deshmukh')
   ) {
@@ -90,29 +103,16 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 6. MNT (Maintenance Department)
+  // 7. MNT (Maintenance Department) - ID 7
   if (
-    codeClean === '6' || codeClean === 'mnt' ||
+    codeClean === '7' || codeClean === 'mnt' ||
     dName.includes('maintenance') ||
-    email.includes('mnt') || email.includes('maintenance') || email.includes('kunal.kulkarni') || name.includes('kunal kulkarni')
+    email.includes('mnt') || email.includes('maintenance') || email.includes('aditya.joshi') || name.includes('aditya joshi')
   ) {
     return {
       mainTitle: 'MAINTENANCE',
       subtitle: '(MNT) DEPARTMENT HEAD PORTAL',
       fullLabel: 'MAINTENANCE (MNT) DEPARTMENT HEAD PORTAL'
-    };
-  }
-
-  // 7. DRN (Drainage & Sewage Department)
-  if (
-    codeClean === '7' || codeClean === 'drn' ||
-    dName.includes('drainage') || dName.includes('sewage') ||
-    email.includes('drn') || email.includes('drainage') || email.includes('sanjay.more') || name.includes('sanjay more')
-  ) {
-    return {
-      mainTitle: 'DRAINAGE & SEWAGE',
-      subtitle: '(DRN) DEPARTMENT HEAD PORTAL',
-      fullLabel: 'DRAINAGE & SEWAGE (DRN) DEPARTMENT HEAD PORTAL'
     };
   }
 

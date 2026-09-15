@@ -23,13 +23,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const SEED_DEPARTMENT_HEADS = [
-  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', department_id: '1', department_name: 'Public Works Department (PWD)', department_code: 'PWD', employee_id: 'DH-PWD-001' },
-  { id: '2', name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', department_id: '2', department_name: 'Sanitation & Waste Management', department_code: 'SAN', employee_id: 'DH-SAN-001' },
-  { id: '3', name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', department_id: '3', department_name: 'Water Supply & Sewerage Board', department_code: 'WTR', employee_id: 'DH-WTR-001' },
-  { id: '4', name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', department_id: '4', department_name: 'Drainage & Sewage Department', department_code: 'DRN', employee_id: 'DH-DRN-001' },
-  { id: '5', name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', department_id: '5', department_name: 'Electrical & Street Lighting', department_code: 'ELE', employee_id: 'DH-ELE-001' },
-  { id: '6', name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', department_id: '6', department_name: 'Traffic Management Department', department_code: 'TRF', employee_id: 'DH-TRF-001' },
-  { id: '7', name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', department_id: '7', department_name: 'Maintenance Department', department_code: 'MNT', employee_id: 'DH-MNT-001' }
+  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', department_id: '1', department_name: 'Public Works Department (PWD)', department_code: 'PWD', employee_id: 'EMP-PWD-001' },
+  { id: '2', name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', department_id: '2', department_name: 'Sanitation & Waste Management', department_code: 'SAN', employee_id: 'EMP-SAN-001' },
+  { id: '3', name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', department_id: '3', department_name: 'Water Supply & Sewerage Board', department_code: 'WTR', employee_id: 'EMP-WTR-001' },
+  { id: '4', name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', department_id: '4', department_name: 'Drainage & Sewage Department', department_code: 'DRN', employee_id: 'EMP-DRN-001' },
+  { id: '5', name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', department_id: '5', department_name: 'Electrical & Street Lighting', department_code: 'ELE', employee_id: 'EMP-ELE-001' },
+  { id: '6', name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', department_id: '6', department_name: 'Traffic Management Department', department_code: 'TRF', employee_id: 'EMP-TRF-001' },
+  { id: '7', name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', department_id: '7', department_name: 'Maintenance Department', department_code: 'MNT', employee_id: 'EMP-MNT-001' }
 ];
 
 export function findDepartmentHeadByIdentifier(identifier: string): UserProfile | null {
@@ -551,25 +551,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           });
         } catch (fetchErr: any) {
           console.warn(`Backend API login connection note (${getApiUrl()}):`, fetchErr.message);
-
-          // Graceful offline demo fallback if backend server is not running
-          const demoHead = findDepartmentHeadByIdentifier(cleanIdentifier);
-          const demoStaff = findServiceStaffByIdentifier(cleanIdentifier);
-          const isAdmin = cleanIdentifier.toLowerCase().includes('admin') || cleanIdentifier === '9876543213';
-
-          if (demoHead || demoStaff || isAdmin || targetRole === 'department_head' || targetRole === 'service_staff' || targetRole === 'city_admin') {
-            const validDemoPasswords = ['rahul@123', 'amit@123', 'vikram@123', 'sanjay@123', 'aditya@123', 'rohan@123', 'kunal@123', 'nagarsetu@123', 'password123', 'admin@123', '8788562103'];
-            const firstName = (demoHead?.full_name || demoStaff?.full_name || '').split(' ')[0].toLowerCase();
-            if (firstName) validDemoPasswords.push(`${firstName}@123`);
-
-            if (validDemoPasswords.includes(password) || !password) {
-              const demoUser: UserProfile = demoHead || demoStaff || DEFAULT_ROLE_USERS[targetRole] || DEFAULT_ROLE_USERS.department_head;
-              setUser(demoUser);
-              localStorage.setItem('nagarsetu_token', 'demo-token-' + Date.now());
-              localStorage.setItem('nagarsetu_user', JSON.stringify(demoUser));
-              return true;
-            }
-          }
 
           if (!isSupabaseConfigured()) {
             throw new Error(`Unable to connect to NagarSetu backend server (${getApiUrl()}). Please make sure your backend API server is running.`);

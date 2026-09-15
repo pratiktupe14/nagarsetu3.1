@@ -46,8 +46,8 @@ const OFFICIAL_DEPARTMENTS = [
     name: 'Electrical & Street Lighting',
     searchTerms: ['Electrical & Street Lighting', 'Electrical & Lighting Department', 'Electrical Department'],
     description: 'Streetlight repair, electrical poles, transformer inspection, and public lighting.',
-    headName: 'Aditya Joshi',
-    email: 'aditya.joshi@nagarsetu.gov.in',
+    headName: 'Kunal Kulkarni',
+    email: 'kunal.kulkarni@nagarsetu.gov.in',
     mobile: '9822000005',
     employeeId: 'EMP-ELE-001'
   },
@@ -66,8 +66,8 @@ const OFFICIAL_DEPARTMENTS = [
     name: 'Maintenance Department',
     searchTerms: ['Maintenance Department', 'Building Maintenance'],
     description: 'General civic facility repairs, building maintenance, public park upkeep, and municipal asset management.',
-    headName: 'Kunal Kulkarni',
-    email: 'kunal.kulkarni@nagarsetu.gov.in',
+    headName: 'Aditya Joshi',
+    email: 'aditya.joshi@nagarsetu.gov.in',
     mobile: '9822000007',
     employeeId: 'EMP-MNT-001'
   }
@@ -126,11 +126,18 @@ async function seed7DemoDepartmentHeads(queryFn) {
       const envPass = process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${dMeta.code}`] || process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
       const initialPassword = envPass || `${firstName}@123`;
 
-      // Check users table for existing account by email or mobile
-      const userCheck = await q(
-        `SELECT id, email, password_hash, must_change_password FROM users WHERE LOWER(email) = ? OR mobile = ?`,
-        [cleanEmail, dMeta.mobile]
+      // Check users table for existing account by email first to avoid cross-account mobile collision
+      let userCheck = await q(
+        `SELECT id, email, password_hash, must_change_password FROM users WHERE LOWER(email) = ?`,
+        [cleanEmail]
       ).catch(() => ({ rows: [] }));
+
+      if ((!userCheck.rows || userCheck.rows.length === 0) && dMeta.mobile) {
+        userCheck = await q(
+          `SELECT id, email, password_hash, must_change_password FROM users WHERE mobile = ?`,
+          [dMeta.mobile]
+        ).catch(() => ({ rows: [] }));
+      }
 
       let userId = null;
 
@@ -138,28 +145,13 @@ async function seed7DemoDepartmentHeads(queryFn) {
         userId = userCheck.rows[0].id;
         const existingHash = userCheck.rows[0].password_hash;
         
-        // Preserve existing password hash if valid, otherwise reset to initial provisioned password
         let targetHash = existingHash;
-        let isKnownValidPass = false;
-        if (existingHash && existingHash.startsWith('$2')) {
-          isKnownValidPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
-          if (!isKnownValidPass) {
-            isKnownValidPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
-          }
-          if (!isKnownValidPass) {
-            isKnownValidPass = await bcrypt.compare('password123', existingHash).catch(() => false);
-          }
-        }
+        let mustChangePassword = (userCheck.rows[0].must_change_password === true || userCheck.rows[0].must_change_password === 1 || userCheck.rows[0].must_change_password === '1' || userCheck.rows[0].must_change_password === 'true' || userCheck.rows[0].must_change_password === 't') ? 1 : 0;
 
-        let mustChangePassword = userCheck.rows[0].must_change_password;
-        if (!isKnownValidPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+        if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
           const salt = await bcrypt.genSalt(10);
           targetHash = await bcrypt.hash(initialPassword, salt);
-          mustChangePassword = 0;
-        } else if (mustChangePassword === undefined || mustChangePassword === null) {
-          mustChangePassword = 0;
-        } else {
-          mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true') ? 1 : 0;
+          mustChangePassword = 1;
         }
 
         await q(

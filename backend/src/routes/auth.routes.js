@@ -86,26 +86,39 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     const digitsOnly = extractDigits(rawInput);
     const normMobile = normalizeMobile(rawInput);
 
-    const sql = `
-      SELECT * FROM users 
-      WHERE mobile = ? 
-         OR mobile = ? 
-         OR mobile = ?
-         OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)
-      ORDER BY id DESC LIMIT 1
-    `;
-    let resUser = await query(sql, [rawInput, digitsOnly, normMobile, cleanIdentifier]);
+    let resUser;
+    if (cleanIdentifier.includes('@')) {
+      resUser = await query(
+        `SELECT * FROM users WHERE LOWER(email) = ? OR (mobile IS NOT NULL AND mobile != '' AND mobile = ?) ORDER BY id DESC LIMIT 1`,
+        [cleanIdentifier, rawInput]
+      );
+    } else {
+      const validMobiles = [rawInput, digitsOnly, normMobile].filter(m => m && m.trim() !== '');
+      if (validMobiles.length > 0) {
+        resUser = await query(
+          `SELECT * FROM users WHERE mobile IN (${validMobiles.map(() => '?').join(',')}) OR LOWER(email) = ? ORDER BY id DESC LIMIT 1`,
+          [...validMobiles, cleanIdentifier]
+        );
+      } else {
+        resUser = await query(
+          `SELECT * FROM users WHERE LOWER(email) = ? ORDER BY id DESC LIMIT 1`,
+          [cleanIdentifier]
+        );
+      }
+    }
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
     // Fallback: If user not found in users table by direct identifier, check if linked via department_heads or field_staff
     if (!user) {
+      const searchNorm = normMobile || 'NO_MOBILE_MATCH';
+      const searchDigits = digitsOnly || 'NO_MOBILE_MATCH';
       const dhFallback = await query(
         `SELECT u.* FROM department_heads dh 
          JOIN users u ON (CAST(u.id AS TEXT) = CAST(dh.user_id AS TEXT) OR LOWER(u.email) = LOWER(dh.email))
-         WHERE LOWER(dh.email) = ? OR dh.phone = ? OR dh.phone LIKE ? OR dh.phone LIKE ?
+         WHERE LOWER(dh.email) = ? OR (dh.phone IS NOT NULL AND dh.phone != '' AND (dh.phone = ? OR dh.phone LIKE ? OR dh.phone LIKE ?))
          ORDER BY dh.id DESC LIMIT 1`,
-        [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`]
+        [cleanIdentifier, rawInput, `%${searchNorm}%`, `%${searchDigits}%`]
       );
       if (dhFallback.rows && dhFallback.rows.length > 0) {
         user = dhFallback.rows[0];
@@ -113,9 +126,9 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
         const fsFallback = await query(
           `SELECT u.* FROM field_staff fs 
            JOIN users u ON (CAST(u.id AS TEXT) = CAST(fs.user_id AS TEXT) OR LOWER(u.email) = LOWER(fs.email))
-           WHERE LOWER(fs.email) = ? OR fs.phone = ? OR fs.phone LIKE ? OR fs.phone LIKE ? OR fs.employee_id = ? 
+           WHERE LOWER(fs.email) = ? OR fs.employee_id = ? OR (fs.phone IS NOT NULL AND fs.phone != '' AND (fs.phone = ? OR fs.phone LIKE ? OR fs.phone LIKE ?))
            ORDER BY fs.id DESC LIMIT 1`,
-          [cleanIdentifier, rawInput, `%${normMobile}%`, `%${digitsOnly}%`, rawInput]
+          [cleanIdentifier, rawInput, rawInput, `%${searchNorm}%`, `%${searchDigits}%`]
         );
         if (fsFallback.rows && fsFallback.rows.length > 0) {
           user = fsFallback.rows[0];
@@ -140,17 +153,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
     }
 
-    // Demo password fallback check for municipal demo accounts in development/testing
-    if (!isMatch) {
-      const demoFallbackPasswords = ['nagarsetu@123', 'password123', 'admin@123', '8788562103'];
-      if (user.name) {
-        const firstName = user.name.split(' ')[0].toLowerCase();
-        demoFallbackPasswords.push(`${firstName}@123`);
-      }
-      if (demoFallbackPasswords.includes(password)) {
-        isMatch = true;
-      }
-    }
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
