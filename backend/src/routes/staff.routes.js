@@ -67,6 +67,23 @@ router.get('/tasks', async (req, res) => {
   }
 });
 
+// Helper: Check department matching
+const isDeptMatch = (deptA, deptB) => {
+  if (!deptA || !deptB) return true;
+  if (String(deptA) === String(deptB)) return true;
+  const pwdGroup = ['1', 'PWD'];
+  const sanGroup = ['2', 'SAN'];
+  const wtrGroup = ['3', 'WTR'];
+  const drnGroup = ['4', 'DRN'];
+  const eleGroup = ['5', 'ELE'];
+  const trfGroup = ['6', 'TRF'];
+  const mntGroup = ['7', 'MNT'];
+  for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
+    if (g.includes(String(deptA)) && g.includes(String(deptB))) return true;
+  }
+  return false;
+};
+
 // Update Task status (e.g. to 'Accepted', 'On the Way', 'In Progress')
 router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {
   try {
@@ -86,23 +103,47 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
 
     const complaint = compRes.rows[0];
 
-    // Staff Authorization Guard: Only assigned staff or staff in same department (or admin) can update status
+    // Staff Authorization Guard: Field staff can only update tasks assigned to them
     const userRole = req.user.role || 'service_staff';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isFieldStaff = ['staff', 'service_staff', 'field_staff'].includes(userRole);
 
     if (!isAdmin) {
       let userDeptId = req.user.department_id;
-      if (!userDeptId) {
-        const fsCheck = await query('SELECT department_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
-        if (fsCheck.rows && fsCheck.rows.length > 0) userDeptId = fsCheck.rows[0].department_id;
+      let staffFsId = req.user.id;
+      let staffEmpId = req.user.employee_id || '';
+
+      const fsCheck = await query('SELECT id, department_id, employee_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
+      if (fsCheck.rows && fsCheck.rows.length > 0) {
+        staffFsId = fsCheck.rows[0].id;
+        if (!staffEmpId) staffEmpId = fsCheck.rows[0].employee_id;
+        if (!userDeptId) userDeptId = fsCheck.rows[0].department_id;
       }
 
-      const isSameDept = userDeptId && complaint.department_id && String(userDeptId) === String(complaint.department_id);
-      const isAssignedToUser = (
-        (complaint.assigned_staff_id && (String(complaint.assigned_staff_id) === String(req.user.id) || String(complaint.assigned_staff_id) === String(req.user.employee_id))) ||
+      let isAssignedToUser = (
+        (complaint.assigned_staff_id && (
+          String(complaint.assigned_staff_id) === String(req.user.id) ||
+          String(complaint.assigned_staff_id) === String(staffFsId) ||
+          (staffEmpId && String(complaint.assigned_staff_id) === String(staffEmpId))
+        )) ||
         (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
       );
 
+      if (!isAssignedToUser) {
+        const assignCheck = await query(
+          'SELECT id FROM assignments WHERE (CAST(complaint_id AS TEXT) = $1 OR complaint_id = $2) AND (CAST(staff_id AS TEXT) = $3 OR CAST(staff_id AS TEXT) = $4) LIMIT 1',
+          [String(complaint.id), complaint.complaint_number || '', String(req.user.id), String(staffFsId)]
+        );
+        if (assignCheck.rows && assignCheck.rows.length > 0) {
+          isAssignedToUser = true;
+        }
+      }
+
+      if (isFieldStaff && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are only authorized to update tasks assigned specifically to you.' });
+      }
+
+      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
       if (!isSameDept && !isAssignedToUser) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to update tasks belonging to another department.' });
       }
@@ -191,36 +232,44 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
     // 2. Staff Authorization & Department Guard
     const userRole = req.user.role || 'service_staff';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
-
-    const isDeptMatch = (deptA, deptB) => {
-      if (!deptA || !deptB) return true;
-      if (String(deptA) === String(deptB)) return true;
-      const pwdGroup = ['1', 'PWD'];
-      const sanGroup = ['2', 'SAN'];
-      const wtrGroup = ['3', 'WTR'];
-      const drnGroup = ['4', 'DRN'];
-      const eleGroup = ['5', 'ELE'];
-      const trfGroup = ['6', 'TRF'];
-      const mntGroup = ['7', 'MNT'];
-      for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
-        if (g.includes(String(deptA)) && g.includes(String(deptB))) return true;
-      }
-      return false;
-    };
+    const isFieldStaff = ['staff', 'service_staff', 'field_staff'].includes(userRole);
 
     if (!isAdmin) {
       let userDeptId = req.user.department_id;
-      if (!userDeptId) {
-        const fsCheck = await query('SELECT department_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
-        if (fsCheck.rows && fsCheck.rows.length > 0) userDeptId = fsCheck.rows[0].department_id;
+      let staffFsId = req.user.id;
+      let staffEmpId = req.user.employee_id || '';
+
+      const fsCheck = await query('SELECT id, department_id, employee_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
+      if (fsCheck.rows && fsCheck.rows.length > 0) {
+        staffFsId = fsCheck.rows[0].id;
+        if (!staffEmpId) staffEmpId = fsCheck.rows[0].employee_id;
+        if (!userDeptId) userDeptId = fsCheck.rows[0].department_id;
       }
 
-      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
-      const isAssignedToUser = (
-        (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(req.user.id)) ||
+      let isAssignedToUser = (
+        (complaint.assigned_staff_id && (
+          String(complaint.assigned_staff_id) === String(req.user.id) ||
+          String(complaint.assigned_staff_id) === String(staffFsId) ||
+          (staffEmpId && String(complaint.assigned_staff_id) === String(staffEmpId))
+        )) ||
         (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
       );
 
+      if (!isAssignedToUser) {
+        const assignCheck = await query(
+          'SELECT id FROM assignments WHERE (CAST(complaint_id AS TEXT) = $1 OR complaint_id = $2) AND (CAST(staff_id AS TEXT) = $3 OR CAST(staff_id AS TEXT) = $4) LIMIT 1',
+          [String(complaint.id), complaint.complaint_number || '', String(req.user.id), String(staffFsId)]
+        );
+        if (assignCheck.rows && assignCheck.rows.length > 0) {
+          isAssignedToUser = true;
+        }
+      }
+
+      if (isFieldStaff && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are only authorized to resolve tasks assigned specifically to you.' });
+      }
+
+      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
       if (!isSameDept && !isAssignedToUser) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to complete tasks belonging to another department.' });
       }
@@ -337,6 +386,53 @@ router.post(['/task/:id/progress', '/tasks/:id/progress'], async (req, res) => {
     }
 
     const complaint = compRes.rows[0];
+
+    // Staff Authorization Guard: Field staff can only add progress notes for tasks assigned to them
+    const userRole = req.user.role || 'service_staff';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isFieldStaff = ['staff', 'service_staff', 'field_staff'].includes(userRole);
+
+    if (!isAdmin) {
+      let userDeptId = req.user.department_id;
+      let staffFsId = req.user.id;
+      let staffEmpId = req.user.employee_id || '';
+
+      const fsCheck = await query('SELECT id, department_id, employee_id FROM field_staff WHERE user_id = $1 OR LOWER(email) = LOWER($2) LIMIT 1', [req.user.id, req.user.email || '']);
+      if (fsCheck.rows && fsCheck.rows.length > 0) {
+        staffFsId = fsCheck.rows[0].id;
+        if (!staffEmpId) staffEmpId = fsCheck.rows[0].employee_id;
+        if (!userDeptId) userDeptId = fsCheck.rows[0].department_id;
+      }
+
+      let isAssignedToUser = (
+        (complaint.assigned_staff_id && (
+          String(complaint.assigned_staff_id) === String(req.user.id) ||
+          String(complaint.assigned_staff_id) === String(staffFsId) ||
+          (staffEmpId && String(complaint.assigned_staff_id) === String(staffEmpId))
+        )) ||
+        (complaint.assigned_staff_email && req.user.email && complaint.assigned_staff_email.toLowerCase() === req.user.email.toLowerCase())
+      );
+
+      if (!isAssignedToUser) {
+        const assignCheck = await query(
+          'SELECT id FROM assignments WHERE (CAST(complaint_id AS TEXT) = $1 OR complaint_id = $2) AND (CAST(staff_id AS TEXT) = $3 OR CAST(staff_id AS TEXT) = $4) LIMIT 1',
+          [String(complaint.id), complaint.complaint_number || '', String(req.user.id), String(staffFsId)]
+        );
+        if (assignCheck.rows && assignCheck.rows.length > 0) {
+          isAssignedToUser = true;
+        }
+      }
+
+      if (isFieldStaff && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are only authorized to add progress notes for tasks assigned specifically to you.' });
+      }
+
+      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
+      if (!isSameDept && !isAssignedToUser) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to add progress notes for tasks belonging to another department.' });
+      }
+    }
+
     const staffName = req.user.name || 'Field Staff';
 
     await query(

@@ -22,8 +22,9 @@ app.set('trust proxy', 1);
 // Security Headers & Core Middleware — CORS MUST BE FIRST
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
   'https://nagarsetu3-1.vercel.app',
+  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
+  'https://nagarsetu-backend-api.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173',
@@ -36,11 +37,14 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || (origin.endsWith('.vercel.app') && origin.includes('nagarsetu')) || (process.env.NODE_ENV !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')))) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'), false);
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    if (process.env.NODE_ENV !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

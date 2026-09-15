@@ -123,7 +123,7 @@ function uploadSingleImage(fieldName) {
             req.file.buffer,
             randomFilename,
             req.file.mimetype || 'image/jpeg',
-            'issues'
+            process.env.SUPABASE_STORAGE_BUCKET || 'issues'
           );
 
           req.file.filename = randomFilename;
@@ -133,11 +133,17 @@ function uploadSingleImage(fieldName) {
         } catch (supabaseErr) {
           console.warn('[UPLOAD WARN] Supabase upload failed:', supabaseErr.message);
 
+          if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_LOCAL_STORAGE_FALLBACK) {
+            return res.status(500).json({
+              error: 'Storage Error: Permanent object storage upload failed. Please verify storage configuration.'
+            });
+          }
+
           req.file.filename = randomFilename;
           req.file.publicUrl = `/uploads/${randomFilename}`;
           req.file.supabaseUrl = `/uploads/${randomFilename}`;
 
-          // Local filesystem fallback (gracefully catch read-only filesystem on Vercel serverless)
+          // Local filesystem fallback (for dev & test suites)
           try {
             const diskPath = path.join(UPLOADS_DIR, randomFilename);
             fs.writeFileSync(diskPath, req.file.buffer);

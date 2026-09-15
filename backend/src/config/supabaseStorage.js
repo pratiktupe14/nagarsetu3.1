@@ -38,21 +38,45 @@ if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder')) {
  * @param {string} bucketName 
  * @returns {Promise<{ publicUrl: string, filePath: string }>}
  */
-async function uploadBufferToSupabase(buffer, filename, mimetype = 'image/jpeg', bucketName = 'issues') {
+async function uploadBufferToSupabase(buffer, filename, mimetype = 'image/jpeg', bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'issues') {
   if (!supabase) {
     throw new Error('Supabase client is not configured on the backend. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
   }
 
+  const targetBucket = bucketName || process.env.SUPABASE_STORAGE_BUCKET || 'issues';
   const cleanFilename = `${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const filePath = `uploads/${cleanFilename}`;
 
-  const { data, error } = await supabase.storage
-    .from(bucketName)
+  let { data, error } = await supabase.storage
+    .from(targetBucket)
     .upload(filePath, buffer, {
       contentType: mimetype,
       cacheControl: '3600',
       upsert: true
     });
+
+  // Attempt lazy auto-creation ONLY in non-production environments (dev / test)
+  if (error && (error.message.includes('Bucket not found') || error.message.includes('bucket_not_found'))) {
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        console.log(`[SUPABASE STORAGE] Non-production mode: Bucket '${targetBucket}' not found. Attempting lazy creation...`);
+        await supabase.storage.createBucket(targetBucket, { public: true });
+        const retry = await supabase.storage
+          .from(targetBucket)
+          .upload(filePath, buffer, {
+            contentType: mimetype,
+            cacheControl: '3600',
+            upsert: true
+          });
+        data = retry.data;
+        error = retry.error;
+      } catch (createErr) {
+        console.error('[SUPABASE STORAGE BUCKET CREATION ERROR]', createErr.message);
+      }
+    } else {
+      console.error(`[SUPABASE STORAGE ERROR] Production bucket '${targetBucket}' is missing. Pre-provisioning required.`);
+    }
+  }
 
   if (error) {
     console.error('[SUPABASE STORAGE ERROR]', error.message);
@@ -60,7 +84,7 @@ async function uploadBufferToSupabase(buffer, filename, mimetype = 'image/jpeg',
   }
 
   const { data: publicUrlData } = supabase.storage
-    .from(bucketName)
+    .from(targetBucket)
     .getPublicUrl(filePath);
 
   if (!publicUrlData || !publicUrlData.publicUrl) {
@@ -69,7 +93,7 @@ async function uploadBufferToSupabase(buffer, filename, mimetype = 'image/jpeg',
 
   return {
     publicUrl: publicUrlData.publicUrl,
-    filePath: data.path || filePath
+    filePath: data?.path || filePath
   };
 }
 

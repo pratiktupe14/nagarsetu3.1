@@ -119,6 +119,23 @@ router.get('/staff-list', async (req, res) => {
   }
 });
 
+// Helper: Check department matching
+const isDeptMatch = (deptA, deptB, empId = '') => {
+  if (!deptA || !deptB) return true;
+  if (String(deptA) === String(deptB)) return true;
+  const pwdGroup = ['1', 'PWD'];
+  const sanGroup = ['2', 'SAN'];
+  const wtrGroup = ['3', 'WTR'];
+  const drnGroup = ['4', 'DRN'];
+  const eleGroup = ['5', 'ELE'];
+  const trfGroup = ['6', 'TRF'];
+  const mntGroup = ['7', 'MNT'];
+  for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
+    if (g.includes(String(deptA)) && (g.includes(String(deptB)) || (empId && empId.startsWith(g[2])))) return true;
+  }
+  return false;
+};
+
 // Verify & Approve / Reject Complaint
 router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {
   try {
@@ -130,6 +147,23 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
     }
     const complaint = compRes.rows[0];
     const citizenId = complaint.citizen_id;
+
+    // Department Authorization check
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    if (!isAdmin) {
+      let userDeptId = req.user.department_id;
+      if (userRole === 'department_head' && !userDeptId) {
+        const dhRes = await query(
+          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
+          [req.user.id, (req.user.email || '').toLowerCase()]
+        );
+        if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
+      }
+      if (userDeptId && complaint.department_id && !isDeptMatch(userDeptId, complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: You cannot verify complaints outside your department.' });
+      }
+    }
 
     if (action === 'approve') {
       let updateSql = `UPDATE complaints SET status = 'Verified', needs_manual_verification = 0, updated_at = CURRENT_TIMESTAMP`;
@@ -217,21 +251,6 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     // Department Authorization check
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
-    const isDeptMatch = (deptA, deptB, empId = '') => {
-      if (!deptA || !deptB) return true;
-      if (String(deptA) === String(deptB)) return true;
-      const pwdGroup = ['1', 'PWD'];
-      const sanGroup = ['2', 'SAN'];
-      const wtrGroup = ['3', 'WTR'];
-      const drnGroup = ['4', 'DRN'];
-      const eleGroup = ['5', 'ELE'];
-      const trfGroup = ['6', 'TRF'];
-      const mntGroup = ['7', 'MNT'];
-      for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
-        if (g.includes(String(deptA)) && (g.includes(String(deptB)) || (empId && empId.startsWith(g[2])))) return true;
-      }
-      return false;
-    };
 
     if (!isAdmin) {
       let userDeptId = req.user.department_id;

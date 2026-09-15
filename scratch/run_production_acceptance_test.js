@@ -636,7 +636,7 @@ async function runAcceptanceSuite() {
       Authorization: `Bearer ${dhToken}`
     });
     const staffList = assignableStaffRes.data?.staff || [];
-    const targetStaff = staffList[0] || { id: '2', name: 'Amit Patil', email: 'amit.patil@nagarsetu.gov.in' };
+    const targetStaff = staffList.find(s => (s.email || '').toLowerCase() === 'amit.patil@nagarsetu.gov.in' || (s.name || '').includes('Amit')) || staffList[0] || { id: '2', name: 'Amit Patil', email: 'amit.patil@nagarsetu.gov.in' };
 
     const assignRes = await request('POST', '/api/officer/assign', {
       Authorization: `Bearer ${dhToken}`

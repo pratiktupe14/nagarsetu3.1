@@ -44,3 +44,10 @@ backend/.env.vercel
 Thumbs.db
 .vercel
 .env*
+
+# Database Dumps & Backups
+*.dump
+*.backup
+*.sql.gz
+backups/
+
