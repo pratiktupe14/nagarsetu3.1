@@ -79,6 +79,11 @@ async function uploadBufferToSupabase(buffer, filename, mimetype = 'image/jpeg',
   }
 
   if (error) {
+    try {
+      const logger = require('../utils/logger');
+      logger.recordStorageError();
+      logger.error('STORAGE_UPLOAD_FAILED', { bucket: targetBucket, message: error.message });
+    } catch (e) {}
     console.error('[SUPABASE STORAGE ERROR]', error.message);
     throw new Error(`Supabase Storage upload failed: ${error.message}`);
   }

@@ -934,6 +934,11 @@ async function query(sql, params = []) {
     try {
       return await pgPool.query(pgSql, params);
     } catch (err) {
+      try {
+        const logger = require('../utils/logger');
+        logger.recordDatabaseError();
+        logger.error('DATABASE_QUERY_ERROR', { message: err.message });
+      } catch (e) {}
       console.error('[DATABASE QUERY ERROR]', err.message);
       // DO NOT fall back to SQLite or memory store. Re-throw error so data consistency is preserved.
       throw err;

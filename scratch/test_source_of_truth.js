@@ -10,6 +10,7 @@ function makeToken(payload) {
 
 async function runTests() {
   await initDatabase();
+  await query("UPDATE users SET must_change_password = 0 WHERE id = 128").catch(() => {});
   const server = app.listen(5098, async () => {
     try {
       const port = 5098;

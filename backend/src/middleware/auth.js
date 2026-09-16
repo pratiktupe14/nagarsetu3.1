@@ -33,12 +33,12 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({ error: 'Access token required', requestId: req.requestId });
   }
 
   jwt.verify(token, getJwtSecret(), async (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      return res.status(403).json({ error: 'Invalid or expired token', requestId: req.requestId });
     }
     req.user = user;
 

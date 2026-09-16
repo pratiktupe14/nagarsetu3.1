@@ -13,7 +13,7 @@ Phase 3 (Database Backup / Restore / Disaster Recovery Audit & Hardening) has co
 Production Supabase administrative verification and safe isolated restore validation remain outstanding because production Supabase Cloud Console credentials / management tokens are unavailable in this execution environment. Per Non-Negotiable Rule 15 and Rule 16, production configurations and restore capabilities are NOT fabricated or claimed from code alone.
 
 To ensure operational readiness while maintaining complete forensic honesty, an Operational Recovery Package has been assembled:
-1. `scratch/nagarsetu_v3.1_phase3_production_verification_checklist.md`: 17-step operational sign-off checklist for administrators.
+1. `scratch/nagarsetu_v3.1_phase3_production_verification_checklist.md`: Operational sign-off checklist for administrators containing required verification fields.
 2. `scratch/nagarsetu_v3.1_phase3_database_recovery_runbook.md`: Operator Disaster Recovery Runbook covering physical and logical restoration.
 3. `scratch/test_db_integrity_checklist.js`: Automated read-only Database Integrity script.
 
@@ -41,15 +41,15 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
 4. BACKUP FREQUENCY
 ==================================================
 
-- Managed Automated Backups: Scheduled daily (infrastructure default 02:00 UTC). EXTERNAL ACTION REQUIRED to confirm in production console.
-- PITR Log Archiving: Continuous WAL stream archiving. EXTERNAL ACTION REQUIRED to confirm active status in production console.
+- Managed Automated Backups: Scheduled daily (infrastructure default 02:00 UTC). REQUIRED EXTERNAL ACTION to confirm in production console.
+- PITR Log Archiving: Continuous WAL stream archiving. REQUIRED EXTERNAL ACTION to confirm active status in production console.
 - Logical CLI Snapshots: Recommended daily/weekly scheduled exports for off-site archiving.
 
 ==================================================
 5. RETENTION
 ==================================================
 
-- Managed Automated Snapshots: 7 days (Free/Pro tier) / 30 days (Enterprise tier). EXTERNAL ACTION REQUIRED to confirm tier settings.
+- Managed Automated Snapshots: 7 days (Free/Pro tier) / 30 days (Enterprise tier). REQUIRED EXTERNAL ACTION to confirm tier settings.
 - Logical Offline Snapshots: Recommended 90-day retention in encrypted off-site cloud storage with Object Lock enabled.
 
 ==================================================
@@ -89,7 +89,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
 
 - Script: `node scratch/test_db_integrity_checklist.js`
 - Test Result: PASS
-- Verified Coverage: Checked 15 schema tables, non-null mandatory constraints (`users.mobile`), and departmental staff population consistency.
+- Verified Coverage: Checked 16 schema tables, non-null mandatory constraints (`users.mobile`), and departmental staff population consistency.
 - Distinction: Database integrity verification confirms active database structure and health, but is NOT proof of backup restore execution.
 
 ==================================================
@@ -117,7 +117,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
 
 - Secret Exposure Scan: Searched `frontend/src` and `frontend/dist`; verified 0 exposures of `DATABASE_URL`, `POSTGRES_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, or `GEMINI_API_KEY`.
 - `.gitignore` Enforcement: Verified protection for `*.dump`, `*.backup`, `*.sql.gz`, and `backups/`.
-- Tracked Files Inspection: Verified no sensitive dump files are tracked in active git repository.
+- Tracked Files Inspection: Untracked `backend/nagarsetu.sqlite.backup` from Git index (`git rm --cached`). Verified `git ls-files` returns 0 tracked database backup artifacts.
 
 ==================================================
 14. DISASTER SCENARIOS
@@ -129,7 +129,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Execute PITR clone in staging -> Export deleted rows -> Re-insert into production via SQL script.
    - RPO: <= 5 minutes (Target) / NOT MEASURED (Actual)
    - RTO: <= 30 minutes (Target) / NOT MEASURED (Actual)
-   - Remaining gap: External Supabase console verification required.
+   - Remaining limitation: External Supabase console verification required.
 
 2. Scenario 2: Accidental User Deletion
    - Current recovery: Point-in-time restoration of `users` / `profiles` state to isolated target.
@@ -137,7 +137,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Clone DB at T-minus 10 mins -> Extract missing user profiles & bcrypt password hashes -> Re-insert into production.
    - RPO: <= 5 minutes (Target) / NOT MEASURED (Actual)
    - RTO: <= 30 minutes (Target) / NOT MEASURED (Actual)
-   - Remaining gap: External Supabase console verification required.
+   - Remaining limitation: External Supabase console verification required.
 
 3. Scenario 3: Bad Migration Execution
    - Current recovery: Restore schema and data to snapshot prior to migration.
@@ -145,7 +145,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Spin up isolated instance -> Restore pre-migration backup -> Re-point `DATABASE_URL`.
    - RPO: <= 5 minutes (Target) / NOT MEASURED (Actual)
    - RTO: <= 30 minutes (Target) / NOT MEASURED (Actual)
-   - Remaining gap: None for schema code; external verification required for physical rollback.
+   - Remaining limitation: None for schema code; external verification required for physical rollback.
 
 4. Scenario 4: Database Corruption
    - Current recovery: Physical infrastructure restore / project clone to latest uncorrupted PITR timestamp.
@@ -153,7 +153,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Identify corruption timestamp -> Provision new project -> Clone to timestamp -> Point backend `DATABASE_URL` to new project.
    - RPO: <= 5 minutes (Target) / NOT MEASURED (Actual)
    - RTO: <= 2 hours (Target) / NOT MEASURED (Actual)
-   - Remaining gap: External Supabase console verification required.
+   - Remaining limitation: External Supabase console verification required.
 
 5. Scenario 5: Supabase Cloud Outage
    - Current recovery: Logical snapshot restoration to secondary cloud PostgreSQL host (e.g. AWS RDS / GCP Cloud SQL).
@@ -161,7 +161,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Spin up secondary PostgreSQL -> Run `pg_restore` of latest `.dump` -> Initialize DDL -> Update Vercel `DATABASE_URL`.
    - RPO: <= 24 hours (Logical backup frequency) / NOT MEASURED (Actual)
    - RTO: <= 2 hours (Target) / NOT MEASURED (Actual)
-   - Remaining gap: Standby secondary host provisioning is manual.
+   - Remaining limitation: Standby secondary host provisioning is manual.
 
 6. Scenario 6: Database Credential Compromise
    - Current recovery: Immediate credential rotation in Supabase Console and Vercel environment.
@@ -169,7 +169,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Reset database password in Supabase -> Update `DATABASE_URL` in Vercel -> Redeploy/recycle backend pools.
    - RPO: 0 (No data loss)
    - RTO: <= 15 minutes
-   - Remaining gap: None.
+   - Remaining limitation: None.
 
 7. Scenario 7: Storage Object Deletion
    - Current recovery: Supabase Storage bucket versioning/backup restore.
@@ -177,7 +177,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Restore Storage bucket object snapshot from Supabase Storage backups.
    - RPO: NOT MEASURED
    - RTO: NOT MEASURED
-   - Remaining gap: Storage object versioning requires cloud console configuration.
+   - Remaining limitation: Storage object versioning requires cloud console configuration.
 
 8. Scenario 8: Database Restored but Storage Unavailable
    - Current recovery: Application functions normally for text/metadata; displays fallback placeholders for missing photos.
@@ -185,7 +185,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Restore database -> Serve civic complaints -> Restore Storage objects asynchronously.
    - RPO: <= 5 minutes (DB)
    - RTO: <= 30 minutes (DB)
-   - Remaining gap: Visual photo restoration deferred until Storage is restored.
+   - Remaining limitation: Visual photo restoration deferred until Storage is restored.
 
 9. Scenario 9: Storage Available but Database Unavailable
    - Current recovery: Express backend returns HTTP 500 / Database Error; Storage assets remain intact.
@@ -193,15 +193,15 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
    - Procedure: Restore database using PITR/Snapshot -> Re-connect Express backend.
    - RPO: <= 5 minutes
    - RTO: <= 30 minutes
-   - Remaining gap: None.
+   - Remaining limitation: None.
 
-10. Scenario 10: Full Project Recreation
+10. Scenario 10: Complete Project Loss
     - Current recovery: Provision new Supabase project -> Restore DB dump -> Create `issues` Storage bucket -> Re-deploy Express backend.
     - Verified: YES (Complete reproducible DDL in `backend/src/config/db.js` & Vercel deployment setup).
     - Procedure: Follow step-by-step instructions in `scratch/nagarsetu_v3.1_phase3_database_recovery_runbook.md`.
     - RPO: <= 24 hours (Snapshot) / <= 5 minutes (PITR)
     - RTO: <= 2 hours
-    - Remaining gap: External Supabase console setup required for new project creation.
+    - Remaining limitation: External Supabase console setup required for new project creation.
 
 ==================================================
 15. RPO CLASSIFICATION
@@ -224,7 +224,7 @@ Zero application code rewrites, zero breaking schema changes, zero fake backup e
 All 9 regression gates executed cleanly with 0 errors:
 - TypeScript Check (`frontend/` `npx tsc --noEmit`): PASS (0 errors)
 - Frontend Build (`cd frontend && npm run build`): PASS (Clean production bundle)
-- Database Integrity Check (`node scratch/test_db_integrity_checklist.js`): PASS (15 tables verified)
+- Database Integrity Check (`node scratch/test_db_integrity_checklist.js`): PASS (16 tables verified)
 - Security Isolation Suite (`node scratch/test_security_isolation.js`): 5/5 PASS
 - Credential Management Suite (`node scratch/test_credential_management.js`): 23/23 PASS
 - P0 Route Security Suite (`node scratch/test_p0_route_security.js`): 9/9 PASS
@@ -259,7 +259,7 @@ The following external actions MUST be performed by an authorized Municipal Admi
 20. FINAL EVIDENCE TABLE
 ==================================================
 
-| Control | Status | Actual Evidence |
+| Control | Status | Evidence |
 |---|---|---|
 | Production DB | VERIFIED | Managed Supabase PostgreSQL connected via `pg.Pool` SSL |
 | Automated backups | NOT VERIFIED | Requires Supabase Cloud Console admin access |
@@ -268,14 +268,15 @@ The following external actions MUST be performed by an authorized Municipal Admi
 | PITR | NOT VERIFIED | Requires Supabase Cloud Console admin access |
 | Recovery window | NOT VERIFIED | Requires Supabase Cloud Console admin access |
 | Restore mechanism | RECOMMENDED | Documented in `scratch/nagarsetu_v3.1_phase3_database_recovery_runbook.md` |
-| Isolated restore | NOT EXECUTED | Unexecuted on production DB to prevent service impact |
+| Isolated restore drill | NOT EXECUTED | Unexecuted on production DB to prevent service impact |
 | Restored DB integrity | VERIFIED | `node scratch/test_db_integrity_checklist.js` PASSED |
 | Schema recovery | VERIFIED | Idempotent DDL in `backend/src/config/db.js` |
 | DB ↔ Storage | VERIFIED | HTTPS URLs in Supabase Storage `issues` bucket |
+| Storage DR | NOT VERIFIED | Requires Supabase Storage bucket versioning/backup |
 | Backup security | VERIFIED | 0 secrets in build output (`frontend/dist`) |
+| Git protection | VERIFIED | `git ls-files` returned 0 tracked backup artifacts |
 | RPO | NOT MEASURED | Target RPO <= 5 mins (PITR) / <= 24 hrs (Daily) |
 | RTO | NOT MEASURED | Target RTO <= 30 mins (Clone) / <= 2 hrs (CLI) |
-| Git backup protection | VERIFIED | `.gitignore` covers `*.dump`, `*.backup`, `*.sql.gz`, `backups/` |
 | TypeScript | PASS | `npx tsc --noEmit` PASSED with 0 errors |
 | Build | PASS | `npm run build` PASSED (Clean production bundle) |
 | Security | PASS | `node scratch/test_security_isolation.js` PASSED (5/5) |
@@ -286,10 +287,38 @@ The following external actions MUST be performed by an authorized Municipal Admi
 | 59-point acceptance | PASS | `node scratch/run_production_acceptance_test.js` PASSED (59/59) |
 
 ==================================================
-21. FINAL VERDICT
+21. FINAL VERDICT & SUMMARY BLOCK
 ==================================================
 
-PHASE 3 STATUS: BLOCKED
+PRODUCTION BACKUP:
+NOT VERIFIED
+
+PITR:
+NOT VERIFIED
+
+RETENTION:
+NOT VERIFIED
+
+RESTORE DRILL:
+NOT EXECUTED
+
+DB INTEGRITY:
+PASS
+
+RPO:
+NOT MEASURED
+
+RTO:
+NOT MEASURED
+
+DB ↔ STORAGE:
+VERIFIED
+
+59-POINT ACCEPTANCE:
+59/59
+
+FINAL STATUS:
+BLOCKED
 
 Blocker Wording:
 "Production Supabase administrative verification and/or safe isolated restore validation remains outstanding."

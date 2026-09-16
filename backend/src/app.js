@@ -2,8 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const requestCorrelation = require('./middleware/requestCorrelation');
 const { authRateLimiter, publicRateLimiter, authedRateLimiter, authenticatedRateLimiter, aiRateLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
+const logger = require('./utils/logger');
 
 const authRoutes = require('./routes/auth.routes');
 const complaintRoutes = require('./routes/complaint.routes');
@@ -18,6 +20,9 @@ const aiRoutes = require('./routes/ai.routes');
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Attach Request Correlation ID & Performance Timing Middleware
+app.use(requestCorrelation);
 
 // Security Headers & Core Middleware — CORS MUST BE FIRST
 const allowedOrigins = [
@@ -48,7 +53,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control', 'Pragma', 'Expires', 'X-Request-ID']
 };
 
 app.use(cors(corsOptions));
@@ -74,10 +79,11 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     dbInitPromise = null;
-    console.error('[DB INIT FATAL ERROR]:', err.message);
+    logger.error('DATABASE_INIT_FATAL_ERROR', { requestId: req.requestId, message: err.message });
     return res.status(500).json({
       error: 'Database Connection Error',
-      message: err.message
+      message: err.message,
+      requestId: req.requestId
     });
   }
 });
@@ -97,6 +103,7 @@ app.get('/', (req, res) => {
     message: 'NAGARSETU Express Backend API is live on Vercel',
     health: '/api/health',
     version: '1.0.0',
+    requestId: req.requestId,
     timestamp: new Date().toISOString()
   });
 });
@@ -107,15 +114,19 @@ app.get('/api', (req, res) => {
     message: 'NAGARSETU API Root',
     health: '/api/health',
     version: '1.0.0',
+    requestId: req.requestId,
     timestamp: new Date().toISOString()
   });
 });
 
+// Liveness & Basic System Health Endpoint
 app.get('/api/health', publicRateLimiter, async (req, res) => {
   try {
     const isSqlite = getIsSqlite();
     const testSql = isSqlite ? "SELECT datetime('now') as db_time" : "SELECT NOW() as db_time";
     const dbRes = await query(testSql);
+    const metrics = logger.getMetrics();
+
     res.json({
       success: true,
       message: 'NAGARSETU Backend is running',
@@ -125,14 +136,55 @@ app.get('/api/health', publicRateLimiter, async (req, res) => {
       database_type: isSqlite ? 'sqlite' : 'postgres',
       db_time: dbRes.rows[0]?.db_time || new Date().toISOString(),
       version: '1.0.0',
+      requestId: req.requestId,
+      uptimeSeconds: metrics.uptimeSeconds,
+      metrics: {
+        totalRequests: metrics.totalRequests,
+        clientErrors: metrics.clientErrors,
+        serverErrors: metrics.serverErrors,
+        slowRequests: metrics.slowRequests
+      },
       timestamp: new Date().toISOString()
     });
   } catch (err) {
+    logger.recordDatabaseError();
     res.status(503).json({
       success: false,
       message: 'Database connection check failed',
       status: 'database_error',
       error: err.message,
+      requestId: req.requestId,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Production Readiness Check Endpoint (Verifies Core Infrastructure Dependencies)
+app.get('/api/health/ready', publicRateLimiter, async (req, res) => {
+  try {
+    const isSqlite = getIsSqlite();
+    const testSql = isSqlite ? "SELECT 1 as ready" : "SELECT 1 as ready";
+    const dbRes = await query(testSql);
+
+    if (dbRes && dbRes.rows && dbRes.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        status: 'ready',
+        database: 'connected',
+        requestId: req.requestId,
+        timestamp: new Date().toISOString()
+      });
+    }
+    throw new Error('Database ping query returned empty result.');
+  } catch (err) {
+    logger.recordDatabaseError();
+    logger.error('READINESS_CHECK_FAILED', { requestId: req.requestId, message: err.message });
+    return res.status(503).json({
+      success: false,
+      status: 'not_ready',
+      database: 'disconnected',
+      error: 'Core database dependency unavailable',
+      requestId: req.requestId,
       timestamp: new Date().toISOString()
     });
   }

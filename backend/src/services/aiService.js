@@ -289,6 +289,15 @@ async function analyzeComplaintPhoto(fileInput) {
     }
 
     console.warn('[NAGARSETU Backend AI] External Gemini API unavailable or unconfigured:', err.message);
+    try {
+      const logger = require('../utils/logger');
+      logger.recordAiError();
+      logger.warn('AI_SERVICE_FALLBACK', {
+        errorCode: err.errorCode || 'AI_UNAVAILABLE',
+        statusCode: err.statusCode || 500,
+        message: err.message
+      });
+    } catch (e) {}
     const defaultCategory = 'Road Damage / Pothole';
     const deptInfo = getDepartmentForCategory(defaultCategory);
 
