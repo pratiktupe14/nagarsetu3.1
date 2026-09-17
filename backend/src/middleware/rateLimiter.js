@@ -150,5 +150,10 @@ module.exports = {
   publicRateLimiter,
   authedRateLimiter,
   authenticatedRateLimiter: authedRateLimiter,
-  aiRateLimiter
+  aiRateLimiter,
+  resetAuthRateLimiter: () => {
+    if (typeof authAttemptTracker !== 'undefined' && authAttemptTracker.clear) {
+      authAttemptTracker.clear();
+    }
+  }
 };

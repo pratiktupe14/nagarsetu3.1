@@ -1,10 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { query } = require('../config/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
+
+// In-Memory OTP Store: Key = normalized mobile number
+// Value = { code, expiresAt, attempts, createdAt }
+const otpStore = new Map();
+
+const otpCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of otpStore.entries()) {
+    if (record.expiresAt < now) {
+      otpStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+if (otpCleanupTimer && typeof otpCleanupTimer.unref === 'function') {
+  otpCleanupTimer.unref();
+}
 
 function extractDigits(str) {
   return String(str || '').replace(/\D/g, '');
@@ -317,21 +335,81 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   }
 });
 
-// OTP Request (Simulated)
+// OTP Request Endpoint
 router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
   const { mobile } = req.body;
-  return res.json({ message: 'OTP sent successfully to ' + mobile, demoOtp: '123456' });
+  const cleanMobile = normalizeMobile(mobile);
+  const now = Date.now();
+
+  const existing = otpStore.get(cleanMobile);
+  if (existing && (now - existing.createdAt < 15 * 1000)) {
+    const retryAfter = Math.ceil((15 * 1000 - (now - existing.createdAt)) / 1000);
+    return res.status(429).json({
+      error: 'Please wait before requesting another OTP',
+      retryAfterSeconds: retryAfter
+    });
+  }
+
+  const generatedCode = String(crypto.randomInt(100000, 999999));
+  const expiresAt = now + 5 * 60 * 1000;
+
+  otpStore.set(cleanMobile, {
+    code: generatedCode,
+    expiresAt,
+    attempts: 0,
+    createdAt: now
+  });
+
+  const responseObj = {
+    message: 'OTP sent successfully to ' + mobile,
+    expiresInSeconds: 300
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    responseObj.dev_otp = generatedCode;
+    responseObj.demoOtp = generatedCode;
+  }
+
+  return res.json(responseObj);
 });
 
-// OTP Verify (Simulated)
+// OTP Verify Endpoint
 router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   try {
     const { mobile, otp, name } = req.body;
-    if (otp !== '123456') {
+    const cleanMobile = normalizeMobile(mobile);
+    const cleanOtp = String(otp || '').trim();
+    const now = Date.now();
+
+    const record = otpStore.get(cleanMobile);
+    let isValidOtp = false;
+
+    if (record) {
+      if (record.expiresAt < now) {
+        otpStore.delete(cleanMobile);
+        return res.status(400).json({ error: 'OTP code has expired. Please request a new one.' });
+      }
+
+      if (record.attempts >= 5) {
+        otpStore.delete(cleanMobile);
+        return res.status(429).json({ error: 'Maximum OTP verification attempts exceeded. Please request a new OTP.' });
+      }
+
+      if (record.code === cleanOtp || (process.env.NODE_ENV !== 'production' && cleanOtp === '123456')) {
+        isValidOtp = true;
+      } else {
+        record.attempts += 1;
+      }
+    } else if (process.env.NODE_ENV !== 'production' && cleanOtp === '123456') {
+      isValidOtp = true;
+    }
+
+    if (!isValidOtp) {
       return res.status(400).json({ error: 'Invalid OTP code' });
     }
 
-    const cleanMobile = normalizeMobile(mobile);
+    otpStore.delete(cleanMobile);
+
     const sql = `SELECT * FROM users WHERE mobile = ? OR mobile = ?`;
     const resUser = await query(sql, [cleanMobile, mobile]);
     
@@ -342,10 +420,9 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
       if (res.clearAuthAttempts) res.clearAuthAttempts();
       return res.json({ message: 'OTP verified successfully', token, user: userObj });
     } else {
-      // Auto-register citizen on first verified OTP
       const citizenName = (name && String(name).trim()) || 'Citizen User';
       const salt = await bcrypt.genSalt(10);
-      const defaultHash = await bcrypt.hash(Math.random().toString(36), salt);
+      const defaultHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), salt);
       const citizenEmail = `${cleanMobile}@citizen.nagarsetu.gov.in`;
 
       await query(
@@ -588,8 +665,8 @@ router.post('/change-password', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'New password cannot be the same as the current password' });
     }
 
-    if (String(newPassword).length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long' });
     }
 
     // Retrieve user and password hash
