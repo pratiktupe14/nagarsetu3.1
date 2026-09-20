@@ -85,6 +85,37 @@ async function resolveUserDepartment(req) {
   };
 }
 
+/**
+ * Self-healing data sanitization: Normalize legacy department_id entries in field_staff & users
+ */
+let hasSanitizedDepartments = false;
+async function sanitizeUnnormalizedStaffDepartments() {
+  if (hasSanitizedDepartments) return;
+  hasSanitizedDepartments = true;
+  try {
+    const rawFs = await query(`SELECT id, department_id FROM field_staff WHERE department_id IS NOT NULL AND department_id != ''`).catch(() => ({ rows: [] }));
+    if (rawFs && rawFs.rows) {
+      for (const r of rawFs.rows) {
+        const norm = normalizeDepartmentInfo(r.department_id);
+        if (norm.idStr && norm.idStr !== String(r.department_id)) {
+          await query(`UPDATE field_staff SET department_id = $1 WHERE id = $2`, [norm.idStr, r.id]).catch(() => {});
+        }
+      }
+    }
+    const rawUsers = await query(`SELECT id, department_id FROM users WHERE role = 'service_staff' AND department_id IS NOT NULL AND department_id != ''`).catch(() => ({ rows: [] }));
+    if (rawUsers && rawUsers.rows) {
+      for (const r of rawUsers.rows) {
+        const norm = normalizeDepartmentInfo(r.department_id);
+        if (norm.idStr && norm.idStr !== String(r.department_id)) {
+          await query(`UPDATE users SET department_id = $1 WHERE id = $2`, [norm.idStr, r.id]).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {
+    // Non-blocking background cleanup
+  }
+}
+
 
 // Public or authenticated list of municipal departments
 router.get('/', async (req, res) => {
@@ -272,6 +303,7 @@ router.get('/complaints', authenticateToken, requireRole(['department_head', 'ad
  */
 router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
+    await sanitizeUnnormalizedStaffDepartments();
     const { userDeptId, userDeptName } = await resolveUserDepartment(req);
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
@@ -324,6 +356,8 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
       LEFT JOIN departments d ON (
         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
+        OR LOWER(d.name) = LOWER(CAST(fs.department_id AS TEXT))
+        OR LOWER(d.name) LIKE '%' || LOWER(CAST(fs.department_id AS TEXT)) || '%'
       )
       LEFT JOIN users u ON CAST(fs.user_id AS TEXT) = CAST(u.id AS TEXT)
       WHERE 1=1
@@ -344,24 +378,30 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
       const idx1 = params.length + 1;
       const idx2 = params.length + 2;
       const idx3 = params.length + 3;
+      const idx4 = params.length + 4;
+      const deptKeyword = `%${(norm.name || '').toLowerCase().split(' ')[0]}%`;
 
       if (norm.code === 'PWD') {
         sql += ` AND (
           CAST(fs.department_id AS TEXT) IN ($${idx1}, $${idx2})
           OR UPPER(CAST(fs.department_id AS TEXT)) = $${idx2}
+          OR LOWER(CAST(fs.department_id AS TEXT)) LIKE $${idx4}
           OR fs.employee_id LIKE $${idx3}
           OR fs.employee_id = 'STF-001'
-          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2}))
+          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2} OR LOWER(d.name) LIKE $${idx4}))
+          OR (u.department_id IS NOT NULL AND (CAST(u.department_id AS TEXT) = $${idx1} OR UPPER(CAST(u.department_id AS TEXT)) = $${idx2}))
         )`;
       } else {
         sql += ` AND (
           CAST(fs.department_id AS TEXT) IN ($${idx1}, $${idx2})
           OR UPPER(CAST(fs.department_id AS TEXT)) = $${idx2}
+          OR LOWER(CAST(fs.department_id AS TEXT)) LIKE $${idx4}
           OR fs.employee_id LIKE $${idx3}
-          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2}))
+          OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $${idx1} OR UPPER(d.code) = $${idx2} OR LOWER(d.name) LIKE $${idx4}))
+          OR (u.department_id IS NOT NULL AND (CAST(u.department_id AS TEXT) = $${idx1} OR UPPER(CAST(u.department_id AS TEXT)) = $${idx2}))
         )`;
       }
-      params.push(norm.idStr, norm.code, `${norm.code}%`);
+      params.push(norm.idStr, norm.code, `${norm.code}%`, deptKeyword);
     }
 
     if (filterStatus === 'active') {
@@ -507,12 +547,18 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
-    let targetDeptId = userDeptId;
-    if (isAdmin && req.body.department_id) {
-      targetDeptId = req.body.department_id;
+    const rawDeptInput = req.body.department_id || req.body.departmentId || req.body.dept_id || req.body.department || req.body.department_name || req.body.department_code;
+
+    let targetDeptInput = isAdmin ? (rawDeptInput || userDeptId) : userDeptId;
+    if (!targetDeptInput) {
+      targetDeptInput = rawDeptInput || userDeptId;
     }
 
-    if (!targetDeptId) {
+    const norm = normalizeDepartmentInfo(targetDeptInput);
+    const finalDeptId = norm.idStr || (targetDeptInput ? String(targetDeptInput) : '');
+    const finalDeptName = norm.name || userDeptName || 'Municipal Department';
+
+    if (!finalDeptId) {
       return res.status(400).json({ error: 'Department assignment could not be resolved.' });
     }
 
@@ -536,14 +582,14 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
       RETURNING *
     `;
 
-    const result = await query(insertSql, [name, mobile, cleanEmail, password_hash, targetDeptId, empId, desig, lang]);
+    const result = await query(insertSql, [name, mobile, cleanEmail, password_hash, finalDeptId, empId, desig, lang]);
     const created = result.rows[0];
 
     // Also insert into field_staff table
     await query(
       `INSERT INTO field_staff (user_id, department_id, name, email, phone, employee_id, role, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'field_staff', 'active')`,
-      [created.id, targetDeptId, name, cleanEmail, mobile, empId]
+      [created.id, finalDeptId, name, cleanEmail, mobile, empId]
     ).catch(() => {});
 
     return res.status(201).json({
@@ -557,8 +603,8 @@ router.post('/staff', authenticateToken, requireRole(['department_head', 'admin'
         mobile: created.mobile,
         employee_id: created.employee_id,
         designation: created.designation,
-        department_id: String(created.department_id),
-        department_name: userDeptName,
+        department_id: String(created.department_id || finalDeptId),
+        department_name: finalDeptName,
         status: 'Active',
         active_tasks: 0,
         completed_tasks: 0,
@@ -591,7 +637,9 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
-      if (String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
+      const staffDeptNorm = normalizeDepartmentInfo(verifyRes.rows[0].department_id);
+      const userDeptNorm = normalizeDepartmentInfo(userDeptId);
+      if (staffDeptNorm.code !== userDeptNorm.code && String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
         return res.status(403).json({ error: 'Forbidden: You can only edit staff members in your department' });
       }
     }
