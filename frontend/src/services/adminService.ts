@@ -267,22 +267,25 @@ export async function fetchDepartmentStaffApi(params?: {
 
     if (res.ok) {
       const data = await res.json();
-        const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => ({
-          id: String(s.id),
-          name: s.name,
-          employee_id: s.employee_id || `STF-${s.id}`,
-          department_name: s.department_name || 'Municipal Department',
-          role: s.designation || s.role || 'Service Staff',
-          status: (s.status || 'active').toLowerCase() === 'active' ? 'Available' : 'Offline',
-          contact_number: s.mobile || s.contact_number || s.phone || '+91 98220 00000',
-          email: s.email,
-          ward_area: 'Nashik City',
-          joined_date: s.created_at || new Date().toISOString(),
-          created_at: s.created_at || new Date().toISOString(),
-          active_tasks: s.active_tasks || 0,
-          completed_tasks: s.completed_tasks || 0,
-          overdue_tasks: s.overdue_tasks || 0
-        }));
+        const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => {
+          const resolvedDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+          return {
+            id: String(s.id),
+            name: s.name,
+            employee_id: s.employee_id || `STF-${s.id}`,
+            department_name: (s.department_name && s.department_name !== 'Municipal Department') ? s.department_name : resolvedDept.name,
+            role: s.designation || s.role || 'Service Staff',
+            status: (s.status || 'active').toLowerCase() === 'active' ? 'Available' : 'Offline',
+            contact_number: s.mobile || s.contact_number || s.phone || '+91 98220 00000',
+            email: s.email,
+            ward_area: 'Nashik City',
+            joined_date: s.created_at || new Date().toISOString(),
+            created_at: s.created_at || new Date().toISOString(),
+            active_tasks: s.active_tasks || 0,
+            completed_tasks: s.completed_tasks || 0,
+            overdue_tasks: s.overdue_tasks || 0
+          };
+        });
         if (mappedStaff.length > 0) {
           memoryStaffRecords = mappedStaff;
         }
@@ -456,22 +459,25 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
   try {
     const apiRes = await fetchDepartmentStaffApi({ department_id: departmentId });
     if (apiRes && Array.isArray(apiRes.staff)) {
-      return apiRes.staff.map((s) => ({
-        id: s.id,
-        name: s.name,
-        employee_id: s.employee_id,
-        department_name: s.department_name || departmentName || 'Municipal Department',
-        role: s.designation || 'Service Staff',
-        status: s.status === 'Active' ? 'Available' : 'Offline',
-        contact_number: s.contact_number || s.mobile || '+91 98220 00000',
-        email: s.email,
-        ward_area: 'Nashik City',
-        joined_date: s.joined_date || new Date().toISOString(),
-        created_at: s.created_at || new Date().toISOString(),
-        active_tasks: s.active_tasks || 0,
-        completed_tasks: s.completed_tasks || 0,
-        overdue_tasks: s.overdue_tasks || 0
-      }));
+      return apiRes.staff.map((s) => {
+        const resolved = resolveDepartmentInfo(s.department_id || s.employee_id || departmentId, s.department_name || departmentName);
+        return {
+          id: s.id,
+          name: s.name,
+          employee_id: s.employee_id,
+          department_name: (s.department_name && s.department_name !== 'Municipal Department') ? s.department_name : resolved.name,
+          role: s.designation || 'Service Staff',
+          status: s.status === 'Active' ? 'Available' : 'Offline',
+          contact_number: s.contact_number || s.mobile || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.joined_date || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString(),
+          active_tasks: s.active_tasks || 0,
+          completed_tasks: s.completed_tasks || 0,
+          overdue_tasks: s.overdue_tasks || 0
+        };
+      });
     }
   } catch (e) {
     console.warn('fetchDepartmentStaffApi failed in getDepartmentServiceStaff:', e);
@@ -494,19 +500,22 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
       }
       const { data, error } = await query;
       if (!error && data && Array.isArray(data)) {
-        return data.map((p: any) => ({
-          id: p.id,
-          name: p.full_name || p.name || 'Staff Member',
-          employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
-          department_name: p.department_name || departmentName || 'Municipal Department',
-          role: 'Service Staff',
-          status: p.status || 'Available',
-          contact_number: p.phone_number || p.mobile || '+91 98220 00000',
-          email: p.email || 'staff@nagarsetu.gov.in',
-          ward_area: p.ward_area || 'Nashik City',
-          joined_date: p.created_at || new Date().toISOString(),
-          created_at: p.created_at || new Date().toISOString()
-        }));
+        return data.map((p: any) => {
+          const resolved = resolveDepartmentInfo(p.department_id || p.employee_id, p.department_name || departmentName);
+          return {
+            id: p.id,
+            name: p.full_name || p.name || 'Staff Member',
+            employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
+            department_name: (p.department_name && p.department_name !== 'Municipal Department') ? p.department_name : resolved.name,
+            role: 'Service Staff',
+            status: p.status || 'Available',
+            contact_number: p.phone_number || p.mobile || '+91 98220 00000',
+            email: p.email || 'staff@nagarsetu.gov.in',
+            ward_area: p.ward_area || 'Nashik City',
+            joined_date: p.created_at || new Date().toISOString(),
+            created_at: p.created_at || new Date().toISOString()
+          };
+        });
       }
     } catch (e) {
       console.warn('Supabase fetch staff error:', e);
@@ -521,11 +530,12 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', staffId).single();
       if (!error && data) {
+        const resolved = resolveDepartmentInfo(data.department_id || data.employee_id, data.department_name);
         return {
           id: data.id,
           name: data.full_name || data.name || 'Staff Member',
           employee_id: data.employee_id || `STF-${String(data.id).slice(0, 4).toUpperCase()}`,
-          department_name: data.department_name || 'Municipal Department',
+          department_name: (data.department_name && data.department_name !== 'Municipal Department') ? data.department_name : resolved.name,
           role: 'Service Staff',
           status: data.status || 'Available',
           contact_number: data.phone_number || '+91 98220 00000',

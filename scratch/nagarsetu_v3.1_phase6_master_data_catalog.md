@@ -1,103 +1,87 @@
-# NAGARSETU 3.1 — Phase 6 Master Data Catalog
+# NAGARSETU 3.1 — Phase 6 Municipal Master Data Catalog
 
-Authoritative catalog of municipal master data, operational configuration, schema definitions, and governance rules in NAGARSETU 3.1.
-
----
-
-## 1. Municipality & City Configuration
-
-- **City Name**: Nashik
-- **Municipal Body**: Nashik Municipal Corporation (NMC)
-- **Timezone**: `Asia/Kolkata` (IST, UTC+5:30)
-- **Default Locale**: `en` (English), supporting multilingual civic interface (`hi`, `mr`)
-- **Emergency Helpline**: `1800-233-1913` / `112`
-- **Primary Source of Truth**: PostgreSQL / SQLite (`departments`, `department_heads`, `field_staff`, `users`, `complaints` database tables)
+## Executive Summary
+This document serves as the single authoritative master catalog for the municipal organizational structure of NAGARSETU 3.1. All organizational mappings, department head relationships, service staff assignments, and category routing rules documented herein are enforced at the database level in PostgreSQL / Supabase and local SQLite instances.
 
 ---
 
-## 2. Municipal Departments Master Data
+## 1. Authoritative 7 Municipal Departments
 
-| Dept ID | Code | Department Name | Description / Scope |
-|---|---|---|---|
-| `1` | `PWD` | Public Works Department | Roads, potholes, footpaths, bridges, public works infrastructure |
-| `2` | `SAN` | Sanitation & Waste Management | Garbage collection, solid waste, street cleaning, bin overflow |
-| `3` | `WTR` | Water Supply & Sewerage Board | Water supply, main pipelines, water leaks, distribution |
-| `4` | `DRN` | Drainage & Sewage Department | Stormwater drains, open gutters, sewerage chokeages, manholes |
-| `5` | `ELE` | Electrical & Street Lighting | Street lights, electrical poles, dark spots, power infrastructure |
-| `6` | `TRF` | Traffic Management Department | Traffic signals, road signage, traffic island maintenance |
-| `7` | `MNT` | Maintenance Department | General civic infrastructure, railings, public building repair |
-
----
-
-## 3. Active Department Leadership Master Data
-
-All Department Heads are linked to authoritative database records in `department_heads` and `users`:
-
-| Dept Code | Active Department Head | Email | Official Employee ID | Status |
-|---|---|---|---|---|
-| `PWD` | Rahul Kumar | `rahul.kumar@nagarsetu.gov.in` | `EMP-PWD-001` | Active |
-| `SAN` | Amit Sharma | `amit.sharma@nagarsetu.gov.in` | `EMP-SAN-001` | Active |
-| `WTR` | Vikram Patil | `vikram.patil@nagarsetu.gov.in` | `EMP-WTR-001` | Active |
-| `DRN` | Sanjay More | `sanjay.more@nagarsetu.gov.in` | `EMP-DRN-001` | Active |
-| `ELE` | Kunal Kulkarni | `kunal.kulkarni@nagarsetu.gov.in` | `EMP-ELE-001` | Active |
-| `TRF` | Rohan Deshmukh | `rohan.deshmukh@nagarsetu.gov.in` | `EMP-TRF-001` | Active |
-| `MNT` | Aditya Joshi | `aditya.joshi@nagarsetu.gov.in` | `EMP-MNT-001` | Active |
+| DB ID | Code | Department Name | Scope & Responsibilities | Assigned Department Head |
+|-------|------|-----------------|--------------------------|--------------------------|
+| 1 | PWD | Public Works Department | Road repairs, asphalt paving, potholes, sidewalk & structural civic infrastructure | Rahul Kumar (`rahul.kumar@nagarsetu.gov.in`) |
+| 2 | SAN | Sanitation & Waste Management | Solid waste collection, dumpster clearing, street sweeping, market sanitation & public hygiene | Amit Sharma (`amit.sharma@nagarsetu.gov.in`) |
+| 3 | WTR | Water Supply & Sewerage Board | Potable water pipelines, leakage sealing, valve control & water supply network | Vikram Patil (`vikram.patil@nagarsetu.gov.in`) |
+| 4 | DRN | Drainage & Sewage Department | Drainage blockages, sewage overflows, open drains, culverts & storm channels | Sanjay More (`sanjay.more@nagarsetu.gov.in`) |
+| 5 | ELE | Electrical & Street Lighting | Streetlight repair, electrical poles, transformer inspection & public lighting | Kunal Kulkarni (`kunal.kulkarni@nagarsetu.gov.in`) |
+| 6 | TRF | Traffic Management Department | Traffic signals, road signage, lane markings & junction traffic safety | Rohan Deshmukh (`rohan.deshmukh@nagarsetu.gov.in`) |
+| 7 | MNT | Maintenance Department | Civic building repairs, public park upkeep & general municipal asset management | Aditya Joshi (`aditya.joshi@nagarsetu.gov.in`) |
 
 ---
 
-## 4. Field Staff Distribution Master Data
+## 2. Department Head Relationships & Constraints
 
-Active workforce linked via `field_staff` database table (36 Total Active Accounts):
-
-| Dept Code | Staff Count | Employee ID Pattern | Default Duty Areas |
-|---|---|---|---|
-| `PWD` | 6 Staff | `PWD-STF-001` to `PWD-STF-006` | Nashik East, West, Panchavati, CIDCO |
-| `SAN` | 5 Staff | `SAN-STF-001` to `SAN-STF-005` | Satpur, Nashik Road, Panchavati |
-| `WTR` | 5 Staff | `WTR-STF-001` to `WTR-STF-005` | Gangapur, CIDCO, Nashik East |
-| `DRN` | 5 Staff | `DRN-STF-001` to `DRN-STF-005` | Satpur, Panchavati, Nashik Road |
-| `ELE` | 5 Staff | `ELE-STF-001` to `ELE-STF-005` | Nashik West, CIDCO, Satpur |
-| `TRF` | 5 Staff | `TRF-STF-001` to `TRF-STF-005` | CBS Circle, Dwarka, Highway Zone |
-| `MNT` | 5 Staff | `MNT-STF-001` to `MNT-STF-005` | Main City Central, Municipal Properties |
-
----
-
-## 5. Civic Issue Category Taxonomy & Department Routing Map
-
-Taxonomy resolution is executed server-side via `taxonomyService.js` and database lookup:
-
-| Canonical Category | Specific Issues / Keywords | Default Target Dept | Department ID |
-|---|---|---|---|
-| `Road Damage / Pothole` | Pothole, asphalt crater, footpath damage, road crack | `PWD` | `1` |
-| `Garbage / Waste` | Overflowing bin, waste accumulation, uncollected trash | `SAN` | `2` |
-| `Water Leakage / Pipeline` | Pipeline burst, water leakage, supply disruption | `WTR` | `3` |
-| `Drainage / Sewage` | Blocked drain, overflowing sewer, open manhole | `DRN` | `4` |
-| `Streetlight / Electrical` | Broken streetlight, exposed wire, pole damage | `ELE` | `5` |
-| `Traffic Infrastructure` | Signal malfunction, damaged traffic sign, island | `TRF` | `6` |
-| `Public Infrastructure Damage` | Railing damage, paver block defect, civic building | `MNT` | `7` |
+- **Strict Non-Swappable Mappings**:
+  - `Rahul Kumar` → `PWD` (Dept ID 1)
+  - `Amit Sharma` → `SAN` (Dept ID 2)
+  - `Vikram Patil` → `WTR` (Dept ID 3)
+  - `Sanjay More` → `DRN` (Dept ID 4)
+  - `Kunal Kulkarni` → `ELE` (Dept ID 5)
+  - `Rohan Deshmukh` → `TRF` (Dept ID 6)
+  - `Aditya Joshi` → `MNT` (Dept ID 7)
+- **Hardening Rules**:
+  - Department Head role (`role: 'department_head'`) is linked strictly to a single department via `department_id`.
+  - Department Heads cannot edit, reassign, or deactivate staff members or complaints outside their assigned department (enforced with HTTP 403 Forbidden).
 
 ---
 
-## 6. Complaint Lifecycle Status Master Data
+## 3. Field Staff Relationships & Baseline Mapping
 
-| Status Code | Description | Allowed Roles to Set |
-|---|---|---|
-| `Submitted` | Initial state upon citizen submission | System / Citizen |
-| `NEEDS_VERIFICATION` | Low confidence AI submission requiring verification | System |
-| `Staff Assigned` | Task assigned to specific field staff by Department Head | Department Head |
-| `Accepted` | Field staff accepted assigned task | Assigned Field Staff |
-| `On the Way` | Field staff dispatched to site | Assigned Field Staff |
-| `In Progress` | Work active on location | Assigned Field Staff |
-| `Resolution Submitted` | Work finished, photo submitted, awaiting DH approval | Assigned Field Staff |
-| `Resolved` | Verified & approved by Department Head | Department Head |
-| `Reopened` | Reopened by Citizen within allowed SLA window | Citizen |
-| `Rejected` | Invalid / duplicate / rejected complaint | Department Head / Admin |
+Each field staff member is assigned to a specific department. Standard baseline field staff:
+
+| Staff ID | Name | Role | Department Code | Department Name | DB ID |
+|----------|------|------|-----------------|-----------------|-------|
+| PWD-STF-001 | Amit Patil | Field Operations | PWD | Public Works Department | 1 |
+| SAN-STF-001 | Prashant Mane | Field Operations | SAN | Sanitation & Waste Management | 2 |
+| WTR-STF-001 | Kiran Patil | Field Operations | WTR | Water Supply & Sewerage Board | 3 |
+| DRN-STF-001 | Sunil Patil | Field Operations | DRN | Drainage & Sewage Department | 4 |
+| ELE-STF-001 | Rahul Joshi | Field Operations | ELE | Electrical & Street Lighting | 5 |
+| TRF-STF-001 | Rohan Patil | Field Operations | TRF | Traffic Management Department | 6 |
+| MNT-STF-001 | Kunal Patil | Field Operations | MNT | Maintenance Department | 7 |
 
 ---
 
-## 7. Governance & Master Data Security Rules
+## 4. Complaint Category Routing & Master Data
 
-1. **Database Source of Truth**: All municipal relationships (`departments`, `department_heads`, `field_staff`) must be queried from PostgreSQL / SQLite.
-2. **Server-Side Category Routing**: Client cannot forge `department_id` to route a complaint to an arbitrary department. Server resolves department using category taxonomy and database lookup.
-3. **No Soft/Hard Hardcoded IDs**: Department logic checks database records by code and primary keys.
-4. **Delete Safety**: Departments with active complaints cannot be deleted (HTTP 400 Bad Request).
-5. **Security Isolation**: Department Heads can view and assign ONLY field staff and complaints belonging to their own department.
+Categories are stored and mapped dynamically to departments via database relationships.
+
+| Category | Primary Department Code | Resolved Department Name |
+|----------|-------------------------|--------------------------|
+| Road damage / potholes | PWD | Public Works Department |
+| Sanitation / waste | SAN | Sanitation & Waste Management |
+| Water supply / leakage | WTR | Water Supply & Sewerage Board |
+| Drainage / sewage | DRN | Drainage & Sewage Department |
+| Electrical / street lighting | ELE | Electrical & Street Lighting |
+| Traffic signals / signage | TRF | Traffic Management Department |
+| Civic building / park maintenance | MNT | Maintenance Department |
+
+---
+
+## 5. Priority & Status Master Configuration
+
+- **Complaint Lifecycle Flow**:
+  `Submitted` → `Staff Assigned` → `Accepted` → `On the Way` → `In Progress` → `Resolution Submitted` → `Resolved`
+- **Reopen Lifecycle Flow**:
+  `Resolved` → `Reopened` → `In Progress` → `Resolution Submitted` → `Resolved`
+- **Authorization Scoping**:
+  - **Field Staff**: Permitted to update status through `Accepted`, `On the Way`, `In Progress`, and `Resolution Submitted`.
+  - **Department Head / Admin**: Authorized to perform final verification (`Resolved` / `Rejected`).
+  - **Citizen**: Authorized to rate resolution or trigger `Reopened` state on resolved complaints.
+
+---
+
+## 6. Security, Isolation, and Historical Integrity
+
+- **Database Source of Truth**: All UI views resolve department details directly from API responses powered by PostgreSQL/Supabase database tables (`departments`, `field_staff`, `department_heads`, `users`).
+- **No Direct Data Mutation**: Client inputs for `department_id` during staff creation or complaint submission are validated on the backend against server-side user credentials and department master records.
+- **Historical Data Protection**: Deletion of departments with active or historical complaints is blocked (`is_active = false` soft deactivation preserved).

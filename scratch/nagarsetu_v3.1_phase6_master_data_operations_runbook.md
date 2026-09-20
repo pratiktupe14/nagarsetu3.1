@@ -1,102 +1,65 @@
 # NAGARSETU 3.1 — Phase 6 Master Data Operations Runbook
 
-Standard Operating Procedures (SOP) for managing municipal master data, department routing, staff assignments, and operational configuration safely in NAGARSETU 3.1.
+## Executive Summary
+This runbook describes operational procedures for managing municipal master data in NAGARSETU 3.1 safely and securely without risking data corruption, orphaned records, or authorization bypasses.
 
 ---
 
-## SOP-01: Adding a New Municipal Department
+## 1. Managing Departments
 
-1. **Prerequisite**: Admin role required (`city_admin` or `admin`).
-2. **Procedure**:
-   Execute `POST /api/departments` with payload:
+### Adding a New Department
+1. Execute `POST /api/department` (Requires `admin` or `city_admin` role).
+2. Payload:
    ```json
    {
-     "name": "Parks & Horticulture Department",
-     "code": "PRK",
-     "description": "Public parks, tree trimming, and green belt maintenance"
+     "name": "New Department Name",
+     "code": "NDP",
+     "description": "Department Scope Description"
    }
    ```
-3. **Validation**:
-   - Backend checks that name and code are unique (`409 Conflict` if duplicate).
-   - Record inserted into `departments` table.
-4. **Taxonomy Sync**: Update `taxonomyService.js` if auto-routing of new civic categories to `PRK` is required.
+3. Backend auto-validates unique department codes and names before insertion into the database.
+
+### Deactivating a Department (Historical Protection)
+1. Do NOT execute `DELETE FROM departments` directly if historical complaints or staff reference the department.
+2. If active complaints exist, reassign active complaints first via `POST /api/department/assign`.
+3. Soft deactivation sets `is_active = false` on the target department record to preserve historical complaints and audit trail.
 
 ---
 
-## SOP-02: Updating Department Metadata
+## 2. Managing Service Staff & Department Assignment
 
-1. **Prerequisite**: Admin role required.
-2. **Procedure**:
-   Execute `PUT /api/departments/:id` with updated fields:
-   ```json
-   {
-     "name": "Water Supply & Hydro Board",
-     "description": "Citywide potable water distribution and hydro infrastructure"
-   }
-   ```
-3. **Safety Guard**: Backend ensures updated code/name does not clash with another department.
+### Adding New Field Staff
+1. Execute `POST /api/department/staff` (Requires `department_head`, `admin`, or `city_admin` role).
+2. Department Head requests automatically lock `department_id` to their own assigned department. Any client-provided `department_id` mismatch is overridden by backend validation.
+3. System automatically inserts records into both `users` and `field_staff` tables with matched `department_id`.
+
+### Changing Staff Department
+1. Admin or authorized Department Head invokes `PUT /api/department/staff/:id`.
+2. Backend validates that the staff member is not currently assigned to active open complaints before performing department migration.
 
 ---
 
-## SOP-03: Deactivating or Removing a Department
+## 3. Managing Department Heads
 
-1. **Prerequisite**: Admin role required.
-2. **Safety Rule**: **NEVER** drop historical records. Departments with active or non-resolved complaints **CANNOT** be deleted.
-3. **Procedure**:
-   Execute `DELETE /api/departments/:id`.
-   - If active complaints exist: API returns `400 Bad Request` with error message `"Cannot delete department with N active complaint(s). Reassign them first."`
-   - To deactivate safely without deleting historical data: Update status field or reassign active complaints prior to deletion.
-
----
-
-## SOP-04: Appointing a New Department Head
-
-1. **Prerequisite**: Admin role required.
-2. **Procedure**:
-   Execute `POST /api/admin/department-heads` with payload:
-   ```json
-   {
-     "fullName": "Rajesh V. Deshmukh",
-     "email": "rajesh.deshmukh@nagarsetu.gov.in",
-     "phone": "+91 98220 00010",
-     "employeeId": "EMP-PWD-002",
-     "departmentId": "1",
-     "designation": "Chief Engineer & Department Head",
-     "password": "SecurePassword123!"
-   }
-   ```
-3. **Atomic Execution**:
-   - Deactivates previous active Department Head for Department `1` (`status = 'inactive'`).
-   - Inserts/updates `department_heads` and `users` tables atomically.
-   - Logs structured security event `DEPARTMENT_HEAD_UPDATED`.
+### Assigning / Updating Department Heads
+1. Execute `POST /api/admin/department-heads` (Requires `admin` or `city_admin` role).
+2. Required non-negotiable Department Head accounts:
+   - `Rahul Kumar` → `PWD` (Dept 1)
+   - `Amit Sharma` → `SAN` (Dept 2)
+   - `Vikram Patil` → `WTR` (Dept 3)
+   - `Sanjay More` → `DRN` (Dept 4)
+   - `Kunal Kulkarni` → `ELE` (Dept 5)
+   - `Rohan Deshmukh` → `TRF` (Dept 6)
+   - `Aditya Joshi` → `MNT` (Dept 7)
+3. Direct execution of `seed7DemoDepartmentHeads(query)` automatically syncs user accounts and department head database mappings idempotently.
 
 ---
 
-## SOP-05: Assigning & Reassigning Field Staff to Department
+## 4. Master Data Validation & Integrity Verification
 
-1. **Prerequisite**: Admin or Department Head role.
-2. **Procedure**:
-   - Service staff accounts must have `department_id` set to the target department ID in `users` and `field_staff` tables.
-   - Staff listing filtered dynamically via database query `WHERE department_id = :deptId`.
-
----
-
-## SOP-06: Verifying Category ↔ Department Routing
-
-1. Run the read-only integrity test:
-   ```bash
-   node scratch/test_phase6_master_data_integrity.js
-   ```
-2. Verify all categories cleanly resolve to valid database department records.
-
----
-
-## SOP-07: Master Data Emergency Rollback & Backup
-
-1. Backup SQLite / PostgreSQL master tables before bulk operations:
-   ```sql
-   CREATE TABLE departments_backup AS SELECT * FROM departments;
-   CREATE TABLE department_heads_backup AS SELECT * FROM department_heads;
-   CREATE TABLE field_staff_backup AS SELECT * FROM field_staff;
-   ```
-2. Always prefer non-destructive soft deactivation (`status = 'inactive'`) over hard row deletions.
+Run the following read-only integrity test script to verify database state before and after any operational maintenance:
+```bash
+node scratch/test_phase6_master_data_integrity.js
+node scratch/test_phase6_master_data_security.js
+```
+Expected output: 0 failures, 32/32 integrity assertions PASS, 9/9 security assertions PASS.

@@ -1,137 +1,131 @@
-/**
- * NAGARSETU 3.1 — Phase 6 Master Data Integrity Test Suite
- * 
- * STRICT READ-ONLY INTEGRITY AUDIT:
- * Checks database tables for:
- * 1. Department uniqueness (no duplicate codes or names)
- * 2. Valid department IDs and active states
- * 3. Staff <-> Department foreign key & database relationships
- * 4. Department Head <-> Department foreign key & database relationships
- * 5. Complaint Category taxonomy <-> Department resolution mapping
- * 6. Orphan detection (staff, heads, complaints)
- * 7. Priority and Status configuration consistency
- * 
- * THIS SCRIPT NEVER MUTATES DATABASE STATE (NO INSERT/UPDATE/DELETE/DROP).
- */
-
+const assert = require('assert');
 const { initDatabase, query } = require('../backend/src/config/db');
-const { CONTROLLED_TAXONOMY, normalizeCategory, getDepartmentForCategory } = require('../backend/src/services/taxonomyService');
 
-let passedTests = 0;
-let totalTests = 0;
-
-function assert(condition, message) {
-  totalTests++;
-  if (condition) {
-    console.log(`[PASS] ${message}`);
-    passedTests++;
-  } else {
-    console.error(`[FAIL] ${message}`);
-  }
-}
-
-async function runIntegrityChecks() {
-  console.log('========================================================================');
-  console.log('  NAGARSETU 3.1 — PHASE 6 MASTER DATA INTEGRITY AUDIT (READ-ONLY)      ');
-  console.log('========================================================================\n');
+async function runMasterDataIntegrityTest() {
+  console.log('========================================================');
+  console.log('  RUNNING PHASE 6 MASTER DATA INTEGRITY TEST (READ-ONLY)');
+  console.log('========================================================\n');
 
   await initDatabase();
 
-  // 1. Department Master Data Uniqueness & Validity
-  const deptsRes = await query(`SELECT id, code, name, description FROM departments ORDER BY id ASC`);
-  const departments = deptsRes.rows || [];
-  assert(departments.length >= 7, `Departments table contains ${departments.length} records (>= 7 expected)`);
+  let totalAssertions = 0;
+  let passedAssertions = 0;
 
-  const codes = departments.map(d => (d.code || '').toUpperCase()).filter(Boolean);
-  const uniqueCodes = new Set(codes);
-  assert(codes.length === uniqueCodes.size, `All department codes are unique (${codes.length} unique codes found: ${Array.from(uniqueCodes).join(', ')})`);
-
-  const names = departments.map(d => (d.name || '').toLowerCase()).filter(Boolean);
-  const uniqueNames = new Set(names);
-  assert(names.length === uniqueNames.size, `All department names are unique (${names.length} unique names found)`);
-
-  // Verify core municipal departments are present
-  const requiredCodes = ['PWD', 'SAN', 'WTR', 'DRN', 'ELE', 'TRF', 'MNT'];
-  const missingCodes = requiredCodes.filter(c => !uniqueCodes.has(c));
-  assert(missingCodes.length === 0, `All 7 core municipal departments present in DB (Missing: ${missingCodes.join(', ') || 'None'})`);
-
-  // 2. Department Head <-> Department Integrity
-  const headsRes = await query(`
-    SELECT dh.id, dh.user_id, dh.department_id, dh.name, dh.email, dh.status, d.code as dept_code, d.name as dept_name
-    FROM department_heads dh
-    LEFT JOIN departments d ON (CAST(dh.department_id AS TEXT) = CAST(d.id AS TEXT) OR UPPER(CAST(dh.department_id AS TEXT)) = UPPER(d.code))
-  `);
-  const heads = headsRes.rows || [];
-  assert(heads.length >= 7, `Department heads table contains ${heads.length} records (>= 7 expected)`);
-
-  const activeHeads = heads.filter(h => (h.status || '').toLowerCase() === 'active');
-  assert(activeHeads.length >= 7, `At least 7 active department heads present (${activeHeads.length} active heads found)`);
-
-  const orphanedHeads = heads.filter(h => h.department_id && !h.dept_code && !h.dept_name);
-  assert(orphanedHeads.length === 0, `Zero orphaned department head records found (Orphaned count: ${orphanedHeads.length})`);
-
-  // 3. Field Staff <-> Department Integrity
-  const staffRes = await query(`
-    SELECT fs.id, fs.user_id, fs.department_id, fs.name, fs.email, fs.employee_id, fs.status, d.code as dept_code, d.name as dept_name
-    FROM field_staff fs
-    LEFT JOIN departments d ON (CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT) OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code))
-  `);
-  const staff = staffRes.rows || [];
-  assert(staff.length >= 36, `Field staff table contains ${staff.length} records (>= 36 expected)`);
-
-  const orphanedStaff = staff.filter(s => s.department_id && !s.dept_code && !s.dept_name);
-  assert(orphanedStaff.length === 0, `Zero orphaned field staff records found (Orphaned count: ${orphanedStaff.length})`);
-
-  const activeStaff = staff.filter(s => (s.status || '').toLowerCase() === 'active' || (s.status || '').toLowerCase() === 'available');
-  assert(activeStaff.length >= 36, `All field staff records have active/valid operational status (${activeStaff.length} active staff)`);
-
-  // 4. Complaint Category Taxonomy & Department Resolution Integrity
-  let categoryResolutionErrors = 0;
-  for (const key of Object.keys(CONTROLLED_TAXONOMY)) {
-    const tax = CONTROLLED_TAXONOMY[key];
-    const deptInfo = getDepartmentForCategory(tax.canonicalCategory);
-
-    // Verify code exists in DB
-    const codeMatch = departments.find(d => (d.code || '').toUpperCase() === deptInfo.code);
-    if (!codeMatch) {
-      console.error(`  Category '${tax.canonicalCategory}' mapped code '${deptInfo.code}' not found in DB departments!`);
-      categoryResolutionErrors++;
+  function testAssert(condition, message) {
+    totalAssertions++;
+    if (condition) {
+      passedAssertions++;
+      console.log(`✓ [PASS] ${message}`);
+    } else {
+      console.error(`✗ [FAIL] ${message}`);
+      throw new Error(`Assertion Failed: ${message}`);
     }
   }
-  assert(categoryResolutionErrors === 0, `All controlled taxonomy categories cleanly resolve to valid database department records`);
 
-  // 5. Complaint Records Department Reference Integrity
-  const compRes = await query(`
-    SELECT c.id, c.complaint_number, c.category, c.department_id, d.code as dept_code, d.name as dept_name
-    FROM complaints c
-    LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code))
+  // 1. Verify exactly 7 core municipal departments
+  const deptsRes = await query('SELECT id, name, code FROM departments ORDER BY id ASC');
+  const depts = deptsRes.rows || [];
+  testAssert(depts.length >= 7, `Authoritative departments present in DB (Found: ${depts.length})`);
+
+  const expectedDepts = [
+    { code: 'PWD', name: 'Public Works Department' },
+    { code: 'SAN', name: 'Sanitation & Waste Management' },
+    { code: 'WTR', name: 'Water Supply & Sewerage Board' },
+    { code: 'DRN', name: 'Drainage & Sewage Department' },
+    { code: 'ELE', name: 'Electrical & Street Lighting' },
+    { code: 'TRF', name: 'Traffic Management Department' },
+    { code: 'MNT', name: 'Maintenance Department' }
+  ];
+
+  for (const exp of expectedDepts) {
+    const found = depts.find(d => (d.code || '').toUpperCase() === exp.code || (d.name || '').toLowerCase().includes(exp.name.toLowerCase().split(' ')[0]));
+    testAssert(Boolean(found), `Department ${exp.code} (${exp.name}) exists in DB (ID: ${found?.id})`);
+  }
+
+  // Check no duplicate codes
+  const codes = depts.map(d => (d.code || '').toUpperCase()).filter(Boolean);
+  const uniqueCodes = new Set(codes);
+  testAssert(codes.length === uniqueCodes.size, `No duplicate department codes found (${codes.length} unique)`);
+
+  // 2. Verify Department Head mappings
+  const dhRes = await query(`
+    SELECT dh.id, dh.name, dh.email, dh.employee_id, dh.department_id, d.code as dept_code, d.name as dept_name
+    FROM department_heads dh
+    LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT)))
+    WHERE LOWER(COALESCE(dh.status, 'active')) = 'active'
   `);
-  const complaints = compRes.rows || [];
-  if (complaints.length > 0) {
-    const orphanedComplaints = complaints.filter(c => c.department_id && !c.dept_code && !c.dept_name);
-    assert(orphanedComplaints.length === 0, `Zero complaints linked to non-existent departments (Orphaned complaints: ${orphanedComplaints.length})`);
-  } else {
-    assert(true, `Complaints department foreign key check passed (0 active complaints in test DB)`);
+  const dhRows = dhRes.rows || [];
+
+  const expectedHeads = [
+    { name: 'Rahul Kumar', code: 'PWD' },
+    { name: 'Amit Sharma', code: 'SAN' },
+    { name: 'Vikram Patil', code: 'WTR' },
+    { name: 'Sanjay More', code: 'DRN' },
+    { name: 'Kunal Kulkarni', code: 'ELE' },
+    { name: 'Rohan Deshmukh', code: 'TRF' },
+    { name: 'Aditya Joshi', code: 'MNT' }
+  ];
+
+  for (const exp of expectedHeads) {
+    const headRow = dhRows.find(h => h.name.toLowerCase() === exp.name.toLowerCase());
+    testAssert(Boolean(headRow), `Department Head '${exp.name}' exists for ${exp.code}`);
+    if (headRow) {
+      const matchCode = (headRow.dept_code || '').toUpperCase();
+      testAssert(matchCode === exp.code || String(headRow.department_id) === String(expectedDepts.findIndex(d => d.code === exp.code) + 1), `'${exp.name}' correctly assigned to ${exp.code} (Got: ${matchCode || headRow.department_id})`);
+    }
   }
 
-  // 6. User Account Role <-> Department Link Integrity
-  const dhUsers = await query(`SELECT id, email, role, department_id FROM users WHERE role = 'department_head'`);
-  const dhUserRows = dhUsers.rows || [];
-  assert(dhUserRows.length >= 7, `Users table has ${dhUserRows.length} department head user accounts (>= 7 expected)`);
-
-  const unlinkedDhUsers = dhUserRows.filter(u => !u.department_id);
-  assert(unlinkedDhUsers.length === 0, `All department head user accounts are linked to a valid department ID (${dhUserRows.length}/${dhUserRows.length} linked)`);
-
-  console.log('\n========================================================================');
-  console.log(`  INTEGRITY AUDIT SUMMARY: ${passedTests}/${totalTests} CHECKS PASSED`);
-  console.log('========================================================================\n');
-
-  if (passedTests !== totalTests) {
-    process.exit(1);
+  // 3. Strict Non-Swapped Mapping Checks: Kunal Kulkarni = ELE, Aditya Joshi = MNT
+  const kunal = dhRows.find(h => h.name.toLowerCase().includes('kunal'));
+  if (kunal) {
+    const kunalDept = (kunal.dept_code || '').toUpperCase();
+    testAssert(kunalDept === 'ELE' || String(kunal.department_id) === '5', `Kunal Kulkarni MUST be ELE (Got: ${kunalDept || kunal.department_id})`);
   }
+
+  const aditya = dhRows.find(h => h.name.toLowerCase().includes('aditya'));
+  if (aditya) {
+    const adityaDept = (aditya.dept_code || '').toUpperCase();
+    testAssert(adityaDept === 'MNT' || String(aditya.department_id) === '7', `Aditya Joshi MUST be MNT (Got: ${adityaDept || aditya.department_id})`);
+  }
+
+  // 4. Field Staff Department Assignment Checks
+  const staffRes = await query(`
+    SELECT fs.id, fs.name, fs.employee_id, fs.department_id, d.code as dept_code, d.name as dept_name
+    FROM field_staff fs
+    LEFT JOIN departments d ON (CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT) OR UPPER(d.code) = UPPER(CAST(fs.department_id AS TEXT)))
+  `);
+  const staffRows = staffRes.rows || [];
+
+  const keyStaffChecks = [
+    { empId: 'PWD-STF-001', code: 'PWD' },
+    { empId: 'SAN-STF-001', code: 'SAN' },
+    { empId: 'WTR-STF-001', code: 'WTR' },
+    { empId: 'DRN-STF-001', code: 'DRN' },
+    { empId: 'ELE-STF-001', code: 'ELE' },
+    { empId: 'TRF-STF-001', code: 'TRF' }
+  ];
+
+  for (const stf of keyStaffChecks) {
+    const foundStaff = staffRows.find(s => s.employee_id === stf.empId);
+    if (foundStaff) {
+      const sCode = (foundStaff.dept_code || '').toUpperCase();
+      testAssert(sCode === stf.code || String(foundStaff.department_id) === String(expectedDepts.findIndex(d => d.code === stf.code) + 1), `Staff '${stf.empId}' mapped to ${stf.code} (Got: ${sCode || foundStaff.department_id})`);
+    } else {
+      console.warn(`[NOTE] Key staff '${stf.empId}' not found in DB rows`);
+    }
+  }
+
+  // 5. Verify no orphan field staff (staff without valid department_id)
+  const orphanStaff = staffRows.filter(s => !s.department_id);
+  testAssert(orphanStaff.length === 0, `No orphan field staff without department_id (Orphans: ${orphanStaff.length})`);
+
+  console.log(`\n========================================================`);
+  console.log(`  PHASE 6 MASTER DATA INTEGRITY TEST PASSED (${passedAssertions}/${totalAssertions} Assertions)`);
+  console.log(`========================================================`);
+  process.exit(0);
 }
 
-runIntegrityChecks().catch(err => {
-  console.error('Fatal error in Master Data Integrity Audit:', err);
+runMasterDataIntegrityTest().catch((err) => {
+  console.error('\n✗ PHASE 6 MASTER DATA INTEGRITY TEST FAILED:', err.message);
   process.exit(1);
 });

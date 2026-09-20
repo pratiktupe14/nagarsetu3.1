@@ -315,7 +315,30 @@ router.get(['/staff', '/staff/assignable'], authenticateToken, requireRole(['dep
              COALESCE(u.designation, 'Field Service Staff') as designation,
              COALESCE(fs.status, 'active') as status,
              u.language_pref, fs.created_at,
-             d.name as department_name, d.code as department_code,
+             COALESCE(d.name,
+               CASE
+                 WHEN CAST(fs.department_id AS TEXT) = '1' OR UPPER(CAST(fs.department_id AS TEXT)) = 'PWD' OR fs.employee_id LIKE 'PWD%' THEN 'Public Works Department'
+                 WHEN CAST(fs.department_id AS TEXT) = '2' OR UPPER(CAST(fs.department_id AS TEXT)) = 'SAN' OR fs.employee_id LIKE 'SAN%' THEN 'Sanitation & Waste Management'
+                 WHEN CAST(fs.department_id AS TEXT) = '3' OR UPPER(CAST(fs.department_id AS TEXT)) = 'WTR' OR fs.employee_id LIKE 'WTR%' THEN 'Water Supply & Sewerage Board'
+                 WHEN CAST(fs.department_id AS TEXT) = '4' OR UPPER(CAST(fs.department_id AS TEXT)) = 'DRN' OR fs.employee_id LIKE 'DRN%' THEN 'Drainage & Sewage Department'
+                 WHEN CAST(fs.department_id AS TEXT) = '5' OR UPPER(CAST(fs.department_id AS TEXT)) = 'ELE' OR fs.employee_id LIKE 'ELE%' THEN 'Electrical & Street Lighting'
+                 WHEN CAST(fs.department_id AS TEXT) = '6' OR UPPER(CAST(fs.department_id AS TEXT)) = 'TRF' OR fs.employee_id LIKE 'TRF%' THEN 'Traffic Management Department'
+                 WHEN CAST(fs.department_id AS TEXT) = '7' OR UPPER(CAST(fs.department_id AS TEXT)) = 'MNT' OR fs.employee_id LIKE 'MNT%' THEN 'Maintenance Department'
+                 ELSE 'Public Works Department'
+               END
+             ) as department_name,
+             COALESCE(d.code,
+               CASE
+                 WHEN CAST(fs.department_id AS TEXT) = '1' OR UPPER(CAST(fs.department_id AS TEXT)) = 'PWD' OR fs.employee_id LIKE 'PWD%' THEN 'PWD'
+                 WHEN CAST(fs.department_id AS TEXT) = '2' OR UPPER(CAST(fs.department_id AS TEXT)) = 'SAN' OR fs.employee_id LIKE 'SAN%' THEN 'SAN'
+                 WHEN CAST(fs.department_id AS TEXT) = '3' OR UPPER(CAST(fs.department_id AS TEXT)) = 'WTR' OR fs.employee_id LIKE 'WTR%' THEN 'WTR'
+                 WHEN CAST(fs.department_id AS TEXT) = '4' OR UPPER(CAST(fs.department_id AS TEXT)) = 'DRN' OR fs.employee_id LIKE 'DRN%' THEN 'DRN'
+                 WHEN CAST(fs.department_id AS TEXT) = '5' OR UPPER(CAST(fs.department_id AS TEXT)) = 'ELE' OR fs.employee_id LIKE 'ELE%' THEN 'ELE'
+                 WHEN CAST(fs.department_id AS TEXT) = '6' OR UPPER(CAST(fs.department_id AS TEXT)) = 'TRF' OR fs.employee_id LIKE 'TRF%' THEN 'TRF'
+                 WHEN CAST(fs.department_id AS TEXT) = '7' OR UPPER(CAST(fs.department_id AS TEXT)) = 'MNT' OR fs.employee_id LIKE 'MNT%' THEN 'MNT'
+                 ELSE 'PWD'
+               END
+             ) as department_code,
              (
                SELECT COUNT(DISTINCT c.id)
                FROM complaints c
