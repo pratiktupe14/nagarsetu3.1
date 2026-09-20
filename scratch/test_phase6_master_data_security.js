@@ -46,7 +46,16 @@ async function runMasterDataSecurityTest() {
   console.log('  RUNNING PHASE 6 MASTER DATA SECURITY TEST            ');
   console.log('========================================================\n');
 
+  process.env.FORCE_PASSWORD_RESET = 'true';
   await initDatabase();
+  const seedDefaultUsers = require('../backend/src/scripts/seedDefaultUsers');
+  const seed7DemoDepartmentHeads = require('../backend/src/scripts/seedDemoDepartmentHeads');
+  const seedServiceStaff = require('../backend/src/scripts/seedServiceStaff');
+  await seedDefaultUsers(query);
+  await seed7DemoDepartmentHeads(query);
+  await seedServiceStaff(query);
+  delete process.env.FORCE_PASSWORD_RESET;
+
   const { server, port } = await startServer();
 
   let totalAssertions = 0;
@@ -70,17 +79,39 @@ async function runMasterDataSecurityTest() {
   });
   const citizenToken = citizenLogin.data.token;
 
-  const pwdDhLogin = await request(port, 'POST', '/api/auth/login', {
-    mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in',
-    password: 'rahul@pass2026'
-  });
-  const pwdDhToken = pwdDhLogin.data.token;
+  const passCandidates = ['rahul@123', 'rahul@pass2026', 'nagarsetu@123', 'rahul@1234'];
+  let pwdDhToken = null;
+  let pwdDhActivePass = 'rahul@123';
+  for (const p of passCandidates) {
+    const res = await request(port, 'POST', '/api/auth/login', { mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in', password: p });
+    if (res.status === 200 && res.data && res.data.token) {
+      pwdDhToken = res.data.token;
+      pwdDhActivePass = p;
+      break;
+    }
+  }
+  if (pwdDhToken) {
+    await request(port, 'POST', '/api/auth/change-password', { currentPassword: pwdDhActivePass, newPassword: 'rahul@pass2026' }, pwdDhToken);
+    const relogin = await request(port, 'POST', '/api/auth/login', { mobileOrEmail: 'rahul.kumar@nagarsetu.gov.in', password: 'rahul@pass2026' });
+    if (relogin.status === 200 && relogin.data.token) pwdDhToken = relogin.data.token;
+  }
 
-  const sanDhLogin = await request(port, 'POST', '/api/auth/login', {
-    mobileOrEmail: 'amit.sharma@nagarsetu.gov.in',
-    password: 'amit@pass2026'
-  });
-  const sanDhToken = sanDhLogin.data.token;
+  const sanPassCandidates = ['amit@123', 'amit@pass2026', 'nagarsetu@123', 'amit@1234'];
+  let sanDhToken = null;
+  let sanDhActivePass = 'amit@123';
+  for (const p of sanPassCandidates) {
+    const res = await request(port, 'POST', '/api/auth/login', { mobileOrEmail: 'amit.sharma@nagarsetu.gov.in', password: p });
+    if (res.status === 200 && res.data && res.data.token) {
+      sanDhToken = res.data.token;
+      sanDhActivePass = p;
+      break;
+    }
+  }
+  if (sanDhToken) {
+    await request(port, 'POST', '/api/auth/change-password', { currentPassword: sanDhActivePass, newPassword: 'amit@pass2026' }, sanDhToken);
+    const relogin = await request(port, 'POST', '/api/auth/login', { mobileOrEmail: 'amit.sharma@nagarsetu.gov.in', password: 'amit@pass2026' });
+    if (relogin.status === 200 && relogin.data.token) sanDhToken = relogin.data.token;
+  }
 
   const staffLogin = await request(port, 'POST', '/api/auth/login', {
     mobileOrEmail: 'amit.patil@nagarsetu.gov.in',

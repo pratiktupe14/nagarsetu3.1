@@ -1279,10 +1279,8 @@ export async function assignTaskByDepartmentHead(
       throw new Error(errJson.error || errJson.message || `Server rejected task assignment (HTTP ${apiRes.status}).`);
     }
   } catch (apiErr: any) {
-    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('REJECTED') || apiErr.message.includes('inactive') || apiErr.message.includes('failed') || apiErr.message.includes('Server rejected'))) {
-      throw apiErr;
-    }
-    console.warn('Backend assign task API fallback:', apiErr);
+    console.error('Backend assign task API error:', apiErr);
+    throw apiErr;
   }
 
   const compIdStr = String(complaintId || '').trim();

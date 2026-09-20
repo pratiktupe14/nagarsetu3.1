@@ -875,9 +875,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const safeAssignedBy = isUuid(req.user.id) ? req.user.id : null;
 
     // 5. Update Complaint in Database by exact canonical primary key ID
-    let updateRes = null;
     try {
-      updateRes = await query(
+      await query(
         `UPDATE complaints
          SET assigned_staff_id = $1,
              assigned_staff_name = $2,
@@ -886,8 +885,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
              assigned_by_name = $5,
              status = $6,
              updated_at = CURRENT_TIMESTAMP
-         WHERE CAST(id AS TEXT) = $7 OR complaint_number = $7
-         RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at`,
+         WHERE CAST(id AS TEXT) = $7 OR complaint_number = $7`,
         [
           assignedStaffId,
           assignedStaffName,
@@ -899,7 +897,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         ]
       );
     } catch (uErr) {
-      updateRes = await query(
+      await query(
         `UPDATE complaints
          SET assigned_staff_id = $1,
              assigned_staff_name = $2,
@@ -907,15 +905,13 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
              assigned_by_name = $4,
              status = $5,
              updated_at = CURRENT_TIMESTAMP
-         WHERE CAST(id AS TEXT) = $6 OR complaint_number = $7
-         RETURNING id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, status, updated_at`,
+         WHERE CAST(id AS TEXT) = $6 OR complaint_number = $6`,
         [
           assignedStaffId,
           assignedStaffName,
           assignedStaffEmail,
           req.user.name || 'Department Head',
           'Staff Assigned',
-          String(canonicalId),
           String(canonicalId)
         ]
       );
