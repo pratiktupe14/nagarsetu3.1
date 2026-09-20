@@ -294,7 +294,12 @@ router.get('/department-heads', async (req, res) => {
       ${whereClause}
       ORDER BY COALESCE(dh.updated_at, dh.created_at) DESC, dh.id DESC
     `;
-    const result = await query(sql);
+    let result = await query(sql);
+    if (!result.rows || result.rows.length < 7) {
+      const seed7DemoDepartmentHeads = require('../scripts/seedDemoDepartmentHeads');
+      await seed7DemoDepartmentHeads(query).catch(() => {});
+      result = await query(sql);
+    }
     return res.json({ department_heads: result.rows });
   } catch (err) {
     console.error('Error fetching department heads:', err);

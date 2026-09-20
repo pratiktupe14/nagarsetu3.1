@@ -69,7 +69,6 @@ function initDatabase() {
 
     const onInitDone = async () => {
       resolve();
-      // Asynchronously ensure seeds only if database is completely empty
       (async () => {
         try {
           const userCount = await query('SELECT COUNT(*) as count FROM users').catch(() => ({ rows: [{ count: 0 }] }));
@@ -79,6 +78,12 @@ function initDatabase() {
             await seed7DemoDepartmentHeads(query);
             await seedServiceStaff(query);
             console.log('Default data seeding completed.');
+          } else {
+            const dhCount = await query(`SELECT COUNT(*) as count FROM department_heads WHERE LOWER(status) = 'active'`).catch(() => ({ rows: [{ count: 0 }] }));
+            if (parseInt(dhCount.rows[0]?.count || 0, 10) < 7) {
+              console.log('Ensuring all 7 official department heads are active...');
+              await seed7DemoDepartmentHeads(query);
+            }
           }
         } catch (e) {
           console.warn('[SEED NOTE]:', e.message);
