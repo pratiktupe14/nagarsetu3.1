@@ -56,7 +56,7 @@ export const AdminPortal: React.FC = () => {
   const [editPriority, setEditPriority] = useState<PriorityLevel>('Medium');
   const [editDepartment, setEditDepartment] = useState<string>('Public Works Department (PWD)');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [slaHours, setSlaHours] = useState<number>(24);
+
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -124,8 +124,8 @@ export const AdminPortal: React.FC = () => {
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
 
     setSubmittingAction(true);
-    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    toast.success(`Task assigned to ${staff.name} with ${slaHours}h SLA deadline.`);
+    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name);
+    toast.success(`Task assigned to ${staff.name} with system-defined SLA deadline.`);
     await loadComplaints();
     const updated = await getAllComplaints();
     setSelectedComplaint(updated.find((c) => c.id === selectedComplaint.id) || null);
@@ -771,20 +771,6 @@ export const AdminPortal: React.FC = () => {
                         {staff.name} ({staff.employee_id}) • Workload: {staff.active_workload_count} tasks
                       </option>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">{t('slaResolutionHours')}</label>
-                  <select
-                    value={slaHours}
-                    onChange={(e) => setSlaHours(Number(e.target.value))}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500"
-                  >
-                    <option value={4}>4 Hours (Emergency SLA)</option>
-                    <option value={8}>8 Hours (High Priority SLA)</option>
-                    <option value={24}>24 Hours (Standard SLA)</option>
-                    <option value={48}>48 Hours (Low Priority SLA)</option>
                   </select>
                 </div>
               </div>

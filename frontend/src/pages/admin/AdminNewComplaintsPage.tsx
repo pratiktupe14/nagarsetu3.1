@@ -56,7 +56,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
   const [editPriority, setEditPriority] = useState<PriorityLevel>('Medium');
   const [editDepartment, setEditDepartment] = useState<string>('Roads & Public Works');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [slaHours, setSlaHours] = useState<number>(24);
+
   const [submittingAction, setSubmittingAction] = useState(false);
   const [showFullImageModal, setShowFullImageModal] = useState(false);
 
@@ -150,8 +150,8 @@ export const AdminNewComplaintsPage: React.FC = () => {
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
     setSubmittingAction(true);
     await verifyAndApproveComplaint(selectedComplaint.id, editPriority, editDepartment);
-    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    toast.success(`Complaint verified and task order dispatched to ${staff.name} (${slaHours}h SLA).`);
+    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name);
+    toast.success(`Complaint verified and task order dispatched to ${staff.name} (system-defined SLA).`);
     await loadComplaints();
     setSelectedComplaint(null);
     setSubmittingAction(false);

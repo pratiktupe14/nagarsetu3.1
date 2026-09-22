@@ -168,6 +168,56 @@ async function createTablesPostgres() {
       }
     };
 
+    
+    // 0. SLA Policies (Authoritative Configuration)
+    await safeCreateTable(`
+      CREATE TABLE IF NOT EXISTS sla_policies (
+        priority TEXT PRIMARY KEY,
+        resolve_hours INTEGER NOT NULL,
+        escalation_hours INTEGER NOT NULL
+      );
+    `);
+    
+    try {
+      const checkSla = await pgPool.query('SELECT count(*) FROM sla_policies');
+      if (parseInt(checkSla.rows[0].count) === 0) {
+        await pgPool.query(`
+          INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES
+          ('Critical', 4, 2),
+          ('High', 24, 12),
+          ('Medium', 48, 24),
+          ('Low', 72, 48);
+        `);
+      }
+    } catch (e) {
+      console.warn('[POSTGRES SLA SEED NOTE]:', e.message);
+    }
+
+    
+    // 0. SLA Policies (Authoritative Configuration)
+    await safeCreateTable(`
+      CREATE TABLE IF NOT EXISTS sla_policies (
+        priority TEXT PRIMARY KEY,
+        resolve_hours INTEGER NOT NULL,
+        escalation_hours INTEGER NOT NULL
+      );
+    `);
+    
+    try {
+      const checkSla = await pgPool.query('SELECT count(*) FROM sla_policies');
+      if (parseInt(checkSla.rows[0].count) === 0) {
+        await pgPool.query(`
+          INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES
+          ('Critical', 4, 2),
+          ('High', 24, 12),
+          ('Medium', 48, 24),
+          ('Low', 72, 48);
+        `);
+      }
+    } catch (e) {
+      console.warn('[POSTGRES SLA SEED NOTE]:', e.message);
+    }
+
     // 1. Departments table
     await safeCreateTable(`
       CREATE TABLE IF NOT EXISTS departments (
@@ -654,6 +704,46 @@ function createTablesSqlite() {
       safeAddColumn('complaints', 'ai_model TEXT');
       safeAddColumn('complaints', 'ai_analyzed_at DATETIME');
       safeAddColumn('complaints', 'needs_manual_verification INTEGER DEFAULT 0');
+
+      
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS sla_policies (
+          priority TEXT PRIMARY KEY,
+          resolve_hours INTEGER NOT NULL,
+          escalation_hours INTEGER NOT NULL
+        );
+      `);
+
+      sqliteDb.get("SELECT COUNT(*) as count FROM sla_policies", (err, row) => {
+        if (!err && row && row.count === 0) {
+          const stmt = sqliteDb.prepare("INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES (?, ?, ?)");
+          stmt.run("Critical", 4, 2);
+          stmt.run("High", 24, 12);
+          stmt.run("Medium", 48, 24);
+          stmt.run("Low", 72, 48);
+          stmt.finalize();
+        }
+      });
+
+      
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS sla_policies (
+          priority TEXT PRIMARY KEY,
+          resolve_hours INTEGER NOT NULL,
+          escalation_hours INTEGER NOT NULL
+        );
+      `);
+
+      sqliteDb.get("SELECT COUNT(*) as count FROM sla_policies", (err, row) => {
+        if (!err && row && row.count === 0) {
+          const stmt = sqliteDb.prepare("INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES (?, ?, ?)");
+          stmt.run("Critical", 4, 2);
+          stmt.run("High", 24, 12);
+          stmt.run("Medium", 48, 24);
+          stmt.run("Low", 72, 48);
+          stmt.finalize();
+        }
+      });
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (

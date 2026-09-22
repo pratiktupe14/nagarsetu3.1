@@ -692,7 +692,7 @@ export function calculateAdminKPIStats(complaints: Complaint[]): AdminKPIStats {
 }
 
 export function formatSlaRemainingTime(slaDeadline?: string): { text: string; isOverdue: boolean } {
-  if (!slaDeadline) return { text: '24h SLA', isOverdue: false };
+  if (!slaDeadline) return { text: 'No SLA configured', isOverdue: false };
   const diffMs = new Date(slaDeadline).getTime() - Date.now();
   if (diffMs <= 0) {
     const overdueMins = Math.abs(Math.floor(diffMs / 60000));
@@ -826,10 +826,8 @@ export async function assignStaffToTask(
   complaintId: string,
   staffId: string,
   staffName: string,
-  slaHours: number = 24,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const slaDeadline = new Date(Date.now() + slaHours * 3600000).toISOString();
 
   // 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)
   try {
@@ -863,7 +861,6 @@ export async function assignStaffToTask(
           assigned_staff_id: staffId,
           assigned_staff_name: staffName,
           status: 'Staff Assigned',
-          sla_deadline: slaDeadline,
           updated_at: new Date().toISOString()
         })
         .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
@@ -871,7 +868,7 @@ export async function assignStaffToTask(
   }
 
   // 3. Activity log & notification
-  logActivity(complaintId, adminName, 'Assigned Field Staff', 'Submitted', 'Staff Assigned', `Dispatched to ${staffName} with ${slaHours}h SLA deadline`);
+  logActivity(complaintId, adminName, 'Assigned Field Staff', 'Submitted', 'Staff Assigned', `Dispatched to ${staffName}`);
   
   pushNotification({
     user_id: complaintId,
@@ -890,7 +887,7 @@ export async function assignStaffToTask(
     complaint_number: complaintId,
     type: 'staff_assigned',
     title: 'New Maintenance Task Dispatched',
-    message: `Task ${complaintId} assigned to you with ${slaHours}h SLA deadline.`
+    message: `Task ${complaintId} assigned to you with system-defined SLA deadline.`
   });
 
   broadcastComplaintChange(complaintId, 'Submitted', 'Staff Assigned', adminName, `Assigned to staff ${staffName}`);

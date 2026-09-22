@@ -67,22 +67,7 @@ router.get('/tasks', async (req, res) => {
   }
 });
 
-// Helper: Check department matching
-const isDeptMatch = (deptA, deptB) => {
-  if (!deptA || !deptB) return true;
-  if (String(deptA) === String(deptB)) return true;
-  const pwdGroup = ['1', 'PWD'];
-  const sanGroup = ['2', 'SAN'];
-  const wtrGroup = ['3', 'WTR'];
-  const drnGroup = ['4', 'DRN'];
-  const eleGroup = ['5', 'ELE'];
-  const trfGroup = ['6', 'TRF'];
-  const mntGroup = ['7', 'MNT'];
-  for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
-    if (g.includes(String(deptA)) && g.includes(String(deptB))) return true;
-  }
-  return false;
-};
+const { isDeptMatch } = require('../utils/departmentUtils');
 
 // Update Task status (e.g. to 'Accepted', 'On the Way', 'In Progress')
 router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {
@@ -143,7 +128,7 @@ router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskS
         return res.status(403).json({ error: 'Forbidden: You are only authorized to update tasks assigned specifically to you.' });
       }
 
-      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
+      const isSameDept = userDeptId && complaint.department_id && (await isDeptMatch(userDeptId, complaint.department_id));
       if (!isSameDept && !isAssignedToUser) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to update tasks belonging to another department.' });
       }
@@ -269,7 +254,7 @@ router.post(['/task/:id/resolve', '/tasks/:id/resolve', '/complaints/:id/complet
         return res.status(403).json({ error: 'Forbidden: You are only authorized to resolve tasks assigned specifically to you.' });
       }
 
-      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
+      const isSameDept = userDeptId && complaint.department_id && (await isDeptMatch(userDeptId, complaint.department_id));
       if (!isSameDept && !isAssignedToUser) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to complete tasks belonging to another department.' });
       }
@@ -427,7 +412,7 @@ router.post(['/task/:id/progress', '/tasks/:id/progress'], async (req, res) => {
         return res.status(403).json({ error: 'Forbidden: You are only authorized to add progress notes for tasks assigned specifically to you.' });
       }
 
-      const isSameDept = userDeptId && complaint.department_id && isDeptMatch(userDeptId, complaint.department_id);
+      const isSameDept = userDeptId && complaint.department_id && (await isDeptMatch(userDeptId, complaint.department_id));
       if (!isSameDept && !isAssignedToUser) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to add progress notes for tasks belonging to another department.' });
       }

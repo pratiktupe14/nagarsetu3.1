@@ -7,6 +7,7 @@ const validateInput = require('../middleware/validateInput');
 const { assignStaffSchema } = require('../schemas/admin.schemas');
 const { notifyStatusChange } = require('../services/notificationService');
 const logger = require('../utils/logger');
+const { isDeptMatch } = require('../utils/departmentUtils');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
@@ -882,7 +883,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     // 4. Department Isolation Security Check: Complaint and staff must belong to the same department
     if (!isAdmin) {
-      if (userDeptId && complaint.department_id && normUserDept !== normCompDept) {
+      const isTaskMatch = await isDeptMatch(userDeptId, complaint.department_id);
+      if (userDeptId && complaint.department_id && !isTaskMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
           actorUserId: req.user?.id,
@@ -899,7 +901,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         });
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      if (userDeptId && staff.department_id && normUserDept !== normStaffDept) {
+      const isStaffMatch = await isDeptMatch(userDeptId, staff.department_id);
+      if (userDeptId && staff.department_id && !isStaffMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
           actorUserId: req.user?.id,
@@ -917,7 +920,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     } else {
-      if (complaint.department_id && staff.department_id && normCompDept !== normStaffDept) {
+      if (complaint.department_id && staff.department_id && compCanonicalId !== staffCanonicalId) {
         return res.status(400).json({ error: 'Invalid assignment: Selected staff member does not belong to the complaint department.' });
       }
     }

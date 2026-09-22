@@ -62,7 +62,7 @@ export const AdminPendingComplaintsPage: React.FC = () => {
   const [editPriority, setEditPriority] = useState<PriorityLevel>('Medium');
   const [editDepartment, setEditDepartment] = useState<string>('Roads & Public Works');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [slaHours, setSlaHours] = useState<number>(24);
+
   const [submittingAction, setSubmittingAction] = useState(false);
   const [showFullImageModal, setShowFullImageModal] = useState(false);
 
@@ -195,7 +195,7 @@ export const AdminPendingComplaintsPage: React.FC = () => {
     if (selectedStaffId) {
       const roster = getDepartmentStaffRoster(editDepartment);
       const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
-      await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
+      await assignStaffToTask(selectedComplaint.id, staff.id, staff.name);
     }
     toast.success(`Complaint ${selectedComplaint.complaint_number} Approved & Assigned.`);
     await loadComplaints();
@@ -773,16 +773,6 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                           </option>
                         ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1">SLA Target Limit (Hours)</label>
-                    <input
-                      type="number"
-                      value={slaHours}
-                      onChange={(e) => setSlaHours(Number(e.target.value))}
-                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 min-h-[44px]"
-                    />
                   </div>
                 </div>
 

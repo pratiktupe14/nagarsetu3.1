@@ -11,6 +11,7 @@ const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
 const { normalizeCategory, getDepartmentForCategory, normalizeSpecificIssue } = require('../services/taxonomyService');
+const { calculateSla } = require('../utils/slaEngine');
 
 // No-cache middleware for dynamic complaint data
 router.use((req, res, next) => {
@@ -242,14 +243,15 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     const isLowConfidence = confidenceVal < 0.80 || needs_manual_verification === true;
     const initialStatus = isLowConfidence ? 'NEEDS_VERIFICATION' : 'Submitted';
 
+    const { slaDeadline } = await calculateSla(priority);
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
         status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id,
         ai_category, ai_specific_issue, ai_confidence, ai_severity, ai_urgency, ai_evidence,
-        ai_model, ai_analyzed_at, needs_manual_verification
+        ai_model, ai_analyzed_at, needs_manual_verification, sla_deadline
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -275,7 +277,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       ai_evidence || description || 'Visual evidence recorded.',
       ai_model || 'gemini-3.6-flash',
       ai_analyzed_at || new Date().toISOString(),
-      isLowConfidence ? 1 : 0
+      isLowConfidence ? 1 : 0,
+      slaDeadline.toISOString()
     ]);
 
     const complaintId = result.rows[0].id;
@@ -624,6 +627,9 @@ const handleStatusUpdate = async (req, res) => {
     if (priority) {
       updateSql += `, priority = ?`;
       updateParams.push(priority);
+      const { slaDeadline } = await calculateSla(priority, new Date(complaint.created_at || Date.now()));
+      updateSql += `, sla_deadline = ?`;
+      updateParams.push(slaDeadline.toISOString());
     }
 
     if (department_id || department_name) {

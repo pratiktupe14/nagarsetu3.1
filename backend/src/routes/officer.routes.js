@@ -117,22 +117,7 @@ router.get('/staff-list', async (req, res) => {
   }
 });
 
-// Helper: Check department matching
-const isDeptMatch = (deptA, deptB, empId = '') => {
-  if (!deptA || !deptB) return true;
-  if (String(deptA) === String(deptB)) return true;
-  const pwdGroup = ['1', 'PWD'];
-  const sanGroup = ['2', 'SAN'];
-  const wtrGroup = ['3', 'WTR'];
-  const drnGroup = ['4', 'DRN'];
-  const eleGroup = ['5', 'ELE'];
-  const trfGroup = ['6', 'TRF'];
-  const mntGroup = ['7', 'MNT'];
-  for (const g of [pwdGroup, sanGroup, wtrGroup, drnGroup, eleGroup, trfGroup, mntGroup]) {
-    if (g.includes(String(deptA)) && (g.includes(String(deptB)) || (empId && empId.startsWith(g[2])))) return true;
-  }
-  return false;
-};
+const { isDeptMatch } = require('../utils/departmentUtils');
 
 // Verify & Approve / Reject Complaint
 router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {
@@ -159,7 +144,7 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
         );
         if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
       }
-      if (userDeptId && complaint.department_id && !isDeptMatch(userDeptId, complaint.department_id)) {
+      if (userDeptId && complaint.department_id && !(await isDeptMatch(userDeptId, complaint.department_id))) {
         return res.status(403).json({ error: 'Forbidden: You cannot verify complaints outside your department.' });
       }
     }
@@ -257,10 +242,10 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
         const dhRes = await query(`SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`, [req.user.id, (req.user.email || '').toLowerCase()]);
         if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
       }
-      if (userDeptId && complaint.department_id && !isDeptMatch(userDeptId, complaint.department_id)) {
+      if (userDeptId && complaint.department_id && !(await isDeptMatch(userDeptId, complaint.department_id))) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      if (userDeptId && staff.department_id && !isDeptMatch(userDeptId, staff.department_id, staff.employee_id)) {
+      if (userDeptId && staff.department_id && !(await isDeptMatch(userDeptId, staff.department_id, staff.employee_id))) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     }
