@@ -141,12 +141,13 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
   try {
     const { complaint_id, action, rejection_reason, corrected_category, corrected_department_id } = req.body;
 
-    const compRes = await query(`SELECT citizen_id, category, department_id FROM complaints WHERE id = ?`, [complaint_id]);
+    const compRes = await query(`SELECT id, citizen_id, category, department_id FROM complaints WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`, [String(complaint_id), String(complaint_id)]);
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
     const complaint = compRes.rows[0];
     const citizenId = complaint.citizen_id;
+    const canonicalId = String(complaint.id);
 
     // Department Authorization check
     const userRole = req.user.role || 'citizen';
@@ -155,8 +156,8 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
       let userDeptId = req.user.department_id;
       if (userRole === 'department_head' && !userDeptId) {
         const dhRes = await query(
-          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
-          [req.user.id, (req.user.email || '').toLowerCase()]
+          `SELECT department_id FROM department_heads WHERE (CAST(user_id AS TEXT) = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
+          [String(req.user.id || ''), (req.user.email || '').toLowerCase()]
         );
         if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
       }
@@ -178,8 +179,8 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
         updateParams.push(corrected_department_id);
       }
 
-      updateSql += ` WHERE id = ?`;
-      updateParams.push(complaint_id);
+      updateSql += ` WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`;
+      updateParams.push(canonicalId, canonicalId);
 
       await query(updateSql, updateParams);
 
@@ -189,18 +190,18 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
 
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaint_id, 'Verified', remarkText, 'Municipal Review', req.user.name || 'Municipal Officer']
+        [canonicalId, 'Verified', remarkText, 'Municipal Review', req.user.name || 'Municipal Officer']
       ).catch(() => {});
 
-      await notifyStatusChange(complaint_id, 'Verified', citizenId);
+      await notifyStatusChange(canonicalId, 'Verified', citizenId);
       return res.json({ message: 'Complaint verified and approved', verified: true });
     } else if (action === 'reject') {
-      await query(`UPDATE complaints SET status = 'Rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [complaint_id]);
+      await query(`UPDATE complaints SET status = 'Rejected', updated_at = CURRENT_TIMESTAMP WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`, [canonicalId, canonicalId]);
       await query(
         `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-        [complaint_id, 'Rejected', rejection_reason || 'Does not meet municipal criteria.', 'Municipal Review', req.user.name || 'Municipal Officer']
+        [canonicalId, 'Rejected', rejection_reason || 'Does not meet municipal criteria.', 'Municipal Review', req.user.name || 'Municipal Officer']
       ).catch(() => {});
-      await notifyStatusChange(complaint_id, 'Rejected', citizenId, rejection_reason);
+      await notifyStatusChange(canonicalId, 'Rejected', citizenId, rejection_reason);
       return res.json({ message: 'Complaint rejected' });
     }
 

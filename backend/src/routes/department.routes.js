@@ -5,6 +5,7 @@ const { query } = require('../config/db');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { assignStaffSchema } = require('../schemas/admin.schemas');
+const { notifyStatusChange } = require('../services/notificationService');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
@@ -56,7 +57,10 @@ async function resolveUserDepartment(req) {
 
   if (!userDeptId || !userDeptName) {
     if (req.user?.id || req.user?.email) {
-      const uRes = await query('SELECT department_id, role FROM users WHERE id = $1 OR email = $2', [req.user.id, req.user.email]);
+      const uRes = await query(
+        'SELECT department_id, role FROM users WHERE CAST(id AS TEXT) = CAST($1 AS TEXT) OR LOWER(email) = LOWER($2)',
+        [String(req.user.id || ''), String(req.user.email || '').toLowerCase()]
+      );
       if (uRes.rows.length > 0) {
         userDeptId = uRes.rows[0].department_id || userDeptId;
       }
@@ -798,8 +802,11 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
-    // 1. Fetch Complaint by ID or Complaint Number
-    const compRes = await query(`SELECT * FROM complaints WHERE id = $1 OR complaint_number = $1`, [complaint_id]);
+    // 1. Fetch Complaint by ID or Complaint Number (with safe CAST to support string IDs like "NS-2026-692436")
+    const compRes = await query(
+      `SELECT * FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [String(complaint_id)]
+    );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint record not found.' });
     }
@@ -818,14 +825,14 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
           OR CAST(fs.id AS TEXT) = $1
           OR LOWER(fs.email) = LOWER($1)
           OR LOWER(fs.name) = LOWER($1)`,
-      [staff_id]
+      [String(staff_id)]
     );
 
     let staff = staffRes.rows && staffRes.rows.length > 0 ? staffRes.rows[0] : null;
     if (!staff) {
       const uRes = await query(
-        `SELECT id, name, email, mobile, department_id, employee_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)) AND (role = 'service_staff' OR role = 'staff')`,
-        [staff_id]
+        `SELECT id, name, email, mobile, department_id, employee_id, status FROM users WHERE (CAST(id AS TEXT) = $1 OR employee_id = $1 OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)) AND (role = 'service_staff' OR role = 'staff' OR role = 'field_staff')`,
+        [String(staff_id)]
       );
       if (uRes.rows && uRes.rows.length > 0) staff = uRes.rows[0];
     }
@@ -921,8 +928,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const verifyRes = await query(
       `SELECT id, complaint_number, department_id, assigned_staff_id, assigned_staff_name, assigned_staff_email, assigned_by, status, updated_at
        FROM complaints
-       WHERE CAST(id AS TEXT) = ? OR complaint_number = ?`,
-      [String(canonicalId), String(canonicalId)]
+       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [String(canonicalId)]
     );
 
     if (!verifyRes.rows || verifyRes.rows.length === 0) {
@@ -942,21 +949,24 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     await query(
       `INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-      [complaint.id, staff.user_id || staff.id, req.user.id]
+      [String(complaint.id), String(staff.user_id || staff.id), String(req.user.id || '')]
     ).catch(() => {});
 
     await query(
       `INSERT INTO task_assignments (complaint_id, staff_id, assigned_by, created_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-      [complaint.id, staff.user_id || staff.id, req.user.id]
+      [String(complaint.id), String(staff.user_id || staff.id), String(req.user.id || '')]
     ).catch(() => {});
 
     // 8. Record Status History
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by)
        VALUES ($1, $2, $3, $4, $5)`,
-      [complaint.id, 'Staff Assigned', `Task assigned to field staff ${staff.name}.`, 'Department Operations', req.user.name || 'Department Head']
+      [String(complaint.id), 'Staff Assigned', `Task assigned to field staff ${staff.name}.`, 'Department Operations', req.user.name || 'Department Head']
     ).catch(() => {});
+
+    // 9. Dispatch in-app notification to citizen
+    await notifyStatusChange(complaint.id || canonicalId, 'Staff Assigned', complaint.citizen_id).catch(() => {});
 
     return res.json({
       success: true,
@@ -971,7 +981,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     });
   } catch (err) {
     console.error('Error assigning staff in department route:', err);
-    return res.status(500).json({ error: 'Server error assigning staff to task.' });
+    return res.status(500).json({ error: err.message || 'Server error assigning staff to task.' });
   }
 });
 
