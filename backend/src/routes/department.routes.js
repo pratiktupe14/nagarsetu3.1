@@ -267,7 +267,7 @@ router.delete('/:id', authenticateToken, requireRole(['admin', 'city_admin']), a
  */
 router.get('/complaints', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
-    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
+    const { userDeptId, userDeptName, userDeptCode } = await resolveUserDepartment(req);
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
@@ -284,19 +284,23 @@ router.get('/complaints', authenticateToken, requireRole(['department_head', 'ad
     const params = [];
 
     if (!isAdmin) {
+      const norm = normalizeDepartmentInfo(userDeptCode || userDeptId || userDeptName);
       sql += ` AND (
         CAST(c.department_id AS TEXT) = $1
-        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
-        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($2))
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER($2)
+        OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $1 OR UPPER(d.code) = UPPER($2)))
+        OR LOWER(c.category) LIKE $3
       )`;
-      params.push(String(userDeptId || -1), String(userDeptName || '').slice(0, 3));
+      const deptKeyword = `%${(norm.name || userDeptName || '').toLowerCase().split(' ')[0]}%`;
+      params.push(String(norm.idStr || userDeptId || -1), String(norm.code || userDeptCode || ''), deptKeyword);
     } else if (req.query.department_id) {
+      const norm = normalizeDepartmentInfo(req.query.department_id);
       sql += ` AND (
         CAST(c.department_id AS TEXT) = $1
-        OR (d.id IS NOT NULL AND CAST(d.id AS TEXT) = $1)
-        OR (d.code IS NOT NULL AND UPPER(d.code) = UPPER($1))
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER($2)
+        OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = $1 OR UPPER(d.code) = UPPER($2)))
       )`;
-      params.push(String(req.query.department_id));
+      params.push(String(norm.idStr || req.query.department_id), String(norm.code || req.query.department_id));
     }
 
     sql += ` ORDER BY c.created_at DESC`;
@@ -1273,5 +1277,8 @@ router.post('/staff/:id/change-password', authenticateToken, requireRole(['depar
     return res.status(500).json({ error: 'Failed to update staff password: ' + (err.message || 'Server error') });
   }
 });
+
+router.normalizeDepartmentInfo = normalizeDepartmentInfo;
+router.resolveUserDepartment = resolveUserDepartment;
 
 module.exports = router;

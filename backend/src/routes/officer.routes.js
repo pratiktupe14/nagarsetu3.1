@@ -14,41 +14,39 @@ router.use(requireRole(['officer', 'admin', 'city_admin', 'department_head']));
 router.get(['/dashboard', '/complaints'], validateInput(officerDashboardSchema), async (req, res) => {
   try {
     const { department_id, priority, status, search } = req.query;
+    const { resolveUserDepartment, normalizeDepartmentInfo } = require('./department.routes');
 
     let sql = `
-      SELECT c.*, d.name as department_name,
+      SELECT c.*, d.name as department_name, d.code as department_code,
              COALESCE(p.full_name, u.name) as citizen_name,
              COALESCE(p.mobile, u.mobile) as citizen_mobile
        FROM complaints c
-       LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR CAST(c.department_id AS TEXT) = d.code)
+       LEFT JOIN departments d ON (
+         CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) 
+         OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(d.code)
+         OR LOWER(d.name) = LOWER(CAST(c.department_id AS TEXT))
+       )
        LEFT JOIN profiles p ON CAST(c.citizen_id AS TEXT) = CAST(p.id AS TEXT)
        LEFT JOIN users u ON CAST(c.citizen_id AS TEXT) = CAST(u.id AS TEXT) OR (p.mobile IS NOT NULL AND u.mobile = p.mobile)
        WHERE 1=1
     `;
     const params = [];
 
-    let targetDeptId = department_id;
+    let targetDeptInput = department_id;
 
     if (req.user.role === 'department_head') {
-      if (req.user.department_id) {
-        targetDeptId = req.user.department_id;
-      } else {
-        const dhRes = await query(
-          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
-          [req.user.id, (req.user.email || '').toLowerCase()]
-        );
-        if (dhRes.rows && dhRes.rows.length > 0) {
-          targetDeptId = dhRes.rows[0].department_id;
-        }
-      }
+      const resolved = await resolveUserDepartment(req);
+      targetDeptInput = resolved.userDeptCode || resolved.userDeptId || req.user.department_id;
     }
 
-    if (targetDeptId) {
+    if (targetDeptInput) {
+      const norm = normalizeDepartmentInfo(targetDeptInput);
       sql += ` AND (
-        CAST(c.department_id AS TEXT) = ? 
-        OR UPPER(d.code) = UPPER(?)
+        CAST(c.department_id AS TEXT) = ?
+        OR UPPER(CAST(c.department_id AS TEXT)) = UPPER(?)
+        OR (d.id IS NOT NULL AND (CAST(d.id AS TEXT) = ? OR UPPER(d.code) = UPPER(?)))
       )`;
-      params.push(String(targetDeptId), String(targetDeptId));
+      params.push(String(norm.idStr || targetDeptInput), String(norm.code || targetDeptInput), String(norm.idStr || targetDeptInput), String(norm.code || targetDeptInput));
     }
     if (priority) {
       sql += ` AND c.priority = ?`;
