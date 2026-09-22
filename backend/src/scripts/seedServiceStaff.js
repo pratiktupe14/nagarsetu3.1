@@ -191,6 +191,11 @@ async function seedServiceStaff(queryFn) {
     }
   }
 
+  // Remove non-canonical/forged staff records if any exist
+  const canonicalEmpIds = SERVICE_STAFF_DEFINITIONS.map(s => s.employee_id);
+  const placeholders = canonicalEmpIds.map((_, idx) => `$${idx + 1}`).join(', ');
+  await q(`DELETE FROM field_staff WHERE employee_id NOT IN (${placeholders})`, canonicalEmpIds).catch(() => {});
+
   console.log(`Service staff seeding completed cleanly! Total: ${SERVICE_STAFF_DEFINITIONS.length}`);
 }
 

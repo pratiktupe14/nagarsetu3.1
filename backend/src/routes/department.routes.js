@@ -6,6 +6,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { assignStaffSchema } = require('../schemas/admin.schemas');
 const { notifyStatusChange } = require('../services/notificationService');
+const logger = require('../utils/logger');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
@@ -55,31 +56,38 @@ async function resolveUserDepartment(req) {
   let userDeptId = req.user?.department_id || null;
   let userDeptName = req.user?.department_name || '';
 
-  if (!userDeptId || !userDeptName) {
-    if (req.user?.id || req.user?.email) {
-      const uRes = await query(
-        'SELECT department_id, role FROM users WHERE CAST(id AS TEXT) = CAST($1 AS TEXT) OR LOWER(email) = LOWER($2)',
-        [String(req.user.id || ''), String(req.user.email || '').toLowerCase()]
-      );
-      if (uRes.rows.length > 0) {
-        userDeptId = uRes.rows[0].department_id || userDeptId;
-      }
+  if (req.user?.id || req.user?.email) {
+    const uRes = await query(
+      'SELECT department_id, role, employee_id, email FROM users WHERE CAST(id AS TEXT) = CAST($1 AS TEXT) OR LOWER(email) = LOWER($2)',
+      [String(req.user.id || ''), String(req.user.email || '').toLowerCase()]
+    );
+    if (uRes.rows.length > 0) {
+      userDeptId = userDeptId || uRes.rows[0].department_id;
+    }
 
-      const dhRes = await query(
-        `SELECT dh.department_id, d.name as department_name 
-         FROM department_heads dh 
-         LEFT JOIN departments d ON CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT) 
-         WHERE CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR dh.email = $2`,
-        [String(req.user.id), req.user.email]
-      );
-      if (dhRes.rows.length > 0) {
-        userDeptId = dhRes.rows[0].department_id || userDeptId;
-        userDeptName = dhRes.rows[0].department_name || userDeptName;
-      }
+    const dhRes = await query(
+      `SELECT dh.department_id, d.name as department_name, d.code as department_code 
+       FROM department_heads dh 
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(dh.department_id AS TEXT))
+       ) 
+       WHERE CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR LOWER(dh.email) = LOWER($2)`,
+      [String(req.user.id || ''), String(req.user.email || '').toLowerCase()]
+    );
+    if (dhRes.rows.length > 0) {
+      userDeptId = dhRes.rows[0].department_code || dhRes.rows[0].department_id || userDeptId;
+      userDeptName = dhRes.rows[0].department_name || userDeptName;
     }
   }
 
-  const norm = normalizeDepartmentInfo(userDeptId);
+  let norm = normalizeDepartmentInfo(userDeptId);
+  if (!norm.code || !['PWD', 'SAN', 'WTR', 'DRN', 'ELE', 'TRF', 'MNT'].includes(norm.code)) {
+    const compositeContext = `${userDeptId || ''} ${userDeptName || ''} ${req.user?.email || ''} ${req.user?.employee_id || ''}`;
+    norm = normalizeDepartmentInfo(compositeContext);
+  }
+
   return {
     userDeptId: norm.idStr || (userDeptId ? String(userDeptId) : ''),
     userDeptName: norm.name || userDeptName || '',
@@ -798,7 +806,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: 'Complaint ID and Staff ID are required.' });
     }
 
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, userDeptCode } = await resolveUserDepartment(req);
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
@@ -847,30 +855,83 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     }
 
     const normDept = (d) => {
+      if (!d && d !== 0) return '';
       const s = String(d || '').trim().toLowerCase();
-      if (s === '1' || s === 'pwd' || s.includes('pwd') || s.includes('road') || s.includes('public works')) return 'PWD';
-      if (s === '2' || s === 'san' || s.includes('san') || s.includes('waste') || s.includes('sanitat')) return 'SAN';
-      if (s === '3' || s === 'wtr' || s.includes('wtr') || s.includes('water') || s.includes('sewerage')) return 'WTR';
-      if (s === '4' || s === 'drn' || s.includes('drn') || s.includes('drain') || s.includes('sewage')) return 'DRN';
-      if (s === '5' || s === 'ele' || s.includes('ele') || s.includes('electric') || s.includes('light')) return 'ELE';
-      if (s === '6' || s === 'trf' || s.includes('trf') || s.includes('traffic')) return 'TRF';
-      if (s === '7' || s === 'mnt' || s.includes('mnt') || s.includes('maint')) return 'MNT';
+      if (s === '1' || s === 'pwd' || s.includes('pwd') || s.includes('road') || s.includes('public works') || s.includes('dept-1')) return 'PWD';
+      if (s === '2' || s === 'san' || s.includes('san') || s.includes('waste') || s.includes('sanitat') || s.includes('dept-2')) return 'SAN';
+      if (s === '3' || s === 'wtr' || s.includes('wtr') || s.includes('water') || s.includes('sewerage') || s.includes('dept-3')) return 'WTR';
+      if (s === '4' || s === 'drn' || s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('dept-4')) return 'DRN';
+      if (s === '5' || s === 'ele' || s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('dept-5')) return 'ELE';
+      if (s === '6' || s === 'trf' || s.includes('trf') || s.includes('traffic') || s.includes('dept-6')) return 'TRF';
+      if (s === '7' || s === 'mnt' || s.includes('mnt') || s.includes('maint') || s.includes('dept-7')) return 'MNT';
+
+      const info = normalizeDepartmentInfo(d);
+      if (info && info.code && ['PWD', 'SAN', 'WTR', 'DRN', 'ELE', 'TRF', 'MNT'].includes(info.code)) {
+        return info.code;
+      }
       return s.toUpperCase();
     };
 
+    const normUserDept = normDept(userDeptCode || userDeptId);
+    const normCompDept = normDept(complaint.department_id);
+    const normStaffDept = normDept(staff.department_id || staff.employee_id);
+
     // 4. Department Isolation Security Check: Complaint and staff must belong to the same department
     if (!isAdmin) {
-      if (userDeptId && complaint.department_id && normDept(userDeptId) !== normDept(complaint.department_id)) {
+      if (userDeptId && complaint.department_id && normUserDept !== normCompDept) {
+        logger.warn('ASSIGNMENT_AUTH_CHECK', {
+          requestId: req.requestId || logger.generateRequestId(),
+          actorUserId: req.user?.id,
+          actorRole: userRole,
+          actorDepartmentId: userDeptId,
+          actorDepartmentCode: normUserDept,
+          taskId: complaint_id,
+          taskDepartmentId: complaint.department_id,
+          taskDepartmentCode: normCompDept,
+          staffId: staff_id,
+          staffDepartmentId: staff.department_id,
+          staffDepartmentCode: normStaffDept,
+          result: 'DENY'
+        });
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      if (userDeptId && staff.department_id && normDept(userDeptId) !== normDept(staff.department_id)) {
+      if (userDeptId && staff.department_id && normUserDept !== normStaffDept) {
+        logger.warn('ASSIGNMENT_AUTH_CHECK', {
+          requestId: req.requestId || logger.generateRequestId(),
+          actorUserId: req.user?.id,
+          actorRole: userRole,
+          actorDepartmentId: userDeptId,
+          actorDepartmentCode: normUserDept,
+          taskId: complaint_id,
+          taskDepartmentId: complaint.department_id,
+          taskDepartmentCode: normCompDept,
+          staffId: staff_id,
+          staffDepartmentId: staff.department_id,
+          staffDepartmentCode: normStaffDept,
+          result: 'DENY'
+        });
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     } else {
-      if (complaint.department_id && staff.department_id && normDept(complaint.department_id) !== normDept(staff.department_id)) {
+      if (complaint.department_id && staff.department_id && normCompDept !== normStaffDept) {
         return res.status(400).json({ error: 'Invalid assignment: Selected staff member does not belong to the complaint department.' });
       }
     }
+
+    logger.info('ASSIGNMENT_AUTH_CHECK', {
+      requestId: req.requestId || logger.generateRequestId(),
+      actorUserId: req.user?.id,
+      actorRole: userRole,
+      actorDepartmentId: userDeptId,
+      actorDepartmentCode: normUserDept,
+      taskId: complaint_id,
+      taskDepartmentId: complaint.department_id,
+      taskDepartmentCode: normCompDept,
+      staffId: staff_id,
+      staffDepartmentId: staff.department_id,
+      staffDepartmentCode: normStaffDept,
+      result: 'ALLOW'
+    });
 
     const assignedStaffId = String(staff.id || staff.user_id);
     const assignedStaffName = staff.name;
