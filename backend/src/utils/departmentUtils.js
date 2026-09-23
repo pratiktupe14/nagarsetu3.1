@@ -6,34 +6,64 @@ async function getCanonicalDepartmentId(deptInput) {
   if (!inputStr) return null;
   
   try {
-    // 1. Try to match by Exact ID (numeric or string/UUID CAST)
+    // 1. Try direct match in departments table by exact numeric ID, text ID, Code, or Name
     if (/^\d+$/.test(inputStr)) {
         let res = await query(
           'SELECT id, code FROM departments WHERE id = $1',
           [parseInt(inputStr, 10)]
         );
-        if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: res.rows[0].code };
+        if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: String(res.rows[0].code).toUpperCase() };
     }
 
-    let resUuid = await query(
+    let resId = await query(
       'SELECT id, code FROM departments WHERE CAST(id AS TEXT) = $1',
       [inputStr]
     );
-    if (resUuid.rows && resUuid.rows.length === 1) return { id: String(resUuid.rows[0].id), code: resUuid.rows[0].code };
+    if (resId.rows && resId.rows.length === 1) return { id: String(resId.rows[0].id), code: String(resId.rows[0].code).toUpperCase() };
 
-    // 2. Try to match by exact Code (case-insensitive)
-    let res = await query(
+    let resCode = await query(
       'SELECT id, code FROM departments WHERE UPPER(code) = UPPER($1)',
       [inputStr]
     );
-    if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: res.rows[0].code };
+    if (resCode.rows && resCode.rows.length === 1) return { id: String(resCode.rows[0].id), code: String(resCode.rows[0].code).toUpperCase() };
 
-    // 3. Try to match by exact Name (case-insensitive)
-    res = await query(
+    let resName = await query(
       'SELECT id, code FROM departments WHERE UPPER(name) = UPPER($1)',
       [inputStr]
     );
-    if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: res.rows[0].code };
+    if (resName.rows && resName.rows.length === 1) return { id: String(resName.rows[0].id), code: String(resName.rows[0].code).toUpperCase() };
+
+    // 2. Try match via department_heads table if inputStr is a department head record identifier
+    let resDh = await query(
+      `SELECT d.id, d.code FROM department_heads dh 
+       JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+         OR UPPER(d.name) = UPPER(CAST(dh.department_id AS TEXT))
+       ) 
+       WHERE CAST(dh.id AS TEXT) = $1 
+          OR CAST(dh.department_id AS TEXT) = $1 
+          OR CAST(dh.user_id AS TEXT) = $1
+       LIMIT 1`,
+      [inputStr]
+    );
+    if (resDh.rows && resDh.rows.length === 1) return { id: String(resDh.rows[0].id), code: String(resDh.rows[0].code).toUpperCase() };
+
+    // 3. Try match via field_staff table if inputStr is a field staff record identifier
+    let resFs = await query(
+      `SELECT d.id, d.code FROM field_staff fs 
+       JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(fs.department_id AS TEXT))
+         OR UPPER(d.name) = UPPER(CAST(fs.department_id AS TEXT))
+       ) 
+       WHERE CAST(fs.id AS TEXT) = $1 
+          OR fs.employee_id = $1 
+          OR CAST(fs.department_id AS TEXT) = $1
+       LIMIT 1`,
+      [inputStr]
+    );
+    if (resFs.rows && resFs.rows.length === 1) return { id: String(resFs.rows[0].id), code: String(resFs.rows[0].code).toUpperCase() };
 
   } catch (e) {
     console.error('getCanonicalDepartmentId error', e);
@@ -51,7 +81,7 @@ async function isDeptMatch(deptA, deptB) {
   
   if (!objA || !objB) return false;
   
-  return String(objA.id) === String(objB.id);
+  return String(objA.id) === String(objB.id) || String(objA.code).toUpperCase() === String(objB.code).toUpperCase();
 }
 
 module.exports = {
