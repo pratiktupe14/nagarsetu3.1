@@ -883,8 +883,9 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     // 4. Department Isolation Security Check: Complaint and staff must belong to the same department
     if (!isAdmin) {
-      const isTaskMatch = await isDeptMatch(userDeptId, complaint.department_id);
-      if (userDeptId && complaint.department_id && !isTaskMatch) {
+      const actorDeptInput = userDeptId || req.user?.department_id || req.user?.id || req.user?.email;
+      const isTaskMatch = await isDeptMatch(actorDeptInput, complaint.department_id);
+      if (!isTaskMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
           actorUserId: req.user?.id,
@@ -901,8 +902,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         });
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      const isStaffMatch = await isDeptMatch(userDeptId, staff.department_id);
-      if (userDeptId && staff.department_id && !isStaffMatch) {
+      const isStaffMatch = await isDeptMatch(actorDeptInput, staff.department_id || staff.employee_id || staff.id);
+      if (!isStaffMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
           actorUserId: req.user?.id,

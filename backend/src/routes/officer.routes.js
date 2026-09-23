@@ -237,15 +237,13 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
     if (!isAdmin) {
-      let userDeptId = req.user.department_id;
-      if (userRole === 'department_head' && !userDeptId) {
-        const dhRes = await query(`SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`, [req.user.id, (req.user.email || '').toLowerCase()]);
-        if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
-      }
-      if (userDeptId && complaint.department_id && !(await isDeptMatch(userDeptId, complaint.department_id))) {
+      let userDeptId = req.user.department_id || req.user.id || req.user.email;
+      const isTaskMatch = await isDeptMatch(userDeptId, complaint.department_id);
+      if (!isTaskMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      if (userDeptId && staff.department_id && !(await isDeptMatch(userDeptId, staff.department_id, staff.employee_id))) {
+      const isStaffMatch = await isDeptMatch(userDeptId, staff.department_id || staff.employee_id || staff.id);
+      if (!isStaffMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     }
