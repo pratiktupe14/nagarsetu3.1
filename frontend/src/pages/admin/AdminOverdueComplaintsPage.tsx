@@ -326,7 +326,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
 
       await changeDepartmentRouting(selectedComplaint.id, reassignDept);
       if (reassignStaffId) {
-        await assignStaffToTask(selectedComplaint.id, reassignStaffId, staffName, reassignSlaHours);
+        await assignStaffToTask(selectedComplaint.id, reassignStaffId, staffName, String(reassignSlaHours));
       }
 
       setActionSuccessMessage(`Routing updated & assigned to ${staffName}.`);

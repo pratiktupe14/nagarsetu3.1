@@ -6,7 +6,7 @@ async function getCanonicalDepartmentId(deptInput) {
   if (!inputStr) return null;
   
   try {
-    // 1. Try to match by Exact ID (strict numeric check)
+    // 1. Try to match by Exact ID (numeric or string/UUID CAST)
     if (/^\d+$/.test(inputStr)) {
         let res = await query(
           'SELECT id, code FROM departments WHERE id = $1',
@@ -14,6 +14,12 @@ async function getCanonicalDepartmentId(deptInput) {
         );
         if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: res.rows[0].code };
     }
+
+    let resUuid = await query(
+      'SELECT id, code FROM departments WHERE CAST(id AS TEXT) = $1',
+      [inputStr]
+    );
+    if (resUuid.rows && resUuid.rows.length === 1) return { id: String(resUuid.rows[0].id), code: resUuid.rows[0].code };
 
     // 2. Try to match by exact Code (case-insensitive)
     let res = await query(

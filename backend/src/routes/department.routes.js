@@ -883,7 +883,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
 
     // 4. Department Isolation Security Check: Complaint and staff must belong to the same department
     if (!isAdmin) {
-      const isTaskMatch = await isDeptMatch(userDeptId, complaint.department_id);
+      const isTaskMatch = (await isDeptMatch(userDeptId, complaint.department_id)) || (normUserDept && normCompDept && normUserDept === normCompDept);
       if (userDeptId && complaint.department_id && !isTaskMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
@@ -901,7 +901,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         });
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      const isStaffMatch = await isDeptMatch(userDeptId, staff.department_id);
+      const isStaffMatch = (await isDeptMatch(userDeptId, staff.department_id)) || (normUserDept && normStaffDept && normUserDept === normStaffDept);
       if (userDeptId && staff.department_id && !isStaffMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),
@@ -920,7 +920,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     } else {
-      if (complaint.department_id && staff.department_id && compCanonicalId !== staffCanonicalId) {
+      const isStaffCompDeptMatch = await isDeptMatch(complaint.department_id, staff.department_id);
+      if (complaint.department_id && staff.department_id && !isStaffCompDeptMatch && normCompDept && normStaffDept && normCompDept !== normStaffDept) {
         return res.status(400).json({ error: 'Invalid assignment: Selected staff member does not belong to the complaint department.' });
       }
     }

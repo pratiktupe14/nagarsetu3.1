@@ -88,12 +88,12 @@ function authenticateToken(req, res, next) {
 
 function normalizeRole(role) {
   if (!role) return '';
-  const r = String(role).trim().toLowerCase();
-  if (r === 'service_staff' || r === 'staff' || r === 'field_staff') return 'service_staff';
-  if (r === 'admin' || r === 'city_admin') return 'city_admin';
-  if (r === 'officer' || r === 'department_head') return 'department_head';
+  const r = String(role).trim().replace(/[\s_-]+/g, '').toLowerCase();
+  if (r === 'servicestaff' || r === 'staff' || r === 'fieldstaff' || r === 'servicestaffmember') return 'service_staff';
+  if (r === 'admin' || r === 'cityadmin' || r === 'superadmin') return 'city_admin';
+  if (r === 'officer' || r === 'departmenthead' || r === 'depthead' || r === 'departmentofficer' || r === 'deptadmin' || r === 'departmentadmin') return 'department_head';
   if (r === 'citizen' || r === 'user') return 'citizen';
-  return r;
+  return String(role).trim().toLowerCase();
 }
 
 function requireRole(roles = []) {
