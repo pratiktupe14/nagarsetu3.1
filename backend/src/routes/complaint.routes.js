@@ -6,12 +6,15 @@ const { authenticateToken, optionalAuthenticateToken, requireRole } = require('.
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
+const complaintRepo = require('../modules/complaints/complaint.repository');
 const { resolveLocation, checkForDuplicates } = require('../services/locationService');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
 const { normalizeCategory, getDepartmentForCategory, normalizeSpecificIssue } = require('../services/taxonomyService');
 const { calculateSla } = require('../utils/slaEngine');
+const { getCanonicalDepartmentId, resolveUserDepartment, isDeptMatch } = require('../security/departmentResolver');
+
 
 // No-cache middleware for dynamic complaint data
 router.use((req, res, next) => {
@@ -88,7 +91,7 @@ async function resolveCitizenProfileId(user) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
   if (isUuid) {
     try {
-      const directCheck = await query(`SELECT id FROM profiles WHERE id = ? LIMIT 1`, [idStr]);
+      const directCheck = await complaintRepo.findProfileById(idStr);
       if (directCheck.rows && directCheck.rows.length > 0) {
         return directCheck.rows[0].id;
       }
@@ -98,7 +101,7 @@ async function resolveCitizenProfileId(user) {
   // 2. Fetch authoritative user record from users table to get verified mobile and email
   let dbUser = user;
   try {
-    const userRes = await query(`SELECT id, name, mobile, email, role FROM users WHERE id = ? LIMIT 1`, [user.id]);
+    const userRes = await complaintRepo.findUserById(user.id);
     if (userRes.rows && userRes.rows.length > 0) {
       dbUser = userRes.rows[0];
     }
@@ -154,7 +157,7 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
 
   // 1. Direct database lookup by department code (e.g., PWD, SAN, WTR, DRN, ELE, TRF, MNT)
   if (deptInfo && deptInfo.code) {
-    const codeRes = await query(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) LIMIT 1`, [deptInfo.code]);
+    const codeRes = await complaintRepo.findDepartmentByCode(deptInfo.code);
     if (codeRes.rows && codeRes.rows.length > 0) {
       return codeRes.rows[0].id;
     }
@@ -162,7 +165,7 @@ async function resolveDepartmentId(deptInput, categoryInput, titleInput) {
 
   // 2. Direct database lookup by department name
   if (deptInfo && deptInfo.name) {
-    const nameRes = await query(`SELECT id FROM departments WHERE UPPER(name) LIKE UPPER(?) LIMIT 1`, [`%${deptInfo.name}%`]);
+    const nameRes = await complaintRepo.findDepartmentByName(deptInfo.name);
     if (nameRes.rows && nameRes.rows.length > 0) {
       return nameRes.rows[0].id;
     }
@@ -404,7 +407,7 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
     } else if (!isScopeAll && authUser && authUser.role === 'department_head') {
       let deptId = authUser.department_id;
       if (!deptId) {
-        const uRes = await query('SELECT department_id FROM users WHERE id = ? OR email = ?', [authUser.id, authUser.email || '']);
+        const uRes = await complaintRepo.findUserDeptFallback(authUser.id, authUser.email);
         if (uRes.rows && uRes.rows.length > 0) deptId = uRes.rows[0].department_id;
       }
       if (!deptId) {
@@ -444,7 +447,27 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
 
     sql += ` ORDER BY c.created_at DESC`;
 
-    const result = await query(sql, params);
+    const result = await complaintRepo.findComplaintsRaw(sql, params);
+    if (!authUser) {
+      const sanitizedRows = result.rows.map((c) => {
+        const {
+          citizen_name,
+          citizen_phone,
+          citizen_email,
+          citizen_mobile,
+          address,
+          latitude,
+          longitude,
+          location_details,
+          assigned_staff_email,
+          assigned_staff_phone,
+          ...publicData
+        } = c;
+        return publicData;
+      });
+      return res.json({ complaints: sanitizedRows });
+    }
+
     return res.json({ complaints: result.rows });
   } catch (err) {
     console.error('Fetch complaints error:', err);
@@ -464,7 +487,7 @@ router.get('/my', authenticateToken, async (req, res) => {
       WHERE CAST(c.citizen_id AS TEXT) = ? OR CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [String(citizenProfileId || ''), String(req.user.id)]);
+    const result = await complaintRepo.findMyComplaints(citizenProfileId, req.user.id);
     return res.json({ complaints: result.rows });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
@@ -487,21 +510,68 @@ router.get('/:id', authenticateToken, async (req, res) => {
       LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
       WHERE CAST(c.id AS TEXT) = ? OR c.complaint_number = ?
     `;
-    const result = await query(sql, [String(req.params.id), String(req.params.id)]);
+    const result = await complaintRepo.findComplaintDetailByIdOrNumber(req.params.id);
     if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
 
     const complaint = result.rows[0];
 
-    // IDOR Authorization Guard: Citizens can ONLY view their own complaints
-    if (req.user && req.user.role === 'citizen') {
+    // Role-based Authorization Guard for Single Complaint Retrieval (ISSUE-010)
+    const user = req.user;
+    const userRole = user ? user.role : null;
+
+    if (userRole === 'citizen') {
       const citizenProfileId = await resolveCitizenProfileId(req.user);
       const isOwner = (citizenProfileId && String(complaint.citizen_id) === String(citizenProfileId)) ||
                       String(complaint.citizen_id) === String(req.user.id);
       if (!isOwner) {
         return res.status(403).json({ error: 'Citizen access denied: You are not authorized to view this complaint.' });
       }
+    } else if (userRole === 'department_head' || userRole === 'officer') {
+      // Department Head: only own department complaints
+      const userDeptInput = user.department_id || user.id || user.email;
+      const isMatch = await isDeptMatch(userDeptInput, complaint.department_id);
+      if (!isMatch) {
+        return res.status(403).json({ error: 'Department Head access denied: You are not authorized to view complaints outside your department.' });
+      }
+    } else if (['staff', 'service_staff', 'field_staff'].includes(userRole)) {
+      // Field Staff: only complaints/tasks they are legitimately authorized to view through existing assignment/department rules
+      let userDeptId = user.department_id;
+      let staffFsId = user.id;
+      let staffEmpId = user.employee_id || '';
+
+      const fsCheck = await complaintRepo.findFieldStaffCheck(user.id, user.email);
+      if (fsCheck.rows && fsCheck.rows.length > 0) {
+        staffFsId = fsCheck.rows[0].id;
+        if (!staffEmpId) staffEmpId = fsCheck.rows[0].employee_id;
+        if (!userDeptId) userDeptId = fsCheck.rows[0].department_id;
+      }
+
+      let isAssignedToUser = (
+        (complaint.assigned_staff_id && (
+          String(complaint.assigned_staff_id) === String(user.id) ||
+          String(complaint.assigned_staff_id) === String(staffFsId) ||
+          (staffEmpId && String(complaint.assigned_staff_id) === String(staffEmpId))
+        )) ||
+        (complaint.assigned_staff_email && user.email && complaint.assigned_staff_email.toLowerCase() === user.email.toLowerCase())
+      );
+
+      if (!isAssignedToUser) {
+        const assignCheck = await complaintRepo.findAssignmentCheck(complaint.id, complaint.complaint_number, user.id, staffFsId, staffEmpId);
+        if (assignCheck.rows && assignCheck.rows.length > 0) {
+          isAssignedToUser = true;
+        }
+      }
+
+      const userDeptInput = userDeptId || user.id || user.email;
+      const isSameDept = userDeptInput && complaint.department_id && (await isDeptMatch(userDeptInput, complaint.department_id));
+
+      if (!isAssignedToUser && !isSameDept) {
+        return res.status(403).json({ error: 'Field staff access denied: You are not authorized to view complaints outside your assignment or department.' });
+      }
+    } else if (userRole === 'admin' || userRole === 'city_admin') {
+      // City Admin: existing city-wide access allowed
     }
 
     // Fetch assignment details if any
@@ -513,7 +583,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       WHERE CAST(a.complaint_id AS TEXT) = ? OR a.complaint_id = ?
       ORDER BY a.assigned_at DESC LIMIT 1
     `;
-    const assignRes = await query(assignSql, [String(complaint.id), String(complaint.id)]);
+    const assignRes = await complaintRepo.findLatestAssignment(complaint.id);
     complaint.assignment = assignRes.rows && assignRes.rows.length > 0 ? assignRes.rows[0] : null;
 
     return res.json({ complaint });
@@ -529,7 +599,7 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     const { rating, comment } = req.body;
 
     const checkSql = `SELECT id, citizen_id FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`;
-    const checkRes = await query(checkSql, [req.params.id, req.params.id, req.params.id]);
+    const checkRes = await complaintRepo.findComplaintForCheck(req.params.id);
 
     if (!checkRes.rows || checkRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
@@ -549,7 +619,7 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
       INSERT INTO feedback (complaint_id, rating, comment)
       VALUES (?, ?, ?)
     `;
-    await query(insertSql, [complaint.id, rating, comment || '']);
+    await complaintRepo.insertFeedback(complaint.id, rating, comment || '');
 
     return res.json({ message: 'Feedback submitted successfully' });
   } catch (err) {
@@ -565,7 +635,7 @@ router.post('/:id/reopen', authenticateToken, async (req, res) => {
     const targetId = req.params.id;
 
     const checkSql = `SELECT id, complaint_number, citizen_id, status FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`;
-    const checkRes = await query(checkSql, [targetId, targetId, targetId]);
+    const checkRes = await complaintRepo.findComplaintForCheck(targetId);
 
     if (!checkRes.rows || checkRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
@@ -621,6 +691,21 @@ const handleStatusUpdate = async (req, res) => {
 
     const complaint = compRes.rows[0];
 
+    // Authorization Guard for Complaint Status Update (ISSUE-004)
+    const userRole = req.user?.role;
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isDeptHead = ['department_head', 'officer'].includes(userRole);
+
+    if (isDeptHead && !isAdmin) {
+      const userDeptInput = req.user.department_id || req.user.id || req.user.email;
+      const isMatch = await isDeptMatch(userDeptInput, complaint.department_id);
+      if (!isMatch) {
+        return res.status(403).json({ error: 'Department Head access denied: You can only update complaints belonging to your own department.' });
+      }
+    } else if (!isAdmin) {
+      return res.status(403).json({ error: 'Access denied: You are not authorized to update complaint status.' });
+    }
+
     const updateParams = [status, new Date().toISOString()];
     let updateSql = `UPDATE complaints SET status = ?, updated_at = ?`;
 
@@ -647,7 +732,7 @@ const handleStatusUpdate = async (req, res) => {
     updateSql += ` WHERE id = ?`;
     updateParams.push(complaint.id);
 
-    await query(updateSql, updateParams);
+    await complaintRepo.updateComplaintStatus(updateSql, updateParams);
 
     // Record auditable status history
     await query(
@@ -664,7 +749,7 @@ const handleStatusUpdate = async (req, res) => {
 
     await notifyStatusChange(complaint.id, status, complaint.citizen_id).catch(() => {});
 
-    const updatedRes = await query(`SELECT * FROM complaints WHERE id = ?`, [complaint.id]);
+    const updatedRes = await complaintRepo.findComplaintById(complaint.id);
     return res.json({
       success: true,
       message: `Complaint status updated to ${status}`,
@@ -697,7 +782,7 @@ router.post('/:id/support', authenticateToken, async (req, res) => {
       [complaint.id]
     );
 
-    const updatedRes = await query(`SELECT support_count FROM complaints WHERE id = ?`, [complaint.id]);
+    const updatedRes = await complaintRepo.findSupportCount(complaint.id);
     const count = updatedRes.rows && updatedRes.rows[0] ? updatedRes.rows[0].support_count : 1;
 
     return res.json({ success: true, message: 'Issue supported successfully', support_count: count });
