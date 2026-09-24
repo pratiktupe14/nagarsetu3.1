@@ -225,14 +225,14 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     if (!isAdmin) {
       const { resolveUserDepartment } = require('./department.routes');
       const { userDeptId, userDeptCode } = await resolveUserDepartment(req);
-      const actorDeptInput = userDeptId || userDeptCode || req.user.department_id || req.user.id || req.user.email;
+      const actorDeptInput = userDeptCode || userDeptId || req.user?.department_id || req.user?.email || req.user?.id;
 
       const isTaskMatch = await isDeptMatch(actorDeptInput, complaint.department_id);
       if (!isTaskMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
 
-      const staffDeptInput = staff.department_id || staff.employee_id || staff.user_id || staff.id;
+      const staffDeptInput = staff.department_code || staff.department_id || staff.email || staff.employee_id || staff.user_id || staff.id;
       const isStaffMatch = await isDeptMatch(actorDeptInput, staffDeptInput);
       if (!isStaffMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
