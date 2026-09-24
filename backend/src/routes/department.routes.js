@@ -85,16 +85,20 @@ async function resolveUserDepartment(req) {
 
   let norm = normalizeDepartmentInfo(userDeptId);
   if (!norm.code || !['PWD', 'SAN', 'WTR', 'DRN', 'ELE', 'TRF', 'MNT'].includes(norm.code)) {
-    const compositeContext = `${userDeptId || ''} ${userDeptName || ''} ${req.user?.email || ''} ${req.user?.employee_id || ''}`;
-    norm = normalizeDepartmentInfo(compositeContext);
+    const compositeContext = `${userDeptId || ''} ${userDeptName || ''}`;
+    if (compositeContext.trim()) {
+      norm = normalizeDepartmentInfo(compositeContext);
+    }
   }
 
+  const validCode = norm.code && ['PWD', 'SAN', 'WTR', 'DRN', 'ELE', 'TRF', 'MNT'].includes(norm.code) ? norm.code : '';
+
   return {
-    userDeptId: norm.idStr || (userDeptId ? String(userDeptId) : ''),
+    userDeptId: validCode ? (norm.idStr || String(userDeptId || '')) : (userDeptId ? String(userDeptId) : ''),
     userDeptName: norm.name || userDeptName || '',
-    userDeptCode: norm.code || '',
+    userDeptCode: validCode,
     userDeptNumericId: norm.id || null,
-    norm
+    norm: norm
   };
 }
 
@@ -902,7 +906,8 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
         });
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      const isStaffMatch = await isDeptMatch(actorDeptInput, staff.department_id || staff.employee_id || staff.id);
+      const staffDeptInput = staff.department_id || staff.employee_id || staff.user_id || staff.id;
+      const isStaffMatch = await isDeptMatch(actorDeptInput, staffDeptInput);
       if (!isStaffMatch) {
         logger.warn('ASSIGNMENT_AUTH_CHECK', {
           requestId: req.requestId || logger.generateRequestId(),

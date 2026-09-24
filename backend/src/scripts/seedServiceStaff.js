@@ -54,7 +54,8 @@ const SERVICE_STAFF_DEFINITIONS = [
   { deptCode: 'MNT', search: 'Maintenance', name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', email: 'yogesh.shinde@nagarsetu.gov.in', mobile: '9822010035' }
 ];
 
-const DEMO_PASSWORD = 'nagarsetu@123';
+const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DEMO_PASSWORD = process.env.DEMO_STAFF_PASSWORD || process.env.DEMO_USER_PASSWORD || (isProd ? null : 'nagarsetu@123');
 
 async function seedServiceStaff(queryFn) {
   const q = queryFn || require('../config/db').query;
@@ -75,9 +76,6 @@ async function seedServiceStaff(queryFn) {
   // Fallback map if departments query returns empty or partial in memory
   const defaultDeptIdMap = { PWD: 1, SAN: 2, WTR: 3, DRN: 4, ELE: 5, TRF: 6, MNT: 7 };
 
-  const salt = await bcrypt.genSalt(10);
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, salt);
-
   let createdCount = 0;
   let updatedCount = 0;
 
@@ -87,7 +85,11 @@ async function seedServiceStaff(queryFn) {
 
     const firstName = item.name.split(' ')[0].toLowerCase();
     const envPass = process.env[`STAFF_INITIAL_PASSWORD_${item.employee_id.replace(/-/g, '_')}`] || process.env[`STAFF_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
-    const initialPassword = envPass || (cleanEmail === 'staff@nagarsetu.gov.in' ? 'staff@123' : `${firstName}@123`);
+    const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : (cleanEmail === 'staff@nagarsetu.gov.in' ? 'staff@123' : `${firstName}@123`));
+
+    if (isProd && (!initialPassword || initialPassword.trim() === '')) {
+      throw new Error(`SECURITY CONFIGURATION ERROR: Missing initial password environment variable for Staff ${item.employee_id} (${cleanEmail}) in production mode.`);
+    }
 
     let userId = null;
 

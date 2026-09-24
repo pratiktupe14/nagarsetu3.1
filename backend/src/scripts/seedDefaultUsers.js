@@ -6,9 +6,14 @@ async function seedDefaultUsers(query) {
     await query(`DELETE FROM users WHERE mobile = '9876543210' OR LOWER(email) = 'rahul@citizen.nagarsetu.gov.in'`).catch(() => {});
 
     const userSalt = await bcrypt.genSalt(10);
-    const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'admin@123';
+    const adminPass = process.env.DEMO_ADMIN_PASSWORD;
+
+    if (!adminPass || adminPass.trim() === '') {
+      throw new Error('SECURITY CONFIGURATION ERROR: DEMO_ADMIN_PASSWORD environment variable is missing. Explicit DEMO_ADMIN_PASSWORD is required to seed or reset the admin account.');
+    }
+
     const adminHash = await bcrypt.hash(adminPass, userSalt);
-    const staffPass = 'nagarsetu@123';
+    const staffPass = process.env.DEMO_STAFF_PASSWORD || 'nagarsetu@123';
     const staffHash = await bcrypt.hash(staffPass, userSalt);
 
     // 1. Ensure Municipal Admin exists idempotently
@@ -48,8 +53,12 @@ async function seedDefaultUsers(query) {
     const officerCheck = await query(`SELECT * FROM users WHERE email = 'officer@nagarsetu.gov.in'`);
     if (!officerCheck.rows || officerCheck.rows.length === 0) {
       await query(
-        `INSERT INTO users (name, mobile, email, password_hash, role, status, language_pref) VALUES (?, ?, ?, ?, 'officer', 'active', 'en')`,
+        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, status, language_pref) VALUES (?, ?, ?, ?, 'officer', 1, 'active', 'en')`,
         ['Inspector V. K. Patil (Officer)', '9876543211', 'officer@nagarsetu.gov.in', officerHash]
+      );
+    } else {
+      await query(
+        `UPDATE users SET department_id = COALESCE(department_id, 1) WHERE email = 'officer@nagarsetu.gov.in'`
       );
     }
 

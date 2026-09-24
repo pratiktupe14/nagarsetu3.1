@@ -73,7 +73,8 @@ const OFFICIAL_DEPARTMENTS = [
   }
 ];
 
-const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || process.env.DEMO_USER_PASSWORD || 'nagarsetu@123';
+const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || process.env.DEMO_USER_PASSWORD || (isProd ? null : 'nagarsetu@123');
 
 async function seed7DemoDepartmentHeads(queryFn) {
   const q = queryFn || require('../config/db').query;
@@ -124,7 +125,11 @@ async function seed7DemoDepartmentHeads(queryFn) {
       // Compute individual initial password for this department head
       const firstName = dMeta.headName.split(' ')[0].toLowerCase();
       const envPass = process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${dMeta.code}`] || process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
-      const initialPassword = envPass || `${firstName}@123`;
+      const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : `${firstName}@123`);
+
+      if (isProd && (!initialPassword || initialPassword.trim() === '')) {
+        throw new Error(`SECURITY CONFIGURATION ERROR: Missing initial password environment variable for Department Head ${dMeta.code} (${cleanEmail}) in production mode.`);
+      }
 
       // Check users table for existing account by email first to avoid cross-account mobile collision
       let userCheck = await q(

@@ -87,16 +87,8 @@ router.get('/staff-list', async (req, res) => {
     const params = [];
 
     if (req.user.role === 'department_head') {
-      let targetDeptId = req.user.department_id;
-      if (!targetDeptId) {
-        const dhRes = await query(
-          `SELECT department_id FROM department_heads WHERE (user_id = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
-          [req.user.id, (req.user.email || '').toLowerCase()]
-        );
-        if (dhRes.rows && dhRes.rows.length > 0) {
-          targetDeptId = dhRes.rows[0].department_id;
-        }
-      }
+      const resolved = await resolveUserDepartment(req);
+      let targetDeptId = resolved.userDeptCode || resolved.userDeptId || req.user.department_id;
       if (targetDeptId) {
         sql += ` AND (
           CAST(fs.department_id AS TEXT) = ?
@@ -136,14 +128,8 @@ router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) =>
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
     if (!isAdmin) {
-      let userDeptId = req.user.department_id;
-      if (userRole === 'department_head' && !userDeptId) {
-        const dhRes = await query(
-          `SELECT department_id FROM department_heads WHERE (CAST(user_id AS TEXT) = ? OR LOWER(email) = ?) AND status = 'active' ORDER BY id DESC LIMIT 1`,
-          [String(req.user.id || ''), (req.user.email || '').toLowerCase()]
-        );
-        if (dhRes.rows && dhRes.rows.length > 0) userDeptId = dhRes.rows[0].department_id;
-      }
+      const resolved = await resolveUserDepartment(req);
+      let userDeptId = resolved.userDeptId || resolved.userDeptCode || req.user.department_id;
       if (userDeptId && complaint.department_id && !(await isDeptMatch(userDeptId, complaint.department_id))) {
         return res.status(403).json({ error: 'Forbidden: You cannot verify complaints outside your department.' });
       }
@@ -237,12 +223,17 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
     if (!isAdmin) {
-      let userDeptId = req.user.department_id || req.user.id || req.user.email;
-      const isTaskMatch = await isDeptMatch(userDeptId, complaint.department_id);
+      const { resolveUserDepartment } = require('./department.routes');
+      const { userDeptId, userDeptCode } = await resolveUserDepartment(req);
+      const actorDeptInput = userDeptId || userDeptCode || req.user.department_id || req.user.id || req.user.email;
+
+      const isTaskMatch = await isDeptMatch(actorDeptInput, complaint.department_id);
       if (!isTaskMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      const isStaffMatch = await isDeptMatch(userDeptId, staff.department_id || staff.employee_id || staff.id);
+
+      const staffDeptInput = staff.department_id || staff.employee_id || staff.user_id || staff.id;
+      const isStaffMatch = await isDeptMatch(actorDeptInput, staffDeptInput);
       if (!isStaffMatch) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
