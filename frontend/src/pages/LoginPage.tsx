@@ -251,7 +251,7 @@ export const LoginPage: React.FC = () => {
                     ) : (
                       <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                     )}
-                    <input
+                    <input aria-label="identifier"
                       type="text"
                       required
                       value={identifier}
@@ -272,7 +272,7 @@ export const LoginPage: React.FC = () => {
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                    <input
+                    <input aria-label="password"
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={password}

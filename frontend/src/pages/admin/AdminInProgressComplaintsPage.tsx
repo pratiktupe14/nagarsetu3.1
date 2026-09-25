@@ -209,7 +209,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
             
             <div className="relative flex-1 min-w-[240px]">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaints..."
                 type="text"
                 placeholder="Search complaints..."
                 value={searchQuery}
@@ -222,7 +222,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -233,7 +233,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -244,7 +244,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -256,7 +256,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 <option value="Critical">Critical</option>
               </select>
 
-              <select
+              <select aria-label="sla  filter"
                 value={slaFilter}
                 onChange={(e) => { setSlaFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -266,7 +266,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 <option value="Overdue">Overdue</option>
               </select>
 
-              <input
+              <input aria-label="date  filter"
                 type="date"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}

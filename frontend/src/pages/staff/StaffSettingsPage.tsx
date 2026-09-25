@@ -327,7 +327,7 @@ export const StaffSettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Full Name *</label>
-                    <input
+                    <input aria-label="full Name"
                       type="text"
                       required
                       value={fullName}
@@ -338,7 +338,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Email Address *</label>
-                    <input
+                    <input aria-label="email"
                       type="email"
                       required
                       value={email}
@@ -349,7 +349,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Contact Phone Number *</label>
-                    <input
+                    <input aria-label="mobile"
                       type="text"
                       required
                       value={mobile}
@@ -400,7 +400,7 @@ export const StaffSettingsPage: React.FC = () => {
                       </div>
 
                       <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={item.state}
                           onChange={(e) => item.set(e.target.checked)}
@@ -448,7 +448,7 @@ export const StaffSettingsPage: React.FC = () => {
                       <div key={idx} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between">
                         <span className="font-bold text-gray-900">{thresh.label}</span>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input
+                          <input aria-label="Select item"
                             type="checkbox"
                             checked={thresh.state}
                             onChange={(e) => thresh.set(e.target.checked)}
@@ -469,7 +469,7 @@ export const StaffSettingsPage: React.FC = () => {
                         <span className="text-[11px] text-rose-700">Receive persistent alerts when SLA target is breached.</span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={alertOverdue}
                           onChange={(e) => setAlertOverdue(e.target.checked)}
@@ -485,7 +485,7 @@ export const StaffSettingsPage: React.FC = () => {
                         <span className="text-[11px] text-rose-700">Immediate high-priority notifications for emergency civic issues.</span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={alertCritical}
                           onChange={(e) => setAlertCritical(e.target.checked)}
@@ -553,7 +553,7 @@ export const StaffSettingsPage: React.FC = () => {
                 <div className="space-y-4 max-w-md text-xs">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Current Password *</label>
-                    <input
+                    <input aria-label="current Password"
                       type="password"
                       required
                       value={currentPassword}
@@ -565,7 +565,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">New Password *</label>
-                    <input
+                    <input aria-label="new Password"
                       type="password"
                       required
                       value={newPassword}
@@ -577,7 +577,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Confirm New Password *</label>
-                    <input
+                    <input aria-label="confirm Password"
                       type="password"
                       required
                       value={confirmPassword}

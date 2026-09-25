@@ -392,7 +392,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
+              <input aria-label="Search complaint ID, issue or location..."
                 type="text"
                 placeholder="Search complaint ID, issue or location..."
                 value={searchQuery}
@@ -431,7 +431,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Category
               </label>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -448,7 +448,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Department
               </label>
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -465,7 +465,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Priority
               </label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -483,7 +483,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Ward / Area
               </label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => { setWardFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -500,7 +500,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Resolved Date
               </label>
-              <select
+              <select aria-label="date  filter"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -517,7 +517,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 SLA Performance
               </label>
-              <select
+              <select aria-label="sla  filter"
                 value={slaFilter}
                 onChange={(e) => { setSlaFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -533,7 +533,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Citizen Rating
               </label>
-              <select
+              <select aria-label="rating  filter"
                 value={ratingFilter}
                 onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -551,7 +551,7 @@ export const AdminResolvedComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Status
               </label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"

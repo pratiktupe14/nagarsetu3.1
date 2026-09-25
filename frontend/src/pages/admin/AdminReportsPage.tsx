@@ -452,7 +452,7 @@ export const AdminReportsPage: React.FC = () => {
               <label className="block text-xs font-extrabold text-gray-700 font-outfit uppercase tracking-wider">
                 Select Report Type *
               </label>
-              <select
+              <select aria-label="selected Report Type"
                 value={selectedReportType}
                 onChange={(e) => setSelectedReportType(e.target.value as ReportType)}
                 className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 font-outfit"
@@ -475,7 +475,7 @@ export const AdminReportsPage: React.FC = () => {
             <div className="flex items-center space-x-3 shrink-0">
               <div>
                 <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Date From</label>
-                <input
+                <input aria-label="date From"
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
@@ -485,7 +485,7 @@ export const AdminReportsPage: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Date To</label>
-                <input
+                <input aria-label="date To"
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
@@ -502,7 +502,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Department */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Department</label>
-              <select
+              <select aria-label="dept  filter"
                 value={deptFilter}
                 onChange={(e) => setDeptFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -517,7 +517,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Category */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Category</label>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -532,7 +532,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Priority */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Priority</label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -548,7 +548,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Status */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Status</label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -566,7 +566,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Ward */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Ward / Area</label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => setWardFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -581,7 +581,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Staff */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Assigned Staff</label>
-              <select
+              <select aria-label="staff  filter"
                 value={staffFilter}
                 onChange={(e) => setStaffFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"

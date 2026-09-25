@@ -378,7 +378,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search staff by name, employee ID, email, or phone..."
                 type="text"
                 placeholder="Search staff by name, employee ID, email, or phone..."
                 value={searchQuery}
@@ -613,7 +613,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Full Name *</label>
-                  <input
+                  <input aria-label="e.g. Amit Patil"
                     type="text"
                     required
                     placeholder="e.g. Amit Patil"
@@ -625,7 +625,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Mobile Number *</label>
-                  <input
+                  <input aria-label="e.g. 9876543210"
                     type="tel"
                     required
                     placeholder="e.g. 9876543210"
@@ -639,7 +639,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Email Address</label>
-                  <input
+                  <input aria-label="amit.patil@nagarsetu.gov.in"
                     type="email"
                     placeholder="amit.patil@nagarsetu.gov.in"
                     value={addEmail}
@@ -650,7 +650,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Employee ID</label>
-                  <input
+                  <input aria-label="e.g. PWD-STF-001"
                     type="text"
                     placeholder="e.g. PWD-STF-001"
                     value={addEmployeeId}
@@ -663,7 +663,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Password *</label>
-                  <input
+                  <input aria-label="Staff login password"
                     type="password"
                     required
                     placeholder="Staff login password"
@@ -675,7 +675,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Confirm Password *</label>
-                  <input
+                  <input aria-label="Confirm password"
                     type="password"
                     required
                     placeholder="Confirm password"
@@ -689,7 +689,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Designation</label>
-                  <input
+                  <input aria-label="add Designation"
                     type="text"
                     value={addDesignation}
                     onChange={(e) => setAddDesignation(e.target.value)}
@@ -699,7 +699,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Preferred Language</label>
-                  <select
+                  <select aria-label="add Language"
                     value={addLanguage}
                     onChange={(e) => setAddLanguage(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -829,7 +829,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Full Name *</label>
-                <input
+                <input aria-label="edit Name"
                   type="text"
                   required
                   value={editName}
@@ -840,7 +840,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Mobile Number *</label>
-                <input
+                <input aria-label="edit Mobile"
                   type="tel"
                   required
                   value={editMobile}
@@ -851,7 +851,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Employee ID</label>
-                <input
+                <input aria-label="edit Employee Id"
                   type="text"
                   value={editEmployeeId}
                   onChange={(e) => setEditEmployeeId(e.target.value)}
@@ -861,7 +861,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Designation</label>
-                <input
+                <input aria-label="edit Designation"
                   type="text"
                   value={editDesignation}
                   onChange={(e) => setEditDesignation(e.target.value)}
@@ -1022,7 +1022,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">New Password *</label>
                   <div className="relative">
-                    <input
+                    <input aria-label="Enter new password (min 6 chars)"
                       type={showNewPassword ? 'text' : 'password'}
                       required
                       placeholder="Enter new password (min 6 chars)"
@@ -1044,7 +1044,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Confirm New Password *</label>
                   <div className="relative">
-                    <input
+                    <input aria-label="Confirm new password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
                       placeholder="Confirm new password"

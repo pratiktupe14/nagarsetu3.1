@@ -245,7 +245,7 @@ export const AdminSettingsPage: React.FC = () => {
                       
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Full Name</label>
-                        <input
+                        <input aria-label="full Name"
                           type="text"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
@@ -255,7 +255,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Official Email Address</label>
-                        <input
+                        <input aria-label="email"
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
@@ -265,7 +265,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Mobile Contact Number</label>
-                        <input
+                        <input aria-label="mobile"
                           type="text"
                           value={mobile}
                           onChange={(e) => setMobile(e.target.value)}
@@ -275,7 +275,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Assigned Department</label>
-                        <input
+                        <input aria-label="department"
                           type="text"
                           value={department}
                           onChange={(e) => setDepartment(e.target.value)}
@@ -515,7 +515,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Date Display Format</label>
-                    <select
+                    <select aria-label="date Format"
                       value={dateFormat}
                       onChange={(e) => setDateFormat(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -528,7 +528,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Time Display Format</label>
-                    <select
+                    <select aria-label="time Format"
                       value={timeFormat}
                       onChange={(e) => setTimeFormat(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -540,7 +540,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Live Dashboard Auto-Refresh</label>
-                    <select
+                    <select aria-label="auto Refresh Interval"
                       value={autoRefreshInterval}
                       onChange={(e) => setAutoRefreshInterval(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -579,7 +579,7 @@ export const AdminSettingsPage: React.FC = () => {
                   
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">Current Password</label>
-                    <input
+                    <input aria-label="Enter current password"
                       type="password"
                       placeholder="Enter current password"
                       value={currentPassword}
@@ -590,7 +590,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">New Password</label>
-                    <input
+                    <input aria-label="Enter new password (min. 6 chars)"
                       type="password"
                       placeholder="Enter new password (min. 6 chars)"
                       value={newPassword}
@@ -601,7 +601,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">Confirm New Password</label>
-                    <input
+                    <input aria-label="Re-enter new password"
                       type="password"
                       placeholder="Re-enter new password"
                       value={confirmPassword}
@@ -694,7 +694,7 @@ const ToggleRow: React.FC<ToggleRowProps> = ({ title, desc, checked, onChange, d
       </div>
 
       <label className={`relative inline-flex items-center cursor-pointer shrink-0 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        <input
+        <input aria-label="Select item"
           type="checkbox"
           checked={checked}
           disabled={disabled}

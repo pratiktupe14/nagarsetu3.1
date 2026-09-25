@@ -104,7 +104,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 Current Temporary Password
               </label>
               <div className="relative">
-                <input
+                <input aria-label="current Password"
                   type={showCurrent ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
@@ -129,7 +129,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 New Password (min 6 characters)
               </label>
               <div className="relative">
-                <input
+                <input aria-label="new Password"
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -155,7 +155,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 Confirm New Password
               </label>
               <div className="relative">
-                <input
+                <input aria-label="confirm Password"
                   type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

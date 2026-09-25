@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getDepartments } from '../../services/departmentService';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import {
   getDepartmentHeadAnnouncements,
@@ -42,6 +43,15 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [departmentsList, setDepartmentsList] = useState<{ id: string; name: string; code?: string }[]>(DEPARTMENTS_LIST);
+
+  useEffect(() => {
+    getDepartments().then((depts) => {
+      if (depts && depts.length > 0) {
+        setDepartmentsList(depts.map((d) => ({ id: String(d.id), name: d.name, code: d.code })));
+      }
+    }).catch(() => {});
+  }, []);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,7 +127,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
     if (isAdmin) {
       if (targetAudience === 'specific_department') {
         targetType = 'department';
-        const match = DEPARTMENTS_LIST.find((d) => d.id === selectedDeptId);
+        const match = departmentsList.find((d) => d.id === selectedDeptId);
         deptId = selectedDeptId;
         deptName = match ? match.name : 'Public Works Department (PWD)';
       }
@@ -288,7 +298,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search announcements by title, description, department or publisher..."
                 type="text"
                 placeholder="Search announcements by title, description, department or publisher..."
                 value={searchQuery}
@@ -298,7 +308,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 shrink-0">
-              <select
+              <select aria-label="selected Type"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-bold text-gray-800 focus:outline-none focus:border-emerald-600 min-h-[42px]"
@@ -314,7 +324,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                 <option value="Public Notice">Public Notice</option>
               </select>
 
-              <select
+              <select aria-label="selected Priority"
                 value={selectedPriority}
                 onChange={(e) => setSelectedPriority(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-bold text-gray-800 focus:outline-none focus:border-emerald-600 min-h-[42px]"
@@ -471,7 +481,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Announcement Title *</label>
-                <input
+                <input aria-label="e.g. Ward 5 Water Pipeline Repairs Advisory"
                   type="text"
                   required
                   placeholder="e.g. Ward 5 Water Pipeline Repairs Advisory"
@@ -483,7 +493,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Detailed Description *</label>
-                <textarea
+                <textarea aria-label="Enter full announcement message..."
                   required
                   rows={4}
                   placeholder="Enter full announcement message..."
@@ -496,7 +506,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Type *</label>
-                  <select
+                  <select aria-label="type"
                     value={type}
                     onChange={(e) => setType(e.target.value as AnnouncementType)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -514,7 +524,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Priority *</label>
-                  <select
+                  <select aria-label="priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as AnnouncementPriorityLevel)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -528,7 +538,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Status *</label>
-                  <select
+                  <select aria-label="status"
                     value={status}
                     onChange={(e) => setStatus(e.target.value as AnnouncementStatus)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -547,7 +557,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                 {isAdmin ? (
                   <div className="space-y-3">
                     <label className="block font-bold text-gray-800">Select Audience *</label>
-                    <select
+                    <select aria-label="target Audience"
                       value={targetAudience}
                       onChange={(e) => setTargetAudience(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -562,12 +572,12 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                     {targetAudience === 'specific_department' && (
                       <div className="pt-1">
                         <label className="block font-bold text-gray-700 mb-1">Target Department *</label>
-                        <select
+                        <select aria-label="selected Dept Id"
                           value={selectedDeptId}
                           onChange={(e) => setSelectedDeptId(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-extrabold text-emerald-800 min-h-[42px]"
                         >
-                          {DEPARTMENTS_LIST.map((d) => (
+                          {departmentsList.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.code} - {d.name}
                             </option>
@@ -588,7 +598,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <label className="flex items-center space-x-2 p-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer font-bold text-gray-800">
-                        <input
+                        <input aria-label="dept Head Target"
                           type="radio"
                           name="deptHeadTarget"
                           checked={targetAudience === 'citizens'}
@@ -599,7 +609,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                       </label>
 
                       <label className="flex items-center space-x-2 p-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer font-bold text-gray-800">
-                        <input
+                        <input aria-label="dept Head Target"
                           type="radio"
                           name="deptHeadTarget"
                           checked={targetAudience === 'department'}
@@ -610,7 +620,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                       </label>
 
                       <label className="flex items-center space-x-2 p-2.5 bg-white border border-gray-200 rounded-xl cursor-pointer font-bold text-gray-800">
-                        <input
+                        <input aria-label="dept Head Target"
                           type="radio"
                           name="deptHeadTarget"
                           checked={targetAudience === 'staff'}

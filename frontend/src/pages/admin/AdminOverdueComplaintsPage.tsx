@@ -465,7 +465,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
+              <input aria-label="Search complaint ID, issue or location..."
                 type="text"
                 placeholder="Search complaint ID, issue or location..."
                 value={searchQuery}
@@ -504,7 +504,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Department
               </label>
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -521,7 +521,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Priority
               </label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -539,7 +539,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Category
               </label>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -556,7 +556,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Assigned Staff
               </label>
-              <select
+              <select aria-label="staff  filter"
                 value={staffFilter}
                 onChange={(e) => { setStaffFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -572,7 +572,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Ward / Area
               </label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => { setWardFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -589,7 +589,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Overdue Duration
               </label>
-              <select
+              <select aria-label="overdue Duration  filter"
                 value={overdueDurationFilter}
                 onChange={(e) => { setOverdueDurationFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -607,7 +607,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Current Status
               </label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-rose-500"
@@ -1044,7 +1044,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 rounded-lg border border-amber-200">
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Select Escalation Level</span>
-                      <select
+                      <select aria-label="escalation Target"
                         value={escalationTarget}
                         onChange={(e) => setEscalationTarget(e.target.value)}
                         className="p-1.5 bg-gray-50 border border-gray-300 rounded text-xs font-bold text-gray-800"
@@ -1220,7 +1220,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Target Department</label>
-                  <select
+                  <select aria-label="reassign Dept"
                     value={reassignDept}
                     onChange={(e) => setReassignDept(e.target.value)}
                     className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
@@ -1233,7 +1233,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Select Field Staff</label>
-                  <select
+                  <select aria-label="reassign Staff Id"
                     value={reassignStaffId}
                     onChange={(e) => setReassignStaffId(e.target.value)}
                     className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
@@ -1249,7 +1249,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">New SLA Deadline Extension (Hours)</label>
-                  <select
+                  <select aria-label="reassign Sla Hours"
                     value={reassignSlaHours}
                     onChange={(e) => setReassignSlaHours(Number(e.target.value))}
                     className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold font-mono"

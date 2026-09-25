@@ -442,7 +442,7 @@ export const StaffTaskMapPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative sm:col-span-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue..."
                 type="text"
                 placeholder="Search complaint ID, issue..."
                 value={searchQuery}
@@ -458,7 +458,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Status Filter */}
             <div>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -473,7 +473,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Priority Filter */}
             <div>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -488,7 +488,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Category Filter */}
             <div>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -877,7 +877,7 @@ export const StaffTaskMapPage: React.FC = () => {
                 <form onSubmit={handleAddProgressNote} className="space-y-2 border-t border-gray-200 pt-3 text-xs">
                   <span className="font-bold text-gray-700 block">Add On-Site Progress Update Note</span>
                   <div className="flex gap-2">
-                    <input
+                    <input aria-label="e.g. Damaged section identified. Repair work has started."
                       type="text"
                       placeholder="e.g. Damaged section identified. Repair work has started."
                       value={progressNote}
@@ -968,7 +968,7 @@ export const StaffTaskMapPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -980,7 +980,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

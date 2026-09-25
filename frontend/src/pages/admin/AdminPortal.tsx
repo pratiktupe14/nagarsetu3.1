@@ -331,7 +331,7 @@ export const AdminPortal: React.FC = () => {
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     placeholder={t('searchPlaceholderAdmin')}
                     value={searchQuery}
@@ -340,7 +340,7 @@ export const AdminPortal: React.FC = () => {
                   />
                 </div>
 
-                <select
+                <select aria-label="status  filter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -353,7 +353,7 @@ export const AdminPortal: React.FC = () => {
                   <option value="Resolved">{translateStatus('Resolved')}</option>
                 </select>
 
-                <select
+                <select aria-label="priority  filter"
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -719,7 +719,7 @@ export const AdminPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('overridePriorityLevel')}</label>
-                  <select
+                  <select aria-label="edit Priority"
                     value={editPriority}
                     onChange={(e) => setEditPriority(e.target.value as PriorityLevel)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -733,7 +733,7 @@ export const AdminPortal: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('overrideDepartment')}</label>
-                  <select
+                  <select aria-label="edit Department"
                     value={editDepartment}
                     onChange={(e) => handleChangeDepartment(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -761,7 +761,7 @@ export const AdminPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('departmentStaffRoster')}</label>
-                  <select
+                  <select aria-label="selected Staff Id"
                     value={selectedStaffId}
                     onChange={(e) => setSelectedStaffId(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -804,7 +804,7 @@ export const AdminPortal: React.FC = () => {
 
             <div className="space-y-2 text-xs">
               <label className="block font-bold text-gray-700">{t('rejectionReasonForStaff')}</label>
-              <textarea
+              <textarea aria-label="rejection Reason"
                 required
                 rows={3}
                 value={rejectionReason}

@@ -63,7 +63,7 @@ export const AdminMapCommandCenter: React.FC<MapCommandCenterProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <label className="text-[10px] font-bold text-gray-500 block uppercase">Department</label>
-            <select
+            <select aria-label="selected Dept"
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -79,7 +79,7 @@ export const AdminMapCommandCenter: React.FC<MapCommandCenterProps> = ({
 
           <div>
             <label className="text-[10px] font-bold text-gray-500 block uppercase">Priority</label>
-            <select
+            <select aria-label="selected Priority"
               value={selectedPriority}
               onChange={(e) => setSelectedPriority(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -94,7 +94,7 @@ export const AdminMapCommandCenter: React.FC<MapCommandCenterProps> = ({
 
           <div>
             <label className="text-[10px] font-bold text-gray-500 block uppercase">Status</label>
-            <select
+            <select aria-label="selected Status"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs text-gray-900 focus:border-emerald-500 font-semibold"

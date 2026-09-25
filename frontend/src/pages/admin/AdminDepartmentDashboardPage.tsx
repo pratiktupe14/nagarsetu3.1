@@ -406,7 +406,7 @@ export const AdminDepartmentDashboardPage: React.FC = () => {
 
           <div className="flex items-center space-x-2 shrink-0">
             {/* DEPARTMENT SELECTOR DROPDOWN (ALL 7 DEPARTMENTS) */}
-            <select
+            <select aria-label="selected Dept Id"
               value={selectedDeptId}
               onChange={(e) => setSelectedDeptId(e.target.value)}
               className="bg-white border-2 border-emerald-500 rounded-lg px-3 py-2 text-xs text-gray-900 font-extrabold shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[38px] font-outfit cursor-pointer"

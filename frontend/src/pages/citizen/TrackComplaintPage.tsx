@@ -264,7 +264,7 @@ export const TrackComplaintPage: React.FC = () => {
           <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
               <Search className="w-5 h-5 absolute left-3.5 top-3.5 text-gray-400" />
-              <input
+              <input aria-label="search Input"
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}

@@ -375,7 +375,7 @@ export const StaffNotificationsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search notifications..."
                 type="text"
                 placeholder="Search notifications..."
                 value={searchQuery}
@@ -710,7 +710,7 @@ export const StaffNotificationsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -722,7 +722,7 @@ export const StaffNotificationsPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

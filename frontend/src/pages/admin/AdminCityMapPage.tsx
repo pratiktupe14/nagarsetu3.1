@@ -389,7 +389,7 @@ export const AdminCityMapPage: React.FC = () => {
             {/* Search Location / ID / Issue */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
+              <input aria-label="Search complaint ID, issue title, location, ward or department..."
                 type="text"
                 placeholder="Search complaint ID, issue title, location, ward or department..."
                 value={searchQuery}
@@ -442,7 +442,7 @@ export const AdminCityMapPage: React.FC = () => {
             {/* Status Dropdown */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-0.5 font-outfit">Status</label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -463,7 +463,7 @@ export const AdminCityMapPage: React.FC = () => {
             {/* Priority Dropdown */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-0.5 font-outfit">Priority</label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -479,7 +479,7 @@ export const AdminCityMapPage: React.FC = () => {
             {/* Department Dropdown */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-0.5 font-outfit">Department</label>
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -494,7 +494,7 @@ export const AdminCityMapPage: React.FC = () => {
             {/* Ward Dropdown */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-0.5 font-outfit">Ward / Area</label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => setWardFilter(e.target.value)}
                 className="w-full p-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"

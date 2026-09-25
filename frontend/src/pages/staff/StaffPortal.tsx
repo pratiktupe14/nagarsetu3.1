@@ -810,7 +810,7 @@ export const StaffPortal: React.FC = () => {
                 <span className="text-[11px] text-gray-500 block">No pending priority tasks assigned.</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {priorityTasksList.map((t) => {
                   const slaInfo = formatSlaRemainingTime(t.sla_deadline);
                   const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
@@ -1304,7 +1304,7 @@ export const StaffPortal: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -1316,7 +1316,7 @@ export const StaffPortal: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

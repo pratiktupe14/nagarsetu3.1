@@ -109,7 +109,7 @@ router.get('/staff-list', async (req, res) => {
   }
 });
 
-const { isDeptMatch } = require('../utils/departmentUtils');
+const { isDeptMatch } = require('../security/departmentResolver');
 
 // Verify & Approve / Reject Complaint
 router.post('/verify', validateInput(verifyComplaintSchema), async (req, res) => {

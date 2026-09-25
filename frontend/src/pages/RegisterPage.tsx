@@ -62,7 +62,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('fullName')}</label>
               <div className="relative">
                 <User className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="full Name"
                   type="text"
                   required
                   value={fullName}
@@ -77,7 +77,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('mobileNumber')}</label>
               <div className="relative">
                 <Smartphone className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="mobile"
                   type="tel"
                   required
                   value={mobile}
@@ -92,7 +92,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('emailAddress')}</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -106,7 +106,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('password')}</label>
               <div className="relative">
                 <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}

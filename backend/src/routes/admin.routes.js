@@ -363,12 +363,20 @@ router.post('/department-heads', async (req, res) => {
     const { name, fullName, email, phone, mobile, employeeId, departmentId, designation, password, status = 'active' } = req.body;
     const cleanName = (fullName || name || '').trim();
     const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPhone = (mobile || phone || '').trim() || '+91 98220 00000';
+    const rawPhone = (mobile || phone || '').trim();
+    const cleanPhone = rawPhone.length > 0 ? rawPhone : null;
     const cleanEmpId = (employeeId || '').trim();
     const cleanDeptId = await resolveDepartmentId(departmentId);
 
     if (!cleanName || !cleanEmail || !cleanDeptId) {
       return res.status(400).json({ error: 'Name, email, and a valid department selection are required.' });
+    }
+
+    if (cleanPhone) {
+      const phoneCheck = await query(`SELECT id FROM users WHERE mobile = ? AND LOWER(email) != ?`, [cleanPhone, cleanEmail]);
+      if (phoneCheck.rows && phoneCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Phone number is already in use.' });
+      }
     }
 
     // Email Uniqueness Check & User Upsert
@@ -465,7 +473,14 @@ router.put('/department-heads/:id', async (req, res) => {
 
     const newName = (fullName || name || currentHead.name || currentUser.name).trim();
     const newEmail = (email || targetEmail).trim().toLowerCase();
-    const newPhone = (mobile || phone || currentHead.phone || currentUser.mobile || '+91 98220 00000').trim();
+
+    let rawPhone;
+    if (mobile !== undefined || phone !== undefined) {
+      rawPhone = (mobile || phone || '').trim();
+    } else {
+      rawPhone = (currentHead.phone || currentUser.mobile || '').trim();
+    }
+    const newPhone = rawPhone.length > 0 ? rawPhone : null;
     const newEmpId = (employeeId !== undefined ? employeeId : (currentHead.employee_id || currentUser.employee_id || '')).trim();
     const newDeptId = departmentId ? (await resolveDepartmentId(departmentId)) : (currentHead.department_id || currentUser.department_id);
     const newStatus = status || currentHead.status || currentUser.status || 'active';
@@ -475,6 +490,14 @@ router.put('/department-heads/:id', async (req, res) => {
       const emailCheck = await query(`SELECT id FROM users WHERE LOWER(email) = ? AND id != ? AND LOWER(email) != ?`, [newEmail, targetUserId, targetEmail.toLowerCase()]);
       if (emailCheck.rows && emailCheck.rows.length > 0) {
         return res.status(400).json({ error: 'Email address is already in use.' });
+      }
+    }
+
+    // Phone Uniqueness check if phone provided
+    if (newPhone) {
+      const phoneCheck = await query(`SELECT id FROM users WHERE mobile = ? AND id != ? AND LOWER(email) != ?`, [newPhone, targetUserId, targetEmail.toLowerCase()]);
+      if (phoneCheck.rows && phoneCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Phone number is already in use.' });
       }
     }
 

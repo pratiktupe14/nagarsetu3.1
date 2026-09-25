@@ -212,7 +212,7 @@ export const CitizenPortal: React.FC = () => {
         </div>
 
         {/* METRICS GRID */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('totalComplaints')}</span>

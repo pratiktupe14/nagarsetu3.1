@@ -401,7 +401,7 @@ export const StaffNewTasksPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue, location..."
                 type="text"
                 placeholder="Search complaint ID, issue, location..."
                 value={searchQuery}
@@ -411,7 +411,7 @@ export const StaffNewTasksPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -423,7 +423,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Low">Low</option>
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -439,7 +439,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Other">Other</option>
               </select>
 
-              <select
+              <select aria-label="sla  filter"
                 value={slaFilter}
                 onChange={(e) => setSlaFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -451,7 +451,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Overdue">Overdue</option>
               </select>
 
-              <select
+              <select aria-label="date  filter"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -462,7 +462,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Older">Older</option>
               </select>
 
-              <select
+              <select aria-label="location  filter"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500 max-w-[160px] truncate"

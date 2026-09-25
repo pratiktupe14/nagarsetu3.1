@@ -516,7 +516,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             {/* Department Filter */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Department</label>
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -531,7 +531,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             {/* Category Filter */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Category</label>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -546,7 +546,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             {/* Priority Filter */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Priority</label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -562,7 +562,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             {/* Ward Filter */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Ward / Area</label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => setWardFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -577,7 +577,7 @@ export const AdminAnalyticsPage: React.FC = () => {
             {/* Status Filter */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Status</label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"

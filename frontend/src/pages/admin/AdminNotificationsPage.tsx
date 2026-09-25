@@ -265,7 +265,7 @@ export const AdminNotificationsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search notifications by title, ID or message..."
                 type="text"
                 placeholder="Search notifications by title, ID or message..."
                 value={searchQuery}

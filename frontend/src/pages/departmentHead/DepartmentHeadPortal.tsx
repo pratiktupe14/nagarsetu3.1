@@ -1535,7 +1535,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
+                  <input aria-label="notif Search"
                     type="text"
                     value={notifSearchQuery}
                     onChange={(e) => setNotifSearchQuery(e.target.value)}
@@ -1731,7 +1731,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Full Name *</label>
-                      <input
+                      <input aria-label="edit Name"
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
@@ -1741,7 +1741,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Contact Phone *</label>
-                      <input
+                      <input aria-label="edit Phone"
                         type="text"
                         value={editPhone}
                         onChange={(e) => setEditPhone(e.target.value)}
@@ -1839,7 +1839,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">Task Assignment Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskAssigned}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskAssigned: e.target.checked })}
@@ -1849,7 +1849,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">Task Completion Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskCompleted}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskCompleted: e.target.checked })}
@@ -1859,7 +1859,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">SLA Overdue Warning Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskOverdue}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskOverdue: e.target.checked })}
@@ -1869,7 +1869,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">New Complaint Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.newComplaint}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, newComplaint: e.target.checked })}
@@ -1999,7 +1999,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       {/* SEARCH INPUT */}
                       <div className="lg:col-span-2 relative">
                         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                        <input
+                        <input aria-label="search"
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
@@ -2015,7 +2015,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* STATUS FILTER */}
                       <div>
-                        <select
+                        <select aria-label="status  filter"
                           value={statusFilter}
                           onChange={(e) => setStatusFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2031,7 +2031,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* PRIORITY FILTER */}
                       <div>
-                        <select
+                        <select aria-label="priority  filter"
                           value={priorityFilter}
                           onChange={(e) => setPriorityFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2046,7 +2046,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* STAFF FILTER */}
                       <div>
-                        <select
+                        <select aria-label="staff  filter"
                           value={staffFilter}
                           onChange={(e) => setStaffFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2060,7 +2060,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* SLA FILTER */}
                       <div>
-                        <select
+                        <select aria-label="sla  filter"
                           value={slaFilter}
                           onChange={(e) => setSlaFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2255,7 +2255,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2271,7 +2271,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2286,7 +2286,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* CATEGORY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="category  filter"
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2300,7 +2300,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2314,7 +2314,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* OVERDUE DURATION FILTER */}
                 <div>
-                  <select
+                  <select aria-label="overdue Duration  filter"
                     value={overdueDurationFilter}
                     onChange={(e) => setOverdueDurationFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2558,7 +2558,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2574,7 +2574,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* REVIEW STATUS FILTER */}
                 <div>
-                  <select
+                  <select aria-label="review Status Tab"
                     value={reviewStatusTab}
                     onChange={(e) => setReviewStatusTab(e.target.value as any)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2588,7 +2588,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2603,7 +2603,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* CATEGORY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="category  filter"
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2617,7 +2617,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3137,7 +3137,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   {/* SEARCH INPUT */}
                   <div className="lg:col-span-2 relative">
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                    <input
+                    <input aria-label="search"
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -3153,7 +3153,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* STATUS FILTER */}
                   <div>
-                    <select
+                    <select aria-label="status  filter"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3168,7 +3168,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* PRIORITY FILTER */}
                   <div>
-                    <select
+                    <select aria-label="priority  filter"
                       value={priorityFilter}
                       onChange={(e) => setPriorityFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3183,7 +3183,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* STAFF FILTER */}
                   <div>
-                    <select
+                    <select aria-label="staff  filter"
                       value={staffFilter}
                       onChange={(e) => setStaffFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3197,7 +3197,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* SLA FILTER */}
                   <div>
-                    <select
+                    <select aria-label="sla  filter"
                       value={slaFilter}
                       onChange={(e) => setSlaFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3650,7 +3650,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -3666,7 +3666,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STATUS FILTER */}
                 <div>
-                  <select
+                  <select aria-label="status  filter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3685,7 +3685,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3700,7 +3700,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3715,7 +3715,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* SLA FILTER */}
                 <div>
-                  <select
+                  <select aria-label="sla  filter"
                     value={slaFilter}
                     onChange={(e) => setSlaFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -4127,7 +4127,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -4145,7 +4145,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               {/* SECONDARY FILTERS ROW */}
               <div className="flex flex-wrap items-center gap-2 text-xs pt-1 border-t border-gray-200/70">
-                <select
+                <select aria-label="category  filter"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4184,7 +4184,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   )}
                 </select>
 
-                <select
+                <select aria-label="priority  filter"
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4196,7 +4196,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Low">Low</option>
                 </select>
 
-                <select
+                <select aria-label="status  filter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4213,7 +4213,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Overdue">Overdue</option>
                 </select>
 
-                <select
+                <select aria-label="staff  filter"
                   value={staffFilter}
                   onChange={(e) => setStaffFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4225,7 +4225,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   ))}
                 </select>
 
-                <select
+                <select aria-label="sla  filter"
                   value={slaFilter}
                   onChange={(e) => setSlaFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4236,7 +4236,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Overdue">Overdue SLA</option>
                 </select>
 
-                <select
+                <select aria-label="date  filter"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4313,7 +4313,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       <thead>
                         <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
                           <th className="p-3.5 w-10 text-center">
-                            <input
+                            <input aria-label="Select item"
                               type="checkbox"
                               checked={selectedComplaints.length > 0 && selectedComplaints.length === paginatedComplaints.length}
                               onChange={(e) => {
@@ -4347,7 +4347,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                           return (
                             <tr key={comp.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
                               <td className="p-3.5 text-center">
-                                <input
+                                <input aria-label="Select item"
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={(e) => {
@@ -4533,7 +4533,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="space-y-3 text-xs">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Current Password *</label>
-                  <input
+                  <input aria-label="current Password"
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -4544,7 +4544,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">New Password *</label>
-                  <input
+                  <input aria-label="new Password"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -4555,7 +4555,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Confirm New Password *</label>
-                  <input
+                  <input aria-label="confirm Password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -4612,7 +4612,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div>
                   <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Current Priority</span>
                   <div className="flex items-center space-x-1 mt-0.5">
-                    <select
+                    <select aria-label="priority"
                       value={detailModalComplaint.priority}
                       onChange={async (e) => {
                         const newPri = e.target.value as any;
@@ -4892,7 +4892,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       );
                     }
                     return (
-                      <select
+                      <select aria-label="selected Staff For Assign"
                         value={selectedStaffForAssign}
                         onChange={(e) => {
                           setSelectedStaffForAssign(e.target.value);
@@ -5045,7 +5045,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               {showReworkInput && (
                 <div className="space-y-2 text-xs">
                   <label className="block font-bold text-rose-900">Rework Instructions for Field Staff *</label>
-                  <textarea
+                  <textarea aria-label="rework Reason"
                     value={reworkReason}
                     onChange={(e) => setReworkReason(e.target.value)}
                     placeholder="Explain specifically what needs to be fixed or re-inspected..."

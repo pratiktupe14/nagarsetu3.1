@@ -295,7 +295,7 @@ export const DepartmentHeadAnnouncements: React.FC<DepartmentHeadAnnouncementsPr
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="relative flex-1 w-full">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -305,7 +305,7 @@ export const DepartmentHeadAnnouncements: React.FC<DepartmentHeadAnnouncementsPr
                 </div>
 
                 <label className="flex items-center space-x-2 font-extrabold text-gray-700 cursor-pointer shrink-0">
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={onlyUnread}
                     onChange={(e) => setOnlyUnread(e.target.checked)}

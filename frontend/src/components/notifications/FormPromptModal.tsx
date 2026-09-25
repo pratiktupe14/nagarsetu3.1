@@ -116,7 +116,7 @@ export const FormPromptModal: React.FC<FormPromptModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             {inputType === 'textarea' ? (
-              <textarea
+              <textarea aria-label="Input text"
                 ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                 rows={3}
                 value={value}
@@ -128,7 +128,7 @@ export const FormPromptModal: React.FC<FormPromptModalProps> = ({
                 className="w-full p-3 bg-gray-50 border border-gray-300 rounded-2xl text-xs text-gray-900 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white font-semibold"
               />
             ) : (
-              <input
+              <input aria-label="Form input"
                 ref={inputRef as React.RefObject<HTMLInputElement>}
                 type="text"
                 value={value}

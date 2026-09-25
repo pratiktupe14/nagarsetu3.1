@@ -117,6 +117,35 @@ export function setMemoryMunicipalDepartments(depts: MunicipalDepartmentRecord[]
   memoryDepartments = depts;
 }
 
+export async function fetchMunicipalDepartmentsApi(): Promise<MunicipalDepartmentRecord[]> {
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+    const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.departments) && data.departments.length > 0) {
+        const fetchedDepts: MunicipalDepartmentRecord[] = data.departments.map((d: any) => ({
+          id: String(d.id),
+          name: d.name,
+          code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+          department_head: d.department_head || 'No Active Head',
+          contact_number: d.contact_number || '+91 98220 00000',
+          email: d.email || 'dept@nagarsetu.gov.in',
+          description: d.description || '',
+          status: (d.status === 'Inactive' || d.status === 'inactive') ? 'Inactive' : 'Active',
+          created_at: d.created_at || new Date().toISOString()
+        }));
+        setMemoryMunicipalDepartments(fetchedDepts);
+        return fetchedDepts;
+      }
+    }
+  } catch (err) {
+    console.warn('fetchMunicipalDepartmentsApi error:', err);
+  }
+  return memoryDepartments;
+}
+
 export function saveMunicipalDepartments(depts: MunicipalDepartmentRecord[]) {
   memoryDepartments = depts;
 }
@@ -157,8 +186,8 @@ export async function saveMunicipalDepartmentApi(
 
   const isEdit = Boolean(dept.id && !dept.id.startsWith('dept-'));
   const url = isEdit
-    ? `${getApiUrl()}/admin/departments/${dept.id}`
-    : `${getApiUrl()}/admin/departments`;
+    ? `${getApiUrl()}/api/admin/departments/${dept.id}`
+    : `${getApiUrl()}/api/admin/departments`;
   const method = isEdit ? 'PUT' : 'POST';
 
   try {
@@ -204,7 +233,7 @@ export async function deleteMunicipalDepartmentApi(id: string): Promise<void> {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 
-  const res = await fetch(`${getApiUrl()}/admin/departments/${id}`, {
+  const res = await fetch(`${getApiUrl()}/api/admin/departments/${id}`, {
     method: 'DELETE',
     headers
   });
@@ -1076,7 +1105,18 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
   ];
 
 
-  return SEVEN_MUNICIPAL_TARGETS.map((target) => {
+  const dynamicTargets = departments.length > 0
+    ? departments.map((d) => ({
+        code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+        name: d.name,
+        defaultHead: d.department_head || 'Department Head',
+        email: d.email || 'head@nagarsetu.gov.in',
+        phone: d.contact_number || '+91 98220 00000',
+        empId: `EMP-${d.code || 'DEPT'}-001`
+      }))
+    : SEVEN_MUNICIPAL_TARGETS;
+
+  return dynamicTargets.map((target) => {
 
     // Match department record by code or name
     const deptObj = departments.find(

@@ -249,7 +249,7 @@ async function createTablesPostgres() {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        mobile TEXT UNIQUE NOT NULL,
+        mobile TEXT UNIQUE,
         email TEXT UNIQUE,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'citizen',
@@ -619,7 +619,7 @@ function createTablesSqlite() {
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
-          mobile TEXT UNIQUE NOT NULL,
+          mobile TEXT UNIQUE,
           email TEXT UNIQUE,
           password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'citizen',

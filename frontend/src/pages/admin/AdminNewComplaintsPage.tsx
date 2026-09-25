@@ -193,7 +193,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
             
             <div className="relative flex-1 min-w-[240px]">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue or location..."
                 type="text"
                 placeholder="Search complaint ID, issue or location..."
                 value={searchQuery}
@@ -206,7 +206,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -216,7 +216,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
                 <option value="Reopened">Reopened</option>
               </select>
 
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -228,7 +228,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
                 <option value="Critical">Critical</option>
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -239,7 +239,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -250,7 +250,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <input
+              <input aria-label="date  filter"
                 type="date"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
@@ -574,23 +574,23 @@ export const AdminNewComplaintsPage: React.FC = () => {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-semibold text-gray-800">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkImage} onChange={(e) => setCheckImage(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkImage} onChange={(e) => setCheckImage(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Issue Image</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkLocation} onChange={(e) => setCheckLocation(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkLocation} onChange={(e) => setCheckLocation(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Location</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkCategory} onChange={(e) => setCheckCategory(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkCategory} onChange={(e) => setCheckCategory(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Category</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkPriority} onChange={(e) => setCheckPriority(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkPriority} onChange={(e) => setCheckPriority(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Priority</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkDuplicate} onChange={(e) => setCheckDuplicate(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkDuplicate} onChange={(e) => setCheckDuplicate(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Duplicate Status</span>
                     </label>
                   </div>
@@ -600,7 +600,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Final Department</label>
-                    <select
+                    <select aria-label="edit Department"
                       value={editDepartment}
                       onChange={(e) => {
                         setEditDepartment(e.target.value);
@@ -617,7 +617,7 @@ export const AdminNewComplaintsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Priority</label>
-                    <select
+                    <select aria-label="edit Priority"
                       value={editPriority}
                       onChange={(e) => setEditPriority(e.target.value as PriorityLevel)}
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 min-h-[44px]"

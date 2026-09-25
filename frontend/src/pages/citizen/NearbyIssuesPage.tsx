@@ -322,7 +322,7 @@ export const NearbyIssuesPage: React.FC = () => {
             {/* RADIUS DROPDOWN */}
             <div className="flex items-center space-x-2">
               <span className="font-bold text-gray-700 font-outfit">Radius:</span>
-              <select
+              <select aria-label="radius Meters"
                 value={radiusMeters}
                 onChange={(e) => setRadiusMeters(Number(e.target.value))}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-emerald-800 focus:border-emerald-500 min-h-[44px]"
@@ -424,7 +424,7 @@ export const NearbyIssuesPage: React.FC = () => {
             {/* SEARCH FIELD */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search nearby civic issues by title, ID, category, or location..."
                 type="text"
                 placeholder="Search nearby civic issues by title, ID, category, or location..."
                 value={searchQuery}
@@ -435,7 +435,7 @@ export const NearbyIssuesPage: React.FC = () => {
 
             {/* STATUS & PRIORITY DROPDOWNS */}
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <select aria-label="selected Status"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-semibold text-gray-800 focus:border-emerald-500 min-h-[44px]"
@@ -449,7 +449,7 @@ export const NearbyIssuesPage: React.FC = () => {
                 <option value="Reopened">Reopened</option>
               </select>
 
-              <select
+              <select aria-label="selected Priority"
                 value={selectedPriority}
                 onChange={(e) => setSelectedPriority(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-semibold text-gray-800 focus:border-emerald-500 min-h-[44px]"

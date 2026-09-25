@@ -837,7 +837,7 @@ export const ReportIssuePage: React.FC = () => {
               {/* ADDRESS & COORDINATES DISPLAY */}
               <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1.5">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">{t('locationAddressLandmark')}</span>
-                <input
+                <input aria-label="location Address"
                   type="text"
                   value={locationAddress}
                   onChange={(e) => setLocationAddress(e.target.value)}
@@ -874,7 +874,7 @@ export const ReportIssuePage: React.FC = () => {
               
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('category')}</label>
-                <select
+                <select aria-label="category"
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value as CivicCategory);
@@ -890,7 +890,7 @@ export const ReportIssuePage: React.FC = () => {
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('complaintTitle')}</label>
-                <input
+                <input aria-label="complaint title input"
                   type="text"
                   id="complaint-title-input"
                   value={title}
@@ -905,7 +905,7 @@ export const ReportIssuePage: React.FC = () => {
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('description')}</label>
-                <textarea
+                <textarea aria-label="description"
                   rows={4}
                   value={description}
                   onChange={(e) => {
@@ -920,7 +920,7 @@ export const ReportIssuePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('priority')}</label>
-                  <select
+                  <select aria-label="priority"
                     value={priority}
                     onChange={(e) => {
                       setPriority(e.target.value as PriorityLevel);
@@ -937,7 +937,7 @@ export const ReportIssuePage: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('myDepartment')}</label>
-                  <select
+                  <select aria-label="department"
                     value={department}
                     onChange={(e) => {
                       setDepartment(e.target.value);
@@ -1046,7 +1046,7 @@ export const ReportIssuePage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('locationAddressLandmark')}</label>
-              <input
+              <input aria-label="location Address"
                 type="text"
                 value={locationAddress}
                 onChange={(e) => setLocationAddress(e.target.value)}

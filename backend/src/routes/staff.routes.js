@@ -67,7 +67,7 @@ router.get('/tasks', async (req, res) => {
   }
 });
 
-const { isDeptMatch } = require('../utils/departmentUtils');
+const { isDeptMatch } = require('../security/departmentResolver');
 
 // Update Task status (e.g. to 'Accepted', 'On the Way', 'In Progress')
 router.post(['/task/:id/status', '/tasks/:id/status'], validateInput(updateTaskStatusSchema), async (req, res) => {

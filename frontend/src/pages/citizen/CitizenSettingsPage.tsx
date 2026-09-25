@@ -162,7 +162,7 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Date Format</label>
-                      <select
+                      <select aria-label="date Format"
                         value={dateFormat}
                         onChange={(e) => setDateFormat(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold min-h-[44px]"
@@ -174,7 +174,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Time Format</label>
-                      <select
+                      <select aria-label="time Format"
                         value={timeFormat}
                         onChange={(e) => setTimeFormat(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold min-h-[44px]"
@@ -285,7 +285,7 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Default Search Radius for Nearby Issues</label>
                     <p className="text-[11px] text-gray-500 mb-2">Controls default radius when opening the Nearby Issues civic map.</p>
-                    <select
+                    <select aria-label="default Radius"
                       value={defaultRadius}
                       onChange={(e) => {
                         const val = Number(e.target.value);

@@ -69,7 +69,7 @@ export const CitizenWorkPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search maintenance work by title, department, or area..."
                 type="text"
                 placeholder="Search maintenance work by title, department, or area..."
                 value={searchQuery}
@@ -79,7 +79,7 @@ export const CitizenWorkPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <select
+              <select aria-label="selected Status"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-semibold text-gray-800 focus:border-emerald-500 min-h-[44px]"
@@ -92,7 +92,7 @@ export const CitizenWorkPage: React.FC = () => {
                 <option value="Delayed">Delayed</option>
               </select>
 
-              <select
+              <select aria-label="selected Dept"
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-semibold text-gray-800 focus:border-emerald-500 min-h-[44px]"

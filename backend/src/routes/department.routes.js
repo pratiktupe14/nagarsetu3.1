@@ -7,7 +7,7 @@ const validateInput = require('../middleware/validateInput');
 const { assignStaffSchema } = require('../schemas/admin.schemas');
 const { notifyStatusChange } = require('../services/notificationService');
 const logger = require('../utils/logger');
-const { isDeptMatch } = require('../utils/departmentUtils');
+const { isDeptMatch } = require('../security/departmentResolver');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
