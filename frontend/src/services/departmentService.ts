@@ -672,7 +672,6 @@ export async function createDepartmentHead(payload: CreateDepartmentHeadPayload)
 
   // 1. Call Local Express Backend API first
   try {
-    const token = localStorage.getItem('nagarsetu_token');
     const response = await fetch(`${getApiUrl()}/api/admin/department-heads`, {
       method: 'POST',
       headers: getNoCacheHeaders({ 'Content-Type': 'application/json' }),

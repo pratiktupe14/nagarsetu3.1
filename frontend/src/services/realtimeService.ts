@@ -1,7 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { ComplaintStatus } from '../types/database.types';
 
-const REALTIME_CHANNEL_NAME = 'nagarsetu_realtime_channel';
 const BROADCAST_BUS_NAME = 'nagarsetu_realtime_bus';
 const CUSTOM_EVENT_NAME = 'nagarsetu_complaint_update_event';
 

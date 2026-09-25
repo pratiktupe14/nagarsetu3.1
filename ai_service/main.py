@@ -35,6 +35,8 @@ class AnalysisResponse(BaseModel):
     confidence: float
     detected_features: Optional[list] = []
     needs_manual_verification: Optional[bool] = False
+    specific_issue: Optional[str] = "Other Civic Defect"
+    urgency: Optional[str] = "Medium"
 
 class GeocodeRequest(BaseModel):
     address: str = Field(..., min_length=2, max_length=500)

@@ -389,7 +389,9 @@ router.post('/department-heads', async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       passwordHash = await bcrypt.hash(password.trim(), salt);
     } else if (!existingUser) {
-      return res.status(400).json({ error: 'Password is required (minimum 6 characters) when creating a new Department Head account.' });
+      const defaultPass = process.env.DEMO_HEAD_PASSWORD || 'rahul@123';
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(defaultPass, salt);
     }
 
     let userId;

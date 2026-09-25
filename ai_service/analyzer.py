@@ -194,5 +194,7 @@ def analyze_complaint_image(image_bytes: bytes, filename: str = "") -> Dict[str,
         "recommended_department": "Public Works Department (PWD)",
         "confidence": 0.0,
         "detected_features": [],
-        "needs_manual_verification": True
+        "needs_manual_verification": True,
+        "specific_issue": "Other Civic Defect",
+        "urgency": "Medium"
     }

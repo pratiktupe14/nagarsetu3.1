@@ -336,41 +336,59 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 });
 
 // OTP Request Endpoint
-router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
-  const { mobile } = req.body;
-  const cleanMobile = normalizeMobile(mobile);
-  const now = Date.now();
+router.post('/otp-request', validateInput(otpRequestSchema), async (req, res) => {
+  try {
+    const { mobile } = req.body;
+    const cleanMobile = normalizeMobile(mobile);
+    const now = Date.now();
 
-  const existing = otpStore.get(cleanMobile);
-  if (existing && (now - existing.createdAt < 15 * 1000)) {
-    const retryAfter = Math.ceil((15 * 1000 - (now - existing.createdAt)) / 1000);
-    return res.status(429).json({
-      error: 'Please wait before requesting another OTP',
-      retryAfterSeconds: retryAfter
+    const existingRes = await query(
+      `SELECT created_at FROM otp_codes WHERE mobile = ? AND expires_at >= CURRENT_TIMESTAMP LIMIT 1`,
+      [cleanMobile]
+    ).catch(() => ({ rows: [] }));
+
+    if (existingRes.rows && existingRes.rows.length > 0) {
+      const createdAtMs = new Date(existingRes.rows[0].created_at).getTime();
+      if (!isNaN(createdAtMs) && (now - createdAtMs < 15 * 1000)) {
+        const retryAfter = Math.ceil((15 * 1000 - (now - createdAtMs)) / 1000);
+        return res.status(429).json({
+          error: 'Please wait before requesting another OTP',
+          retryAfterSeconds: retryAfter
+        });
+      }
+    }
+
+    const generatedCode = String(crypto.randomInt(100000, 999999));
+    const expiresAtDate = new Date(now + 5 * 60 * 1000);
+
+    await query(`DELETE FROM otp_codes WHERE mobile = ? OR expires_at < CURRENT_TIMESTAMP`, [cleanMobile]).catch(() => {});
+    await query(
+      `INSERT INTO otp_codes (mobile, code, attempts, created_at, expires_at) VALUES (?, ?, 0, CURRENT_TIMESTAMP, ?)`,
+      [cleanMobile, generatedCode, expiresAtDate.toISOString()]
+    ).catch(() => {});
+
+    otpStore.set(cleanMobile, {
+      code: generatedCode,
+      expiresAt: now + 5 * 60 * 1000,
+      attempts: 0,
+      createdAt: now
     });
+
+    const responseObj = {
+      message: 'OTP sent successfully to ' + mobile,
+      expiresInSeconds: 300
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+      responseObj.dev_otp = generatedCode;
+      responseObj.demoOtp = generatedCode;
+    }
+
+    return res.json(responseObj);
+  } catch (err) {
+    console.error('OTP request error:', err);
+    return res.status(500).json({ error: 'Failed to process OTP request' });
   }
-
-  const generatedCode = String(crypto.randomInt(100000, 999999));
-  const expiresAt = now + 5 * 60 * 1000;
-
-  otpStore.set(cleanMobile, {
-    code: generatedCode,
-    expiresAt,
-    attempts: 0,
-    createdAt: now
-  });
-
-  const responseObj = {
-    message: 'OTP sent successfully to ' + mobile,
-    expiresInSeconds: 300
-  };
-
-  if (process.env.NODE_ENV !== 'production') {
-    responseObj.dev_otp = generatedCode;
-    responseObj.demoOtp = generatedCode;
-  }
-
-  return res.json(responseObj);
 });
 
 // OTP Verify Endpoint
@@ -381,16 +399,24 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
     const cleanOtp = String(otp || '').trim();
     const now = Date.now();
 
-    const record = otpStore.get(cleanMobile);
+    const dbOtpRes = await query(
+      `SELECT code, attempts, expires_at FROM otp_codes WHERE mobile = ? LIMIT 1`,
+      [cleanMobile]
+    ).catch(() => ({ rows: [] }));
+
+    let record = dbOtpRes.rows && dbOtpRes.rows.length > 0 ? dbOtpRes.rows[0] : otpStore.get(cleanMobile);
     let isValidOtp = false;
 
     if (record) {
-      if (record.expiresAt < now) {
+      const expiresMs = record.expires_at ? new Date(record.expires_at).getTime() : record.expiresAt;
+      if (expiresMs && expiresMs < now) {
+        await query(`DELETE FROM otp_codes WHERE mobile = ?`, [cleanMobile]).catch(() => {});
         otpStore.delete(cleanMobile);
         return res.status(400).json({ error: 'OTP code has expired. Please request a new one.' });
       }
 
       if (record.attempts >= 5) {
+        await query(`DELETE FROM otp_codes WHERE mobile = ?`, [cleanMobile]).catch(() => {});
         otpStore.delete(cleanMobile);
         return res.status(429).json({ error: 'Maximum OTP verification attempts exceeded. Please request a new OTP.' });
       }
@@ -398,7 +424,10 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
       if (record.code === cleanOtp || (process.env.NODE_ENV !== 'production' && cleanOtp === '123456')) {
         isValidOtp = true;
       } else {
-        record.attempts += 1;
+        await query(`UPDATE otp_codes SET attempts = COALESCE(attempts, 0) + 1 WHERE mobile = ?`, [cleanMobile]).catch(() => {});
+        if (otpStore.has(cleanMobile)) {
+          otpStore.get(cleanMobile).attempts += 1;
+        }
       }
     } else if (process.env.NODE_ENV !== 'production' && cleanOtp === '123456') {
       isValidOtp = true;
@@ -408,6 +437,7 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
       return res.status(400).json({ error: 'Invalid OTP code' });
     }
 
+    await query(`DELETE FROM otp_codes WHERE mobile = ?`, [cleanMobile]).catch(() => {});
     otpStore.delete(cleanMobile);
 
     const sql = `SELECT * FROM users WHERE mobile = ? OR mobile = ?`;

@@ -479,14 +479,14 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
 router.get('/my', authenticateToken, async (req, res) => {
   try {
     const citizenProfileId = await resolveCitizenProfileId(req.user);
-    const sql = `
-      SELECT c.*, d.name as department_name, d.code as department_code, f.rating, f.comment as feedback_comment
-      FROM complaints c
-      ${DEPT_JOIN_SQL}
-      LEFT JOIN feedback f ON CAST(f.complaint_id AS TEXT) = CAST(c.id AS TEXT)
-      WHERE CAST(c.citizen_id AS TEXT) = ? OR CAST(c.citizen_id AS TEXT) = ?
-      ORDER BY c.created_at DESC
-    `;
+
+
+
+
+
+
+
+
     const result = await complaintRepo.findMyComplaints(citizenProfileId, req.user.id);
     return res.json({ complaints: result.rows });
   } catch (err) {

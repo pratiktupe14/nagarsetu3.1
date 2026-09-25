@@ -526,6 +526,17 @@ async function createTablesPostgres() {
       );
     `);
 
+    // 16. Persistent OTP codes table
+    await safeCreateTable(`
+      CREATE TABLE IF NOT EXISTS otp_codes (
+        mobile TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        attempts INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL
+      );
+    `);
+
     // Seed default departments if table is empty
     const deptCheck = await pgPool.query('SELECT COUNT(*) as count FROM departments');
     if (parseInt(deptCheck.rows[0]?.count || 0, 10) === 0) {
@@ -890,6 +901,16 @@ function createTablesSqlite() {
         );
       `);
 
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS otp_codes (
+          mobile TEXT PRIMARY KEY,
+          code TEXT NOT NULL,
+          attempts INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          expires_at DATETIME NOT NULL
+        );
+      `);
+
       sqliteDb.get("SELECT COUNT(*) as count FROM departments", (err, row) => {
         if (!err && row && row.count === 0) {
           const stmt = sqliteDb.prepare("INSERT INTO departments (id, name, code, description) VALUES (?, ?, ?, ?)");
@@ -984,8 +1005,17 @@ async function query(sql, params = []) {
     }
 
     let pgSql = sql;
-    let paramIndex = 1;
-    pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+    if (/\?/.test(pgSql)) {
+      let paramIndex = 1;
+      const existingMatches = pgSql.match(/\$(\d+)/g);
+      if (existingMatches) {
+        const highestIdx = Math.max(...existingMatches.map(m => parseInt(m.slice(1), 10)));
+        if (!isNaN(highestIdx) && highestIdx > 0) {
+          paramIndex = highestIdx + 1;
+        }
+      }
+      pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+    }
 
     const trimmed = pgSql.trim();
     if (trimmed.toUpperCase().startsWith('INSERT') && !trimmed.toUpperCase().includes('RETURNING')) {
