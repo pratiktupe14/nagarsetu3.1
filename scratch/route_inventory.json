@@ -5,7 +5,7 @@
       "fullPath": "/api/admin/analytics",
       "subPath": "/analytics",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 27,
+      "line": 28,
       "hasAuth": false,
       "hasRole": false
     },
@@ -14,7 +14,7 @@
       "fullPath": "/api/admin/hotspots",
       "subPath": "/hotspots",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 67,
+      "line": 75,
       "hasAuth": false,
       "hasRole": false
     },
@@ -23,7 +23,7 @@
       "fullPath": "/api/admin/users",
       "subPath": "/users",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 82,
+      "line": 90,
       "hasAuth": false,
       "hasRole": false
     },
@@ -32,7 +32,7 @@
       "fullPath": "/api/admin/users",
       "subPath": "/users",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 92,
+      "line": 100,
       "hasAuth": false,
       "hasRole": false
     },
@@ -41,7 +41,7 @@
       "fullPath": "/api/admin/users/:id",
       "subPath": "/users/:id",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 112,
+      "line": 120,
       "hasAuth": false,
       "hasRole": false
     },
@@ -50,7 +50,7 @@
       "fullPath": "/api/admin/users/:id",
       "subPath": "/users/:id",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 127,
+      "line": 135,
       "hasAuth": false,
       "hasRole": false
     },
@@ -59,7 +59,7 @@
       "fullPath": "/api/admin/departments",
       "subPath": "/departments",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 137,
+      "line": 145,
       "hasAuth": false,
       "hasRole": false
     },
@@ -68,7 +68,25 @@
       "fullPath": "/api/admin/departments",
       "subPath": "/departments",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 146,
+      "line": 154,
+      "hasAuth": false,
+      "hasRole": false
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/admin/departments/:id",
+      "subPath": "/departments/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "line": 194,
+      "hasAuth": false,
+      "hasRole": false
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/admin/departments/:id",
+      "subPath": "/departments/:id",
+      "file": "backend\\src\\routes\\admin.routes.js",
+      "line": 241,
       "hasAuth": false,
       "hasRole": false
     },
@@ -77,7 +95,7 @@
       "fullPath": "/api/admin/department-heads",
       "subPath": "/department-heads",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 161,
+      "line": 281,
       "hasAuth": false,
       "hasRole": false
     },
@@ -86,7 +104,7 @@
       "fullPath": "/api/admin/department-heads",
       "subPath": "/department-heads",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 233,
+      "line": 361,
       "hasAuth": false,
       "hasRole": false
     },
@@ -95,7 +113,7 @@
       "fullPath": "/api/admin/department-heads/:id",
       "subPath": "/department-heads/:id",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 316,
+      "line": 449,
       "hasAuth": false,
       "hasRole": false
     },
@@ -104,7 +122,7 @@
       "fullPath": "/api/admin/department-heads/:id/deactivate",
       "subPath": "/department-heads/:id/deactivate",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 399,
+      "line": 537,
       "hasAuth": false,
       "hasRole": false
     },
@@ -113,7 +131,7 @@
       "fullPath": "/api/admin/department-heads/:id/reactivate",
       "subPath": "/department-heads/:id/reactivate",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 417,
+      "line": 555,
       "hasAuth": false,
       "hasRole": false
     },
@@ -122,7 +140,7 @@
       "fullPath": "/api/admin/department-heads/:id",
       "subPath": "/department-heads/:id",
       "file": "backend\\src\\routes\\admin.routes.js",
-      "line": 436,
+      "line": 574,
       "hasAuth": false,
       "hasRole": false
     },
@@ -140,7 +158,7 @@
       "fullPath": "/api/ai/analyze",
       "subPath": "/analyze",
       "file": "backend\\src\\routes\\ai.routes.js",
-      "line": 128,
+      "line": 143,
       "hasAuth": false,
       "hasRole": false
     },
@@ -203,7 +221,7 @@
       "fullPath": "/api/auth/register",
       "subPath": "/register",
       "file": "backend\\src\\routes\\auth.routes.js",
-      "line": 22,
+      "line": 40,
       "hasAuth": false,
       "hasRole": false
     },
@@ -212,7 +230,7 @@
       "fullPath": "/api/auth/login",
       "subPath": "/login",
       "file": "backend\\src\\routes\\auth.routes.js",
-      "line": 63,
+      "line": 99,
       "hasAuth": false,
       "hasRole": false
     },
@@ -221,7 +239,7 @@
       "fullPath": "/api/auth/otp-request",
       "subPath": "/otp-request",
       "file": "backend\\src\\routes\\auth.routes.js",
-      "line": 266,
+      "line": 339,
       "hasAuth": false,
       "hasRole": false
     },
@@ -230,7 +248,7 @@
       "fullPath": "/api/auth/otp-verify",
       "subPath": "/otp-verify",
       "file": "backend\\src\\routes\\auth.routes.js",
-      "line": 272,
+      "line": 377,
       "hasAuth": false,
       "hasRole": false
     },
@@ -239,7 +257,34 @@
       "fullPath": "/api/auth/me",
       "subPath": "/me",
       "file": "backend\\src\\routes\\auth.routes.js",
-      "line": 299,
+      "line": 447,
+      "hasAuth": true,
+      "hasRole": false
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/auth/profile",
+      "subPath": "/profile",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "line": 548,
+      "hasAuth": true,
+      "hasRole": false
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/change-password",
+      "subPath": "/change-password",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "line": 651,
+      "hasAuth": true,
+      "hasRole": false
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/auth/refresh",
+      "subPath": "/refresh",
+      "file": "backend\\src\\routes\\auth.routes.js",
+      "line": 758,
       "hasAuth": true,
       "hasRole": false
     },
@@ -248,7 +293,7 @@
       "fullPath": "/api/complaints/analyze-upload",
       "subPath": "/analyze-upload",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 24,
+      "line": 25,
       "hasAuth": true,
       "hasRole": false
     },
@@ -257,7 +302,7 @@
       "fullPath": "/api/complaints/submit",
       "subPath": "/submit",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 125,
+      "line": 197,
       "hasAuth": true,
       "hasRole": false
     },
@@ -266,7 +311,7 @@
       "fullPath": "/api/complaints/:id/history",
       "subPath": "/:id/history",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 253,
+      "line": 359,
       "hasAuth": true,
       "hasRole": false
     },
@@ -275,7 +320,7 @@
       "fullPath": "/api/complaints",
       "subPath": "/",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 270,
+      "line": 384,
       "hasAuth": false,
       "hasRole": false
     },
@@ -284,7 +329,7 @@
       "fullPath": "/api/complaints/my",
       "subPath": "/my",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 325,
+      "line": 456,
       "hasAuth": true,
       "hasRole": false
     },
@@ -293,7 +338,7 @@
       "fullPath": "/api/complaints/:id",
       "subPath": "/:id",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 344,
+      "line": 476,
       "hasAuth": true,
       "hasRole": false
     },
@@ -302,7 +347,43 @@
       "fullPath": "/api/complaints/:id/feedback",
       "subPath": "/:id/feedback",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 390,
+      "line": 527,
+      "hasAuth": true,
+      "hasRole": false
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/:id/reopen",
+      "subPath": "/:id/reopen",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "line": 562,
+      "hasAuth": true,
+      "hasRole": false
+    },
+    {
+      "method": "PATCH",
+      "fullPath": "/api/complaints/:id/status",
+      "subPath": "/:id/status",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "line": 679,
+      "hasAuth": true,
+      "hasRole": true
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/complaints/:id/status",
+      "subPath": "/:id/status",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "line": 680,
+      "hasAuth": true,
+      "hasRole": true
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/complaints/:id/support",
+      "subPath": "/:id/support",
+      "file": "backend\\src\\routes\\complaint.routes.js",
+      "line": 683,
       "hasAuth": true,
       "hasRole": false
     },
@@ -311,7 +392,7 @@
       "fullPath": "/api/complaints/purge-all",
       "subPath": "/purge-all",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 419,
+      "line": 724,
       "hasAuth": true,
       "hasRole": true
     },
@@ -320,7 +401,7 @@
       "fullPath": "/api/complaints/purge-all",
       "subPath": "/purge-all",
       "file": "backend\\src\\routes\\complaint.routes.js",
-      "line": 433,
+      "line": 725,
       "hasAuth": true,
       "hasRole": true
     },
@@ -329,25 +410,43 @@
       "fullPath": "/api/departments",
       "subPath": "/",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 47,
+      "line": 138,
       "hasAuth": false,
       "hasRole": false
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments",
+      "subPath": "/",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "line": 148,
+      "hasAuth": true,
+      "hasRole": true
+    },
+    {
+      "method": "PUT",
+      "fullPath": "/api/departments/:id",
+      "subPath": "/:id",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "line": 188,
+      "hasAuth": true,
+      "hasRole": true
+    },
+    {
+      "method": "DELETE",
+      "fullPath": "/api/departments/:id",
+      "subPath": "/:id",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "line": 234,
+      "hasAuth": true,
+      "hasRole": true
     },
     {
       "method": "GET",
       "fullPath": "/api/departments/complaints",
       "subPath": "/complaints",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 61,
-      "hasAuth": true,
-      "hasRole": true
-    },
-    {
-      "method": "GET",
-      "fullPath": "/api/departments/staff",
-      "subPath": "/staff",
-      "file": "backend\\src\\routes\\department.routes.js",
-      "line": 98,
+      "line": 273,
       "hasAuth": true,
       "hasRole": true
     },
@@ -356,7 +455,7 @@
       "fullPath": "/api/departments/staff/assignable",
       "subPath": "/staff/assignable",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 261,
+      "line": 540,
       "hasAuth": true,
       "hasRole": true
     },
@@ -365,7 +464,7 @@
       "fullPath": "/api/departments/staff",
       "subPath": "/staff",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 294,
+      "line": 582,
       "hasAuth": true,
       "hasRole": true
     },
@@ -374,7 +473,7 @@
       "fullPath": "/api/departments/staff/:id",
       "subPath": "/staff/:id",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 376,
+      "line": 670,
       "hasAuth": true,
       "hasRole": true
     },
@@ -383,7 +482,7 @@
       "fullPath": "/api/departments/staff/:id/deactivate",
       "subPath": "/staff/:id/deactivate",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 449,
+      "line": 745,
       "hasAuth": true,
       "hasRole": true
     },
@@ -392,7 +491,7 @@
       "fullPath": "/api/departments/staff/:id/deactivate",
       "subPath": "/staff/:id/deactivate",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 450,
+      "line": 746,
       "hasAuth": true,
       "hasRole": true
     },
@@ -401,7 +500,7 @@
       "fullPath": "/api/departments/staff/:id/activate",
       "subPath": "/staff/:id/activate",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 478,
+      "line": 774,
       "hasAuth": true,
       "hasRole": true
     },
@@ -410,7 +509,7 @@
       "fullPath": "/api/departments/staff/:id/activate",
       "subPath": "/staff/:id/activate",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 479,
+      "line": 775,
       "hasAuth": true,
       "hasRole": true
     },
@@ -419,7 +518,7 @@
       "fullPath": "/api/departments/staff/:id",
       "subPath": "/staff/:id",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 485,
+      "line": 781,
       "hasAuth": true,
       "hasRole": true
     },
@@ -428,7 +527,7 @@
       "fullPath": "/api/departments/assign",
       "subPath": "/assign",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 515,
+      "line": 811,
       "hasAuth": true,
       "hasRole": true
     },
@@ -437,7 +536,16 @@
       "fullPath": "/api/departments/verify",
       "subPath": "/verify",
       "file": "backend\\src\\routes\\department.routes.js",
-      "line": 682,
+      "line": 1067,
+      "hasAuth": true,
+      "hasRole": true
+    },
+    {
+      "method": "POST",
+      "fullPath": "/api/departments/staff/:id/change-password",
+      "subPath": "/staff/:id/change-password",
+      "file": "backend\\src\\routes\\department.routes.js",
+      "line": 1168,
       "hasAuth": true,
       "hasRole": true
     },
@@ -478,30 +586,12 @@
       "hasRole": false
     },
     {
-      "method": "GET",
-      "fullPath": "/api/notifications/my",
-      "subPath": "/my",
-      "file": "backend\\src\\routes\\notification.routes.js",
-      "line": 11,
-      "hasAuth": true,
-      "hasRole": false
-    },
-    {
       "method": "POST",
       "fullPath": "/api/notifications/mark-read",
       "subPath": "/mark-read",
       "file": "backend\\src\\routes\\notification.routes.js",
-      "line": 30,
+      "line": 41,
       "hasAuth": false,
-      "hasRole": false
-    },
-    {
-      "method": "GET",
-      "fullPath": "/api/officer/dashboard",
-      "subPath": "/dashboard",
-      "file": "backend\\src\\routes\\officer.routes.js",
-      "line": 14,
-      "hasAuth": true,
       "hasRole": false
     },
     {
@@ -509,7 +599,7 @@
       "fullPath": "/api/officer/staff-list",
       "subPath": "/staff-list",
       "file": "backend\\src\\routes\\officer.routes.js",
-      "line": 72,
+      "line": 76,
       "hasAuth": false,
       "hasRole": false
     },
@@ -518,7 +608,7 @@
       "fullPath": "/api/officer/verify",
       "subPath": "/verify",
       "file": "backend\\src\\routes\\officer.routes.js",
-      "line": 110,
+      "line": 115,
       "hasAuth": false,
       "hasRole": false
     },
@@ -527,7 +617,7 @@
       "fullPath": "/api/officer/assign",
       "subPath": "/assign",
       "file": "backend\\src\\routes\\officer.routes.js",
-      "line": 168,
+      "line": 185,
       "hasAuth": false,
       "hasRole": false
     },
@@ -536,7 +626,7 @@
       "fullPath": "/api/officer/duplicates",
       "subPath": "/duplicates",
       "file": "backend\\src\\routes\\officer.routes.js",
-      "line": 258,
+      "line": 306,
       "hasAuth": false,
       "hasRole": false
     },
@@ -553,73 +643,80 @@
   "frontendCalls": [
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 188,
+      "line": 264,
       "rawUrl": "${getApiUrl()}/api/department/staff?${qParams.toString()}",
       "method": "GET",
-      "snippet": "let res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {"
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 192,
-      "rawUrl": "${getApiUrl()}/api/departments/staff?${qParams.toString()}",
-      "method": "GET",
-      "snippet": "res = await fetch(`${getApiUrl()}/api/departments/staff?${qParams.toString()}`, {"
-    },
-    {
-      "file": "frontend\\src\\services\\adminService.ts",
-      "line": 201,
-      "rawUrl": "${getApiUrl()}/api/department/staff",
-      "method": "GET",
-      "snippet": "apiUrl: `${getApiUrl()}/api/department/staff`,"
-    },
-    {
-      "file": "frontend\\src\\services\\adminService.ts",
-      "line": 291,
+      "line": 321,
       "rawUrl": "${getApiUrl()}/api/department/staff",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 308,
+      "line": 338,
       "rawUrl": "${getApiUrl()}/api/department/staff/${id}",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 322,
+      "line": 352,
       "rawUrl": "${getApiUrl()}/api/department/staff/${id}/deactivate",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 335,
+      "line": 365,
       "rawUrl": "${getApiUrl()}/api/department/staff/${id}/activate",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 348,
+      "line": 378,
       "rawUrl": "${getApiUrl()}/api/department/staff/${id}",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/staff/${id}`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 785,
+      "line": 716,
+      "rawUrl": "${getApiUrl()}/api/complaints/${complaintId}/status",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\adminService.ts",
+      "line": 775,
+      "rawUrl": "${getApiUrl()}/api/complaints/${complaintId}/status",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\adminService.ts",
+      "line": 839,
       "rawUrl": "${getApiUrl()}/api/department/assign",
       "method": "GET",
       "snippet": "let res = await fetch(`${getApiUrl()}/api/department/assign`, {"
     },
     {
       "file": "frontend\\src\\services\\adminService.ts",
-      "line": 791,
+      "line": 845,
       "rawUrl": "${getApiUrl()}/api/officer/assign",
       "method": "GET",
       "snippet": "await fetch(`${getApiUrl()}/api/officer/assign`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\adminService.ts",
+      "line": 938,
+      "rawUrl": "${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/history",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/history`, {"
     },
     {
       "file": "frontend\\src\\services\\aiVisionService.ts",
@@ -630,262 +727,304 @@
     },
     {
       "file": "frontend\\src\\services\\aiVisionService.ts",
-      "line": 411,
+      "line": 413,
       "rawUrl": "${baseUrl}/api/ai/analyze",
       "method": "GET",
       "snippet": "const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 49,
+      "line": 48,
       "rawUrl": "${getApiUrl()}/api/announcements",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements`, {"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 76,
+      "line": 67,
       "rawUrl": "${getApiUrl()}/api/announcements/${id}/read",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}/read`, {"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 92,
+      "line": 83,
       "rawUrl": "${getApiUrl()}/api/announcements/admin/all",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements/admin/all`, {"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 124,
+      "line": 115,
       "rawUrl": "${getApiUrl()}/api/announcements",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements`, {"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 151,
+      "line": 142,
       "rawUrl": "${getApiUrl()}/api/announcements/${id}",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}`, {"
     },
     {
       "file": "frontend\\src\\services\\announcementService.ts",
-      "line": 168,
+      "line": 159,
       "rawUrl": "${getApiUrl()}/api/announcements/${id}",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/announcements/${id}`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 121,
-      "rawUrl": "${getApiUrl()}/api/complaints",
+      "line": 214,
+      "rawUrl": "${getApiUrl()}/api/complaints?scope=all",
       "method": "GET",
-      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints`, {"
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 182,
-      "rawUrl": "${getApiUrl()}/api/complaints",
+      "line": 264,
+      "rawUrl": "${getApiUrl()}/api/complaints?scope=all",
       "method": "GET",
-      "snippet": "apiUrl: `${getApiUrl()}/api/complaints`,"
+      "snippet": "apiUrl: `${getApiUrl()}/api/complaints?scope=all`,"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 201,
+      "line": 285,
       "rawUrl": "${getApiUrl()}/api/complaints/my",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/my`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 317,
+      "line": 339,
+      "rawUrl": "${getApiUrl()}/api/staff/tasks",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/staff/tasks`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 351,
+      "rawUrl": "Backend /api/staff/tasks fetch error:",
+      "method": "GET",
+      "snippet": "console.error('Backend /api/staff/tasks fetch error:', err);"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 369,
       "rawUrl": "${getApiUrl()}/api/department/complaints",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 322,
-      "rawUrl": "${getApiUrl()}/api/complaints",
-      "method": "GET",
-      "snippet": "const fallbackRes = await fetch(`${getApiUrl()}/api/complaints`, { headers });"
-    },
-    {
-      "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 408,
+      "line": 393,
       "rawUrl": "${getApiUrl()}/api/complaints/${encodeURIComponent(idOrNumber)}",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(idOrNumber)}`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 540,
+      "line": 455,
       "rawUrl": "${getApiUrl()}/api/complaints/submit",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/submit`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 628,
+      "line": 542,
       "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status",
       "method": "GET",
       "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 637,
+      "line": 553,
       "rawUrl": "${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status",
       "method": "GET",
-      "snippet": "await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {"
+      "snippet": "const fallbackRes = await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 695,
+      "line": 613,
       "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status",
       "method": "GET",
-      "snippet": "await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
+      "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 752,
+      "line": 672,
       "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status",
       "method": "GET",
-      "snippet": "await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
+      "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 844,
+      "line": 763,
       "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(targetParam)}/resolve",
       "method": "GET",
       "snippet": "const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetParam)}/resolve`;"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 957,
+      "line": 868,
       "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(complaintId)}/resolve",
       "method": "GET",
       "snippet": "const resolvedTargetUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(complaintId)}/resolve`;"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 1196,
+      "line": 896,
+      "rawUrl": "${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/progress",
+      "method": "GET",
+      "snippet": "const url = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/progress`;"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 931,
+      "rawUrl": "${getApiUrl()}/api/department/verify",
+      "method": "GET",
+      "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 1010,
+      "rawUrl": "${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/feedback",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/feedback`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 1046,
+      "rawUrl": "${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/reopen",
+      "method": "GET",
+      "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/reopen`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 1058,
+      "rawUrl": "${getApiUrl()}/api/department/verify",
+      "method": "GET",
+      "snippet": "const deptRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 1123,
+      "rawUrl": "${getApiUrl()}/api/complaints/${complaintId}/support",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/support`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\complaintService.ts",
+      "line": 1265,
       "rawUrl": "${getApiUrl()}/api/department/assign",
       "method": "GET",
       "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/department/assign`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 1327,
+      "line": 1356,
       "rawUrl": "${getApiUrl()}/api/department/verify",
       "method": "GET",
       "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 1411,
+      "line": 1429,
       "rawUrl": "${getApiUrl()}/api/department/verify",
       "method": "GET",
       "snippet": "const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {"
     },
     {
       "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 1543,
+      "line": 1533,
       "rawUrl": "${getApiUrl()}/api/complaints/purge-all",
       "method": "DELETE",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE', headers });"
     },
     {
-      "file": "frontend\\src\\services\\complaintService.ts",
-      "line": 1545,
-      "rawUrl": "${getApiUrl()}/api/complaints/purge-all",
-      "method": "POST",
-      "snippet": "await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'POST', headers });"
-    },
-    {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 223,
+      "line": 232,
       "rawUrl": "${getApiUrl()}/api/admin/departments",
       "method": "GET",
       "snippet": "const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 443,
-      "rawUrl": "${getApiUrl()}/api/auth/login",
+      "line": 453,
+      "rawUrl": "${getApiUrl()}/api/departments",
       "method": "GET",
-      "snippet": "const loginRes = await fetch(`${getApiUrl()}/api/auth/login`, {"
+      "snippet": "fetch(`${getApiUrl()}/api/departments`, { headers }),"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 461,
-      "rawUrl": "${getApiUrl()}/api/admin/department-heads",
-      "method": "GET",
-      "snippet": "fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }),"
-    },
-    {
-      "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 462,
-      "rawUrl": "${getApiUrl()}/api/admin/departments",
-      "method": "GET",
-      "snippet": "fetch(`${getApiUrl()}/api/admin/departments`, { headers }),"
-    },
-    {
-      "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 463,
+      "line": 454,
       "rawUrl": "${getApiUrl()}/api/complaints",
       "method": "GET",
       "snippet": "fetch(`${getApiUrl()}/api/complaints`, { headers })"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 480,
+      "line": 457,
+      "rawUrl": "${getApiUrl()}/api/admin/department-heads",
+      "method": "GET",
+      "snippet": "requests.push(fetch(`${getApiUrl()}/api/admin/department-heads`, { headers }));"
+    },
+    {
+      "file": "frontend\\src\\services\\departmentService.ts",
+      "line": 479,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads",
       "method": "GET",
       "snippet": "apiUrl: `${getApiUrl()}/api/admin/department-heads`,"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 526,
+      "line": 525,
       "rawUrl": "${getApiUrl()}/api/department/staff",
       "method": "GET",
       "snippet": "const apiStaffRes = await fetch(`${getApiUrl()}/api/department/staff`, { headers });"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 680,
+      "line": 676,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads",
       "method": "GET",
       "snippet": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads`, {"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 883,
+      "line": 879,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads/${headId}",
       "method": "GET",
       "snippet": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}`, {"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 925,
+      "line": 921,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads/${headId}/deactivate",
       "method": "GET",
       "snippet": "await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/deactivate`, {"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 959,
+      "line": 955,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads/${headId}/reactivate",
       "method": "GET",
       "snippet": "await fetch(`${getApiUrl()}/api/admin/department-heads/${headId}/reactivate`, {"
     },
     {
       "file": "frontend\\src\\services\\departmentService.ts",
-      "line": 1003,
+      "line": 999,
       "rawUrl": "${getApiUrl()}/api/admin/department-heads/${headIdOrDeptId}",
       "method": "GET",
       "snippet": "const response = await fetch(`${getApiUrl()}/api/admin/department-heads/${headIdOrDeptId}`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\departmentService.ts",
+      "line": 1096,
+      "rawUrl": "${getApiUrl()}/api/department/staff/${encodeURIComponent(staffId)}/change-password",
+      "method": "GET",
+      "snippet": "const response = await fetch(`${getApiUrl()}/api/department/staff/${encodeURIComponent(staffId)}/change-password`, {"
     },
     {
       "file": "frontend\\src\\services\\locationService.ts",
@@ -895,11 +1034,25 @@
       "snippet": "const getBackendMapsUrl = () => `${getApiUrl()}/api/maps`;"
     },
     {
-      "file": "frontend\\src\\services\\locationService.ts",
-      "line": 186,
-      "rawUrl": "${getApiUrl()}/api/maps/google-maps",
+      "file": "frontend\\src\\services\\notificationService.ts",
+      "line": 35,
+      "rawUrl": "${getApiUrl()}/api/notifications/my",
       "method": "GET",
-      "snippet": "const getPythonMapsUrl = () => `${getApiUrl()}/api/maps/google-maps`;"
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/notifications/my`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\notificationService.ts",
+      "line": 120,
+      "rawUrl": "${getApiUrl()}/api/notifications/mark-read",
+      "method": "GET",
+      "snippet": "fetch(`${getApiUrl()}/api/notifications/mark-read`, {"
+    },
+    {
+      "file": "frontend\\src\\services\\notificationService.ts",
+      "line": 152,
+      "rawUrl": "${getApiUrl()}/api/notifications/mark-read",
+      "method": "GET",
+      "snippet": "fetch(`${getApiUrl()}/api/notifications/mark-read`, {"
     },
     {
       "file": "frontend\\src\\pages\\citizen\\TrackComplaintPage.tsx",
@@ -907,6 +1060,20 @@
       "rawUrl": "${getApiUrl()}/api/complaints/${encodeURIComponent(lookupKey)}/history",
       "method": "GET",
       "snippet": "const response = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(lookupKey)}/history`, {"
+    },
+    {
+      "file": "frontend\\src\\pages\\LoginPage.tsx",
+      "line": 71,
+      "rawUrl": "${getApiUrl()}/api/auth/otp-request",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/auth/otp-request`, {"
+    },
+    {
+      "file": "frontend\\src\\pages\\LoginPage.tsx",
+      "line": 93,
+      "rawUrl": "${getApiUrl()}/api/auth/otp-verify",
+      "method": "GET",
+      "snippet": "const res = await fetch(`${getApiUrl()}/api/auth/otp-verify`, {"
     },
     {
       "file": "frontend\\src\\components\\LiveGoogleMap.tsx",
