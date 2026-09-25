@@ -383,15 +383,18 @@ router.post('/department-heads', async (req, res) => {
     const emailCheck = await query(`SELECT id, email, role FROM users WHERE LOWER(email) = ?`, [cleanEmail]);
     let existingUser = emailCheck.rows && emailCheck.rows.length > 0 ? emailCheck.rows[0] : null;
 
-    // Password Hashing
+    // Password Hashing & Validation
     let passwordHash = null;
-    if (password && password.trim().length >= 6) {
+    const cleanPassword = typeof password === 'string' ? password.trim() : '';
+
+    if (cleanPassword.length > 0) {
+      if (cleanPassword.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      }
       const salt = await bcrypt.genSalt(10);
-      passwordHash = await bcrypt.hash(password.trim(), salt);
+      passwordHash = await bcrypt.hash(cleanPassword, salt);
     } else if (!existingUser) {
-      const defaultPass = process.env.DEMO_HEAD_PASSWORD || 'rahul@123';
-      const salt = await bcrypt.genSalt(10);
-      passwordHash = await bcrypt.hash(defaultPass, salt);
+      return res.status(400).json({ error: 'Password is required for new department head account (minimum 6 characters).' });
     }
 
     let userId;

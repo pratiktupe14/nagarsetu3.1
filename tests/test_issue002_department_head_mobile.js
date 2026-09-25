@@ -33,6 +33,7 @@ test('ISSUE-002 — Department Head Mobile Collision Verification', async () => 
         name: 'DH Blank Phone Test',
         email: email1,
         phone: '',
+        password: 'nagarsetuPass2026',
         departmentId: '1',
         designation: 'Department Head'
       })
@@ -52,6 +53,7 @@ test('ISSUE-002 — Department Head Mobile Collision Verification', async () => 
         name: 'DH Real Phone User 1',
         email: email2,
         phone: realPhone,
+        password: 'nagarsetuPass2026',
         departmentId: '2',
         designation: 'Department Head'
       })
@@ -71,6 +73,7 @@ test('ISSUE-002 — Department Head Mobile Collision Verification', async () => 
         name: 'DH Real Phone User 2 Duplicate',
         email: email3,
         phone: realPhone,
+        password: 'nagarsetuPass2026',
         departmentId: '3',
         designation: 'Department Head'
       })
