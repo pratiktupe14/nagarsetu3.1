@@ -115,17 +115,17 @@ async function seedServiceStaff(queryFn) {
 
       let mustChangePassword = existingUser.must_change_password;
       if (isInitialProvisionedPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
-        mustChangePassword = 1;
+        mustChangePassword = true;
       } else if (mustChangePassword === undefined || mustChangePassword === null) {
-        mustChangePassword = 0;
+        mustChangePassword = false;
       } else {
-        mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true') ? 1 : 0;
+        mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true');
       }
 
       if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
         const salt = await bcrypt.genSalt(10);
         targetHash = await bcrypt.hash(initialPassword, salt);
-        mustChangePassword = 1;
+        mustChangePassword = true;
       }
 
       await q(
@@ -150,7 +150,7 @@ async function seedServiceStaff(queryFn) {
       const insUser = await q(
         `INSERT INTO users 
          (name, mobile, email, password_hash, role, department_id, employee_id, designation, status, language_pref, must_change_password)
-         VALUES ($1, $2, $3, $4, 'service_staff', $5, $6, 'Field Service Staff', 'active', 'en', 1)`,
+         VALUES ($1, $2, $3, $4, 'service_staff', $5, $6, 'Field Service Staff', 'active', 'en', true)`,
         [item.name, item.mobile, cleanEmail, passwordHash, deptId, item.employee_id]
       ).catch(() => ({ rows: [] }));
       userId = insUser.rows?.[0]?.id || null;

@@ -9,51 +9,35 @@ async function getCanonicalDepartmentId(deptInput) {
   if (deptInput === null || deptInput === undefined || deptInput === '') return null;
   const inputStr = String(deptInput).trim();
   if (!inputStr) return null;
-  
+
   try {
-    // 1. Try direct match in departments table by exact numeric ID, text ID, Code, or Name
-    if (/^\d+$/.test(inputStr)) {
-      let res = await query(
-        'SELECT id, code FROM departments WHERE id = $1',
-        [parseInt(inputStr, 10)]
-      );
-      if (res.rows && res.rows.length === 1) return { id: String(res.rows[0].id), code: String(res.rows[0].code).toUpperCase() };
+    // 1. Direct match in departments table by exact Code, Name, or ID (PostgreSQL UUID or Integer or String)
+    let resDept = await query(
+      `SELECT id, code FROM departments 
+       WHERE UPPER(code) = UPPER($1) 
+          OR UPPER(name) = UPPER($1) 
+          OR CAST(id AS TEXT) = $1`,
+      [inputStr]
+    );
+    if (resDept.rows && resDept.rows.length === 1) {
+      return { id: String(resDept.rows[0].id), code: String(resDept.rows[0].code).toUpperCase() };
     }
 
-    let resId = await query(
-      'SELECT id, code FROM departments WHERE CAST(id AS TEXT) = $1',
-      [inputStr]
-    );
-    if (resId.rows && resId.rows.length === 1) return { id: String(resId.rows[0].id), code: String(resId.rows[0].code).toUpperCase() };
-
-    let resCode = await query(
-      'SELECT id, code FROM departments WHERE UPPER(code) = UPPER($1)',
-      [inputStr]
-    );
-    if (resCode.rows && resCode.rows.length === 1) return { id: String(resCode.rows[0].id), code: String(resCode.rows[0].code).toUpperCase() };
-
-    let resName = await query(
-      'SELECT id, code FROM departments WHERE UPPER(name) = UPPER($1)',
-      [inputStr]
-    );
-    if (resName.rows && resName.rows.length === 1) return { id: String(resName.rows[0].id), code: String(resName.rows[0].code).toUpperCase() };
-
-    // 2. Try structured pattern extractions (e.g. "dept-1", "dept-PWD", "PWD-01", "Roads & Public Works (PWD)")
+    // 2. Structured pattern extractions (e.g. "dept-1", "dept-PWD", "PWD-01", "Roads & Public Works (PWD)")
     let cleanVal = inputStr;
     if (cleanVal.toLowerCase().startsWith('dept-')) {
       cleanVal = cleanVal.slice(5).trim();
-    }
-    if (cleanVal.includes('-')) {
-      cleanVal = cleanVal.split('-')[0].trim();
     }
     const matchParen = inputStr.match(/\(([^)]+)\)/);
     if (matchParen && matchParen[1]) {
       const insideParen = matchParen[1].trim();
       let resParen = await query(
-        'SELECT id, code FROM departments WHERE UPPER(code) = UPPER($1) OR CAST(id AS TEXT) = $1',
+        'SELECT id, code FROM departments WHERE UPPER(code) = UPPER($1) OR CAST(id AS TEXT) = $1 OR UPPER(name) = UPPER($1)',
         [insideParen]
       );
-      if (resParen.rows && resParen.rows.length === 1) return { id: String(resParen.rows[0].id), code: String(resParen.rows[0].code).toUpperCase() };
+      if (resParen.rows && resParen.rows.length === 1) {
+        return { id: String(resParen.rows[0].id), code: String(resParen.rows[0].code).toUpperCase() };
+      }
     }
 
     if (cleanVal && cleanVal !== inputStr) {
@@ -61,21 +45,22 @@ async function getCanonicalDepartmentId(deptInput) {
         'SELECT id, code FROM departments WHERE UPPER(code) = UPPER($1) OR CAST(id AS TEXT) = $1 OR UPPER(name) = UPPER($1)',
         [cleanVal]
       );
-      if (resClean.rows && resClean.rows.length === 1) return { id: String(resClean.rows[0].id), code: String(resClean.rows[0].code).toUpperCase() };
+      if (resClean.rows && resClean.rows.length === 1) {
+        return { id: String(resClean.rows[0].id), code: String(resClean.rows[0].code).toUpperCase() };
+      }
     }
 
-    // 3. Try match via department_heads table if inputStr is a department head record identifier, user_id, or email
+    // 3. Email, Employee ID, or User ID lookups in department_heads table
     let resDh = await query(
       `SELECT dh.department_id, d.id as d_id, d.code as d_code FROM department_heads dh 
        LEFT JOIN departments d ON (
          CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
          OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
-         OR UPPER(d.name) = UPPER(CAST(dh.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(dh.department_id AS TEXT))
        ) 
-       WHERE CAST(dh.id AS TEXT) = $1 
+       WHERE LOWER(dh.email) = LOWER($1)
+          OR (dh.employee_id IS NOT NULL AND dh.employee_id != '' AND dh.employee_id = $1)
           OR CAST(dh.user_id AS TEXT) = $1
-          OR LOWER(dh.email) = LOWER($1)
-          OR dh.employee_id = $1
        ORDER BY dh.id DESC LIMIT 1`,
       [inputStr]
     );
@@ -88,18 +73,17 @@ async function getCanonicalDepartmentId(deptInput) {
       }
     }
 
-    // 4. Try match via field_staff table if inputStr is a field staff record identifier, user_id, or email
+    // 4. Email, Employee ID, or User ID lookups in field_staff table
     let resFs = await query(
       `SELECT fs.department_id, d.id as d_id, d.code as d_code FROM field_staff fs 
        LEFT JOIN departments d ON (
          CAST(d.id AS TEXT) = CAST(fs.department_id AS TEXT)
          OR UPPER(d.code) = UPPER(CAST(fs.department_id AS TEXT))
-         OR UPPER(d.name) = UPPER(CAST(fs.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(fs.department_id AS TEXT))
        ) 
-       WHERE CAST(fs.id AS TEXT) = $1 
+       WHERE LOWER(fs.email) = LOWER($1)
+          OR (fs.employee_id IS NOT NULL AND fs.employee_id != '' AND fs.employee_id = $1)
           OR CAST(fs.user_id AS TEXT) = $1
-          OR fs.employee_id = $1
-          OR LOWER(fs.email) = LOWER($1)
        ORDER BY fs.id DESC LIMIT 1`,
       [inputStr]
     );
@@ -112,17 +96,16 @@ async function getCanonicalDepartmentId(deptInput) {
       }
     }
 
-    // 5. Try match via users table if inputStr is a user id, email, or employee_id
+    // 5. Lookups in users table
     let resUsers = await query(
       `SELECT u.department_id, d.id as d_id, d.code as d_code FROM users u 
        LEFT JOIN departments d ON (
          CAST(d.id AS TEXT) = CAST(u.department_id AS TEXT)
          OR UPPER(d.code) = UPPER(CAST(u.department_id AS TEXT))
-         OR UPPER(d.name) = UPPER(CAST(u.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(u.department_id AS TEXT))
        ) 
-       WHERE CAST(u.id AS TEXT) = $1 
-          OR LOWER(u.email) = LOWER($1)
-          OR u.employee_id = $1
+       WHERE (CAST(u.id AS TEXT) = $1 OR LOWER(u.email) = LOWER($1) OR u.employee_id = $1)
+         AND u.department_id IS NOT NULL AND u.department_id != ''
        ORDER BY u.id DESC LIMIT 1`,
       [inputStr]
     );
@@ -138,7 +121,7 @@ async function getCanonicalDepartmentId(deptInput) {
   } catch (e) {
     console.error('getCanonicalDepartmentId error', e);
   }
-  
+
   return null;
 }
 
@@ -149,16 +132,61 @@ async function resolveUserDepartment(req) {
   if (!req || !req.user) return { userDeptId: null, userDeptCode: null, canonical: null };
   const user = req.user;
 
+  // 1. If user is department_head, query department_heads by user.id or user.email
+  if (user.id || user.email) {
+    let resDh = await query(
+      `SELECT dh.department_id, d.id as d_id, d.code as d_code FROM department_heads dh 
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(dh.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(dh.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(dh.department_id AS TEXT))
+       ) 
+       WHERE (CAST(dh.user_id AS TEXT) = CAST($1 AS TEXT) OR LOWER(dh.email) = LOWER($2))
+       ORDER BY dh.id DESC LIMIT 1`,
+      [String(user.id || ''), String(user.email || '').toLowerCase()]
+    );
+    if (resDh.rows && resDh.rows.length > 0) {
+      const row = resDh.rows[0];
+      if (row.d_id && row.d_code) {
+        const canonical = { id: String(row.d_id), code: String(row.d_code).toUpperCase() };
+        return { userDeptId: canonical.id, userDeptCode: canonical.code, canonical };
+      }
+      if (row.department_id) {
+        const res = await getCanonicalDepartmentId(row.department_id);
+        if (res) return { userDeptId: res.id, userDeptCode: res.code, canonical: res };
+      }
+    }
+  }
+
+  // 2. Query users table
+  if (user.id || user.email) {
+    let resU = await query(
+      `SELECT u.department_id, d.id as d_id, d.code as d_code FROM users u 
+       LEFT JOIN departments d ON (
+         CAST(d.id AS TEXT) = CAST(u.department_id AS TEXT)
+         OR UPPER(d.code) = UPPER(CAST(u.department_id AS TEXT))
+         OR LOWER(d.name) = LOWER(CAST(u.department_id AS TEXT))
+       ) 
+       WHERE (CAST(u.id AS TEXT) = CAST($1 AS TEXT) OR LOWER(u.email) = LOWER($2))
+         AND u.department_id IS NOT NULL AND u.department_id != ''
+       ORDER BY u.id DESC LIMIT 1`,
+      [String(user.id || ''), String(user.email || '').toLowerCase()]
+    );
+    if (resU.rows && resU.rows.length > 0) {
+      const row = resU.rows[0];
+      if (row.d_id && row.d_code) {
+        const canonical = { id: String(row.d_id), code: String(row.d_code).toUpperCase() };
+        return { userDeptId: canonical.id, userDeptCode: canonical.code, canonical };
+      }
+      if (row.department_id) {
+        const res = await getCanonicalDepartmentId(row.department_id);
+        if (res) return { userDeptId: res.id, userDeptCode: res.code, canonical: res };
+      }
+    }
+  }
+
   if (user.department_id) {
     const res = await getCanonicalDepartmentId(user.department_id);
-    if (res) return { userDeptId: res.id, userDeptCode: res.code, canonical: res };
-  }
-  if (user.id) {
-    const res = await getCanonicalDepartmentId(user.id);
-    if (res) return { userDeptId: res.id, userDeptCode: res.code, canonical: res };
-  }
-  if (user.email) {
-    const res = await getCanonicalDepartmentId(user.email);
     if (res) return { userDeptId: res.id, userDeptCode: res.code, canonical: res };
   }
   return { userDeptId: null, userDeptCode: null, canonical: null };

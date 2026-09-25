@@ -193,8 +193,12 @@ router.post('/assign', validateInput(assignStaffSchema), async (req, res) => {
     const complaint = compRes.rows[0];
 
     const staffRes = await query(
-      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status 
+      `SELECT fs.id, fs.user_id, fs.name, fs.email, fs.phone as mobile, fs.department_id, fs.employee_id, fs.status, d.code as department_code, d.name as department_name 
        FROM field_staff fs 
+       LEFT JOIN departments d ON (
+         CAST(fs.department_id AS TEXT) = CAST(d.id AS TEXT)
+         OR UPPER(CAST(fs.department_id AS TEXT)) = UPPER(d.code)
+       )
        WHERE CAST(fs.id AS TEXT) = ? OR CAST(fs.user_id AS TEXT) = ? OR fs.employee_id = ? OR LOWER(fs.email) = LOWER(?)`,
       [String(staff_id), String(staff_id), String(staff_id), String(staff_id)]
     );

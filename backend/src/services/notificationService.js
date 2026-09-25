@@ -24,20 +24,20 @@ async function createNotification(userId, complaintId, message, channel = 'in_ap
     try {
       const sql = `
         INSERT INTO notifications (user_id, complaint_id, channel, message, is_read, created_at)
-        VALUES (?, ?, ?, ?, false, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
       `;
       await query(sql, [targetUserId, String(complaintId), channel, message]);
     } catch (insertErr) {
       // In PostgreSQL if channel column doesn't exist
       try {
         await query(
-          `INSERT INTO notifications (user_id, complaint_id, message, is_read, created_at) VALUES (?, ?, ?, false, CURRENT_TIMESTAMP)`,
+          `INSERT INTO notifications (user_id, complaint_id, message, is_read, created_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
           [targetUserId, String(complaintId), message]
         );
       } catch (insertErr2) {
         // Fallback without user_id if FK fails
         await query(
-          `INSERT INTO notifications (complaint_id, message, is_read, created_at) VALUES (?, ?, false, CURRENT_TIMESTAMP)`,
+          `INSERT INTO notifications (complaint_id, message, is_read, created_at) VALUES (?, ?, 0, CURRENT_TIMESTAMP)`,
           [String(complaintId), message]
         ).catch(() => {});
       }
