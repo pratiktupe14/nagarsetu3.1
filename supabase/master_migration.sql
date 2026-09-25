@@ -34,14 +34,15 @@ CREATE TABLE IF NOT EXISTS public.departments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Seed Initial 5 Municipal Departments
+-- Seed Initial 7 Municipal Departments
 INSERT INTO public.departments (name, code, description) VALUES
   ('Public Works Department (PWD)', 'PWD', 'Potholes, asphalt repairs, road damage, public infrastructure'),
   ('Sanitation & Waste Management', 'SAN', 'Garbage collection, overflowing dustbins, street sweeping, solid waste'),
   ('Water Supply & Sewerage Board', 'WTR', 'Water leakage, pipelines, water supply, sewage board'),
   ('Drainage & Sewage Department', 'DRN', 'Drainage blockage, sewage overflow, open drains, monsoon channels'),
   ('Electrical & Street Lighting', 'ELE', 'Streetlights, electrical poles, junction boxes, civic lighting'),
-  ('Traffic Management Department', 'TRF', 'Traffic signals, traffic infrastructure, road signage, junctions')
+  ('Traffic Management Department', 'TRF', 'Traffic signals, traffic infrastructure, road signage, junctions'),
+  ('Maintenance Department', 'MNT', 'General civic facility repairs, building maintenance, public asset upkeep')
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description;
