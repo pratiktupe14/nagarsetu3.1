@@ -2,20 +2,25 @@ const { query, getIsSqlite } = require('../config/db');
 
 async function createNotification(userId, complaintId, message, channel = 'in_app') {
   try {
-    let targetUserId = userId;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(userId || ''));
-    if (!isUuid && userId) {
+    let targetUserId = userId !== null && userId !== undefined ? String(userId).trim() : null;
+    const strId = targetUserId || '';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strId);
+    const isInteger = /^\d+$/.test(strId);
+
+    if (isInteger) {
       try {
-        const uRes = await query(`SELECT mobile, email FROM users WHERE id = ? LIMIT 1`, [userId]);
+        const uRes = await query(`SELECT mobile, email FROM users WHERE id = ? LIMIT 1`, [parseInt(strId, 10)]);
         if (uRes.rows && uRes.rows.length > 0) {
           const u = uRes.rows[0];
           const cleanMobile = String(u.mobile || '').replace(/\D/g, '').slice(-10);
-          const pRes = await query(
-            `SELECT id FROM profiles WHERE (mobile LIKE ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)) LIMIT 1`,
-            [`%${cleanMobile}%`, String(u.email || '').toLowerCase()]
-          );
-          if (pRes.rows && pRes.rows.length > 0) {
-            targetUserId = pRes.rows[0].id;
+          if (cleanMobile) {
+            const pRes = await query(
+              `SELECT id FROM profiles WHERE (mobile LIKE ? OR (email IS NOT NULL AND email != '' AND LOWER(email) = ?)) LIMIT 1`,
+              [`%${cleanMobile}%`, String(u.email || '').toLowerCase()]
+            );
+            if (pRes.rows && pRes.rows.length > 0) {
+              targetUserId = pRes.rows[0].id;
+            }
           }
         }
       } catch (e) {}

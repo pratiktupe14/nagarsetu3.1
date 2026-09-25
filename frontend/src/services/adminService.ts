@@ -865,7 +865,7 @@ export async function assignStaffToTask(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
-    let res = await fetch(`${getApiUrl()}/api/department/assign`, {
+    const res = await fetch(`${getApiUrl()}/api/department/assign`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ complaint_id: complaintId, staff_id: staffId })

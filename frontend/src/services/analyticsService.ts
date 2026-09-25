@@ -153,7 +153,7 @@ export function calculateHotspotClusters(complaints: Complaint[], radiusMeters: 
     const lat = Number(c.latitude);
     const lng = Number(c.longitude);
 
-    let foundCluster = clusters.find((cluster) => {
+    const foundCluster = clusters.find((cluster) => {
       const dist = calculateDistanceMeters(cluster.latitude, cluster.longitude, lat, lng);
       return dist <= radiusMeters;
     });

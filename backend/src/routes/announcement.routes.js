@@ -214,6 +214,7 @@ router.post('/', requireRole(['admin', 'city_admin', 'department_head']), async 
     const created = insertRes.rows[0] || {};
 
     // Dispatch In-App Notifications if Published
+    let notifStats = { target_count: 0, dispatched_count: 0, failed_count: 0 };
     if (published === 1) {
       try {
         let notifSql = `SELECT id FROM users WHERE status = 'active'`;
@@ -243,23 +244,37 @@ router.post('/', requireRole(['admin', 'city_admin', 'department_head']), async 
         }
 
         const targetUsers = await query(notifSql, notifParams);
+        const rows = targetUsers.rows || [];
+        notifStats.target_count = rows.length;
         const notifMsg = `📢 ${title} (${annPriority} Priority)`;
 
-        for (const u of targetUsers.rows) {
-          await query(
-            `INSERT INTO notifications (user_id, channel, message, is_read)
-             VALUES ($1, 'in_app', $2, 0)`,
-            [u.id, notifMsg]
-          );
+        for (const u of rows) {
+          try {
+            await query(
+              `INSERT INTO notifications (user_id, channel, message, is_read)
+               VALUES ($1, 'in_app', $2, 0)`,
+              [u.id, notifMsg]
+            );
+            notifStats.dispatched_count++;
+          } catch (insertErr) {
+            notifStats.failed_count++;
+            console.error(`[ANNOUNCEMENT NOTIF ERROR] Failed to dispatch notification for user #${u.id}:`, insertErr.message);
+          }
         }
       } catch (nErr) {
-        console.error('Error dispatching notifications:', nErr);
+        console.error('[ANNOUNCEMENT NOTIF TARGET ERROR] Target calculation failed:', nErr.message);
       }
     }
 
+    const hasPartialFailure = notifStats.failed_count > 0;
+    const responseMsg = hasPartialFailure
+      ? `Announcement created, but ${notifStats.failed_count} of ${notifStats.target_count} notifications failed to deliver.`
+      : 'Announcement created successfully';
+
     return res.status(201).json({
       success: true,
-      message: 'Announcement created successfully',
+      message: responseMsg,
+      notification_stats: notifStats,
       announcement: {
         id: String(created.id),
         title: created.title,

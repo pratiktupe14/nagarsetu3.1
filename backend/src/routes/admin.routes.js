@@ -388,18 +388,24 @@ router.post('/department-heads', async (req, res) => {
     if (password && password.trim().length >= 6) {
       const salt = await bcrypt.genSalt(10);
       passwordHash = await bcrypt.hash(password.trim(), salt);
-    } else {
-      const salt = await bcrypt.genSalt(10);
-      passwordHash = await bcrypt.hash('Nagarsetu@2026', salt);
+    } else if (!existingUser) {
+      return res.status(400).json({ error: 'Password is required (minimum 6 characters) when creating a new Department Head account.' });
     }
 
     let userId;
     if (existingUser) {
       userId = existingUser.id;
-      await query(
-        `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = 'department_head', department_id = ?, employee_id = ?, status = ? WHERE id = ? OR LOWER(email) = ?`,
-        [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status, userId, cleanEmail]
-      );
+      if (passwordHash) {
+        await query(
+          `UPDATE users SET name = ?, mobile = ?, email = ?, password_hash = ?, role = 'department_head', department_id = ?, employee_id = ?, status = ? WHERE id = ? OR LOWER(email) = ?`,
+          [cleanName, cleanPhone, cleanEmail, passwordHash, cleanDeptId, cleanEmpId, status, userId, cleanEmail]
+        );
+      } else {
+        await query(
+          `UPDATE users SET name = ?, mobile = ?, email = ?, role = 'department_head', department_id = ?, employee_id = ?, status = ? WHERE id = ? OR LOWER(email) = ?`,
+          [cleanName, cleanPhone, cleanEmail, cleanDeptId, cleanEmpId, status, userId, cleanEmail]
+        );
+      }
     } else {
       const insertUserRes = await query(
         `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,

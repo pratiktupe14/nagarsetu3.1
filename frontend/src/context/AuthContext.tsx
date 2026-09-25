@@ -667,9 +667,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ? 'department_head'
             : (roleRes.data?.role as UserRole) || (profile?.role as UserRole) || (cleanEmail.toLowerCase().includes('admin') ? 'city_admin' : targetRole);
           const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
-          let rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
-          let rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
-          let rawDeptCode = deptHead?.departments?.code;
+          const rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
+          const rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
+          const rawDeptCode = deptHead?.departments?.code;
           const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName, cleanEmail);
 
           if (resolvedRole === 'department_head' && (!resDept.id || resDept.code === 'UNASSIGNED')) {

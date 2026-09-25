@@ -90,6 +90,26 @@ app.use(async (req, res, next) => {
 
 // Serve static uploads safely (Prevent execution as script/code)
 app.use('/uploads', (req, res, next) => {
+  let reqPath = '';
+  try {
+    reqPath = decodeURIComponent(req.path || '').toLowerCase();
+  } catch (e) {
+    return res.status(400).json({ error: 'Security Violation: Malformed URL path.' });
+  }
+
+  // Block path traversal attempts
+  if (reqPath.includes('..') || reqPath.includes('\0')) {
+    return res.status(400).json({ error: 'Security Violation: Path traversal rejected.' });
+  }
+
+  // Restrict serving to valid image formats only
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const hasAllowedExt = allowedExtensions.some(ext => reqPath.endsWith(ext));
+
+  if (!hasAllowedExt) {
+    return res.status(403).json({ error: 'Security Violation: Direct access restricted to valid image assets.' });
+  }
+
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
   res.setHeader('Content-Disposition', 'inline');

@@ -131,6 +131,10 @@ function initDatabase() {
         const testRes = await pgPool.query('SELECT NOW() as connected_at');
         console.log('PostgreSQL connected successfully at:', testRes.rows[0]?.connected_at);
 
+        // Always synchronize serial sequences to COALESCE(MAX(id), 1) to prevent duplicate key errors
+        await pgPool.query("SELECT setval('departments_id_seq', (SELECT COALESCE(MAX(id), 1) FROM departments));").catch(() => {});
+        await pgPool.query("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));").catch(() => {});
+
         // Ensure all required persistent tables exist (only run full DDL if users table is absent)
         const regCheck = await pgPool.query("SELECT to_regclass('public.users') as reg;").catch(() => ({ rows: [] }));
         if (!regCheck.rows[0]?.reg) {
@@ -194,29 +198,6 @@ async function createTablesPostgres() {
     }
 
     
-    // 0. SLA Policies (Authoritative Configuration)
-    await safeCreateTable(`
-      CREATE TABLE IF NOT EXISTS sla_policies (
-        priority TEXT PRIMARY KEY,
-        resolve_hours INTEGER NOT NULL,
-        escalation_hours INTEGER NOT NULL
-      );
-    `);
-    
-    try {
-      const checkSla = await pgPool.query('SELECT count(*) FROM sla_policies');
-      if (parseInt(checkSla.rows[0].count) === 0) {
-        await pgPool.query(`
-          INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES
-          ('Critical', 4, 2),
-          ('High', 24, 12),
-          ('Medium', 48, 24),
-          ('Low', 72, 48);
-        `);
-      }
-    } catch (e) {
-      console.warn('[POSTGRES SLA SEED NOTE]:', e.message);
-    }
 
     // 1. Departments table
     await safeCreateTable(`
@@ -571,6 +552,9 @@ async function createTablesPostgres() {
       await pgPool.query("UPDATE departments SET code = 'TRF' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '6' OR name ILIKE '%Traffic%');").catch(() => {});
       await pgPool.query("UPDATE departments SET code = 'MNT' WHERE (code IS NULL OR code = '') AND (CAST(id AS TEXT) = '7' OR name ILIKE '%Maintenance%');").catch(() => {});
     }
+
+    // Always synchronize departments_id_seq to MAX(id) to avoid duplicate key errors on auto-increment INSERTs
+    await pgPool.query("SELECT setval('departments_id_seq', (SELECT COALESCE(MAX(id), 1) FROM departments));").catch(() => {});
   } catch (err) {
     console.error('Error creating PostgreSQL tables:', err);
     throw err;
@@ -725,25 +709,7 @@ function createTablesSqlite() {
         }
       });
 
-      
-      sqliteDb.run(`
-        CREATE TABLE IF NOT EXISTS sla_policies (
-          priority TEXT PRIMARY KEY,
-          resolve_hours INTEGER NOT NULL,
-          escalation_hours INTEGER NOT NULL
-        );
-      `);
 
-      sqliteDb.get("SELECT COUNT(*) as count FROM sla_policies", (err, row) => {
-        if (!err && row && row.count === 0) {
-          const stmt = sqliteDb.prepare("INSERT INTO sla_policies (priority, resolve_hours, escalation_hours) VALUES (?, ?, ?)");
-          stmt.run("Critical", 4, 2);
-          stmt.run("High", 24, 12);
-          stmt.run("Medium", 48, 24);
-          stmt.run("Low", 72, 48);
-          stmt.finalize();
-        }
-      });
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS departments (

@@ -36,29 +36,30 @@ async function seedDefaultUsers(query) {
     const staffCheck = await query(`SELECT * FROM users WHERE email = 'staff@nagarsetu.gov.in'`);
     if (!staffCheck.rows || staffCheck.rows.length === 0) {
       await query(
-        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status, language_pref) VALUES (?, ?, ?, ?, 'service_staff', 1, 'STF-001', 'active', 'en')`,
+        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status, language_pref) VALUES (?, ?, ?, ?, 'service_staff', '1', 'STF-001', 'active', 'en')`,
         ['Ramesh Kumar (Field Staff)', '9876543212', 'staff@nagarsetu.gov.in', staffHash]
       );
       console.log('Staff user added.');
     } else {
       await query(
-        `UPDATE users SET password_hash = ?, role = 'service_staff', department_id = COALESCE(department_id, 1), status = 'active' WHERE email = 'staff@nagarsetu.gov.in'`,
+        `UPDATE users SET password_hash = ?, role = 'service_staff', department_id = COALESCE(department_id, '1'), status = 'active' WHERE email = 'staff@nagarsetu.gov.in'`,
         [staffHash]
       );
       console.log('Staff user updated idempotently.');
     }
 
     // 3. Ensure Officer demo account exists idempotently
-    const officerHash = await bcrypt.hash('password123', userSalt);
+    const officerPass = process.env.DEMO_OFFICER_PASSWORD || staffPass;
+    const officerHash = await bcrypt.hash(officerPass, userSalt);
     const officerCheck = await query(`SELECT * FROM users WHERE email = 'officer@nagarsetu.gov.in'`);
     if (!officerCheck.rows || officerCheck.rows.length === 0) {
       await query(
-        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, status, language_pref) VALUES (?, ?, ?, ?, 'officer', 1, 'active', 'en')`,
+        `INSERT INTO users (name, mobile, email, password_hash, role, department_id, status, language_pref) VALUES (?, ?, ?, ?, 'officer', '1', 'active', 'en')`,
         ['Inspector V. K. Patil (Officer)', '9876543211', 'officer@nagarsetu.gov.in', officerHash]
       );
     } else {
       await query(
-        `UPDATE users SET department_id = COALESCE(department_id, 1) WHERE email = 'officer@nagarsetu.gov.in'`
+        `UPDATE users SET department_id = COALESCE(department_id, '1') WHERE email = 'officer@nagarsetu.gov.in'`
       );
     }
 

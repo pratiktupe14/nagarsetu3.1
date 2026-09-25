@@ -917,7 +917,10 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                                 {/* Deactivate */}
                                 <button
-                                  onClick={() => handleOpenEditModal(dept)}
+                                  onClick={() => {
+                                    setDeleteModalDept(dept);
+                                    setDeleteError(null);
+                                  }}
                                   className="px-2 py-1 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 font-bold rounded-lg text-xs transition-colors"
                                   title="Deactivate Department"
                                 >
