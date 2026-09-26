@@ -19,9 +19,11 @@ const loginSchema = {
   body: Joi.object({
     mobileOrEmail: Joi.string().min(3).max(150).optional(),
     identifier: Joi.string().min(3).max(150).optional(),
+    email: Joi.string().min(3).max(150).optional(),
+    mobile: Joi.string().min(3).max(150).optional(),
     password: Joi.string().required(),
     role: Joi.string().optional()
-  }).or('mobileOrEmail', 'identifier')
+  }).or('mobileOrEmail', 'identifier', 'email', 'mobile')
 };
 
 const otpRequestSchema = {

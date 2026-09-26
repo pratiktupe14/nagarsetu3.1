@@ -68,7 +68,7 @@ async function seedDefaultUsers(query) {
     }
 
     // 4. Ensure Pratik Dilip Tupe Citizen account (mobile: 8788562103) exists idempotently with valid bcrypt password_hash
-    const citizenPass = '8788562103';
+    const citizenPass = process.env.DEMO_USER_PASSWORD || '8788562103';
     const citizenHash = await bcrypt.hash(citizenPass, userSalt);
     const citizenEmail = 'citizen8788@nagarsetu.gov.in';
 
