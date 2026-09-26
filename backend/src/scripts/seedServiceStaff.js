@@ -105,18 +105,14 @@ async function seedServiceStaff(queryFn) {
       const existingHash = existingUser.password_hash;
 
       let targetHash = existingHash;
-      const isCurrentPass = (existingHash && existingHash.startsWith('$2')) ? await bcrypt.compare(initialPassword, existingHash).catch(() => false) : false;
-
       let mustChangePassword = existingUser.must_change_password;
-      if (!isCurrentPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+      if (mustChangePassword === undefined || mustChangePassword === null) {
         mustChangePassword = true;
-      } else if (mustChangePassword === undefined || mustChangePassword === null) {
-        mustChangePassword = false;
       } else {
-        mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true');
+        mustChangePassword = Boolean(mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true');
       }
 
-      if (!targetHash || !targetHash.startsWith('$2') || !isCurrentPass || process.env.FORCE_PASSWORD_RESET === 'true') {
+      if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
         const salt = await bcrypt.genSalt(10);
         targetHash = await bcrypt.hash(initialPassword, salt);
         mustChangePassword = true;

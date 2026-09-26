@@ -151,11 +151,9 @@ async function seed7DemoDepartmentHeads(queryFn) {
         const existingHash = userCheck.rows[0].password_hash;
         
         let targetHash = existingHash;
-        const isCurrentPass = (existingHash && existingHash.startsWith('$2')) ? await bcrypt.compare(initialPassword, existingHash).catch(() => false) : false;
-
         let mustChangePassword = (userCheck.rows[0].must_change_password === true || userCheck.rows[0].must_change_password === 1 || userCheck.rows[0].must_change_password === '1' || userCheck.rows[0].must_change_password === 'true' || userCheck.rows[0].must_change_password === 't') ? 1 : 0;
 
-        if (!targetHash || !targetHash.startsWith('$2') || !isCurrentPass || process.env.FORCE_PASSWORD_RESET === 'true') {
+        if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
           const salt = await bcrypt.genSalt(10);
           targetHash = await bcrypt.hash(initialPassword, salt);
           mustChangePassword = 1;

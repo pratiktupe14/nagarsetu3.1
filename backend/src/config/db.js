@@ -67,28 +67,8 @@ function initDatabase() {
     const currentDbType = (process.env.DB_TYPE || DB_TYPE || '').toLowerCase();
     const shouldBePostgres = currentDbType === 'sqlite' ? false : (isVercel || isProduction || currentDbType === 'postgres' || Boolean(dbUrl));
 
-    const onInitDone = async () => {
+    const onInitDone = () => {
       resolve();
-      (async () => {
-        try {
-          const userCount = await query('SELECT COUNT(*) as count FROM users').catch(() => ({ rows: [{ count: 0 }] }));
-          if (parseInt(userCount.rows[0]?.count || 0, 10) === 0) {
-            console.log('Database empty, seeding default data...');
-            await seedDefaultUsers(query);
-            await seed7DemoDepartmentHeads(query);
-            await seedServiceStaff(query);
-            console.log('Default data seeding completed.');
-          } else {
-            const dhCount = await query(`SELECT COUNT(*) as count FROM department_heads WHERE LOWER(status) = 'active'`).catch(() => ({ rows: [{ count: 0 }] }));
-            if (parseInt(dhCount.rows[0]?.count || 0, 10) < 7) {
-              console.log('Ensuring all 7 official department heads are active...');
-              await seed7DemoDepartmentHeads(query);
-            }
-          }
-        } catch (e) {
-          console.warn('[SEED NOTE]:', e.message);
-        }
-      })().catch(() => {});
     };
 
     if (shouldBePostgres) {
@@ -117,9 +97,9 @@ function initDatabase() {
           pgPool = new Pool({
             connectionString: dbUrl,
             ssl: { rejectUnauthorized: false },
-            max: 10,
+            max: 20,
             idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 5000
+            connectionTimeoutMillis: 15000
           });
 
           pgPool.on('error', (err) => {

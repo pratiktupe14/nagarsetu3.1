@@ -331,7 +331,22 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    return res.status(500).json({ error: 'Server error during login' });
+    if (process.env.NODE_ENV !== 'production') {
+      return res.status(500).json({
+        success: false,
+        message: 'Login failed due to a backend server error: ' + (err.message || 'Unknown error'),
+        error: err.message || 'Server error during login',
+        errorCode: 'LOGIN_SERVER_ERROR',
+        requestId: req.requestId
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during login',
+      error: 'Server error during login',
+      errorCode: 'LOGIN_SERVER_ERROR',
+      requestId: req.requestId
+    });
   }
 });
 

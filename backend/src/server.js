@@ -34,16 +34,24 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start Server after DB Init
 initDatabase()
-  .then(async () => {
-    await seedDefaultUsers(query);
-    await seed7DemoDepartmentHeads();
-    await seedServiceStaff();
+  .then(() => {
     app.listen(PORT, () => {
       logger.info('SERVER_STARTED', { port: PORT, url: `http://localhost:${PORT}` });
       console.log(`=======================================================`);
       console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);
       console.log(`=======================================================`);
     });
+
+    // Run data synchronization in background without blocking server startup
+    (async () => {
+      try {
+        await seedDefaultUsers(query);
+        await seed7DemoDepartmentHeads();
+        await seedServiceStaff();
+      } catch (seedErr) {
+        console.warn('[SERVER SEED WARNING]:', seedErr.message);
+      }
+    })().catch(() => {});
   })
   .catch((err) => {
     logger.error('FATAL_DB_INIT_FAILED', { message: err.message, stack: err.stack });
