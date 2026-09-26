@@ -500,38 +500,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (resolvedHead) roleUser = resolvedHead;
     }
 
-    // Always fetch fresh backend token for the target role to maintain authorization synchronization
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
-    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD;
-    if (demoAdminPass || demoUserPass) {
-      try {
-        let loginId = roleUser.email || roleUser.mobile;
-        if (!loginId) {
-          loginId = newRole === 'city_admin' ? '9876543213' : newRole === 'department_head' ? 'rahul.kumar@nagarsetu.gov.in' : newRole === 'service_staff' ? '9876543211' : '9876543210';
-        }
-        const loginPass = newRole === 'city_admin' ? demoAdminPass : demoUserPass;
-        if (loginPass) {
-          const res = await fetch(`${getApiUrl()}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobileOrEmail: loginId, password: loginPass })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.token && data.user) {
-              localStorage.setItem('nagarsetu_token', data.token);
-              if (data.user.role) {
-                const backendRole = data.user.role === 'admin' ? 'city_admin' : data.user.role;
-                roleUser = { ...roleUser, role: backendRole as UserRole, id: String(data.user.id || roleUser.id) };
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Role switch token sync notice:', e);
-      }
-    }
-
     setUser(roleUser);
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
   };
@@ -561,7 +529,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
-            const mappedRole: UserRole = data.user.role === 'admin' ? 'city_admin' : (data.user.role as UserRole);
+            const mappedRole: UserRole = (data.user.role === 'admin' || data.user.role === 'city_admin')
+              ? 'city_admin'
+              : (data.user.role === 'field_staff' || data.user.role === 'staff' || data.user.role === 'service_staff')
+                ? 'service_staff'
+                : (data.user.role as UserRole);
             const staffMatch = mappedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanIdentifier) : null;
             const resDept = resolveDepartmentInfo(
               data.user.department_id || staffMatch?.department_id,

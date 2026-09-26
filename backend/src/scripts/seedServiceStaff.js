@@ -55,7 +55,7 @@ const SERVICE_STAFF_DEFINITIONS = [
 ];
 
 const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const DEMO_PASSWORD = process.env.DEMO_STAFF_PASSWORD || process.env.DEMO_USER_PASSWORD || (isProd ? null : 'nagarsetu@123');
+const DEMO_PASSWORD = process.env.DEMO_STAFF_PASSWORD || (isProd ? null : 'staff@123');
 
 async function seedServiceStaff(queryFn) {
   const q = queryFn || require('../config/db').query;
@@ -85,7 +85,7 @@ async function seedServiceStaff(queryFn) {
 
     const firstName = item.name.split(' ')[0].toLowerCase();
     const envPass = process.env[`STAFF_INITIAL_PASSWORD_${item.employee_id.replace(/-/g, '_')}`] || process.env[`STAFF_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
-    const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : (cleanEmail === 'staff@nagarsetu.gov.in' ? 'staff@123' : `${firstName}@123`));
+    const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : 'staff@123');
 
     if (isProd && (!initialPassword || initialPassword.trim() === '')) {
       throw new Error(`SECURITY CONFIGURATION ERROR: Missing initial password environment variable for Staff ${item.employee_id} (${cleanEmail}) in production mode.`);
@@ -105,16 +105,10 @@ async function seedServiceStaff(queryFn) {
       const existingHash = existingUser.password_hash;
 
       let targetHash = existingHash;
-      let isInitialProvisionedPass = false;
-      if (existingHash && existingHash.startsWith('$2')) {
-        isInitialProvisionedPass = await bcrypt.compare(initialPassword, existingHash).catch(() => false);
-        if (!isInitialProvisionedPass) {
-          isInitialProvisionedPass = await bcrypt.compare('nagarsetu@123', existingHash).catch(() => false);
-        }
-      }
+      const isCurrentPass = (existingHash && existingHash.startsWith('$2')) ? await bcrypt.compare(initialPassword, existingHash).catch(() => false) : false;
 
       let mustChangePassword = existingUser.must_change_password;
-      if (isInitialProvisionedPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+      if (!isCurrentPass || !targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
         mustChangePassword = true;
       } else if (mustChangePassword === undefined || mustChangePassword === null) {
         mustChangePassword = false;
@@ -122,7 +116,7 @@ async function seedServiceStaff(queryFn) {
         mustChangePassword = (mustChangePassword === true || mustChangePassword === 1 || mustChangePassword === '1' || mustChangePassword === 't' || mustChangePassword === 'true');
       }
 
-      if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+      if (!targetHash || !targetHash.startsWith('$2') || !isCurrentPass || process.env.FORCE_PASSWORD_RESET === 'true') {
         const salt = await bcrypt.genSalt(10);
         targetHash = await bcrypt.hash(initialPassword, salt);
         mustChangePassword = true;

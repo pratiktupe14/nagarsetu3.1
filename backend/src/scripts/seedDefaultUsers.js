@@ -13,7 +13,11 @@ async function seedDefaultUsers(query) {
     }
 
     const adminHash = await bcrypt.hash(adminPass, userSalt);
-    const staffPass = process.env.DEMO_STAFF_PASSWORD || 'nagarsetu@123';
+    const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const staffPass = process.env.DEMO_STAFF_PASSWORD || (isProd ? null : 'staff@123');
+    if (isProd && (!staffPass || staffPass.trim() === '')) {
+      throw new Error('SECURITY CONFIGURATION ERROR: DEMO_STAFF_PASSWORD environment variable is missing in production mode.');
+    }
     const staffHash = await bcrypt.hash(staffPass, userSalt);
 
     // 1. Ensure Municipal Admin exists idempotently

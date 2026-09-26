@@ -28,24 +28,17 @@ export const LoginPage: React.FC = () => {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg('');
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || '';
-    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || '';
-    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || '';
-    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || '';
 
     if (role === 'citizen') {
       setIdentifier('8788562103');
-      setPassword(demoUserPass);
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
-      setPassword(demoAdminPass);
     } else if (role === 'department_head') {
       setIdentifier('rahul.kumar@nagarsetu.gov.in');
-      setPassword(demoHeadPass);
     } else if (role === 'service_staff') {
       setIdentifier('staff@nagarsetu.gov.in');
-      setPassword(demoStaffPass);
     }
+    setPassword('');
   };
 
   useEffect(() => {

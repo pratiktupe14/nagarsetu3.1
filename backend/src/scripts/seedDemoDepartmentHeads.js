@@ -74,7 +74,7 @@ const OFFICIAL_DEPARTMENTS = [
 ];
 
 const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || process.env.DEMO_USER_PASSWORD || (isProd ? null : 'nagarsetu@123');
+const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || (isProd ? null : 'head@123');
 
 async function seed7DemoDepartmentHeads(queryFn) {
   const q = queryFn || require('../config/db').query;
@@ -125,7 +125,7 @@ async function seed7DemoDepartmentHeads(queryFn) {
       // Compute individual initial password for this department head
       const firstName = dMeta.headName.split(' ')[0].toLowerCase();
       const envPass = process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${dMeta.code}`] || process.env[`DEPARTMENT_HEAD_INITIAL_PASSWORD_${firstName.toUpperCase()}`];
-      const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : `${firstName}@123`);
+      const initialPassword = envPass || DEMO_PASSWORD || (isProd ? null : 'head@123');
 
       if (isProd && (!initialPassword || initialPassword.trim() === '')) {
         throw new Error(`SECURITY CONFIGURATION ERROR: Missing initial password environment variable for Department Head ${dMeta.code} (${cleanEmail}) in production mode.`);
@@ -151,9 +151,11 @@ async function seed7DemoDepartmentHeads(queryFn) {
         const existingHash = userCheck.rows[0].password_hash;
         
         let targetHash = existingHash;
+        const isCurrentPass = (existingHash && existingHash.startsWith('$2')) ? await bcrypt.compare(initialPassword, existingHash).catch(() => false) : false;
+
         let mustChangePassword = (userCheck.rows[0].must_change_password === true || userCheck.rows[0].must_change_password === 1 || userCheck.rows[0].must_change_password === '1' || userCheck.rows[0].must_change_password === 'true' || userCheck.rows[0].must_change_password === 't') ? 1 : 0;
 
-        if (!targetHash || !targetHash.startsWith('$2') || process.env.FORCE_PASSWORD_RESET === 'true') {
+        if (!targetHash || !targetHash.startsWith('$2') || !isCurrentPass || process.env.FORCE_PASSWORD_RESET === 'true') {
           const salt = await bcrypt.genSalt(10);
           targetHash = await bcrypt.hash(initialPassword, salt);
           mustChangePassword = 1;
