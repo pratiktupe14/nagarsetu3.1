@@ -111,7 +111,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
         [cleanIdentifier, rawInput]
       );
     } else {
-      const validMobiles = [rawInput, digitsOnly, normMobile].filter(m => m && m.trim() !== '');
+      const validMobiles = Array.from(new Set([rawInput, digitsOnly, normMobile].filter(m => m && String(m).trim() !== '')));
       if (validMobiles.length > 0) {
         resUser = await query(
           `SELECT * FROM users WHERE mobile IN (${validMobiles.map(() => '?').join(',')}) OR LOWER(email) = ? ORDER BY id DESC LIMIT 1`,
@@ -171,7 +171,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
     }
 
-    if (!isMatch && process.env.NODE_ENV !== 'production' && (user.mobile === '8788562103' || user.email === 'citizen8788@nagarsetu.gov.in')) {
+    if (!isMatch && process.env.NODE_ENV !== 'production' && (String(user.mobile || '').trim() === '8788562103' || normalizeMobile(user.mobile) === '8788562103' || (user.email && user.email.toLowerCase() === 'citizen8788@nagarsetu.gov.in'))) {
       if (password === '8788562103' || password === 'password123' || password === process.env.DEMO_USER_PASSWORD) {
         isMatch = true;
       }

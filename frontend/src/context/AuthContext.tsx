@@ -551,9 +551,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: data.user.email || cleanIdentifier,
               mobile: data.user.mobile || staffMatch?.mobile || '',
               role: mappedRole,
-              department_id: data.user.department_id ? String(data.user.department_id) : resDept.id,
-              department_name: data.user.department_name || staffMatch?.department_name || resDept.fullName || resDept.name,
-              department_code: data.user.department_code || resDept.code,
+              department_id: data.user.department_id ? String(data.user.department_id) : (mappedRole === 'citizen' ? undefined : resDept.id),
+              department_name: data.user.department_name || staffMatch?.department_name || (mappedRole === 'citizen' ? undefined : (resDept.fullName || resDept.name)),
+              department_code: data.user.department_code || (mappedRole === 'citizen' ? undefined : resDept.code),
               employee_id: data.user.employee_id || staffMatch?.employee_id || undefined,
               language_pref: data.user.language_pref || 'en',
               must_change_password: Boolean(data.user.must_change_password)

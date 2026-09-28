@@ -99,7 +99,7 @@ function initDatabase() {
             ssl: { rejectUnauthorized: false },
             max: 20,
             idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 15000
+            connectionTimeoutMillis: 30000
           });
 
           pgPool.on('error', (err) => {
@@ -130,6 +130,7 @@ function initDatabase() {
           pgPool.end().catch(() => {});
           pgPool = null;
         }
+        initPromise = null;
         return reject(new Error(`Database Connection Failed: ${err.message}. Serverless memory fallback is disabled.`));
       }
     } else {
