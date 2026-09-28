@@ -1,17 +1,26 @@
-const { Pool } = require('../backend/node_modules/pg');
-const pool = new Pool({ connectionString: 'postgresql://postgres.ozeiymkbxtrqqdoxtmhm:P1d2s3j4t5%40@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres' });
+const { query, initDatabase } = require('../backend/src/config/db');
 
-async function check() {
-  const u = await pool.query("SELECT id, name, email, role, department_id, employee_id, status FROM users WHERE LOWER(email) = 'staff@nagarsetu.gov.in'");
-  console.log('users row for staff@nagarsetu.gov.in:', u.rows);
-  
-  const fs = await pool.query("SELECT id, user_id, department_id, name, email, employee_id, status FROM field_staff WHERE LOWER(email) = 'staff@nagarsetu.gov.in'");
-  console.log('field_staff row for staff@nagarsetu.gov.in:', fs.rows);
+async function test() {
+  try {
+    await initDatabase();
+    
+    console.log('--- COMPLAINTS ---');
+    const comp = await query("SELECT id, complaint_number, category, department_id FROM complaints ORDER BY id DESC LIMIT 5");
+    console.log(comp.rows);
 
-  const depts = await pool.query("SELECT id, name, code FROM departments");
-  console.log('all departments:', depts.rows);
+    console.log('--- FIELD STAFF TABLE ---');
+    const fs = await query("SELECT id, user_id, name, email, department_id, employee_id FROM field_staff LIMIT 10");
+    console.log(fs.rows);
 
-  await pool.end();
+    console.log('--- USERS TABLE (STAFF) ---');
+    const users = await query("SELECT id, name, email, role, department_id, employee_id FROM users WHERE role IN ('service_staff', 'staff', 'field_staff') LIMIT 10");
+    console.log(users.rows);
+
+    console.log('--- DEPARTMENT HEADS TABLE ---');
+    const dh = await query("SELECT id, user_id, name, email, department_id FROM department_heads LIMIT 10");
+    console.log(dh.rows);
+  } catch(e) {
+    console.error('ERROR:', e);
+  }
 }
-
-check().catch(console.error);
+test();

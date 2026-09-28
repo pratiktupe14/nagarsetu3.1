@@ -10,16 +10,29 @@ async function getCanonicalDepartmentId(deptInput) {
   const inputStr = String(deptInput).trim();
   if (!inputStr) return null;
 
+  const codeMap = {
+    '1': 'PWD', 'pwd': 'PWD',
+    '2': 'SAN', 'san': 'SAN',
+    '3': 'WTR', 'wtr': 'WTR',
+    '4': 'DRN', 'drn': 'DRN',
+    '5': 'ELE', 'ele': 'ELE',
+    '6': 'TRF', 'trf': 'TRF',
+    '7': 'MNT', 'mnt': 'MNT'
+  };
+
+  const candidateCode = codeMap[inputStr.toLowerCase()] || inputStr;
+
   try {
     // 1. Direct match in departments table by exact Code, Name, or ID (PostgreSQL UUID or Integer or String)
     let resDept = await query(
       `SELECT id, code FROM departments 
        WHERE UPPER(code) = UPPER($1) 
+          OR UPPER(code) = UPPER($2) 
           OR UPPER(name) = UPPER($1) 
           OR CAST(id AS TEXT) = $1`,
-      [inputStr]
+      [inputStr, candidateCode]
     );
-    if (resDept.rows && resDept.rows.length === 1) {
+    if (resDept.rows && resDept.rows.length > 0) {
       return { id: String(resDept.rows[0].id), code: String(resDept.rows[0].code).toUpperCase() };
     }
 
@@ -202,9 +215,31 @@ async function isDeptMatch(deptA, deptB) {
   const objA = await getCanonicalDepartmentId(deptA);
   const objB = await getCanonicalDepartmentId(deptB);
   
-  if (!objA || !objB) return false;
-  
-  return String(objA.id) === String(objB.id) || String(objA.code).toUpperCase() === String(objB.code).toUpperCase();
+  if (objA && objB) {
+    if (String(objA.id) === String(objB.id) || String(objA.code).toUpperCase() === String(objB.code).toUpperCase()) {
+      return true;
+    }
+  }
+
+  const normFallback = (d) => {
+    const s = String(d || '').trim().toLowerCase();
+    if (s === '1' || s === 'pwd' || s.includes('pwd') || s.includes('public works') || s.startsWith('pwd-')) return 'PWD';
+    if (s === '2' || s === 'san' || s.includes('san') || s.includes('waste') || s.includes('sanitat') || s.startsWith('san-')) return 'SAN';
+    if (s === '3' || s === 'wtr' || s.includes('wtr') || s.includes('water') || s.includes('sewerage') || s.startsWith('wtr-')) return 'WTR';
+    if (s === '4' || s === 'drn' || s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.startsWith('drn-')) return 'DRN';
+    if (s === '5' || s === 'ele' || s.includes('ele') || s.includes('electric') || s.includes('light') || s.startsWith('ele-')) return 'ELE';
+    if (s === '6' || s === 'trf' || s.includes('trf') || s.includes('traffic') || s.startsWith('trf-')) return 'TRF';
+    if (s === '7' || s === 'mnt' || s.includes('mnt') || s.includes('maint') || s.startsWith('mnt-')) return 'MNT';
+    return s.toUpperCase();
+  };
+
+  const c1 = normFallback(deptA);
+  const c2 = normFallback(deptB);
+  if (c1 && c2 && c1 !== 'UNASSIGNED' && c2 !== 'UNASSIGNED') {
+    return c1 === c2;
+  }
+
+  return false;
 }
 
 module.exports = {
