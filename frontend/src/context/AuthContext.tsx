@@ -870,6 +870,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     localStorage.removeItem('nagarsetu_user');
     localStorage.removeItem('nagarsetu_token');
+    sessionStorage.removeItem('nagarsetu_user');
+    sessionStorage.removeItem('nagarsetu_token');
     setUser(null);
   };
 

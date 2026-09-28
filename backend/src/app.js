@@ -64,21 +64,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Database initialization middleware (skip for OPTIONS preflight)
 const { initDatabase, query, getIsSqlite } = require('./config/db');
-let dbInitPromise = null;
 app.use(async (req, res, next) => {
   if (req.method === 'OPTIONS') {
     return next();
   }
   try {
-    if (!dbInitPromise && typeof initDatabase === 'function') {
-      dbInitPromise = initDatabase();
-    }
-    if (dbInitPromise) {
-      await dbInitPromise;
-    }
+    await initDatabase();
     next();
   } catch (err) {
-    dbInitPromise = null;
     logger.error('DATABASE_INIT_FATAL_ERROR', { requestId: req.requestId, message: err.message });
     return res.status(500).json({
       error: 'Database Connection Error',

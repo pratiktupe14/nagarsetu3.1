@@ -421,11 +421,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (supabase && supabase.auth) {
         await supabase.auth.signOut().catch(() => {});
       }
-      logout();
-      localStorage.removeItem('nagarsetu_user');
+      await logout();
       onMobileClose();
       setShowLogoutConfirm(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (err) {
       console.error('Logout failed:', err);
       setLogoutError('Unable to logout. Please try again.');

@@ -5,7 +5,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
 import { UserRole } from '../types/database.types';
 import {
-  Menu, Search, User, Building2, Wrench, ChevronDown, ShieldCheck, Zap
+  Menu, Search, User, Building2, Wrench, ChevronDown, ShieldCheck, Zap, LogOut
 } from 'lucide-react';
 
 interface DashboardHeaderProps {
@@ -19,7 +19,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onMobileMenuOpen,
   isMobileMenuOpen = false
 }) => {
-  const { user, role, switchRole } = useAuth();
+  const { user, role, switchRole, logout } = useAuth();
   const navigate = useNavigate();
   const activeRole: UserRole = role || user?.role || 'citizen';
 
@@ -28,6 +28,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     if (targetRole === 'citizen') navigate('/citizen/portal');
     if (targetRole === 'city_admin') navigate('/admin/portal');
     if (targetRole === 'service_staff') navigate('/staff/portal');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -50,7 +55,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </h1>
       </div>
 
-      {/* RIGHT: LANGUAGE SELECTOR, NOTIFICATIONS & USER ROLE SWITCHER */}
+      {/* RIGHT: LANGUAGE SELECTOR, NOTIFICATIONS, USER PROFILE & LOGOUT */}
       <div className="flex items-center space-x-2.5">
         
         {/* COMPACT LANGUAGE SELECTOR */}
@@ -94,8 +99,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* NOTIFICATION CENTER */}
         <NotificationCenter />
 
-        {/* USER PROFILE BADGE */}
-        <div className="hidden sm:flex items-center space-x-2 pl-2 border-l border-gray-200 text-right">
+        {/* USER PROFILE BADGE & LOGOUT BUTTON */}
+        <div className="hidden sm:flex items-center space-x-3 pl-2 border-l border-gray-200 text-right">
           <div>
             <span className="text-xs font-bold text-gray-900 block leading-tight">
               {activeRole === 'citizen' 
@@ -108,7 +113,27 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 : user.department_name.split('(')[0].trim()}
             </span>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center space-x-1.5"
+            title="Logout"
+            aria-label="Logout"
+          >
+            <LogOut className="w-4 h-4 text-gray-500 hover:text-rose-600" />
+            <span className="hidden lg:inline text-xs font-bold text-gray-600 hover:text-rose-600">Logout</span>
+          </button>
         </div>
+
+        {/* MOBILE LOGOUT BUTTON */}
+        <button
+          onClick={handleLogout}
+          className="flex sm:hidden p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] items-center justify-center"
+          title="Logout"
+          aria-label="Logout"
+        >
+          <LogOut className="w-4 h-4 text-gray-500" />
+        </button>
 
       </div>
 

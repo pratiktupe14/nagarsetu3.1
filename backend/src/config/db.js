@@ -40,104 +40,114 @@ function initDatabase() {
     return initPromise;
   }
 
-  initPromise = new Promise(async (resolve, reject) => {
-    const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
-    const isProduction = process.env.NODE_ENV === 'production';
-    const rawDbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING || '').trim();
-    
-    // Sanitize DB URL: strip surrounding quotes and accidental "DATABASE_URL=" prefix
-    let dbUrl = rawDbUrl.replace(/^["']|["']$/g, '').trim();
-    if (dbUrl.startsWith('DATABASE_URL=')) dbUrl = dbUrl.slice('DATABASE_URL='.length).trim();
-    if (dbUrl.startsWith('POSTGRES_URL=')) dbUrl = dbUrl.slice('POSTGRES_URL='.length).trim();
-    dbUrl = dbUrl.replace(/^["']|["']$/g, '').trim();
+  initPromise = new Promise((resolve, reject) => {
+    (async () => {
+      const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
+      const isProduction = process.env.NODE_ENV === 'production';
+      const rawDbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL_NON_POOLING || '').trim();
 
-    // Auto-normalize URL encoding for passwords containing special characters (e.g. '@')
-    const urlMatch = dbUrl.match(/^(postgres(?:ql)?:\/\/)([^:]+):(.+)@([^@]+)$/);
-    if (urlMatch) {
-      const [, proto, user, pass, hostRest] = urlMatch;
-      try {
-        const decodedPass = decodeURIComponent(pass);
-        const encodedPass = encodeURIComponent(decodedPass);
-        dbUrl = `${proto}${user}:${encodedPass}@${hostRest}`;
-      } catch (e) {
-        // Keep original if decoding fails
-      }
-    }
+      // Sanitize DB URL: strip surrounding quotes and accidental "DATABASE_URL=" prefix
+      let dbUrl = rawDbUrl.replace(/^["']|["']$/g, '').trim();
+      if (dbUrl.startsWith('DATABASE_URL=')) dbUrl = dbUrl.slice('DATABASE_URL='.length).trim();
+      if (dbUrl.startsWith('POSTGRES_URL=')) dbUrl = dbUrl.slice('POSTGRES_URL='.length).trim();
+      dbUrl = dbUrl.replace(/^["']|["']$/g, '').trim();
 
-    const currentDbType = (process.env.DB_TYPE || DB_TYPE || '').toLowerCase();
-    const shouldBePostgres = currentDbType === 'sqlite' ? false : (isVercel || isProduction || currentDbType === 'postgres' || Boolean(dbUrl));
-
-    const onInitDone = () => {
-      resolve();
-    };
-
-    if (shouldBePostgres) {
-      if (!dbUrl) {
-        const errMsg = 'FATAL DATABASE ERROR: PostgreSQL connection string (DATABASE_URL / POSTGRES_URL) is required in Vercel/Production mode. In-memory fallback is disabled.';
-        console.error(errMsg);
-        return reject(new Error(errMsg));
+      // Auto-normalize URL encoding for passwords containing special characters (e.g. '@')
+      const urlMatch = dbUrl.match(/^(postgres(?:ql)?:\/\/)([^:]+):(.+)@([^@]+)$/);
+      if (urlMatch) {
+        const [, proto, user, pass, hostRest] = urlMatch;
+        try {
+          const decodedPass = decodeURIComponent(pass);
+          const encodedPass = encodeURIComponent(decodedPass);
+          dbUrl = `${proto}${user}:${encodedPass}@${hostRest}`;
+        } catch (e) {
+          // Keep original if decoding fails
+        }
       }
 
-      if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
-        const errMsg = `FATAL DATABASE ERROR: Invalid DATABASE_URL format. Connection string must start with "postgresql://" or "postgres://". Received invalid value: "${dbUrl}". Please update DATABASE_URL in Vercel Project Settings to your real Supabase connection string (e.g. postgresql://postgres.[PROJECT_ID]:[PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres).`;
-        console.error(errMsg);
-        return reject(new Error(errMsg));
-      }
+      const currentDbType = (process.env.DB_TYPE || DB_TYPE || '').toLowerCase();
+      const shouldBePostgres = currentDbType === 'sqlite' ? false : (isVercel || isProduction || currentDbType === 'postgres' || Boolean(dbUrl));
 
-      if (dbUrl.includes('[YOUR-PASSWORD]') || dbUrl.includes('[YOUR_PASSWORD]') || dbUrl.includes('[PASSWORD]')) {
-        const errMsg = 'FATAL DATABASE ERROR: DATABASE_URL contains placeholder "[YOUR-PASSWORD]". Please replace it with your actual Supabase database password in Vercel Project Settings.';
-        console.error(errMsg);
-        return reject(new Error(errMsg));
-      }
-
-      const maskedUrl = dbUrl.replace(/:([^@/]+)@/, ':***@');
-      console.log('Connecting to persistent PostgreSQL database at:', maskedUrl);
-      try {
-        if (!pgPool) {
-          pgPool = new Pool({
-            connectionString: dbUrl,
-            ssl: { rejectUnauthorized: false },
-            max: 20,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 30000
-          });
-
-          pgPool.on('error', (err) => {
-            console.error('[POSTGRES POOL UNEXPECTED ERROR]:', err.message);
-          });
+      if (shouldBePostgres) {
+        if (!dbUrl) {
+          const errMsg = 'FATAL DATABASE ERROR: PostgreSQL connection string (DATABASE_URL / POSTGRES_URL) is required in Vercel/Production mode. In-memory fallback is disabled.';
+          console.error(errMsg);
+          initPromise = null;
+          return reject(new Error(errMsg));
         }
 
-        // Verify connection with active query
-        const testRes = await pgPool.query('SELECT NOW() as connected_at');
-        console.log('PostgreSQL connected successfully at:', testRes.rows[0]?.connected_at);
-
-        // Always synchronize serial sequences to COALESCE(MAX(id), 1) to prevent duplicate key errors
-        await pgPool.query("SELECT setval('departments_id_seq', (SELECT COALESCE(MAX(id), 1) FROM departments));").catch(() => {});
-        await pgPool.query("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));").catch(() => {});
-
-        // Ensure all required persistent tables exist (only run full DDL if users table is absent)
-        const regCheck = await pgPool.query("SELECT to_regclass('public.users') as reg;").catch(() => ({ rows: [] }));
-        if (!regCheck.rows[0]?.reg) {
-          console.log('PostgreSQL schema not found, running initial table migrations...');
-          await createTablesPostgres();
+        if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+          const errMsg = `FATAL DATABASE ERROR: Invalid DATABASE_URL format. Connection string must start with "postgresql://" or "postgres://". Received invalid value: "${dbUrl}". Please update DATABASE_URL in Vercel Project Settings to your real Supabase connection string.`;
+          console.error(errMsg);
+          initPromise = null;
+          return reject(new Error(errMsg));
         }
-        useSqlite = false;
-        await onInitDone();
-      } catch (err) {
-        console.error('FATAL POSTGRESQL CONNECTION ERROR:', err.message);
-        // Clear cached pool on connection error so subsequent requests can re-attempt
-        if (pgPool) {
-          pgPool.end().catch(() => {});
-          pgPool = null;
+
+        if (dbUrl.includes('[YOUR-PASSWORD]') || dbUrl.includes('[YOUR_PASSWORD]') || dbUrl.includes('[PASSWORD]')) {
+          const errMsg = 'FATAL DATABASE ERROR: DATABASE_URL contains placeholder "[YOUR-PASSWORD]". Please replace it with your actual Supabase database password in Vercel Project Settings.';
+          console.error(errMsg);
+          initPromise = null;
+          return reject(new Error(errMsg));
         }
-        initPromise = null;
-        return reject(new Error(`Database Connection Failed: ${err.message}. Serverless memory fallback is disabled.`));
+
+        const maskedUrl = dbUrl.replace(/:([^@/]+)@/, ':***@');
+        console.log('Connecting to persistent PostgreSQL database at:', maskedUrl);
+        try {
+          if (!pgPool) {
+            pgPool = new Pool({
+              connectionString: dbUrl,
+              ssl: { rejectUnauthorized: false },
+              max: 10,
+              idleTimeoutMillis: 30000,
+              connectionTimeoutMillis: 10000
+            });
+
+            pgPool.on('error', (err) => {
+              console.error('[POSTGRES POOL UNEXPECTED ERROR]:', err.message);
+            });
+          }
+
+          // Verify connection with active query
+          const testRes = await pgPool.query('SELECT NOW() as connected_at');
+          console.log('PostgreSQL connected successfully at:', testRes.rows[0]?.connected_at);
+
+          // Always synchronize serial sequences to COALESCE(MAX(id), 1) to prevent duplicate key errors
+          await pgPool.query("SELECT setval('departments_id_seq', (SELECT COALESCE(MAX(id), 1) FROM departments));").catch(() => {});
+          await pgPool.query("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));").catch(() => {});
+
+          // Ensure all required persistent tables exist (only run full DDL if users table is absent)
+          const regCheck = await pgPool.query("SELECT to_regclass('public.users') as reg;").catch(() => ({ rows: [] }));
+          if (!regCheck.rows[0]?.reg) {
+            console.log('PostgreSQL schema not found, running initial table migrations...');
+            await createTablesPostgres();
+          }
+          useSqlite = false;
+          resolve();
+        } catch (err) {
+          console.error('FATAL POSTGRESQL CONNECTION ERROR:', err.message);
+          // Clear cached pool on connection error so subsequent requests can re-attempt
+          if (pgPool) {
+            pgPool.end().catch(() => {});
+            pgPool = null;
+          }
+          initPromise = null;
+          reject(new Error(`Database Connection Failed: ${err.message}. Serverless memory fallback is disabled.`));
+        }
+      } else {
+        // Local development SQLite mode (only allowed when NOT in Vercel and NOT in Production)
+        console.log('Initializing local development SQLite database...');
+        setupSqlite(
+          () => resolve(),
+          (err) => {
+            initPromise = null;
+            reject(err);
+          }
+        );
       }
-    } else {
-      // Local development SQLite mode (only allowed when NOT in Vercel and NOT in Production)
-      console.log('Initializing local development SQLite database...');
-      setupSqlite(onInitDone, reject);
-    }
+    })().catch((err) => {
+      initPromise = null;
+      reject(err);
+    });
   });
 
   return initPromise;

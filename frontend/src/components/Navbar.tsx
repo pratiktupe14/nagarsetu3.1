@@ -17,9 +17,9 @@ export const Navbar: React.FC = () => {
 
   const isPublicPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register';
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   const handleRoleSwitch = async (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
