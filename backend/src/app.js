@@ -52,7 +52,7 @@ const corsOptions = {
     if (process.env.NODE_ENV !== 'production' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) {
       return callback(null, true);
     }
-    callback(new Error('Not allowed by CORS'), false);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
