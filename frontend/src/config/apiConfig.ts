@@ -11,9 +11,12 @@ export const getApiUrl = (): string => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:5000';
     }
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app')) {
+      return 'https://nagarsetu-backend-api.vercel.app';
+    }
     return window.location.origin.replace(/\/$/, '');
   }
-  return 'http://localhost:5000';
+  return 'https://nagarsetu-backend-api.vercel.app';
 };
 
 export const getAiServiceUrl = (): string => {
