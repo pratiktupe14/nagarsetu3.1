@@ -171,12 +171,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
     }
 
-    if (!isMatch && process.env.NODE_ENV !== 'production' && (String(user.mobile || '').trim() === '8788562103' || normalizeMobile(user.mobile) === '8788562103' || (user.email && user.email.toLowerCase() === 'citizen8788@nagarsetu.gov.in'))) {
-      if (password === '8788562103' || password === 'password123' || password === process.env.DEMO_USER_PASSWORD) {
-        isMatch = true;
-      }
-    }
-
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
