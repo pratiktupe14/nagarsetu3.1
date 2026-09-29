@@ -162,7 +162,7 @@ export const CitizenPortal: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              {t('welcome')}, {user?.full_name || t('roleCitizen')}
+              {t('welcome')}, {user?.full_name || (user as any)?.name || 'Citizen'}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
               {t('tagline')}
@@ -212,7 +212,7 @@ export const CitizenPortal: React.FC = () => {
         </div>
 
         {/* METRICS GRID */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('totalComplaints')}</span>

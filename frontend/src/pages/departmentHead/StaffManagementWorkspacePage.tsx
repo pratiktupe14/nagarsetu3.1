@@ -11,20 +11,21 @@ import {
   DepartmentStaffApiItem,
   DepartmentStaffApiSummary
 } from '../../services/adminService';
+import { changeStaffPasswordByDepartmentHead } from '../../services/departmentService';
 import {
   Users, UserCheck, UserX, Clock, PlusCircle, Search, Filter,
   RefreshCw, CheckCircle2, AlertTriangle, Eye, Edit3, Trash2,
-  Lock, X, Phone, Mail, ShieldCheck, ShieldAlert, Check, User
+  Lock, X, Phone, Mail, ShieldCheck, ShieldAlert, Check, User, Key, EyeOff
 } from 'lucide-react';
 
 export const StaffManagementWorkspacePage: React.FC = () => {
   const { user, role } = useAuth();
   const activeRole = role || user?.role || 'citizen';
-  const isAdmin = ['admin', 'city_admin'].includes(activeRole);
+  const isAdmin = ['admin', 'city_admin', 'super_admin', 'municipal_admin'].includes(activeRole);
   const isDeptHead = activeRole === 'department_head';
 
   const userDeptName = user?.department_name || (isDeptHead ? 'My Department' : 'City Administration');
-  const userDeptId = user?.department_id ? String(user.department_id) : undefined;
+  const userDeptId = isAdmin ? undefined : (user?.department_id ? String(user.department_id) : undefined);
 
   const [staffList, setStaffList] = useState<DepartmentStaffApiItem[]>([]);
   const [summary, setSummary] = useState<DepartmentStaffApiSummary>({
@@ -68,14 +69,71 @@ export const StaffManagementWorkspacePage: React.FC = () => {
   const [editDesignation, setEditDesignation] = useState('');
   const [editLanguage, setEditLanguage] = useState('en');
 
+  // Change Password Form State
+  const [changePasswordStaff, setChangePasswordStaff] = useState<DepartmentStaffApiItem | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState<string | null>(null);
+
+  const handleOpenChangePassword = (staff: DepartmentStaffApiItem) => {
+    setChangePasswordStaff(staff);
+    setNewPasswordInput('');
+    setConfirmPasswordInput('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setChangePasswordError(null);
+    setChangePasswordSuccess(null);
+  };
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!changePasswordStaff) return;
+
+    if (!newPasswordInput) {
+      setChangePasswordError('New password is required.');
+      return;
+    }
+    if (newPasswordInput.length < 6) {
+      setChangePasswordError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setChangePasswordError('New password and confirm password do not match.');
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    setChangePasswordError(null);
+    setChangePasswordSuccess(null);
+
+    try {
+      const staffTargetId = changePasswordStaff.id || (changePasswordStaff as any).user_id || changePasswordStaff.employee_id;
+      const res = await changeStaffPasswordByDepartmentHead(staffTargetId, newPasswordInput, confirmPasswordInput);
+      setChangePasswordSuccess(res.message || 'Password updated successfully.');
+      setSuccessMsg(`Password for ${changePasswordStaff.name} updated successfully.`);
+      setTimeout(() => {
+        setChangePasswordStaff(null);
+        loadStaffData();
+      }, 1200);
+    } catch (err: any) {
+      setChangePasswordError(err.message || 'Failed to update staff password.');
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
   const loadStaffData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetchDepartmentStaffApi({
-        status: statusFilter.toLowerCase(),
+        status: statusFilter === 'All' ? 'all' : statusFilter.toLowerCase(),
         search: searchQuery,
-        department_id: userDeptId
+        department_id: isAdmin ? undefined : userDeptId
       });
       setStaffList(res.staff);
       setSummary(res.summary);
@@ -85,7 +143,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery, userDeptId]);
+  }, [statusFilter, searchQuery, userDeptId, isAdmin]);
 
   useEffect(() => {
     loadStaffData();
@@ -320,7 +378,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search staff by name, employee ID, email, or phone..."
                 type="text"
                 placeholder="Search staff by name, employee ID, email, or phone..."
                 value={searchQuery}
@@ -446,6 +504,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                             onClick={() => setViewingStaff(staff)}
                             className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                             title="View Staff Profile"
+                            aria-label={`View profile for ${staff.name}`}
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
@@ -457,9 +516,23 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                               onClick={() => handleOpenEdit(staff)}
                               className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                               title="Edit Staff Member"
+                              aria-label={`Edit ${staff.name}`}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                               <span>Edit</span>
+                            </button>
+                          )}
+
+                          {/* CHANGE PASSWORD BUTTON */}
+                          {!isArchived && (
+                            <button
+                              onClick={() => handleOpenChangePassword(staff)}
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
+                              title="Change Staff Password"
+                              aria-label={`Change password for ${staff.name}`}
+                            >
+                              <Key className="w-3.5 h-3.5" />
+                              <span>Password</span>
                             </button>
                           )}
 
@@ -469,6 +542,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
                               onClick={() => setDeactivateConfirmId(staff)}
                               className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs inline-flex items-center space-x-1 min-h-[32px]"
                               title="Deactivate Staff"
+                              aria-label={`Deactivate ${staff.name}`}
                             >
                               <UserX className="w-3.5 h-3.5" />
                               <span>Deactivate</span>
@@ -539,7 +613,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Full Name *</label>
-                  <input
+                  <input aria-label="e.g. Amit Patil"
                     type="text"
                     required
                     placeholder="e.g. Amit Patil"
@@ -551,7 +625,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Mobile Number *</label>
-                  <input
+                  <input aria-label="e.g. 9876543210"
                     type="tel"
                     required
                     placeholder="e.g. 9876543210"
@@ -565,7 +639,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Email Address</label>
-                  <input
+                  <input aria-label="amit.patil@nagarsetu.gov.in"
                     type="email"
                     placeholder="amit.patil@nagarsetu.gov.in"
                     value={addEmail}
@@ -576,7 +650,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Employee ID</label>
-                  <input
+                  <input aria-label="e.g. PWD-STF-001"
                     type="text"
                     placeholder="e.g. PWD-STF-001"
                     value={addEmployeeId}
@@ -589,7 +663,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Password *</label>
-                  <input
+                  <input aria-label="Staff login password"
                     type="password"
                     required
                     placeholder="Staff login password"
@@ -601,7 +675,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Confirm Password *</label>
-                  <input
+                  <input aria-label="Confirm password"
                     type="password"
                     required
                     placeholder="Confirm password"
@@ -615,7 +689,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Designation</label>
-                  <input
+                  <input aria-label="add Designation"
                     type="text"
                     value={addDesignation}
                     onChange={(e) => setAddDesignation(e.target.value)}
@@ -625,7 +699,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
                 <div>
                   <label className="block font-extrabold text-gray-800 mb-1">Preferred Language</label>
-                  <select
+                  <select aria-label="add Language"
                     value={addLanguage}
                     onChange={(e) => setAddLanguage(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold min-h-[42px]"
@@ -708,20 +782,25 @@ export const StaffManagementWorkspacePage: React.FC = () => {
               </div>
 
               {/* WORKLOAD STATS */}
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-blue-800 block">Active Tasks</span>
-                  <span className="text-lg font-extrabold text-blue-900 font-mono">{viewingStaff.active_tasks}</span>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-emerald-800 block">Completed</span>
-                  <span className="text-lg font-extrabold text-emerald-900 font-mono">{viewingStaff.completed_tasks}</span>
-                </div>
-                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
-                  <span className="text-[10px] font-extrabold uppercase font-mono text-rose-800 block">Overdue</span>
-                  <span className="text-lg font-extrabold text-rose-900 font-mono">{viewingStaff.overdue_tasks}</span>
-                </div>
-              </div>
+              {(() => {
+                const currentStaff = staffList.find((s) => s.id === viewingStaff.id || s.employee_id === viewingStaff.employee_id) || viewingStaff;
+                return (
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-blue-800 block">Active Tasks</span>
+                      <span className="text-lg font-extrabold text-blue-900 font-mono">{currentStaff.active_tasks || 0}</span>
+                    </div>
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-emerald-800 block">Completed</span>
+                      <span className="text-lg font-extrabold text-emerald-900 font-mono">{currentStaff.completed_tasks || 0}</span>
+                    </div>
+                    <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+                      <span className="text-[10px] font-extrabold uppercase font-mono text-rose-800 block">Overdue</span>
+                      <span className="text-lg font-extrabold text-rose-900 font-mono">{currentStaff.overdue_tasks || 0}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex justify-end pt-2">
                 <button
@@ -750,7 +829,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Full Name *</label>
-                <input
+                <input aria-label="edit Name"
                   type="text"
                   required
                   value={editName}
@@ -761,7 +840,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Mobile Number *</label>
-                <input
+                <input aria-label="edit Mobile"
                   type="tel"
                   required
                   value={editMobile}
@@ -772,7 +851,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Employee ID</label>
-                <input
+                <input aria-label="edit Employee Id"
                   type="text"
                   value={editEmployeeId}
                   onChange={(e) => setEditEmployeeId(e.target.value)}
@@ -782,7 +861,7 @@ export const StaffManagementWorkspacePage: React.FC = () => {
 
               <div>
                 <label className="block font-extrabold text-gray-800 mb-1">Designation</label>
-                <input
+                <input aria-label="edit Designation"
                   type="text"
                   value={editDesignation}
                   onChange={(e) => setEditDesignation(e.target.value)}
@@ -901,7 +980,113 @@ export const StaffManagementWorkspacePage: React.FC = () => {
           </div>
         )}
 
+        {/* CHANGE STAFF PASSWORD MODAL */}
+        {changePasswordStaff && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <form onSubmit={handleChangePasswordSubmit} className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 border border-gray-200 shadow-xl my-8 text-xs font-sans">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center space-x-2 text-blue-700">
+                  <Key className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-extrabold text-gray-900 font-outfit text-base">Change Staff Password</h3>
+                </div>
+                <button type="button" onClick={() => setChangePasswordStaff(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-gray-200 space-y-1 text-xs">
+                <div className="flex items-center justify-between text-gray-900 font-bold">
+                  <span>{changePasswordStaff.name}</span>
+                  <span className="font-mono text-[11px] text-gray-500">{changePasswordStaff.employee_id}</span>
+                </div>
+                <div className="text-gray-600 text-[11px] font-mono">
+                  {changePasswordStaff.email || changePasswordStaff.contact_number || changePasswordStaff.mobile}
+                </div>
+              </div>
+
+              {changePasswordError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 font-bold rounded-xl flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{changePasswordError}</span>
+                </div>
+              )}
+
+              {changePasswordSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-xl flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{changePasswordSuccess}</span>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-extrabold text-gray-800 mb-1">New Password *</label>
+                  <div className="relative">
+                    <input aria-label="Enter new password (min 6 chars)"
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Enter new password (min 6 chars)"
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 pr-10 font-medium min-h-[42px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-extrabold text-gray-800 mb-1">Confirm New Password *</label>
+                  <div className="relative">
+                    <input aria-label="Confirm new password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Confirm new password"
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-xl p-2.5 pr-10 font-medium min-h-[42px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-3 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordStaff(null)}
+                  className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-800 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changePasswordLoading}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold flex items-center space-x-2 min-h-[42px] disabled:opacity-50"
+                >
+                  {changePasswordLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                  <span>Update Password</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
       </div>
     </DashboardLayout>
+
   );
 };

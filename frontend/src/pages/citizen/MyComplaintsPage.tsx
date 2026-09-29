@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -42,6 +43,7 @@ function getStageIndex(status: string): number {
 export const MyComplaintsPage: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translateStatus } = useLanguage();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -125,7 +127,7 @@ export const MyComplaintsPage: React.FC = () => {
     }
 
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      toast.warning('Geolocation is not supported by your browser.');
       return;
     }
 
@@ -138,7 +140,7 @@ export const MyComplaintsPage: React.FC = () => {
       },
       (err) => {
         console.error(err);
-        alert('Could not access current location. Please check browser permissions.');
+        toast.warning('Could not access current location. Please check browser permissions.');
         setGpsLoading(false);
       }
     );
@@ -279,7 +281,7 @@ export const MyComplaintsPage: React.FC = () => {
             {/* SEARCH INPUT */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search by complaint ID or issue title..."
                 type="text"
                 placeholder="Search by complaint ID or issue title..."
                 value={searchQuery}
@@ -307,7 +309,7 @@ export const MyComplaintsPage: React.FC = () => {
               
               {/* Area Dropdown */}
               <div>
-                <select
+                <select aria-label="area  filter"
                   value={areaFilter}
                   onChange={(e) => setAreaFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -321,7 +323,7 @@ export const MyComplaintsPage: React.FC = () => {
 
               {/* Priority Dropdown */}
               <div>
-                <select
+                <select aria-label="priority  filter"
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -336,7 +338,7 @@ export const MyComplaintsPage: React.FC = () => {
 
               {/* Department Dropdown */}
               <div>
-                <select
+                <select aria-label="department  filter"
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -353,7 +355,7 @@ export const MyComplaintsPage: React.FC = () => {
 
               {/* Date Filter Dropdown */}
               <div>
-                <select
+                <select aria-label="date  filter"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -367,7 +369,7 @@ export const MyComplaintsPage: React.FC = () => {
 
               {/* Sort By Dropdown */}
               <div>
-                <select
+                <select aria-label="sort By"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-emerald-800 font-extrabold focus:border-emerald-500 min-h-[44px]"

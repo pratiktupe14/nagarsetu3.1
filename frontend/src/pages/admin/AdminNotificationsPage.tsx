@@ -4,7 +4,8 @@ import { DashboardLayout } from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications
+  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications,
+  syncNotificationsFromBackend
 } from '../../services/notificationService';
 import { NotificationItem, NotificationType } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -42,11 +43,15 @@ export const AdminNotificationsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'All' | 'Unread' | 'Read' | 'Complaint' | 'SLA' | 'Staff' | 'Critical'>('All');
 
   // Load Notifications
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let list = getNotificationsForRole(user?.id, 'city_admin');
+      setNotifications(list);
+
+      await syncNotificationsFromBackend();
+      list = getNotificationsForRole(user?.id, 'city_admin');
       setNotifications(list);
     } catch (e) {
       console.error(e);
@@ -260,7 +265,7 @@ export const AdminNotificationsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search notifications by title, ID or message..."
                 type="text"
                 placeholder="Search notifications by title, ID or message..."
                 value={searchQuery}

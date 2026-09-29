@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const StaffSettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, updateUserProfile } = useAuth();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -20,7 +20,7 @@ export const StaffSettingsPage: React.FC = () => {
   >('profile');
 
   // Dynamic Staff Identity & Department
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
     [user?.department_id, user?.department_name]
@@ -82,13 +82,22 @@ export const StaffSettingsPage: React.FC = () => {
   };
 
   // Handle Profile Save
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!updateUserProfile) return;
     setSaving(true);
-    setTimeout(() => {
+    try {
+      await updateUserProfile({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        mobile: mobile.trim()
+      });
+      showSaveToast('Profile settings saved to database successfully.');
+    } catch (err: any) {
+      showSaveToast(`Error: ${err.message || 'Failed to save profile'}`);
+    } finally {
       setSaving(false);
-      showSaveToast('Profile settings saved successfully.');
-    }, 400);
+    }
   };
 
   // Handle Notification Preferences Save
@@ -119,7 +128,7 @@ export const StaffSettingsPage: React.FC = () => {
   };
 
   // Handle Password Update
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(null);
@@ -138,14 +147,20 @@ export const StaffSettingsPage: React.FC = () => {
     }
 
     setUpdatingPassword(true);
-    setTimeout(() => {
-      setUpdatingPassword(false);
-      setPasswordSuccess('Password updated successfully.');
+    try {
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
+      }
+      setPasswordSuccess('Password updated successfully in database.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       showSaveToast('Account security password updated.');
-    }, 600);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password. Verify your current password.');
+    } finally {
+      setUpdatingPassword(false);
+    }
   };
 
   // Handle Logout Execution
@@ -312,7 +327,7 @@ export const StaffSettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Full Name *</label>
-                    <input
+                    <input aria-label="full Name"
                       type="text"
                       required
                       value={fullName}
@@ -323,7 +338,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Email Address *</label>
-                    <input
+                    <input aria-label="email"
                       type="email"
                       required
                       value={email}
@@ -334,7 +349,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Contact Phone Number *</label>
-                    <input
+                    <input aria-label="mobile"
                       type="text"
                       required
                       value={mobile}
@@ -385,7 +400,7 @@ export const StaffSettingsPage: React.FC = () => {
                       </div>
 
                       <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={item.state}
                           onChange={(e) => item.set(e.target.checked)}
@@ -433,7 +448,7 @@ export const StaffSettingsPage: React.FC = () => {
                       <div key={idx} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between">
                         <span className="font-bold text-gray-900">{thresh.label}</span>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input
+                          <input aria-label="Select item"
                             type="checkbox"
                             checked={thresh.state}
                             onChange={(e) => thresh.set(e.target.checked)}
@@ -454,7 +469,7 @@ export const StaffSettingsPage: React.FC = () => {
                         <span className="text-[11px] text-rose-700">Receive persistent alerts when SLA target is breached.</span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={alertOverdue}
                           onChange={(e) => setAlertOverdue(e.target.checked)}
@@ -470,7 +485,7 @@ export const StaffSettingsPage: React.FC = () => {
                         <span className="text-[11px] text-rose-700">Immediate high-priority notifications for emergency civic issues.</span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input
+                        <input aria-label="Select item"
                           type="checkbox"
                           checked={alertCritical}
                           onChange={(e) => setAlertCritical(e.target.checked)}
@@ -538,7 +553,7 @@ export const StaffSettingsPage: React.FC = () => {
                 <div className="space-y-4 max-w-md text-xs">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Current Password *</label>
-                    <input
+                    <input aria-label="current Password"
                       type="password"
                       required
                       value={currentPassword}
@@ -550,7 +565,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">New Password *</label>
-                    <input
+                    <input aria-label="new Password"
                       type="password"
                       required
                       value={newPassword}
@@ -562,7 +577,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Confirm New Password *</label>
-                    <input
+                    <input aria-label="confirm Password"
                       type="password"
                       required
                       value={confirmPassword}

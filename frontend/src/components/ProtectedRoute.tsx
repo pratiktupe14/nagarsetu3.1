@@ -23,7 +23,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
             <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin absolute -bottom-1 -right-1" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU 3.0</h3>
+            <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU</h3>
             <p className="text-xs text-slate-400 font-medium">Verifying secure session & profile permissions...</p>
           </div>
         </div>
@@ -31,7 +31,29 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     );
   }
 
-  // 2. Redirect to /login if user is unauthenticated
+  // 2. Redirect to /login if user is unauthenticated or token expired
+  const token = localStorage.getItem('nagarsetu_token');
+  if (!token) {
+    localStorage.removeItem('nagarsetu_user');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('nagarsetu_token');
+        localStorage.removeItem('nagarsetu_user');
+        return <Navigate to="/login" state={{ from: location }} replace />;
+      }
+    }
+  } catch (e) {
+    localStorage.removeItem('nagarsetu_token');
+    localStorage.removeItem('nagarsetu_user');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   if (!user || !user.role) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }

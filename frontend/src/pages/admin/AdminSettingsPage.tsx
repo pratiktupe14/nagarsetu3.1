@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export const AdminSettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, updateUserProfile } = useAuth();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -43,7 +43,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [slaAlertOverdue, setSlaAlertOverdue] = useState(true);
 
   // Application Settings State
-  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_admin_lang') || 'en');
+  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_admin_lang') || 'en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [timeFormat, setTimeFormat] = useState('12 Hour');
   const [autoRefreshInterval, setAutoRefreshInterval] = useState('30s');
@@ -63,21 +63,36 @@ export const AdminSettingsPage: React.FC = () => {
     if (cachedLang) setLanguage(cachedLang);
   }, []);
 
+  const [saving, setSaving] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
   // Save Settings Function
-  const handleSaveSettings = (e?: React.FormEvent) => {
+  const handleSaveSettings = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaveErrorMsg(null);
+    setSaving(true);
 
-    // Save language preference
-    localStorage.setItem('nagarsetu_admin_lang', language);
-
-    // Show soft success feedback
-    setSaveSuccessMsg('✓ Settings saved successfully.');
-    setTimeout(() => setSaveSuccessMsg(null), 3500);
+    try {
+      if (updateUserProfile) {
+        await updateUserProfile({
+          full_name: fullName.trim(),
+          email: email.trim(),
+          mobile: mobile.trim(),
+          language_pref: language
+        });
+      }
+      localStorage.setItem('nagarsetu_admin_lang', language);
+      setSaveSuccessMsg('✓ Admin profile & settings saved to database successfully.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to save admin settings.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Update Password Function
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveErrorMsg(null);
 
@@ -94,11 +109,21 @@ export const AdminSettingsPage: React.FC = () => {
       return;
     }
 
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setSaveSuccessMsg('✓ Password updated successfully.');
-    setTimeout(() => setSaveSuccessMsg(null), 3500);
+    setUpdatingPassword(true);
+    try {
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
+      }
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setSaveSuccessMsg('✓ Password updated and verified in database successfully.');
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to update password. Please check your current password.');
+    } finally {
+      setUpdatingPassword(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -220,7 +245,7 @@ export const AdminSettingsPage: React.FC = () => {
                       
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Full Name</label>
-                        <input
+                        <input aria-label="full Name"
                           type="text"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
@@ -230,7 +255,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Official Email Address</label>
-                        <input
+                        <input aria-label="email"
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
@@ -240,7 +265,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Mobile Contact Number</label>
-                        <input
+                        <input aria-label="mobile"
                           type="text"
                           value={mobile}
                           onChange={(e) => setMobile(e.target.value)}
@@ -250,7 +275,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                       <div>
                         <label className="block font-bold text-gray-700 mb-1">Assigned Department</label>
-                        <input
+                        <input aria-label="department"
                           type="text"
                           value={department}
                           onChange={(e) => setDepartment(e.target.value)}
@@ -490,7 +515,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Date Display Format</label>
-                    <select
+                    <select aria-label="date Format"
                       value={dateFormat}
                       onChange={(e) => setDateFormat(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -503,7 +528,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Time Display Format</label>
-                    <select
+                    <select aria-label="time Format"
                       value={timeFormat}
                       onChange={(e) => setTimeFormat(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -515,7 +540,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Live Dashboard Auto-Refresh</label>
-                    <select
+                    <select aria-label="auto Refresh Interval"
                       value={autoRefreshInterval}
                       onChange={(e) => setAutoRefreshInterval(e.target.value)}
                       className="w-full p-2.5 bg-white border border-gray-300 rounded-lg font-mono font-medium text-gray-900 focus:ring-1 focus:ring-emerald-500"
@@ -554,7 +579,7 @@ export const AdminSettingsPage: React.FC = () => {
                   
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">Current Password</label>
-                    <input
+                    <input aria-label="Enter current password"
                       type="password"
                       placeholder="Enter current password"
                       value={currentPassword}
@@ -565,7 +590,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">New Password</label>
-                    <input
+                    <input aria-label="Enter new password (min. 6 chars)"
                       type="password"
                       placeholder="Enter new password (min. 6 chars)"
                       value={newPassword}
@@ -576,7 +601,7 @@ export const AdminSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">Confirm New Password</label>
-                    <input
+                    <input aria-label="Re-enter new password"
                       type="password"
                       placeholder="Re-enter new password"
                       value={confirmPassword}
@@ -588,9 +613,10 @@ export const AdminSettingsPage: React.FC = () => {
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition-colors"
+                      disabled={updatingPassword}
+                      className="px-4 py-2 bg-emerald-600 disabled:bg-emerald-400 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
                     >
-                      Update Password
+                      {updatingPassword ? 'Updating Password in Database...' : 'Update Password'}
                     </button>
                   </div>
 
@@ -668,7 +694,7 @@ const ToggleRow: React.FC<ToggleRowProps> = ({ title, desc, checked, onChange, d
       </div>
 
       <label className={`relative inline-flex items-center cursor-pointer shrink-0 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        <input
+        <input aria-label="Select item"
           type="checkbox"
           checked={checked}
           disabled={disabled}

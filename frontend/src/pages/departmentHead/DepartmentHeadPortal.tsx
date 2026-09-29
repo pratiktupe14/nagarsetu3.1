@@ -4,13 +4,14 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { DepartmentHeadAnnouncements } from '../../components/DepartmentHeadAnnouncements';
 import {
-  getStoredComplaints, getStaffTasks, assignTaskByDepartmentHead,
+  getStaffTasks, assignTaskByDepartmentHead,
   requestReworkDepartmentHead, approveResolutionDepartmentHead, getComplaintById,
   getDepartmentComplaints
 } from '../../services/complaintService';
@@ -18,6 +19,7 @@ import {
   getAllServiceStaffRecords, formatSlaRemainingTime, ServiceStaffMemberRecord,
   getDepartmentServiceStaff, getStaffMemberById
 } from '../../services/adminService';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   getNotificationsForRole, pushNotification, markNotificationAsRead,
   markAllNotificationsAsRead
@@ -92,9 +94,13 @@ function DeptMapFlyToController({ center, zoom }: { center: [number, number] | n
   return null;
 }
 
-const getDepartmentInfo = (departmentName: string) => {
+const getDepartmentInfo = (departmentName?: string, departmentId?: string | number, departmentCode?: string) => {
   const nameLower = (departmentName || '').toLowerCase();
-  if (nameLower.includes('sanitation') || nameLower.includes('waste')) {
+  const idStr = String(departmentId || '').toLowerCase();
+  const codeStr = (departmentCode || '').toUpperCase();
+
+  // 1. Sanitation & Waste Management (SAN) - ID 2
+  if (idStr === '2' || codeStr === 'SAN' || nameLower.includes('sanitat') || nameLower.includes('waste') || nameLower.includes('san')) {
     return {
       fullName: 'Sanitation & Waste Management',
       shortName: 'Sanitation & Waste',
@@ -104,7 +110,9 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Garbage Collection', 'Dustbin Cleanup', 'Waste Removal']
     };
   }
-  if (nameLower.includes('water')) {
+
+  // 2. Water Supply & Sewerage Board (WTR) - ID 3
+  if (idStr === '3' || codeStr === 'WTR' || nameLower.includes('water') || nameLower.includes('sewerage board') || nameLower.includes('wtr')) {
     return {
       fullName: 'Water Supply & Sewerage Board',
       shortName: 'Water Supply & Sewerage',
@@ -114,19 +122,23 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Pipeline Repair', 'Water Leakage', 'Water Supply Issue']
     };
   }
-  if (nameLower.includes('drainage') || nameLower.includes('sewage')) {
+
+  // 3. Drainage & Sewage Department (DRN) - ID 4
+  if (idStr === '4' || codeStr === 'DRN' || nameLower.includes('drain') || nameLower.includes('sewage') || nameLower.includes('drn')) {
     return {
-      fullName: 'Drainage & Stormwater Dept',
-      shortName: 'Drainage & Stormwater',
+      fullName: 'Drainage & Sewage Department',
+      shortName: 'Drainage & Sewage',
       icon: Waves,
       badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-300',
       description: 'Monsoon stormwater channels, drain de-silting & urban flood mitigation.',
       taskTypes: ['Drain Blockage', 'Sewage Overflow', 'Drain Cleaning']
     };
   }
-  if (nameLower.includes('electric') || nameLower.includes('light')) {
+
+  // 4. Electrical & Street Lighting (ELE) - ID 5
+  if (idStr === '5' || codeStr === 'ELE' || nameLower.includes('electric') || nameLower.includes('light') || nameLower.includes('ele')) {
     return {
-      fullName: 'Electrical & Lighting Dept',
+      fullName: 'Electrical & Street Lighting',
       shortName: 'Electrical & Lighting',
       icon: Zap,
       badgeColor: 'bg-yellow-50 text-yellow-800 border-yellow-300',
@@ -134,9 +146,11 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Streetlight Repair', 'Electrical Maintenance', 'Cable Repair']
     };
   }
-  if (nameLower.includes('traffic')) {
+
+  // 5. Traffic Management Department (TRF) - ID 6
+  if (idStr === '6' || codeStr === 'TRF' || nameLower.includes('traffic') || nameLower.includes('trf')) {
     return {
-      fullName: 'Traffic Management Dept',
+      fullName: 'Traffic Management Department',
       shortName: 'Traffic Management',
       icon: Activity,
       badgeColor: 'bg-purple-50 text-purple-800 border-purple-300',
@@ -144,13 +158,38 @@ const getDepartmentInfo = (departmentName: string) => {
       taskTypes: ['Traffic Signal Repair', 'Signage Maintenance', 'Traffic Infrastructure']
     };
   }
+
+  // 6. Maintenance Department (MNT) - ID 7
+  if (idStr === '7' || codeStr === 'MNT' || nameLower.includes('mainten') || nameLower.includes('mnt')) {
+    return {
+      fullName: 'Maintenance Department',
+      shortName: 'Maintenance Department',
+      icon: Building2,
+      badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-300',
+      description: 'Building maintenance, civic structure repairs & facility upkeep.',
+      taskTypes: ['Facility Maintenance', 'Building Repair', 'Civic Maintenance']
+    };
+  }
+
+  // 7. Public Works Department (PWD) - ID 1
+  if (idStr === '1' || codeStr === 'PWD' || nameLower.includes('public works') || nameLower.includes('road') || nameLower.includes('pwd')) {
+    return {
+      fullName: 'Public Works Department (PWD)',
+      shortName: 'Public Works (PWD)',
+      icon: Wrench,
+      badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+      description: 'Pothole Patching, Road Damage & Public Infrastructure Repairs.',
+      taskTypes: ['Pothole Repair', 'Road Maintenance', 'Infrastructure Repair']
+    };
+  }
+
   return {
-    fullName: 'Roads & Public Works (PWD)',
-    shortName: 'Public Works (PWD)',
-    icon: Wrench,
-    badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
-    description: 'Pothole Patching, Road Damage & Public Infrastructure Repairs.',
-    taskTypes: ['Pothole Repair', 'Road Maintenance', 'Infrastructure Repair']
+    fullName: 'Unassigned Department',
+    shortName: 'Unassigned',
+    icon: Building2,
+    badgeColor: 'bg-gray-50 text-gray-800 border-gray-300',
+    description: 'Unassigned municipal department.',
+    taskTypes: []
   };
 };
 
@@ -222,8 +261,9 @@ const formatRelativeTimestamp = (isoDateString: string) => {
 };
 
 export const DepartmentHeadPortal: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile, changePassword } = useAuth();
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
+  const { toast, showRichFeedback } = useNotification();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -240,7 +280,8 @@ export const DepartmentHeadPortal: React.FC = () => {
   const isStaffDetailView = currentPath.startsWith('/department-head/staff/');
   const isMapView = currentPath === '/department-head/map' || currentPath === '/department/map';
   const isNotifView = currentPath === '/department-head/notifications';
-  const isProfileView = currentPath === '/department-head/profile';
+  const isSettingsView = currentPath === '/department-head/settings';
+  const isProfileView = currentPath === '/department-head/profile' || isSettingsView;
 
   // Map Controls State
   const [mapCenter, setMapCenter] = useState<[number, number] | null>([20.0059, 73.7898]);
@@ -260,7 +301,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   const headDeptId = activeHeadRecord?.department_id || user?.department_id || '';
   const headId = activeHeadRecord?.user_id || user?.id || '';
 
-  const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull), [headDepartmentFull]);
+  const deptInfo = useMemo(() => getDepartmentInfo(headDepartmentFull, headDeptId, user?.department_code), [headDepartmentFull, headDeptId, user]);
   const isSanitationDept = useMemo(() => {
     const normDeptId = String(headDeptId == null ? '' : headDeptId).trim().toLowerCase();
     const normDeptFull = String(headDepartmentFull == null ? '' : headDepartmentFull).trim().toLowerCase();
@@ -433,7 +474,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
       // Validate that department assignment exists
       if (!activeDeptId && !activeDeptFull) {
-        setError('Department assignment could not be verified. Please contact City Administration.');
+        setError('Department assignment could not be resolved. Please contact City Administration.');
         setDepartmentComplaints([]);
         setDepartmentStaff([]);
         setLoading(false);
@@ -555,10 +596,10 @@ export const DepartmentHeadPortal: React.FC = () => {
     }
   };
 
-  // Profile Update Handler (Real Supabase + Local Storage Update)
+  // Profile Update Handler (Authoritative PostgreSQL Database Update via Express API)
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
-      alert('Full Name cannot be empty.');
+      toast.warning('Full Name cannot be empty.');
       return;
     }
 
@@ -566,34 +607,34 @@ export const DepartmentHeadPortal: React.FC = () => {
     setProfileSuccessMsg(null);
 
     try {
-      if (isSupabaseConfigured() && user?.id) {
-        await supabase.from('profiles').update({
+      if (updateUserProfile) {
+        await updateUserProfile({
           full_name: editName.trim(),
           mobile: editPhone.trim()
-        }).eq('id', user.id);
+        });
       }
 
-      // Update cached local user
-      const updatedUser = { ...user, full_name: editName.trim(), mobile: editPhone.trim() };
-      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
-
       setIsEditingProfile(false);
-      setProfileSuccessMsg('Profile updated successfully.');
-      setTimeout(() => setProfileSuccessMsg(null), 4000);
+      setProfileSuccessMsg('Profile updated and saved to database successfully.');
+      toast.success('Profile updated and saved to database successfully.');
       await loadData();
     } catch (err: any) {
       console.error('Error updating profile:', err);
-      alert(err.message || 'Unable to update profile.');
+      toast.error(err.message || 'Unable to update profile.');
     } finally {
       setSavingProfile(false);
     }
   };
 
-  // Change Password Handler (Supabase Auth)
+  // Change Password Handler (Authoritative PostgreSQL Database Update via Express API)
   const handleExecuteChangePassword = async () => {
     setPasswordError(null);
     setPasswordSuccess(null);
 
+    if (!currentPassword) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
       setPasswordError('New password must be at least 6 characters long.');
       return;
@@ -605,12 +646,11 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     setChangingPassword(true);
     try {
-      if (isSupabaseConfigured()) {
-        const { error: authErr } = await supabase.auth.updateUser({ password: newPassword });
-        if (authErr) throw authErr;
+      if (changePassword) {
+        await changePassword(currentPassword, newPassword);
       }
 
-      setPasswordSuccess('Password updated successfully.');
+      setPasswordSuccess('Password updated and verified in database successfully.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -620,7 +660,7 @@ export const DepartmentHeadPortal: React.FC = () => {
       }, 2000);
     } catch (err: any) {
       console.error(err);
-      setPasswordError(err.message || 'Failed to update password.');
+      setPasswordError(err.message || 'Failed to update password. Please check your current password.');
     } finally {
       setChangingPassword(false);
     }
@@ -988,7 +1028,7 @@ export const DepartmentHeadPortal: React.FC = () => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const numMatch = c.complaint_number.toLowerCase().includes(q);
-        const taskIdMatch = `task-${c.id.slice(0, 6)}`.includes(q);
+        const taskIdMatch = `task-${String(c.id).slice(0, 6)}`.includes(q);
         const titleMatch = c.title.toLowerCase().includes(q);
         const catMatch = c.category.toLowerCase().includes(q);
         const locMatch = (c.location_address || '').toLowerCase().includes(q);
@@ -1062,7 +1102,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     const headers = ['Task ID', 'Complaint Number', 'Title', 'Category', 'Location Address', 'Latitude', 'Longitude', 'Priority', 'Status', 'Assigned Staff', 'SLA Due Date'];
     const rows = targetList.map((c) => [
-      `"TASK-${c.id.slice(0, 6).toUpperCase()}"`,
+      `"TASK-${String(c.id).slice(0, 6).toUpperCase()}"`,
       `"${c.complaint_number}"`,
       `"${(c.title || '').replace(/"/g, '""')}"`,
       `"${(c.category || '').replace(/"/g, '""')}"`,
@@ -1087,12 +1127,24 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Confirm Task Assignment to Department Staff
   const handleExecuteAssignment = async (compObj: Complaint, staffObj: ServiceStaffMemberRecord) => {
-    const cleanHeadDept = String(headDepartmentFull || '').split('(')[0].trim().toLowerCase();
-    const cleanStaffDept = String(staffObj.department_name || '').split('(')[0].trim().toLowerCase();
+    const headDeptResolved = resolveDepartmentInfo(headDeptId, headDepartmentFull || deptInfo.fullName);
+    const staffDeptResolved = resolveDepartmentInfo(staffObj.department_id, staffObj.department_name);
+    const compDeptResolved = resolveDepartmentInfo(compObj.department_id, compObj.department_name || (compObj as any).department, compObj.category);
 
-    if (cleanStaffDept && cleanHeadDept && !cleanStaffDept.includes(cleanHeadDept) && !cleanHeadDept.includes(cleanStaffDept)) {
-      alert(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name}) does not belong to your department (${deptInfo.fullName}).`);
-      return;
+    // 1. Staff Department Matching Check against Department Head (by immutable department ID/code)
+    if (headDeptResolved.code !== 'UNASSIGNED' && staffDeptResolved.code !== 'UNASSIGNED') {
+      if (headDeptResolved.code !== staffDeptResolved.code && headDeptResolved.id !== staffDeptResolved.id) {
+        toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Service staff member '${staffObj.name}' (${staffObj.department_name || staffDeptResolved.fullName}) does not belong to your department (${headDeptResolved.fullName}).`);
+        return;
+      }
+    }
+
+    // 2. Complaint Department Matching Check against Department Head (by immutable department ID/code)
+    if (headDeptResolved.code !== 'UNASSIGNED' && compDeptResolved.code !== 'UNASSIGNED') {
+      if (headDeptResolved.code !== compDeptResolved.code && headDeptResolved.id !== compDeptResolved.id) {
+        toast.error(`CROSS-DEPARTMENT ASSIGNMENT BLOCKED: Complaint '${compObj.complaint_number || compObj.id}' (${compDeptResolved.fullName}) does not belong to your department (${headDeptResolved.fullName}).`);
+        return;
+      }
     }
 
     setAssigning(true);
@@ -1116,23 +1168,45 @@ export const DepartmentHeadPortal: React.FC = () => {
       }
 
       // Read-back verification to guarantee persistence before displaying success
-      const refreshedList = await getDepartmentComplaints(undefined, deptInfo.fullName);
-      const assignedComp = refreshedList.find(c => c.id === compObj.id || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
+      const refreshedList = await getDepartmentComplaints(headDeptId, deptInfo.fullName);
+      let assignedComp = refreshedList.find(c => String(c.id) === String(compObj.id) || c.complaint_number === compObj.id || c.complaint_number === compObj.complaint_number);
 
-      if (!assignedComp || (assignedComp.status !== 'Staff Assigned' && assignedComp.status !== 'In Progress' && assignedComp.status !== 'Accepted')) {
-        throw new Error(`Assignment verification warning: Task status read-back returned '${assignedComp?.status || 'Unassigned'}'. Please refresh and check database.`);
+      if (!assignedComp || ((assignedComp.status as string) !== 'Staff Assigned' && (assignedComp.status as string) !== 'Assigned' && (assignedComp.status as string) !== 'In Progress' && (assignedComp.status as string) !== 'Accepted')) {
+        // If bulk department list read-back returned stale cache, re-fetch exact complaint directly from primary DB
+        try {
+          const singleComp = await getComplaintById(String(compObj.id || compObj.complaint_number));
+          if (singleComp && ((singleComp.status as string) === 'Staff Assigned' || (singleComp.status as string) === 'Assigned' || (singleComp.status as string) === 'In Progress')) {
+            assignedComp = singleComp;
+          } else {
+            throw new Error(`Assignment verification failed: Database status read-back returned '${singleComp?.status || assignedComp?.status || 'Submitted'}' instead of 'Staff Assigned'.`);
+          }
+        } catch (singleErr: any) {
+          if (singleErr.message && singleErr.message.includes('Assignment verification failed')) {
+            throw singleErr;
+          }
+          throw new Error(`Assignment verification failed: Task status read-back returned '${assignedComp?.status || 'Submitted'}'.`);
+        }
       }
 
       setAssignModalComplaint(null);
       setSelectedAssignComplaint(null);
       setSelectedAssignStaff(null);
       setSelectedStaffForAssign('');
-      alert(`Task assigned successfully to ${staffObj.name} (${staffObj.employee_id || 'Service Staff'}). Assignment verified.`);
+      
+      // Phase 7 UX Requirement: Rich Feedback Card for Task Assignment
+      await showRichFeedback({
+        title: 'Task Assigned Successfully',
+        complaintNumber: compObj.complaint_number || compObj.id,
+        staffName: staffObj.name,
+        staffId: staffObj.employee_id || 'STF-001',
+        departmentName: staffObj.department_name || deptInfo.fullName
+      });
+
       await loadData();
     } catch (err: any) {
       console.error(err);
       setAssignError(err.message || 'Error executing task assignment.');
-      alert(err.message || 'Error executing task assignment.');
+      toast.error(err.message || 'Error executing task assignment.');
     } finally {
       setAssigning(false);
     }
@@ -1141,12 +1215,12 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Execute Reassignment
   const handleExecuteReassignment = async () => {
     if (!reassignModalComplaint || !targetReassignStaffId) {
-      alert('Please select a service staff member to reassign this task to.');
+      toast.warning('Please select a service staff member to reassign this task to.');
       return;
     }
     const newStaff = departmentStaff.find((s) => s.id === targetReassignStaffId);
     if (!newStaff) {
-      alert('Selected staff member record not found.');
+      toast.warning('Selected staff member record not found.');
       return;
     }
 
@@ -1171,11 +1245,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       setReassignModalComplaint(null);
       setTargetReassignStaffId('');
       setReassignReason('');
-      alert(`Task reassigned successfully to ${newStaff.name} (${newStaff.employee_id || 'Service Staff'}). Assignment verified.`);
+      toast.success(`Task reassigned successfully to ${newStaff.name} (${newStaff.employee_id || 'Service Staff'}). Assignment verified.`);
       await loadData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error reassigning task.');
+      toast.error(err.message || 'Error reassigning task.');
     } finally {
       setReassigning(false);
     }
@@ -1184,7 +1258,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Execute Escalation
   const handleExecuteEscalation = async () => {
     if (!escalateModalComplaint || !escalationReason.trim()) {
-      alert('Please state the reason for escalating this critical overdue task.');
+      toast.warning('Please state the reason for escalating this critical overdue task.');
       return;
     }
 
@@ -1203,11 +1277,11 @@ export const DepartmentHeadPortal: React.FC = () => {
       setEscalateModalComplaint(null);
       setEscalationReason('');
       setEscalationNotes('');
-      alert(`Task ${escalateModalComplaint.complaint_number} has been officially escalated to City Administration.`);
+      toast.success(`Task ${escalateModalComplaint.complaint_number} has been officially escalated to City Administration.`);
       await loadData();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error escalating task.');
+      toast.error(err.message || 'Error escalating task.');
     } finally {
       setEscalating(false);
     }
@@ -1243,13 +1317,13 @@ export const DepartmentHeadPortal: React.FC = () => {
     const compToApprove = reviewModalComplaint || detailModalComplaint;
     if (!compToApprove) return;
 
-    // Security Department Isolation Check
-    const normDept = (d: string) => (d || '').split('(')[0].trim().toLowerCase();
-    const cDept = normDept(compToApprove.department_name || compToApprove.category);
-    const hDept = normDept(headDepartmentFull);
+    // Security Department Isolation Check using unified resolveDepartmentInfo
+    const cDept = resolveDepartmentInfo(compToApprove.department_id, compToApprove.department_name, compToApprove.category);
+    const hDept = resolveDepartmentInfo(headDeptId, headDepartmentFull || user?.department_name);
 
-    if (cDept && hDept && !cDept.includes(hDept) && !hDept.includes(cDept)) {
-      alert(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
+    if (cDept && hDept && ((typeof cDept === 'object' ? cDept.code : cDept) !== 'ALL') && ((typeof hDept === 'object' ? hDept.code : hDept) !== 'ALL') && ((typeof cDept === 'object' ? cDept.code : cDept) !== (typeof hDept === 'object' ? hDept.code : hDept))) {
+      toast.error(`SECURITY VIOLATION: You cannot verify a complaint belonging to another department.`);
+
       return;
     }
 
@@ -1263,10 +1337,10 @@ export const DepartmentHeadPortal: React.FC = () => {
       setDetailModalComplaint(null);
       setConfirmApproveModal(null);
       await loadData();
-      alert(`Complaint ${compToApprove.complaint_number || complaintId} has been successfully verified, approved, and officially resolved!`);
+      toast.success(`Complaint ${compToApprove.complaint_number || complaintId} has been successfully verified, approved, and officially resolved!`);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error approving resolution.');
+      toast.error(err.message || 'Error approving resolution.');
     } finally {
       setReviewing(false);
     }
@@ -1275,7 +1349,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   // Request Field Work Rework
   const handleRequestRework = async (complaintId: string) => {
     if (!reworkReason.trim()) {
-      alert('Please provide instructions for the rework.');
+      toast.warning('Please provide instructions for the rework.');
       return;
     }
     setReviewing(true);
@@ -1284,25 +1358,26 @@ export const DepartmentHeadPortal: React.FC = () => {
       setReviewModalComplaint(null);
       setShowReworkInput(false);
       setReworkReason('');
+      toast.success('Rework instructions sent to field staff.');
       await loadData();
     } catch (err) {
       console.error(err);
-      alert('Error requesting rework.');
+      toast.error('Error requesting rework.');
     } finally {
       setReviewing(false);
     }
   };
 
-  if (!isHeadActive || user?.status === 'Inactive' || user?.status === 'inactive') {
+  if (!isHeadActive || user?.status === 'Inactive' || user?.status === 'inactive' || error || (!loading && !headDeptId && !headDepartmentFull)) {
     return (
-      <DashboardLayout title="Leadership Account Inactive">
+      <DashboardLayout title="Department Assignment Required">
         <div className="p-8 max-w-md mx-auto my-16 bg-white border border-rose-200 rounded-2xl shadow-lg text-center space-y-4 font-sans">
           <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
             <ShieldAlert className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Department Leadership Inactive</h2>
+          <h2 className="text-xl font-extrabold text-gray-900 font-outfit">Department Assignment Required</h2>
           <p className="text-xs text-gray-600 leading-relaxed font-medium">
-            Your Department Head account status is currently <strong>Inactive</strong> or unassigned to an active municipal department. Department Head portal access has been revoked.
+            {error || "Department assignment could not be resolved. Please contact City Administration."}
           </p>
           <button
             onClick={async () => {
@@ -1319,7 +1394,7 @@ export const DepartmentHeadPortal: React.FC = () => {
   }
 
   return (
-    <DashboardLayout title={isNotifView ? "Notifications" : isProfileView ? "Department Head Profile" : isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Work" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : "Department Operations"}>
+    <DashboardLayout title={isNotifView ? "Notifications" : isProfileView ? "Department Head Profile" : isMapView ? "Department Map" : isOverdue ? "Overdue Tasks" : isCompleted ? "Completed Work" : isInProgress ? t('inProgress') : isStaffView ? t('staff') : isAssignWorkspace ? t('taskAssignment') : deptInfo.fullName}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -1343,18 +1418,22 @@ export const DepartmentHeadPortal: React.FC = () => {
                     ? "Completed Work"
                     : isAssignWorkspace
                     ? "Task Assignment"
-                    : isComplaints || (!isNotifView && !isProfileView && !isStaffView)
-                    ? (isPwdDept ? "All PWD Complaints" : `All ${deptInfo.shortName} Complaints`)
-                    : deptInfo.fullName}
+                    : isNotifView
+                    ? "Department Notifications"
+                    : isProfileView
+                    ? "Head Profile"
+                    : isStaffView
+                    ? `${deptInfo.shortName} Field Staff`
+                    : `${deptInfo.fullName} Complaints`}
                 </h1>
                 <span className="font-mono text-[10px] font-extrabold bg-white text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  {isMapView ? `${deptInfo.shortName} COMMAND • GEOGRAPHIC OPERATIONAL OVERVIEW` : isOverdue ? `${deptInfo.shortName} COMMAND • SLA BREACH MONITORING` : isInProgress ? `${deptInfo.shortName} COMMAND • IN-PROGRESS EXECUTION` : isCompleted ? `${deptInfo.shortName} COMMAND • COMPLETED WORK VERIFICATION` : isAssignWorkspace ? 'TASK ASSIGNMENT & WORKLOAD MANAGEMENT' : isComplaints ? 'ALL COMPLAINTS DIRECTORY' : isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : 'DEPARTMENT HEAD PORTAL'}
+                  {isMapView ? `${deptInfo.shortName} COMMAND • GEOGRAPHIC OPERATIONAL OVERVIEW` : isOverdue ? `${deptInfo.shortName} COMMAND • SLA BREACH MONITORING` : isInProgress ? `${deptInfo.shortName} COMMAND • IN-PROGRESS EXECUTION` : isCompleted ? `${deptInfo.shortName} COMMAND • COMPLETED WORK VERIFICATION` : isAssignWorkspace ? 'TASK ASSIGNMENT & WORKLOAD MANAGEMENT' : isComplaints ? `${deptInfo.shortName.toUpperCase()} COMPLAINTS DIRECTORY` : isNotifView ? 'DEPARTMENT NOTIFICATIONS' : isProfileView ? 'HEAD PROFILE' : `${deptInfo.shortName.toUpperCase()} PORTAL`}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
                   Department Head: {headName}
                 </span>
                 <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  {deptInfo.shortName} (ID: {headDeptId})
+                  Department ID: {headDeptId}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-1">
@@ -1424,7 +1503,7 @@ export const DepartmentHeadPortal: React.FC = () => {
           <div className="space-y-6">
 
             {/* 5 NOTIFICATION SUMMARY CARDS (REAL SUPABASE DATA) */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border border-gray-200 rounded-2xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
               <div className="p-4 text-center space-y-1">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Total Notifications</span>
                 <span className="text-2xl font-extrabold text-gray-900 font-mono block">{notifMetrics.total}</span>
@@ -1456,7 +1535,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
+                  <input aria-label="notif Search"
                     type="text"
                     value={notifSearchQuery}
                     onChange={(e) => setNotifSearchQuery(e.target.value)}
@@ -1652,7 +1731,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Full Name *</label>
-                      <input
+                      <input aria-label="edit Name"
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
@@ -1662,7 +1741,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Contact Phone *</label>
-                      <input
+                      <input aria-label="edit Phone"
                         type="text"
                         value={editPhone}
                         onChange={(e) => setEditPhone(e.target.value)}
@@ -1760,7 +1839,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">Task Assignment Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskAssigned}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskAssigned: e.target.checked })}
@@ -1770,7 +1849,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">Task Completion Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskCompleted}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskCompleted: e.target.checked })}
@@ -1780,7 +1859,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">SLA Overdue Warning Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.taskOverdue}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, taskOverdue: e.target.checked })}
@@ -1790,7 +1869,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 flex items-center justify-between">
                   <span className="font-bold text-gray-800">New Complaint Alerts</span>
-                  <input
+                  <input aria-label="Select item"
                     type="checkbox"
                     checked={notifPrefs.newComplaint}
                     onChange={(e) => setNotifPrefs({ ...notifPrefs, newComplaint: e.target.checked })}
@@ -1803,7 +1882,7 @@ export const DepartmentHeadPortal: React.FC = () => {
             {/* DANGER ZONE / ACCOUNT ACTIONS */}
             <div className="p-6 bg-rose-50/50 border border-rose-200 rounded-2xl space-y-3 text-xs">
               <h3 className="font-extrabold text-rose-900 font-outfit text-sm uppercase tracking-wider">Account Actions</h3>
-              <p className="text-gray-600 font-medium">Log out of your NAGARSETU 3.0 Department Head session.</p>
+              <p className="text-gray-600 font-medium">Log out of your NAGARSETU Department Head session.</p>
 
               <div className="pt-2">
                 <button
@@ -1891,7 +1970,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                                   setMapCenter(coords);
                                   setMapZoom(15);
                                 },
-                                () => alert('Could not retrieve current location. Remaining on department view.')
+                                () => toast.warning('Could not retrieve current location. Remaining on department view.')
                               );
                             }
                           }}
@@ -1920,7 +1999,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       {/* SEARCH INPUT */}
                       <div className="lg:col-span-2 relative">
                         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                        <input
+                        <input aria-label="search"
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
@@ -1936,7 +2015,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* STATUS FILTER */}
                       <div>
-                        <select
+                        <select aria-label="status  filter"
                           value={statusFilter}
                           onChange={(e) => setStatusFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -1952,7 +2031,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* PRIORITY FILTER */}
                       <div>
-                        <select
+                        <select aria-label="priority  filter"
                           value={priorityFilter}
                           onChange={(e) => setPriorityFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -1967,7 +2046,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* STAFF FILTER */}
                       <div>
-                        <select
+                        <select aria-label="staff  filter"
                           value={staffFilter}
                           onChange={(e) => setStaffFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -1981,7 +2060,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                       {/* SLA FILTER */}
                       <div>
-                        <select
+                        <select aria-label="sla  filter"
                           value={slaFilter}
                           onChange={(e) => setSlaFilter(e.target.value)}
                           className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2176,7 +2255,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2192,7 +2271,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2207,7 +2286,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* CATEGORY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="category  filter"
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2221,7 +2300,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2235,7 +2314,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* OVERDUE DURATION FILTER */}
                 <div>
-                  <select
+                  <select aria-label="overdue Duration  filter"
                     value={overdueDurationFilter}
                     onChange={(e) => setOverdueDurationFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-rose-600 shadow-2xs"
@@ -2479,7 +2558,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -2495,7 +2574,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* REVIEW STATUS FILTER */}
                 <div>
-                  <select
+                  <select aria-label="review Status Tab"
                     value={reviewStatusTab}
                     onChange={(e) => setReviewStatusTab(e.target.value as any)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2509,7 +2588,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2524,7 +2603,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* CATEGORY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="category  filter"
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -2538,7 +2617,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3058,7 +3137,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   {/* SEARCH INPUT */}
                   <div className="lg:col-span-2 relative">
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                    <input
+                    <input aria-label="search"
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -3074,7 +3153,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* STATUS FILTER */}
                   <div>
-                    <select
+                    <select aria-label="status  filter"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3089,7 +3168,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* PRIORITY FILTER */}
                   <div>
-                    <select
+                    <select aria-label="priority  filter"
                       value={priorityFilter}
                       onChange={(e) => setPriorityFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3104,7 +3183,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* STAFF FILTER */}
                   <div>
-                    <select
+                    <select aria-label="staff  filter"
                       value={staffFilter}
                       onChange={(e) => setStaffFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3118,7 +3197,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                   {/* SLA FILTER */}
                   <div>
-                    <select
+                    <select aria-label="sla  filter"
                       value={slaFilter}
                       onChange={(e) => setSlaFilter(e.target.value)}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3431,7 +3510,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-gray-900 font-outfit">{stf.name}</span>
-                          <span className="text-[10px] font-mono text-gray-500">({stf.employee_id || stf.id.slice(0, 8)})</span>
+                          <span className="text-[10px] font-mono text-gray-500">({stf.employee_id || String(stf.id).slice(0, 8)})</span>
                           <span className={`text-[9px] px-1.5 py-0.2 rounded border ${wlBadge}`}>{wlStatus}</span>
                         </div>
                         <span className="font-mono text-xs font-extrabold text-gray-900">{activeCount} Tasks</span>
@@ -3516,7 +3595,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-4 font-mono text-gray-600 font-bold">{stf.employee_id || `STF-${stf.id.slice(0, 6)}`}</td>
+                            <td className="py-3 px-4 font-mono text-gray-600 font-bold">{stf.employee_id || `STF-${String(stf.id).slice(0, 6)}`}</td>
                             <td className="py-3 px-4">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
                                 stf.status === 'Available' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
@@ -3571,7 +3650,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="lg:col-span-2 relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -3587,7 +3666,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STATUS FILTER */}
                 <div>
-                  <select
+                  <select aria-label="status  filter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3606,7 +3685,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* PRIORITY FILTER */}
                 <div>
-                  <select
+                  <select aria-label="priority  filter"
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3621,7 +3700,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* STAFF FILTER */}
                 <div>
-                  <select
+                  <select aria-label="staff  filter"
                     value={staffFilter}
                     onChange={(e) => setStaffFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -3636,7 +3715,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 {/* SLA FILTER */}
                 <div>
-                  <select
+                  <select aria-label="sla  filter"
                     value={slaFilter}
                     onChange={(e) => setSlaFilter(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 shadow-2xs"
@@ -4048,7 +4127,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -4066,7 +4145,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               {/* SECONDARY FILTERS ROW */}
               <div className="flex flex-wrap items-center gap-2 text-xs pt-1 border-t border-gray-200/70">
-                <select
+                <select aria-label="category  filter"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4105,7 +4184,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   )}
                 </select>
 
-                <select
+                <select aria-label="priority  filter"
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4117,7 +4196,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Low">Low</option>
                 </select>
 
-                <select
+                <select aria-label="status  filter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4134,7 +4213,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Overdue">Overdue</option>
                 </select>
 
-                <select
+                <select aria-label="staff  filter"
                   value={staffFilter}
                   onChange={(e) => setStaffFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4146,7 +4225,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   ))}
                 </select>
 
-                <select
+                <select aria-label="sla  filter"
                   value={slaFilter}
                   onChange={(e) => setSlaFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4157,7 +4236,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                   <option value="Overdue">Overdue SLA</option>
                 </select>
 
-                <select
+                <select aria-label="date  filter"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
@@ -4234,7 +4313,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       <thead>
                         <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 uppercase font-mono text-[10px] font-extrabold">
                           <th className="p-3.5 w-10 text-center">
-                            <input
+                            <input aria-label="Select item"
                               type="checkbox"
                               checked={selectedComplaints.length > 0 && selectedComplaints.length === paginatedComplaints.length}
                               onChange={(e) => {
@@ -4268,7 +4347,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                           return (
                             <tr key={comp.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/50' : ''}`}>
                               <td className="p-3.5 text-center">
-                                <input
+                                <input aria-label="Select item"
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={(e) => {
@@ -4453,8 +4532,19 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               <div className="space-y-3 text-xs">
                 <div>
+                  <label className="block font-bold text-gray-700 mb-1">Current Password *</label>
+                  <input aria-label="current Password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password..."
+                    className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900"
+                  />
+                </div>
+
+                <div>
                   <label className="block font-bold text-gray-700 mb-1">New Password *</label>
-                  <input
+                  <input aria-label="new Password"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -4465,7 +4555,7 @@ export const DepartmentHeadPortal: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Confirm New Password *</label>
-                  <input
+                  <input aria-label="confirm Password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -4522,7 +4612,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div>
                   <span className="text-[10px] font-mono text-gray-500 font-bold uppercase block">Current Priority</span>
                   <div className="flex items-center space-x-1 mt-0.5">
-                    <select
+                    <select aria-label="priority"
                       value={detailModalComplaint.priority}
                       onChange={async (e) => {
                         const newPri = e.target.value as any;
@@ -4802,7 +4892,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       );
                     }
                     return (
-                      <select
+                      <select aria-label="selected Staff For Assign"
                         value={selectedStaffForAssign}
                         onChange={(e) => {
                           setSelectedStaffForAssign(e.target.value);
@@ -4955,7 +5045,7 @@ export const DepartmentHeadPortal: React.FC = () => {
               {showReworkInput && (
                 <div className="space-y-2 text-xs">
                   <label className="block font-bold text-rose-900">Rework Instructions for Field Staff *</label>
-                  <textarea
+                  <textarea aria-label="rework Reason"
                     value={reworkReason}
                     onChange={(e) => setReworkReason(e.target.value)}
                     placeholder="Explain specifically what needs to be fixed or re-inspected..."

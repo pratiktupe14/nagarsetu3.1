@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,7 +8,8 @@ import { resolveDepartmentInfo } from '../services/departmentService';
 import {
   Home, FileText, PlusCircle, MapPin, Bell, User, Settings, HelpCircle, Info,
   Building2, Users, Clock, Map, ChevronLeft, ChevronRight, X, Activity,
-  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone
+  CheckCircle2, AlertTriangle, LogOut, UserCheck, LayoutDashboard, Megaphone,
+  Wrench
 } from 'lucide-react';
 
 export function getDepartmentHeadPortalLabel(
@@ -63,11 +64,24 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 4. ELE (Electrical & Street Lighting)
+  // 4. DRN (Drainage & Sewage Department) - ID 4
   if (
-    codeClean === '4' || codeClean === 'ele' ||
+    codeClean === '4' || codeClean === 'drn' ||
+    dName.includes('drainage') || dName.includes('sewage') ||
+    email.includes('drn') || email.includes('drainage') || email.includes('sanjay.more') || name.includes('sanjay more')
+  ) {
+    return {
+      mainTitle: 'DRAINAGE & SEWAGE',
+      subtitle: '(DRN) DEPARTMENT HEAD PORTAL',
+      fullLabel: 'DRAINAGE & SEWAGE (DRN) DEPARTMENT HEAD PORTAL'
+    };
+  }
+
+  // 5. ELE (Electrical & Street Lighting) - ID 5
+  if (
+    codeClean === '5' || codeClean === 'ele' ||
     dName.includes('electrical') || dName.includes('lighting') ||
-    email.includes('ele') || email.includes('electrical') || email.includes('aditya.joshi') || name.includes('aditya joshi')
+    email.includes('ele') || email.includes('electrical') || email.includes('kunal.kulkarni') || name.includes('kunal kulkarni')
   ) {
     return {
       mainTitle: 'ELECTRICAL & STREET LIGHTING',
@@ -76,9 +90,9 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 5. TRF (Traffic Management Department)
+  // 6. TRF (Traffic Management Department) - ID 6
   if (
-    codeClean === '5' || codeClean === 'trf' ||
+    codeClean === '6' || codeClean === 'trf' ||
     dName.includes('traffic') ||
     email.includes('trf') || email.includes('traffic') || email.includes('rohan.deshmukh') || name.includes('rohan deshmukh')
   ) {
@@ -89,29 +103,16 @@ export function getDepartmentHeadPortalLabel(
     };
   }
 
-  // 6. MNT (Maintenance Department)
+  // 7. MNT (Maintenance Department) - ID 7
   if (
-    codeClean === '6' || codeClean === 'mnt' ||
+    codeClean === '7' || codeClean === 'mnt' ||
     dName.includes('maintenance') ||
-    email.includes('mnt') || email.includes('maintenance') || email.includes('kunal.kulkarni') || name.includes('kunal kulkarni')
+    email.includes('mnt') || email.includes('maintenance') || email.includes('aditya.joshi') || name.includes('aditya joshi')
   ) {
     return {
       mainTitle: 'MAINTENANCE',
       subtitle: '(MNT) DEPARTMENT HEAD PORTAL',
       fullLabel: 'MAINTENANCE (MNT) DEPARTMENT HEAD PORTAL'
-    };
-  }
-
-  // 7. DRN (Drainage & Sewage Department)
-  if (
-    codeClean === '7' || codeClean === 'drn' ||
-    dName.includes('drainage') || dName.includes('sewage') ||
-    email.includes('drn') || email.includes('drainage') || email.includes('sanjay.more') || name.includes('sanjay more')
-  ) {
-    return {
-      mainTitle: 'DRAINAGE & SEWAGE',
-      subtitle: '(DRN) DEPARTMENT HEAD PORTAL',
-      fullLabel: 'DRAINAGE & SEWAGE (DRN) DEPARTMENT HEAD PORTAL'
     };
   }
 
@@ -154,6 +155,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      if (document.activeElement instanceof HTMLElement) {
+        triggerRef.current = document.activeElement;
+      }
+
+      const timer = setTimeout(() => {
+        if (drawerRef.current) {
+          const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusables.length > 0) {
+            focusables[0].focus();
+          }
+        }
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onMobileClose();
+          return;
+        }
+
+        if (e.key === 'Tab' && drawerRef.current) {
+          const focusables = Array.from(
+            drawerRef.current.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+          ).filter((el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
+
+          if (focusables.length === 0) return;
+
+          const firstEl = focusables[0];
+          const lastEl = focusables[focusables.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstEl) {
+            e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else if (triggerRef.current) {
+      const elToFocus = triggerRef.current;
+      triggerRef.current = null;
+      setTimeout(() => {
+        if (elToFocus && typeof elToFocus.focus === 'function') {
+          elToFocus.focus();
+        } else {
+          const toggleBtn = document.querySelector<HTMLElement>('button[aria-label="Open navigation menu"]');
+          toggleBtn?.focus();
+        }
+      }, 50);
+    }
+  }, [mobileOpen, onMobileClose]);
+
   const activeRole: UserRole = role || user?.role || 'citizen';
 
   const citizenNav: NavGroup[] = [
@@ -165,6 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { label: t('trackComplaint'), path: '/citizen/track', icon: Activity },
         { label: t('reportComplaint'), path: '/citizen/report', icon: PlusCircle },
         { label: t('nearbyIssues'), path: '/citizen/nearby', icon: MapPin },
+        { label: 'Civic Works', path: '/citizen/work', icon: Wrench },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell }
       ]
     },
@@ -172,7 +242,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: t('accountMenu'),
       items: [
         { label: t('announcements'), path: '/citizen/announcements', icon: Megaphone },
-        { label: t('notifications'), path: '/citizen/notifications', icon: Bell },
         { label: t('profile'), path: '/citizen/profile', icon: User },
         { label: t('settings'), path: '/citizen/settings', icon: Settings }
       ]
@@ -352,11 +421,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (supabase && supabase.auth) {
         await supabase.auth.signOut().catch(() => {});
       }
-      logout();
-      localStorage.removeItem('nagarsetu_user');
+      await logout();
       onMobileClose();
       setShowLogoutConfirm(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (err) {
       console.error('Logout failed:', err);
       setLogoutError('Unable to logout. Please try again.');
@@ -371,20 +439,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="space-y-6 px-3">
         {/* NAGARSETU LOGO & ROLE BADGE */}
         <div className="flex flex-col space-y-2 pb-4 border-b border-gray-100">
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm group-hover:bg-emerald-700 transition-colors font-outfit shrink-0">
-              NS
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col overflow-hidden">
-                <span className="font-extrabold text-base text-gray-900 tracking-tight leading-none font-outfit truncate">
-                  NAGARSETU
-                </span>
-                <span className="text-[9px] uppercase tracking-wider text-emerald-700 font-bold font-mono">
-                  Civic Platform 3.0
-                </span>
-              </div>
-            )}
+          <Link to="/" className="flex items-center space-x-2 group">
+            <img
+              src="/logo.png"
+              alt="NAGARSETU"
+              className={`h-9 w-auto object-contain transition-transform group-hover:scale-105 ${isCollapsed ? 'mx-auto' : 'max-w-[180px]'}`}
+            />
           </Link>
 
           {!isCollapsed && (
@@ -549,6 +609,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onToggleCollapse}
           className="absolute -right-3 top-20 bg-white border border-gray-200 rounded-full p-1 text-gray-500 hover:text-emerald-600 shadow-sm transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center"
           title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -556,14 +617,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* MOBILE DRAWER SIDEBAR */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Mobile Navigation">
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs" onClick={onMobileClose} />
 
-          <div className="relative flex-1 max-w-xs w-full bg-white h-full shadow-xl flex flex-col z-10 font-sans">
+          <div ref={drawerRef} className="relative flex-1 max-w-xs w-full bg-white h-full shadow-xl flex flex-col z-10 font-sans">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
               <span className="font-extrabold text-sm text-gray-900 font-outfit">NAGARSETU Navigation</span>
               <button
                 onClick={onMobileClose}
+                aria-label="Close navigation menu"
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />

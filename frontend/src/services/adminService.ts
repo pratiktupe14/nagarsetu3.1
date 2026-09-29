@@ -1,5 +1,5 @@
 import { Complaint, ComplaintActivityLog, DepartmentStaffMember, AdminKPIStats, PriorityLevel } from '../types/database.types';
-import { getStoredComplaints, saveStoredComplaints } from './complaintService';
+import { getAllComplaints } from './complaintService';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -60,9 +60,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-ELE',
     name: 'Electrical & Lighting Dept',
     code: 'ELE-01',
-    department_head: 'Aditya Joshi',
+    department_head: 'Kunal Kulkarni',
     contact_number: '+91 98220 00005',
-    email: 'aditya.joshi@nagarsetu.gov.in',
+    email: 'kunal.kulkarni@nagarsetu.gov.in',
     description: 'LED streetlights, junction box repairs, feeder pillar cabinets, and municipal electrical grid maintenance.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -93,28 +93,61 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-MNT',
     name: 'Maintenance Department',
     code: 'MNT-01',
-    department_head: 'Kunal Kulkarni',
+    department_head: 'Aditya Joshi',
     contact_number: '+91 98220 00007',
-    email: 'kunal.kulkarni@nagarsetu.gov.in',
+    email: 'aditya.joshi@nagarsetu.gov.in',
     description: 'General civic facility repairs, building maintenance, public asset upkeep, and municipal asset management.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
   }
 ];
 
+// In-memory runtime cache for municipal departments (PostgreSQL is authoritative source)
+let memoryDepartments: MunicipalDepartmentRecord[] = [...DEFAULT_MUNICIPAL_DEPARTMENTS];
+
+try {
+  localStorage.removeItem(LOCAL_STORAGE_DEPARTMENTS_KEY);
+} catch (e) {}
+
 export function getMunicipalDepartments(): MunicipalDepartmentRecord[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_DEPARTMENTS_KEY);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {}
+  return memoryDepartments;
+}
+
+export function setMemoryMunicipalDepartments(depts: MunicipalDepartmentRecord[]) {
+  memoryDepartments = depts;
+}
+
+export async function fetchMunicipalDepartmentsApi(): Promise<MunicipalDepartmentRecord[]> {
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+    const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.departments) && data.departments.length > 0) {
+        const fetchedDepts: MunicipalDepartmentRecord[] = data.departments.map((d: any) => ({
+          id: String(d.id),
+          name: d.name,
+          code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+          department_head: d.department_head || 'No Active Head',
+          contact_number: d.contact_number || '+91 98220 00000',
+          email: d.email || 'dept@nagarsetu.gov.in',
+          description: d.description || '',
+          status: (d.status === 'Inactive' || d.status === 'inactive') ? 'Inactive' : 'Active',
+          created_at: d.created_at || new Date().toISOString()
+        }));
+        setMemoryMunicipalDepartments(fetchedDepts);
+        return fetchedDepts;
+      }
+    }
+  } catch (err) {
+    console.warn('fetchMunicipalDepartmentsApi error:', err);
   }
-  localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(DEFAULT_MUNICIPAL_DEPARTMENTS));
-  return DEFAULT_MUNICIPAL_DEPARTMENTS;
+  return memoryDepartments;
 }
 
 export function saveMunicipalDepartments(depts: MunicipalDepartmentRecord[]) {
-  localStorage.setItem(LOCAL_STORAGE_DEPARTMENTS_KEY, JSON.stringify(depts));
+  memoryDepartments = depts;
 }
 
 export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRecord, 'id' | 'created_at'> & { id?: string }): MunicipalDepartmentRecord {
@@ -140,6 +173,78 @@ export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRe
   all.unshift(newDept);
   saveMunicipalDepartments(all);
   return newDept;
+}
+
+export async function saveMunicipalDepartmentApi(
+  dept: Omit<MunicipalDepartmentRecord, 'id' | 'created_at'> & { id?: string }
+): Promise<MunicipalDepartmentRecord> {
+  const token = localStorage.getItem('nagarsetu_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
+  const isEdit = Boolean(dept.id && !dept.id.startsWith('dept-'));
+  const url = isEdit
+    ? `${getApiUrl()}/api/admin/departments/${dept.id}`
+    : `${getApiUrl()}/api/admin/departments`;
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: JSON.stringify({
+        name: dept.name,
+        code: dept.code,
+        description: dept.description
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || 'Failed to save department to database');
+    }
+
+    const data = await res.json();
+    const savedRecord: MunicipalDepartmentRecord = {
+      id: String(data.department?.id || dept.id || 'dept-' + Date.now()),
+      name: data.department?.name || dept.name,
+      code: data.department?.code || dept.code,
+      department_head: dept.department_head,
+      contact_number: dept.contact_number,
+      email: dept.email,
+      description: data.department?.description || dept.description || '',
+      status: dept.status,
+      created_at: data.department?.created_at || new Date().toISOString()
+    };
+
+    saveOrUpdateMunicipalDepartment(savedRecord);
+    return savedRecord;
+  } catch (err: any) {
+    console.error('saveMunicipalDepartmentApi error:', err);
+    throw err;
+  }
+}
+
+export async function deleteMunicipalDepartmentApi(id: string): Promise<void> {
+  const token = localStorage.getItem('nagarsetu_token');
+  const headers = {
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+
+  const res = await fetch(`${getApiUrl()}/api/admin/departments/${id}`, {
+    method: 'DELETE',
+    headers
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || errData.message || 'Failed to delete department from database');
+  }
+
+  const all = getMunicipalDepartments().filter((d) => d.id !== id);
+  saveMunicipalDepartments(all);
 }
 
 const LOCAL_STORAGE_STAFF_KEY = 'nagarsetu_service_staff_v3';
@@ -185,27 +290,34 @@ export async function fetchDepartmentStaffApi(params?: {
     if (params?.search) qParams.append('search', params.search);
     if (params?.department_id) qParams.append('department_id', params.department_id);
 
-    let res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
+    const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
       headers: getAuthHeaders()
     });
-    if (!res.ok && (res.status === 404 || res.status === 502)) {
-      res = await fetch(`${getApiUrl()}/api/departments/staff?${qParams.toString()}`, {
-        headers: getAuthHeaders()
-      });
-    }
 
     if (res.ok) {
       const data = await res.json();
-      if (data && Array.isArray(data.staff)) {
-        console.log('[ADMIN DATA SYNC]', {
-          apiUrl: `${getApiUrl()}/api/department/staff`,
-          fetchTime: new Date().toISOString(),
-          responseStatus: res.status,
-          databaseRecordCount: data.staff.length,
-          lastUpdatedRecord: data.staff[0]?.created_at || 'N/A',
-          localCacheUsed: false,
-          finalRecordCount: data.staff.length
+        const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => {
+          const resolvedDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+          return {
+            id: String(s.id),
+            name: s.name,
+            employee_id: s.employee_id || `STF-${s.id}`,
+            department_name: (s.department_name && s.department_name !== 'Municipal Department') ? s.department_name : resolvedDept.name,
+            role: s.designation || s.role || 'Service Staff',
+            status: (s.status || 'active').toLowerCase() === 'active' ? 'Available' : 'Offline',
+            contact_number: s.mobile || s.contact_number || s.phone || '+91 98220 00000',
+            email: s.email,
+            ward_area: 'Nashik City',
+            joined_date: s.created_at || new Date().toISOString(),
+            created_at: s.created_at || new Date().toISOString(),
+            active_tasks: s.active_tasks || 0,
+            completed_tasks: s.completed_tasks || 0,
+            overdue_tasks: s.overdue_tasks || 0
+          };
         });
+        if (mappedStaff.length > 0) {
+          memoryStaffRecords = mappedStaff;
+        }
         return {
           staff: data.staff,
           summary: data.summary || {
@@ -216,39 +328,13 @@ export async function fetchDepartmentStaffApi(params?: {
           }
         };
       }
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Failed to fetch department staff (HTTP ${res.status})`);
+    } catch (err: any) {
+      console.error('Failed to fetch staff from API:', err);
+      throw err;
     }
-  } catch (err) {
-    console.warn('Failed to fetch staff from API:', err);
   }
-
-  const defaultStaff = getAllServiceStaffRecords().map((s) => ({
-    id: s.id,
-    name: s.name,
-    email: s.email,
-    mobile: s.contact_number,
-    contact_number: s.contact_number,
-    employee_id: s.employee_id,
-    designation: s.role || 'Field Service Staff',
-    department_name: s.department_name,
-    status: (s.status === 'Available' || s.status === 'On Task' || s.status === 'Busy' ? 'Active' : 'Inactive') as 'Active' | 'Inactive',
-    active_tasks: 0,
-    completed_tasks: 0,
-    overdue_tasks: 0,
-    language: 'en',
-    joined_date: s.joined_date,
-    created_at: s.created_at
-  }));
-
-  return {
-    staff: defaultStaff,
-    summary: {
-      totalStaff: defaultStaff.length,
-      activeStaff: defaultStaff.filter((s) => s.status === 'Active').length,
-      inactiveStaff: defaultStaff.filter((s) => s.status === 'Inactive').length,
-      activeTasks: 0
-    }
-  };
-}
 
 export async function createServiceStaffApi(payload: {
   name: string;
@@ -293,7 +379,7 @@ export async function updateServiceStaffApi(id: string, payload: Partial<Departm
 export async function deactivateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/deactivate`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -306,7 +392,7 @@ export async function deactivateServiceStaffApi(id: string): Promise<{ success: 
 export async function activateServiceStaffApi(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${getApiUrl()}/api/department/staff/${id}/activate`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: getAuthHeaders()
     });
     const data = await res.json();
@@ -342,76 +428,55 @@ export interface ServiceStaffMemberRecord {
   ward_area: string;
   joined_date: string;
   created_at: string;
+  active_tasks?: number;
+  completed_tasks?: number;
+  overdue_tasks?: number;
 }
 
 export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
 
-const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [
-  // 0. Primary Demo Staff — Ramesh Kumar (36th Staff)
-  { id: 'stf-pwd-00', name: 'Ramesh Kumar', employee_id: 'STF-001', department_name: 'Roads & Public Works (PWD)', role: 'Field Maintenance Staff', status: 'Available', contact_number: '+91 98765 43212', email: 'staff@nagarsetu.gov.in', ward_area: 'Central Zone (Ward 1)', joined_date: '2026-01-01T00:00:00.000Z', created_at: '2026-01-01T00:00:00.000Z' },
+const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [];
 
-  // 1. PWD — 5 Staff
-  { id: 'stf-pwd-01', name: 'Amit Patil', employee_id: 'PWD-STF-001', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10001', email: 'amit.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 12)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-pwd-02', name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10002', email: 'sagar.jadhav@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 5)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-pwd-03', name: 'Nikhil Shinde', employee_id: 'PWD-STF-003', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10003', email: 'nikhil.shinde@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-pwd-04', name: 'Rohit More', employee_id: 'PWD-STF-004', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10004', email: 'rohit.more@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 18)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-pwd-05', name: 'Akash Pawar', employee_id: 'PWD-STF-005', department_name: 'Roads & Public Works (PWD)', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10005', email: 'akash.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 22)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
+// In-memory runtime cache for service staff records (PostgreSQL is authoritative source)
+let memoryStaffRecords: ServiceStaffMemberRecord[] = [];
+let isFetchingStaff = false;
 
-  // 2. SAN — 5 Staff
-  { id: 'stf-san-01', name: 'Prashant Mane', employee_id: 'SAN-STF-001', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10006', email: 'prashant.mane@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 14)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-san-02', name: 'Ganesh Chavan', employee_id: 'SAN-STF-002', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10007', email: 'ganesh.chavan@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 2)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-san-03', name: 'Mahesh Kadam', employee_id: 'SAN-STF-003', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10008', email: 'mahesh.kadam@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 9)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-san-04', name: 'Swapnil Bhosale', employee_id: 'SAN-STF-004', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10009', email: 'swapnil.bhosale@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 19)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-san-05', name: 'Deepak Wagh', employee_id: 'SAN-STF-005', department_name: 'Sanitation & Waste Management', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10010', email: 'deepak.wagh@nagarsetu.gov.in', ward_area: 'Satpur (Ward 24)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-
-  // 3. WTR — 5 Staff
-  { id: 'stf-wtr-01', name: 'Kiran Patil', employee_id: 'WTR-STF-001', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10011', email: 'kiran.patil@nagarsetu.gov.in', ward_area: 'Nashik Road (Ward 1)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-wtr-02', name: 'Manoj Shinde', employee_id: 'WTR-STF-002', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10012', email: 'manoj.shinde@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 11)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-wtr-03', name: 'Sachin More', employee_id: 'WTR-STF-003', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10013', email: 'sachin.more@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 7)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-wtr-04', name: 'Ajay Jadhav', employee_id: 'WTR-STF-004', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10014', email: 'ajay.jadhav@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 17)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-wtr-05', name: 'Vivek Pawar', employee_id: 'WTR-STF-005', department_name: 'Water Supply & Sewerage Board', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10015', email: 'vivek.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 21)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-
-  // 4. DRN — 5 Staff
-  { id: 'stf-drn-01', name: 'Sunil Patil', employee_id: 'DRN-STF-001', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10016', email: 'sunil.patil@nagarsetu.gov.in', ward_area: 'Nashik Road (Ward 3)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-drn-02', name: 'Ramesh More', employee_id: 'DRN-STF-002', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10017', email: 'ramesh.more@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 15)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-drn-03', name: 'Santosh Jadhav', employee_id: 'DRN-STF-003', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10018', email: 'santosh.jadhav@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 10)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-drn-04', name: 'Dinesh Shinde', employee_id: 'DRN-STF-004', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10019', email: 'dinesh.shinde@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 20)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-drn-05', name: 'Pravin Pawar', employee_id: 'DRN-STF-005', department_name: 'Drainage & Sewage Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10020', email: 'pravin.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 25)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-
-  // 5. ELE — 5 Staff
-  { id: 'stf-ele-01', name: 'Rahul Joshi', employee_id: 'ELE-STF-001', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10021', email: 'rahul.joshi@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 13)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-ele-02', name: 'Sameer Kulkarni', employee_id: 'ELE-STF-002', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10022', email: 'sameer.kulkarni@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 6)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-ele-03', name: 'Tejas Deshmukh', employee_id: 'ELE-STF-003', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10023', email: 'tejas.deshmukh@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-ele-04', name: 'Omkar Patil', employee_id: 'ELE-STF-004', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10024', email: 'omkar.patil@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 16)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-ele-05', name: 'Harshad More', employee_id: 'ELE-STF-005', department_name: 'Electrical & Street Lighting', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10025', email: 'harshad.more@nagarsetu.gov.in', ward_area: 'Satpur (Ward 23)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-
-  // 6. TRF — 5 Staff
-  { id: 'stf-trf-01', name: 'Rohan Patil', employee_id: 'TRF-STF-001', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10026', email: 'rohan.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 11)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-trf-02', name: 'Vishal Jadhav', employee_id: 'TRF-STF-002', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10027', email: 'vishal.jadhav@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 4)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-trf-03', name: 'Tushar More', employee_id: 'TRF-STF-003', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10028', email: 'tushar.more@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 9)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-trf-04', name: 'Nitin Shinde', employee_id: 'TRF-STF-004', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10029', email: 'nitin.shinde@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 17)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-trf-05', name: 'Amol Pawar', employee_id: 'TRF-STF-005', department_name: 'Traffic Management Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10030', email: 'amol.pawar@nagarsetu.gov.in', ward_area: 'Satpur (Ward 22)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-
-  // 7. MNT — 5 Staff
-  { id: 'stf-mnt-01', name: 'Kunal Patil', employee_id: 'MNT-STF-001', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10031', email: 'kunal.patil@nagarsetu.gov.in', ward_area: 'Nashik West (Ward 12)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-mnt-02', name: 'Ganesh More', employee_id: 'MNT-STF-002', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10032', email: 'ganesh.more@nagarsetu.gov.in', ward_area: 'Nashik East (Ward 5)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-mnt-03', name: 'Mayur Jadhav', employee_id: 'MNT-STF-003', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10033', email: 'mayur.jadhav@nagarsetu.gov.in', ward_area: 'Panchavati (Ward 8)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-mnt-04', name: 'Sachin Pawar', employee_id: 'MNT-STF-004', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10034', email: 'sachin.pawar@nagarsetu.gov.in', ward_area: 'CIDCO (Ward 18)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' },
-  { id: 'stf-mnt-05', name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', department_name: 'Maintenance Department', role: 'Service Staff', status: 'Available', contact_number: '+91 98220 10035', email: 'yogesh.shinde@nagarsetu.gov.in', ward_area: 'Satpur (Ward 24)', joined_date: '2026-01-10T00:00:00.000Z', created_at: '2026-01-10T00:00:00.000Z' }
-];
+try {
+  localStorage.removeItem(LOCAL_STORAGE_STAFF_KEY);
+} catch (e) {}
 
 export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);
-  if (data) {
-    try {
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed) && parsed.length >= 36) {
-        return parsed;
-      }
-    } catch (e) {}
+  if (memoryStaffRecords.length === 0 && !isFetchingStaff) {
+    isFetchingStaff = true;
+    fetchDepartmentStaffApi()
+      .then((res) => {
+        if (res && res.staff && res.staff.length > 0) {
+          memoryStaffRecords = res.staff.map((s: any) => ({
+            id: String(s.id),
+            name: s.name,
+            employee_id: s.employee_id || `STF-${s.id}`,
+            department_name: s.department_name || 'Municipal Department',
+            role: s.designation || s.role || 'Service Staff',
+            status: (s.status || 'active').toLowerCase() === 'active' ? 'Available' : 'Offline',
+            contact_number: s.mobile || s.contact_number || s.phone || '+91 98220 00000',
+            email: s.email,
+            ward_area: 'Nashik City',
+            joined_date: s.created_at || new Date().toISOString(),
+            created_at: s.created_at || new Date().toISOString(),
+            active_tasks: s.active_tasks || 0,
+            completed_tasks: s.completed_tasks || 0,
+            overdue_tasks: s.overdue_tasks || 0
+          }));
+        }
+      })
+      .catch((err) => console.warn('Background staff fetch error:', err))
+      .finally(() => { isFetchingStaff = false; });
   }
-  localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(DEFAULT_SERVICE_STAFF));
-  return DEFAULT_SERVICE_STAFF;
+  return memoryStaffRecords;
+}
+
+export function setMemoryServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
+  memoryStaffRecords = staff;
 }
 
 export async function getDepartmentServiceStaff(departmentId?: string, departmentName?: string): Promise<ServiceStaffMemberRecord[]> {
@@ -422,29 +487,35 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
   // 1. Try Backend Express API first
   try {
     const apiRes = await fetchDepartmentStaffApi({ department_id: departmentId });
-    if (apiRes.staff && apiRes.staff.length > 0) {
-      return apiRes.staff.map((s) => ({
-        id: s.id,
-        name: s.name,
-        employee_id: s.employee_id,
-        department_name: s.department_name || departmentName || 'Municipal Department',
-        role: s.designation || 'Service Staff',
-        status: s.status === 'Active' ? 'Available' : 'Offline',
-        contact_number: s.contact_number || s.mobile || '+91 98220 00000',
-        email: s.email,
-        ward_area: 'Nashik City',
-        joined_date: s.joined_date || new Date().toISOString(),
-        created_at: s.created_at || new Date().toISOString()
-      }));
+    if (apiRes && Array.isArray(apiRes.staff)) {
+      return apiRes.staff.map((s) => {
+        const resolved = resolveDepartmentInfo(s.department_id || s.employee_id || departmentId, s.department_name || departmentName);
+        return {
+          id: s.id,
+          name: s.name,
+          employee_id: s.employee_id,
+          department_name: (s.department_name && s.department_name !== 'Municipal Department') ? s.department_name : resolved.name,
+          role: s.designation || 'Service Staff',
+          status: s.status === 'Active' ? 'Available' : 'Offline',
+          contact_number: s.contact_number || s.mobile || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.joined_date || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString(),
+          active_tasks: s.active_tasks || 0,
+          completed_tasks: s.completed_tasks || 0,
+          overdue_tasks: s.overdue_tasks || 0
+        };
+      });
     }
   } catch (e) {
     console.warn('fetchDepartmentStaffApi failed in getDepartmentServiceStaff:', e);
   }
 
-function isValidUuid(id?: string): boolean {
-  if (!id) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-}
+  function isValidUuid(id?: string): boolean {
+    if (!id) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
 
   // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
@@ -457,35 +528,30 @@ function isValidUuid(id?: string): boolean {
         query = query.or(`department_name.ilike.%${cleanDept}%,employee_id.ilike.%${cleanDept}%`);
       }
       const { data, error } = await query;
-      if (!error && data && Array.isArray(data) && data.length > 0) {
-        return data.map((p: any) => ({
-          id: p.id,
-          name: p.full_name || p.name || 'Staff Member',
-          employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
-          department_name: p.department_name || departmentName || 'Municipal Department',
-          role: 'Service Staff',
-          status: p.status || 'Available',
-          contact_number: p.phone_number || p.mobile || '+91 98220 00000',
-          email: p.email || 'staff@nagarsetu.gov.in',
-          ward_area: p.ward_area || 'Nashik City',
-          joined_date: p.created_at || new Date().toISOString(),
-          created_at: p.created_at || new Date().toISOString()
-        }));
+      if (!error && data && Array.isArray(data)) {
+        return data.map((p: any) => {
+          const resolved = resolveDepartmentInfo(p.department_id || p.employee_id, p.department_name || departmentName);
+          return {
+            id: p.id,
+            name: p.full_name || p.name || 'Staff Member',
+            employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
+            department_name: (p.department_name && p.department_name !== 'Municipal Department') ? p.department_name : resolved.name,
+            role: 'Service Staff',
+            status: p.status || 'Available',
+            contact_number: p.phone_number || p.mobile || '+91 98220 00000',
+            email: p.email || 'staff@nagarsetu.gov.in',
+            ward_area: p.ward_area || 'Nashik City',
+            joined_date: p.created_at || new Date().toISOString(),
+            created_at: p.created_at || new Date().toISOString()
+          };
+        });
       }
     } catch (e) {
       console.warn('Supabase fetch staff error:', e);
     }
   }
 
-  // 3. Fallback to default roster filtered by department ID, code, or name
-  const all = getAllServiceStaffRecords();
-  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
-  
-  const filtered = all.filter((s) => {
-    return isStaffInDepartment(s, targetDept.id, targetDept.code, targetDept.name);
-  });
-
-  return filtered;
+  return [];
 }
 
 export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {
@@ -493,11 +559,12 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', staffId).single();
       if (!error && data) {
+        const resolved = resolveDepartmentInfo(data.department_id || data.employee_id, data.department_name);
         return {
           id: data.id,
           name: data.full_name || data.name || 'Staff Member',
-          employee_id: data.employee_id || `STF-${data.id.slice(0, 4).toUpperCase()}`,
-          department_name: data.department_name || 'Municipal Department',
+          employee_id: data.employee_id || `STF-${String(data.id).slice(0, 4).toUpperCase()}`,
+          department_name: (data.department_name && data.department_name !== 'Municipal Department') ? data.department_name : resolved.name,
           role: 'Service Staff',
           status: data.status || 'Available',
           contact_number: data.phone_number || '+91 98220 00000',
@@ -513,11 +580,38 @@ export async function getStaffMemberById(staffId: string): Promise<ServiceStaffM
   }
 
   const all = getAllServiceStaffRecords();
-  return all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
+  const staff = all.find((s) => s.id === staffId || s.employee_id === staffId) || null;
+  if (!staff) return null;
+
+  const storedComplaints = await getAllComplaints().catch(() => []);
+  const isAssigned = (c: any) =>
+    c.assigned_staff_id === staff.id ||
+    c.assigned_staff_id === staff.employee_id ||
+    (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (staff.email || '').toLowerCase()) ||
+    c.assigned_staff_name === staff.name;
+
+  const activeTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && ['Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified'].includes(c.status)
+  ).length;
+
+  const completedTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && c.status === 'Resolved'
+  ).length;
+
+  const overdueTasks = storedComplaints.filter(
+    (c) => isAssigned(c) && ((c.status as string) === 'Overdue' || (c.status !== 'Resolved' && c.status !== 'Rejected' && c.sla_deadline && new Date(c.sla_deadline) < new Date()))
+  ).length;
+
+  return {
+    ...staff,
+    active_tasks: activeTasks,
+    completed_tasks: completedTasks,
+    overdue_tasks: overdueTasks
+  };
 }
 
 export function saveServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
-  localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(staff));
+  memoryStaffRecords = staff;
 }
 
 export function saveOrUpdateServiceStaffRecord(staff: Omit<ServiceStaffMemberRecord, 'id' | 'created_at'> & { id?: string }): ServiceStaffMemberRecord {
@@ -549,7 +643,7 @@ export function getDepartmentStaffRoster(departmentName?: string, complaints: Co
   const allStaff = getAllServiceStaffRecords();
   const roster: DepartmentStaffMember[] = allStaff.map((s) => {
     const activeTasks = complaints.filter(
-      (c) => c.assigned_staff_id === s.id && c.status !== 'Resolved' && c.status !== 'Rejected'
+      (c) => (c.assigned_staff_id === s.id || c.assigned_staff_id === s.employee_id || (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (s.email || '').toLowerCase()) || c.assigned_staff_name === s.name) && c.status !== 'Resolved' && c.status !== 'Rejected'
     ).length;
     return {
       id: s.id,
@@ -563,9 +657,9 @@ export function getDepartmentStaffRoster(departmentName?: string, complaints: Co
 
   if (!departmentName || departmentName === 'All') return roster;
 
-  const dLower = departmentName.toLowerCase();
+  const dLower = String(departmentName || '').toLowerCase();
   return roster.filter((s) => {
-    const sLower = s.department_name.toLowerCase();
+    const sLower = String(s.department_name || '').toLowerCase();
     if (sLower.includes(dLower) || dLower.includes(sLower)) return true;
 
     // Department Codes & Names cross-mapping (DEPT-1 through DEPT-7)
@@ -627,7 +721,7 @@ export function calculateAdminKPIStats(complaints: Complaint[]): AdminKPIStats {
 }
 
 export function formatSlaRemainingTime(slaDeadline?: string): { text: string; isOverdue: boolean } {
-  if (!slaDeadline) return { text: '24h SLA', isOverdue: false };
+  if (!slaDeadline) return { text: 'No SLA configured', isOverdue: false };
   const diffMs = new Date(slaDeadline).getTime() - Date.now();
   if (diffMs <= 0) {
     const overdueMins = Math.abs(Math.floor(diffMs / 60000));
@@ -646,32 +740,58 @@ export async function verifyAndApproveComplaint(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Approved';
-    comp.priority = priority;
-    comp.department_name = departmentName;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    logActivity(complaintId, adminName, 'Verified & Approved Complaint', prevStatus, 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'approved',
-      title: 'Complaint Verified & Approved',
-      message: `Your complaint ${comp.complaint_number} has been verified and approved for ${departmentName} dispatch.`
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {
+      method: 'PATCH',
+      headers: getNoCacheHeaders({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }),
+      body: JSON.stringify({
+        status: 'Approved',
+        priority,
+        department_name: departmentName,
+        remarks: `Verified & Approved by ${adminName}. Priority: ${priority}, Department: ${departmentName}`
+      })
     });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Approved', adminName, `Approved & routed to ${departmentName}`);
-    return true;
+    if (res.ok) {
+      logActivity(complaintId, adminName, 'Verified & Approved Complaint', 'Submitted', 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
+      broadcastComplaintChange(complaintId, 'Submitted', 'Approved', adminName, `Approved & routed to ${departmentName}`);
+      return true;
+    }
+  } catch (e) {
+    console.warn('verifyAndApproveComplaint API error:', e);
   }
-  return false;
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('complaints')
+        .update({
+          status: 'Approved',
+          priority,
+          department_name: departmentName,
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
+    } catch (e) {}
+  }
+
+  logActivity(complaintId, adminName, 'Verified & Approved Complaint', 'Submitted', 'Approved', `Priority set to ${priority}, Department routed to ${departmentName}`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'approved',
+    title: 'Complaint Verified & Approved',
+    message: `Your complaint ${complaintId} has been verified and approved for ${departmentName} dispatch.`
+  });
+
+  broadcastComplaintChange(complaintId, 'Submitted', 'Approved', adminName, `Approved & routed to ${departmentName}`);
+  return true;
 }
 
 export async function changeDepartmentRouting(
@@ -679,41 +799,64 @@ export async function changeDepartmentRouting(
   departmentName: string,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.department_name = departmentName;
-    comp.status = 'Department Assigned';
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    logActivity(complaintId, adminName, 'Re-routed Department', prevStatus, 'Department Assigned', `Department updated to ${departmentName}`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'department_assigned',
-      title: 'Department Assigned',
-      message: `Complaint ${comp.complaint_number} routed to ${departmentName}.`
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/status`, {
+      method: 'PATCH',
+      headers: getNoCacheHeaders({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }),
+      body: JSON.stringify({
+        status: 'Department Assigned',
+        department_name: departmentName,
+        remarks: `Re-routed to ${departmentName} by ${adminName}`
+      })
     });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
-    return true;
+    if (res.ok) {
+      logActivity(complaintId, adminName, 'Re-routed Department', 'Submitted', 'Department Assigned', `Department updated to ${departmentName}`);
+      broadcastComplaintChange(complaintId, 'Submitted', 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
+      return true;
+    }
+  } catch (e) {
+    console.warn('changeDepartmentRouting API error:', e);
   }
-  return false;
+
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('complaints')
+        .update({
+          department_name: departmentName,
+          status: 'Department Assigned',
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
+    } catch (e) {}
+  }
+
+  logActivity(complaintId, adminName, 'Re-routed Department', 'Submitted', 'Department Assigned', `Department updated to ${departmentName}`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'department_assigned',
+    title: 'Department Assigned',
+    message: `Complaint ${complaintId} routed to ${departmentName}.`
+  });
+
+  broadcastComplaintChange(complaintId, 'Submitted', 'Department Assigned', adminName, `Re-routed to ${departmentName}`);
+  return true;
 }
 
 export async function assignStaffToTask(
   complaintId: string,
   staffId: string,
   staffName: string,
-  slaHours: number = 24,
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const slaDeadline = new Date(Date.now() + slaHours * 3600000).toISOString();
 
   // 1. Try Backend API (/api/department/assign then /api/officer/assign fallback)
   try {
@@ -722,7 +865,7 @@ export async function assignStaffToTask(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
-    let res = await fetch(`${getApiUrl()}/api/department/assign`, {
+    const res = await fetch(`${getApiUrl()}/api/department/assign`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ complaint_id: complaintId, staff_id: staffId })
@@ -747,51 +890,37 @@ export async function assignStaffToTask(
           assigned_staff_id: staffId,
           assigned_staff_name: staffName,
           status: 'Staff Assigned',
-          sla_deadline: slaDeadline,
           updated_at: new Date().toISOString()
         })
         .or(`id.eq.${complaintId},complaint_number.eq.${complaintId}`);
     } catch (e) {}
   }
 
-  // 3. LocalStorage persistence
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.assigned_staff_id = staffId;
-    comp.assigned_staff_name = staffName;
-    comp.status = 'Staff Assigned';
-    comp.sla_deadline = slaDeadline;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
+  // 3. Activity log & notification
+  logActivity(complaintId, adminName, 'Assigned Field Staff', 'Submitted', 'Staff Assigned', `Dispatched to ${staffName}`);
+  
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'staff_assigned',
+    title: 'Field Officer Dispatched',
+    message: `Field officer ${staffName} assigned to repair ${complaintId}.`
+  });
 
-    logActivity(complaintId, adminName, 'Assigned Field Staff', prevStatus, 'Staff Assigned', `Dispatched to ${staffName} with ${slaHours}h SLA deadline`);
-    
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'Field Officer Dispatched',
-      message: `Field officer ${staffName} assigned to repair ${comp.complaint_number}.`
-    });
+  pushNotification({
+    user_id: staffId,
+    role: 'service_staff',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'staff_assigned',
+    title: 'New Maintenance Task Dispatched',
+    message: `Task ${complaintId} assigned to you with system-defined SLA deadline.`
+  });
 
-    pushNotification({
-      user_id: staffId,
-      role: 'service_staff',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'New Maintenance Task Dispatched',
-      message: `Task ${comp.complaint_number} assigned to you with ${slaHours}h SLA deadline.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Staff Assigned', adminName, `Assigned to staff ${staffName}`);
-    return true;
-  }
-  return false;
+  broadcastComplaintChange(complaintId, 'Submitted', 'Staff Assigned', adminName, `Assigned to staff ${staffName}`);
+  return true;
 }
 
 export async function escalateComplaint(
@@ -799,43 +928,99 @@ export async function escalateComplaint(
   escalationTarget: string = 'Senior Department Officer',
   adminName: string = 'City Admin Officer'
 ): Promise<boolean> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    logActivity(
-      complaintId,
-      adminName,
-      `Escalated to ${escalationTarget}`,
-      comp.status,
-      comp.status,
-      `SLA Breach Escalation: High priority notice dispatched to ${escalationTarget}`
-    );
+  logActivity(
+    complaintId,
+    adminName,
+    `Escalated to ${escalationTarget}`,
+    'In Progress',
+    'Escalated',
+    `SLA Breach Escalation: High priority notice dispatched to ${escalationTarget}`
+  );
 
-    pushNotification({
-      user_id: comp.assigned_staff_id || 'admin-group',
-      role: comp.assigned_staff_id ? 'service_staff' : 'city_admin',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'sla_breached',
-      title: `ESCALATION: ${comp.complaint_number}`,
-      message: `Complaint ${comp.complaint_number} has been escalated to ${escalationTarget} due to SLA breach.`
+  pushNotification({
+    user_id: 'admin-group',
+    role: 'city_admin',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'sla_breached',
+    title: `ESCALATION: ${complaintId}`,
+    message: `Complaint ${complaintId} has been escalated to ${escalationTarget} due to SLA breach.`
+  });
+
+  broadcastComplaintChange(complaintId, 'In Progress', 'In Progress', adminName, `Escalated to ${escalationTarget}`);
+  return true;
+}
+
+// In-memory activity logs cache (PostgreSQL complaint_status_history is authoritative)
+let memoryActivityLogs: ComplaintActivityLog[] = [];
+
+try {
+  localStorage.removeItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
+} catch (e) {}
+
+export async function fetchComplaintActivityLogs(complaintId: string): Promise<ComplaintActivityLog[]> {
+  if (!complaintId) return [];
+
+  // 1. Try Backend API first (/api/complaints/:id/history)
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/history`, {
+      headers: getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {})
     });
-
-    broadcastComplaintChange(comp.id, comp.status, comp.status, adminName, `Escalated to ${escalationTarget}`);
-    return true;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.history)) {
+        const mapped: ComplaintActivityLog[] = data.history.map((h: any) => ({
+          id: String(h.id),
+          complaint_id: String(h.complaint_id),
+          actor_name: h.updated_by || 'System',
+          action: h.remark || `Status: ${h.status}`,
+          previous_status: undefined,
+          new_status: h.status,
+          notes: h.remark,
+          created_at: h.created_at || new Date().toISOString()
+        }));
+        memoryActivityLogs = memoryActivityLogs.filter(l => l.complaint_id !== complaintId).concat(mapped);
+        return mapped;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend fetchComplaintActivityLogs error:', err);
   }
-  return false;
+
+  // 2. Try Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase
+        .from('complaint_status_history')
+        .select('*')
+        .eq('complaint_id', complaintId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const mapped: ComplaintActivityLog[] = data.map((h: any) => ({
+          id: String(h.id),
+          complaint_id: String(h.complaint_id),
+          actor_name: h.updated_by || 'System',
+          action: h.remark || `Status: ${h.status}`,
+          previous_status: undefined,
+          new_status: h.status,
+          notes: h.remark,
+          created_at: h.created_at || new Date().toISOString()
+        }));
+        memoryActivityLogs = memoryActivityLogs.filter(l => l.complaint_id !== complaintId).concat(mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch complaint history error:', err);
+    }
+  }
+
+  return memoryActivityLogs.filter(l => l.complaint_id === complaintId);
 }
 
 export function getComplaintActivityLogs(complaintId: string): ComplaintActivityLog[] {
-  const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
-  if (data) {
-    try {
-      const all: ComplaintActivityLog[] = JSON.parse(data);
-      return all.filter((l) => l.complaint_id === complaintId);
-    } catch (e) {}
-  }
-  return [];
+  return memoryActivityLogs.filter((l) => l.complaint_id === complaintId);
 }
 
 export function logActivity(
@@ -846,9 +1031,7 @@ export function logActivity(
   newStatus: any,
   notes?: string
 ) {
-  const data = localStorage.getItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY);
-  const all: ComplaintActivityLog[] = data ? JSON.parse(data) : [];
-  all.unshift({
+  const newLog: ComplaintActivityLog = {
     id: 'log-' + Date.now(),
     complaint_id: complaintId,
     actor_name: actorName,
@@ -857,8 +1040,8 @@ export function logActivity(
     new_status: newStatus,
     notes,
     created_at: new Date().toISOString()
-  });
-  localStorage.setItem(LOCAL_STORAGE_ACTIVITY_LOGS_KEY, JSON.stringify(all));
+  };
+  memoryActivityLogs.unshift(newLog);
 }
 
 export interface DepartmentHeadSummary {
@@ -916,13 +1099,24 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
     { code: 'SAN', name: 'Sanitation & Waste Management', defaultHead: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002', empId: 'EMP-SAN-001' },
     { code: 'WTR', name: 'Water Supply & Sewerage Board', defaultHead: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003', empId: 'EMP-WTR-001' },
     { code: 'DRN', name: 'Drainage & Sewage Department', defaultHead: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004', empId: 'EMP-DRN-001' },
-    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
+    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
     { code: 'TRF', name: 'Traffic Management Department', defaultHead: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006', empId: 'EMP-TRF-001' },
-    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
+    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
   ];
 
 
-  return SEVEN_MUNICIPAL_TARGETS.map((target) => {
+  const dynamicTargets = departments.length > 0
+    ? departments.map((d) => ({
+        code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+        name: d.name,
+        defaultHead: d.department_head || 'Department Head',
+        email: d.email || 'head@nagarsetu.gov.in',
+        phone: d.contact_number || '+91 98220 00000',
+        empId: `EMP-${d.code || 'DEPT'}-001`
+      }))
+    : SEVEN_MUNICIPAL_TARGETS;
+
+  return dynamicTargets.map((target) => {
 
     // Match department record by code or name
     const deptObj = departments.find(
@@ -951,7 +1145,7 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
       .map((p) => ({
         id: p.id,
         name: p.full_name || 'Staff Member',
-        employee_id: p.employee_id || `STF-${p.id.slice(0, 4).toUpperCase()}`,
+        employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
         department_name: target.name,
         role: 'Service Staff',
         status: p.status || 'Available',

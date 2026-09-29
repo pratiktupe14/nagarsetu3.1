@@ -5,10 +5,10 @@ import { useLanguage } from '../context/LanguageContext';
 export const PriorityBadge: React.FC<{ priority: PriorityLevel }> = ({ priority }) => {
   const { translatePriority, t } = useLanguage();
   const styles: Record<PriorityLevel, string> = {
-    Low: 'bg-gray-50 text-gray-700 border-gray-200',
-    Medium: 'bg-yellow-50 text-yellow-800 border-yellow-200',
-    High: 'bg-orange-50 text-orange-800 border-orange-200 font-semibold',
-    Critical: 'bg-rose-50 text-rose-800 border-rose-200 font-bold'
+    Low: 'bg-gray-100 text-gray-800 border-gray-300',
+    Medium: 'bg-amber-50 text-amber-900 border-amber-300 font-semibold',
+    High: 'bg-orange-50 text-orange-900 border-orange-300 font-bold',
+    Critical: 'bg-rose-50 text-rose-900 border-rose-300 font-extrabold'
   };
 
   return (

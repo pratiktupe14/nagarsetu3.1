@@ -5,8 +5,10 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getMunicipalDepartments, getAllServiceStaffRecords,
+  fetchDepartmentStaffApi,
   formatSlaRemainingTime, MunicipalDepartmentRecord, ServiceStaffMemberRecord
 } from '../../services/adminService';
+import { getDepartments } from '../../services/departmentService';
 import { exportComplaintsToCSV } from '../../services/analyticsService';
 import { Complaint } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
@@ -77,46 +79,53 @@ export const AdminReportsPage: React.FC = () => {
   });
 
   // Local Saved Reports History
-  const [recentReports, setRecentReports] = useState<SavedReportItem[]>([
-    {
-      id: 'rpt-1',
-      report_number: 'RPT-2026-0821-492',
-      name: 'Daily Complaint Operations Report',
-      type: 'Daily Complaint Report',
-      generated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      generated_by: 'City Administration Officer',
-      record_count: 32,
-      status: 'Generated'
-    },
-    {
-      id: 'rpt-2',
-      report_number: 'RPT-2026-0820-318',
-      name: 'Department Operational Performance Report',
-      type: 'Department Performance Report',
-      generated_at: new Date(Date.now() - 86400000).toISOString(),
-      generated_by: 'Municipal Commissioner Office',
-      record_count: 7,
-      status: 'Generated'
-    },
-    {
-      id: 'rpt-3',
-      report_number: 'RPT-2026-0818-104',
-      name: 'SLA Compliance & Breach Escalation Audit',
-      type: 'SLA Compliance Report',
-      generated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-      generated_by: 'City Administration Officer',
-      record_count: 12,
-      status: 'Generated'
-    }
-  ]);
+  const [recentReports, setRecentReports] = useState<SavedReportItem[]>([]);
 
-  // Load Complaints Data
+  const [municipalDepartments, setMunicipalDepartments] = useState<MunicipalDepartmentRecord[]>(() => getMunicipalDepartments());
+  const [staffMembers, setStaffMembers] = useState<ServiceStaffMemberRecord[]>(() => getAllServiceStaffRecords());
+
+  // Load Complaints, Departments, and Staff from PostgreSQL
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getAllComplaints();
+      const [list, depts, staffRes] = await Promise.all([
+        getAllComplaints(),
+        getDepartments().catch(() => []),
+        fetchDepartmentStaffApi().catch(() => ({ staff: [] }))
+      ]);
       setComplaints(list);
+      if (depts && depts.length > 0) {
+        setMunicipalDepartments(depts.map(d => ({
+          id: d.id,
+          name: d.name,
+          code: d.code,
+          department_head: 'Department Head',
+          contact_number: '+91 98220 00000',
+          email: 'head@nagarsetu.gov.in',
+          description: d.description || '',
+          status: 'Active' as const,
+          created_at: new Date().toISOString()
+        })));
+      }
+      if (staffRes?.staff && staffRes.staff.length > 0) {
+        setStaffMembers(staffRes.staff.map((s: any) => ({
+          id: String(s.id),
+          name: s.name,
+          employee_id: s.employee_id || `STF-${s.id}`,
+          department_name: s.department_name || 'Municipal Department',
+          role: s.designation || 'Service Staff',
+          status: ((s.status || 'Active').toLowerCase() === 'active' ? 'Available' : 'Offline') as 'Available' | 'Offline',
+          contact_number: s.mobile || s.contact_number || '+91 98220 00000',
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.created_at || new Date().toISOString(),
+          created_at: s.created_at || new Date().toISOString(),
+          active_tasks: s.active_tasks || 0,
+          completed_tasks: s.completed_tasks || 0,
+          overdue_tasks: s.overdue_tasks || 0
+        })));
+      }
     } catch (e) {
       console.error(e);
       setError('Unable to load report data.');
@@ -132,10 +141,6 @@ export const AdminReportsPage: React.FC = () => {
   useRealtimeComplaints(useCallback(() => {
     loadData();
   }, [loadData]));
-
-  // Reference Data
-  const municipalDepartments = useMemo(() => getMunicipalDepartments(), []);
-  const staffMembers = useMemo(() => getAllServiceStaffRecords(), []);
 
   const wardOptions = useMemo(() => {
     const set = new Set<string>();
@@ -340,7 +345,7 @@ export const AdminReportsPage: React.FC = () => {
         employee_id: stf.employee_id,
         department: stf.department_name,
         active,
-        completed: completed > 0 ? completed : 14,
+        completed,
         overdue,
         status: stf.status,
         rating: '4.8 / 5'
@@ -375,6 +380,16 @@ export const AdminReportsPage: React.FC = () => {
       setHasGeneratedReport(true);
       setGenerating(false);
     }, 600);
+  };
+
+  // Handle PDF Export Action
+  const handleDownloadPdf = () => {
+    const originalTitle = document.title;
+    document.title = `${selectedReportType.replace(/\s+/g, '_')}_${generatedReportMeta.id}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
   // Handle Print Action
@@ -437,7 +452,7 @@ export const AdminReportsPage: React.FC = () => {
               <label className="block text-xs font-extrabold text-gray-700 font-outfit uppercase tracking-wider">
                 Select Report Type *
               </label>
-              <select
+              <select aria-label="selected Report Type"
                 value={selectedReportType}
                 onChange={(e) => setSelectedReportType(e.target.value as ReportType)}
                 className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 font-outfit"
@@ -460,7 +475,7 @@ export const AdminReportsPage: React.FC = () => {
             <div className="flex items-center space-x-3 shrink-0">
               <div>
                 <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Date From</label>
-                <input
+                <input aria-label="date From"
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
@@ -470,7 +485,7 @@ export const AdminReportsPage: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Date To</label>
-                <input
+                <input aria-label="date To"
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
@@ -487,7 +502,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Department */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Department</label>
-              <select
+              <select aria-label="dept  filter"
                 value={deptFilter}
                 onChange={(e) => setDeptFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -502,7 +517,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Category */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Category</label>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -517,7 +532,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Priority */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Priority</label>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -533,7 +548,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Status */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Status</label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -551,7 +566,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Ward */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Ward / Area</label>
-              <select
+              <select aria-label="ward  filter"
                 value={wardFilter}
                 onChange={(e) => setWardFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -566,7 +581,7 @@ export const AdminReportsPage: React.FC = () => {
             {/* Staff */}
             <div>
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase mb-1 font-outfit">Assigned Staff</label>
-              <select
+              <select aria-label="staff  filter"
                 value={staffFilter}
                 onChange={(e) => setStaffFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -662,7 +677,7 @@ export const AdminReportsPage: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={handlePrintReport}
+                  onClick={handleDownloadPdf}
                   className="px-3.5 py-1.5 bg-white border border-gray-300 text-gray-800 font-bold rounded-lg text-xs hover:bg-gray-50 transition-colors flex items-center space-x-1.5 shadow-xs"
                 >
                   <FileText className="w-3.5 h-3.5 text-rose-600" />
@@ -976,7 +991,7 @@ export const AdminReportsPage: React.FC = () => {
               </div>
               <div className="text-right">
                 <span className="block font-sans font-bold text-gray-900">City Administration Desk</span>
-                <span className="text-[10px]">NAGARSETU Civic Operations Portal v3.0</span>
+                <span className="text-[10px]">NAGARSETU Civic Operations Portal</span>
               </div>
             </div>
 

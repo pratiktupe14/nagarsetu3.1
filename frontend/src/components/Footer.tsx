@@ -9,19 +9,16 @@ export const Footer: React.FC = () => {
     <footer className="bg-white border-t border-gray-200 py-8 mt-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-600">
         
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold">
-            <Shield className="w-4 h-4" />
-          </div>
-          <span className="font-extrabold text-gray-900 font-outfit">NAGARSETU 3.0</span>
+        <div className="flex items-center space-x-3">
+          <img src="/logo.png" alt="NAGARSETU" className="h-12 sm:h-16 w-auto object-contain max-w-[280px]" />
           <span className="text-gray-400">•</span>
           <span>{t('governancePlatform')}</span>
         </div>
 
         <div className="flex items-center space-x-6 text-gray-500 font-medium">
-          <a href="#" className="hover:text-emerald-700">{t('privacyPolicy')}</a>
-          <a href="#" className="hover:text-emerald-700">{t('termsOfService')}</a>
-          <a href="#" className="hover:text-emerald-700">{t('municipalHelpdesk')}</a>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('privacyPolicy')}</button>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('termsOfService')}</button>
+          <button type="button" onClick={(e) => e.preventDefault()} className="hover:text-emerald-700 cursor-pointer">{t('municipalHelpdesk')}</button>
         </div>
 
         <div className="text-gray-400 font-mono text-[11px]">

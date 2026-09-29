@@ -11,11 +11,12 @@ import {
   DepartmentLeadershipSummary
 } from '../../services/departmentService';
 import { getDepartmentServiceStaff } from '../../services/adminService';
-import { getStoredComplaints } from '../../services/complaintService';
+import { getAllComplaints } from '../../services/complaintService';
 import { pushNotification } from '../../services/notificationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   Search, Plus, RefreshCw, Building2, Users, FileText, CheckCircle2,
@@ -41,6 +42,7 @@ const SEVEN_DEPARTMENTS_META = [
 export const AdminDepartmentHeadsPage: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { toast } = useNotification();
 
   const [headSummaries, setHeadSummaries] = useState<DepartmentLeadershipSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,7 +290,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
     if (!viewDeptComplaintsModal) return;
     setViewDeptComplaintsModal((prev) => (prev ? { ...prev, loading: true, error: null } : null));
     try {
-      const allComplaints = await getStoredComplaints();
+      const allComplaints = await getAllComplaints();
       const targetQuery = deptId || deptCode || deptName || '';
       const filtered = allComplaints.filter((c) => matchComplaintToDepartment(c, targetQuery, undefined, deptName));
       setViewDeptComplaintsModal((prev) => (prev ? { ...prev, complaints: filtered, loading: false, error: null } : null));
@@ -449,7 +451,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setDeactivateModalHead(null);
       await loadData();
     } catch (e: any) {
-      alert(e.message || 'Failed to deactivate Department Head.');
+      toast.error(e.message || 'Failed to deactivate Department Head.');
     } finally {
       setSubmitting(false);
     }
@@ -467,7 +469,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
       setTimeout(() => setToastMessage(null), 4000);
       await loadData();
     } catch (e: any) {
-      alert(e.message || 'Failed to reactivate Department Head.');
+      toast.error(e.message || 'Failed to reactivate Department Head.');
     } finally {
       setSubmitting(false);
     }
@@ -591,7 +593,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
         <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
-            <input
+            <input aria-label="search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -601,7 +603,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-            <select
+            <select aria-label="dept  filter"
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
@@ -613,7 +615,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               ))}
             </select>
 
-            <select
+            <select aria-label="status  filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-xs text-gray-800 font-semibold min-h-[42px]"
@@ -869,7 +871,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               <div className="space-y-3 text-xs">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Target Municipal Department *</label>
-                  <select
+                  <select aria-label="form Dept Id"
                     value={formDeptId}
                     onChange={(e) => handleDepartmentSelectionChange(e.target.value)}
                     disabled={Boolean(showChangeHeadModal)}
@@ -884,7 +886,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Full Name *</label>
-                  <input
+                  <input aria-label="form Full Name"
                     type="text"
                     required
                     value={formFullName}
@@ -896,7 +898,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Official Municipal Email * (Supabase Identity)</label>
-                  <input
+                  <input aria-label="form Email"
                     type="email"
                     required
                     value={formEmail}
@@ -910,7 +912,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Employee ID *</label>
-                    <input
+                    <input aria-label="form Employee Id"
                       type="text"
                       required
                       value={formEmployeeId}
@@ -922,7 +924,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Phone Number</label>
-                    <input
+                    <input aria-label="form Phone"
                       type="text"
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value)}
@@ -935,7 +937,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Password * (Min 8 Chars)</label>
-                    <input
+                    <input aria-label="form Password"
                       type="password"
                       required
                       value={formPassword}
@@ -947,7 +949,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Confirm Password *</label>
-                    <input
+                    <input aria-label="form Confirm Password"
                       type="password"
                       required
                       value={formConfirmPassword}
@@ -1354,7 +1356,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 {/* SEARCH INPUT */}
                 <div className="relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
+                  <input aria-label="Search complaints by ID, title, category, location, or assigned staff..."
                     type="text"
                     placeholder="Search complaints by ID, title, category, location, or assigned staff..."
                     value={complaintFilters.search}
@@ -1376,7 +1378,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   {/* STATUS FILTER */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Status</label>
-                    <select
+                    <select aria-label="status"
                       value={complaintFilters.status}
                       onChange={(e) => setComplaintFilters((prev) => ({ ...prev, status: e.target.value }))}
                       className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
@@ -1398,7 +1400,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   {/* PRIORITY FILTER */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Priority</label>
-                    <select
+                    <select aria-label="priority"
                       value={complaintFilters.priority}
                       onChange={(e) => setComplaintFilters((prev) => ({ ...prev, priority: e.target.value }))}
                       className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
@@ -1414,7 +1416,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   {/* CATEGORY FILTER */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Category</label>
-                    <select
+                    <select aria-label="category"
                       value={complaintFilters.category}
                       onChange={(e) => setComplaintFilters((prev) => ({ ...prev, category: e.target.value }))}
                       className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
@@ -1429,7 +1431,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   {/* ASSIGNED STAFF FILTER */}
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 font-mono">Assigned Staff</label>
-                    <select
+                    <select aria-label="staff"
                       value={complaintFilters.staff}
                       onChange={(e) => setComplaintFilters((prev) => ({ ...prev, staff: e.target.value }))}
                       className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-hidden focus:border-blue-500 cursor-pointer"
@@ -1464,14 +1466,14 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                   {/* CUSTOM DATE INPUTS IF CUSTOM SELECTED */}
                   {complaintFilters.datePreset === 'Custom' && (
                     <div className="flex items-center space-x-2">
-                      <input
+                      <input aria-label="from Date"
                         type="date"
                         value={complaintFilters.fromDate}
                         onChange={(e) => setComplaintFilters((prev) => ({ ...prev, fromDate: e.target.value }))}
                         className="p-1.5 bg-white border border-gray-200 rounded-lg text-xs font-mono"
                       />
                       <span className="text-gray-400 text-xs font-bold">to</span>
-                      <input
+                      <input aria-label="to Date"
                         type="date"
                         value={complaintFilters.toDate}
                         onChange={(e) => setComplaintFilters((prev) => ({ ...prev, toDate: e.target.value }))}
@@ -1727,7 +1729,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
               <div className="space-y-4 text-xs">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Full Name</label>
-                  <input
+                  <input aria-label="form Full Name"
                     type="text"
                     value={formFullName}
                     onChange={(e) => setFormFullName(e.target.value)}
@@ -1738,7 +1740,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-700 font-bold mb-1">Official Email Address</label>
-                    <input
+                    <input aria-label="form Email"
                       type="email"
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
@@ -1748,7 +1750,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-gray-700 font-bold mb-1">Employee ID</label>
-                    <input
+                    <input aria-label="form Employee Id"
                       type="text"
                       value={formEmployeeId}
                       onChange={(e) => setFormEmployeeId(e.target.value)}
@@ -1760,7 +1762,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-700 font-bold mb-1">Contact Phone</label>
-                    <input
+                    <input aria-label="form Phone"
                       type="text"
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value)}
@@ -1770,7 +1772,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-gray-700 font-bold mb-1">Department</label>
-                    <select
+                    <select aria-label="form Dept Id"
                       value={formDeptId}
                       onChange={(e) => setFormDeptId(e.target.value)}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:bg-white focus:border-amber-500"
@@ -1785,7 +1787,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
                   <label className="block text-amber-900 font-bold">New Password (Optional)</label>
                   <p className="text-[11px] text-amber-700">Leave blank to keep current login password unchanged.</p>
-                  <input
+                  <input aria-label="form Password"
                     type="password"
                     value={formPassword}
                     onChange={(e) => setFormPassword(e.target.value)}

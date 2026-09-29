@@ -7,7 +7,7 @@ import { getAllServiceStaffRecords } from '../services/adminService';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 interface AuthContextType {
-  user: UserProfile;
+  user: UserProfile | null;
   role: UserRole;
   loading: boolean;
   login: (identifier: string, password: string, role: UserRole) => Promise<boolean>;
@@ -15,9 +15,68 @@ interface AuthContextType {
   registerCitizen: (fullName: string, mobile: string, email: string, password?: string) => Promise<boolean>;
   switchRole: (role: UserRole) => void;
   logout: () => Promise<void>;
+  updateUserProfile: (data: Partial<UserProfile>) => Promise<UserProfile>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  refreshSession: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const SEED_DEPARTMENT_HEADS = [
+  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', department_id: '1', department_name: 'Public Works Department (PWD)', department_code: 'PWD', employee_id: 'EMP-PWD-001' },
+  { id: '2', name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', department_id: '2', department_name: 'Sanitation & Waste Management', department_code: 'SAN', employee_id: 'EMP-SAN-001' },
+  { id: '3', name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', department_id: '3', department_name: 'Water Supply & Sewerage Board', department_code: 'WTR', employee_id: 'EMP-WTR-001' },
+  { id: '4', name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', department_id: '4', department_name: 'Drainage & Sewage Department', department_code: 'DRN', employee_id: 'EMP-DRN-001' },
+  { id: '5', name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', department_id: '5', department_name: 'Electrical & Street Lighting', department_code: 'ELE', employee_id: 'EMP-ELE-001' },
+  { id: '6', name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', department_id: '6', department_name: 'Traffic Management Department', department_code: 'TRF', employee_id: 'EMP-TRF-001' },
+  { id: '7', name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', department_id: '7', department_name: 'Maintenance Department', department_code: 'MNT', employee_id: 'EMP-MNT-001' }
+];
+
+export function findDepartmentHeadByIdentifier(identifier: string): UserProfile | null {
+  if (!identifier) return null;
+  const clean = identifier.trim().toLowerCase();
+  if (!clean) return null;
+
+  const exact = SEED_DEPARTMENT_HEADS.find((dh) => {
+    const e = (dh.email || '').toLowerCase();
+    const emp = (dh.employee_id || '').toLowerCase();
+    const id = (dh.id || '').toLowerCase();
+    const name = (dh.name || '').toLowerCase();
+    return e === clean || emp === clean || id === clean || (name && name.includes(clean));
+  });
+
+  if (exact) {
+    return {
+      id: exact.id,
+      full_name: exact.name,
+      email: exact.email,
+      role: 'department_head',
+      department_id: exact.department_id,
+      department_name: exact.department_name,
+      department_code: exact.department_code,
+      employee_id: exact.employee_id,
+      language_pref: 'en'
+    };
+  }
+
+  const resDept = resolveDepartmentInfo(undefined, undefined, clean);
+  if (resDept && resDept.code !== 'UNASSIGNED') {
+    const seedMatch = SEED_DEPARTMENT_HEADS.find((dh) => dh.department_code === resDept.code);
+    return {
+      id: seedMatch?.id || `dh-${resDept.code.toLowerCase()}-01`,
+      full_name: seedMatch?.name || `${resDept.name} Head`,
+      email: seedMatch?.email || (clean.includes('@') ? clean : `${clean}@nagarsetu.gov.in`),
+      role: 'department_head',
+      department_id: resDept.id,
+      department_name: resDept.fullName || resDept.name,
+      department_code: resDept.code,
+      employee_id: seedMatch?.employee_id || `DH-${resDept.code}-001`,
+      language_pref: 'en'
+    };
+  }
+
+  return null;
+}
 
 export function findServiceStaffByIdentifier(identifier: string): UserProfile | null {
   if (!identifier) return null;
@@ -122,8 +181,8 @@ export function findServiceStaffByIdentifier(identifier: string): UserProfile | 
 
 export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   citizen: {
-    id: 'demo-citizen-id-101',
-    full_name: 'Rahul Sharma',
+    id: 'citizen-user-id',
+    full_name: 'Citizen User',
     mobile: '9876543210',
     email: 'citizen@nagarsetu.gov.in',
     role: 'citizen',
@@ -149,11 +208,13 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   },
   department_head: {
     id: 'demo-head-id-404',
-    full_name: 'Department Head',
-    email: 'dept.head@nagarsetu.gov.in',
+    full_name: 'Rahul Kumar',
+    email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
-    department_name: '',
-    department_id: '',
+    department_name: 'Public Works Department (PWD)',
+    department_id: '1',
+    department_code: 'PWD',
+    employee_id: 'DH-PWD-001',
     language_pref: 'en'
   }
 };
@@ -168,12 +229,12 @@ export function getPortalForRole(role: UserRole): string {
 }
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile>(() => {
+  const [user, setUser] = useState<UserProfile | null>(() => {
     const cached = localStorage.getItem('nagarsetu_user');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.role) {
+        if (parsed && parsed.role && parsed.id) {
           if (parsed.role === 'service_staff' && (!parsed.department_id || !parsed.department_name)) {
             const resolved = findServiceStaffByIdentifier(parsed.email || parsed.employee_id || parsed.id || '');
             if (resolved) {
@@ -185,7 +246,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } catch (e) {}
     }
-    return DEFAULT_ROLE_USERS.citizen;
+    return null;
   });
 
   const [loading, setLoading] = useState(true);
@@ -200,6 +261,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 3500);
 
     async function checkCurrentSession() {
+      // 1. Authoritative Backend Database Session Check
+      const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+      if (storedToken) {
+        try {
+          const res = await fetch(`${getApiUrl()}/api/auth/me`, {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.user && isMounted) {
+              const u = data.user;
+              const authenticatedUser: UserProfile = {
+                id: String(u.id),
+                full_name: u.name,
+                email: u.email || '',
+                mobile: u.mobile || '',
+                role: (u.role === 'admin' ? 'city_admin' : (u.role === 'staff' ? 'service_staff' : u.role)) as UserRole,
+                department_id: u.department_id ? String(u.department_id) : undefined,
+                department_name: u.department_name || undefined,
+                department_code: u.department_code || undefined,
+                employee_id: u.employee_id || undefined,
+                language_pref: u.language_pref || 'en'
+              };
+              setUser(authenticatedUser);
+              localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+              if (isMounted) setLoading(false);
+              clearTimeout(safetyTimer);
+              return;
+            }
+          } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+            localStorage.removeItem('nagarsetu_token');
+            localStorage.removeItem('nagarsetu_user');
+            sessionStorage.removeItem('nagarsetu_token');
+            sessionStorage.removeItem('nagarsetu_user');
+            if (isMounted) setUser(null);
+          }
+        } catch (backendErr) {
+          console.warn('Authoritative backend /api/auth/me check note:', backendErr);
+        }
+      }
+
       if (!isSupabaseConfigured()) {
         if (isMounted) setLoading(false);
         clearTimeout(safetyTimer);
@@ -220,11 +327,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]);
 
           const profile = profRes.data;
-          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const userRole = roleRes.data?.role || profile?.role || authUser.user_metadata?.role || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : undefined);
           const deptHead = headRes.data;
 
           if (isMounted) {
-            let role: UserRole = (userRole as UserRole) || 'citizen';
+            let role: UserRole = (userRole as UserRole) || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
             let deptId = profile?.department_id || deptHead?.department_id;
             let deptName = profile?.department_name || deptHead?.departments?.name;
 
@@ -232,6 +339,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               role = 'department_head';
               deptId = deptHead.department_id;
               deptName = deptHead.departments?.name || deptName;
+            } else if (profile?.role === 'city_admin' || profile?.role === 'admin' || userEmail.toLowerCase().includes('admin')) {
+              role = 'city_admin';
             }
 
             if (role === 'service_staff' && (!deptId || !deptName)) {
@@ -300,10 +409,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]);
 
           const profile = profRes.data;
-          const userRole = roleRes.data?.role || authUser.user_metadata?.role;
+          const userRole = roleRes.data?.role || profile?.role || authUser.user_metadata?.role || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : undefined);
           const deptHead = headRes.data;
 
-          let role: UserRole = (userRole as UserRole) || 'citizen';
+          let role: UserRole = (userRole as UserRole) || (userEmail.toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
           let deptId = profile?.department_id || deptHead?.department_id;
           let deptName = profile?.department_name || deptHead?.departments?.name;
 
@@ -311,6 +420,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role = 'department_head';
             deptId = deptHead.department_id;
             deptName = deptHead.departments?.name || deptName;
+          } else if (profile?.role === 'city_admin' || profile?.role === 'admin' || userEmail.toLowerCase().includes('admin')) {
+            role = 'city_admin';
           }
 
           if (role === 'service_staff' && (!deptId || !deptName)) {
@@ -359,9 +470,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('onAuthStateChange setup note:', e);
     }
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'nagarsetu_token' || e.key === 'nagarsetu_user') {
+        checkCurrentSession();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
+      window.removeEventListener('storage', handleStorageChange);
       if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
         try {
           authSubscription.unsubscribe();
@@ -370,12 +489,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const switchRole = (newRole: UserRole) => {
+  const switchRole = async (newRole: UserRole) => {
     let roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
     if (newRole === 'service_staff' && user && user.email) {
       const resolved = findServiceStaffByIdentifier(user.email);
       if (resolved) roleUser = resolved;
     }
+    if (newRole === 'department_head' && user && user.email) {
+      const resolvedHead = findDepartmentHeadByIdentifier(user.email);
+      if (resolvedHead) roleUser = resolvedHead;
+    }
+
     setUser(roleUser);
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
   };
@@ -386,42 +510,98 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 1. Try Local Express Backend API authentication first
       try {
-        const response = await fetch(`${getApiUrl()}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
-        });
+        let response: Response;
+        try {
+          response = await fetch(`${getApiUrl()}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
+          });
+        } catch (fetchErr: any) {
+          console.warn(`Backend API login connection note (${getApiUrl()}):`, fetchErr.message);
+
+          if (!isSupabaseConfigured()) {
+            throw new Error(`Unable to connect to NagarSetu backend server (${getApiUrl()}). Please make sure your backend API server is running.`);
+          }
+          throw fetchErr;
+        }
+
         if (response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
-            const mappedRole: UserRole = data.user.role === 'admin' ? 'city_admin' : (data.user.role as UserRole);
+            const mappedRole: UserRole = (data.user.role === 'admin' || data.user.role === 'city_admin')
+              ? 'city_admin'
+              : (data.user.role === 'field_staff' || data.user.role === 'staff' || data.user.role === 'service_staff')
+                ? 'service_staff'
+                : (data.user.role as UserRole);
             const staffMatch = mappedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanIdentifier) : null;
             const resDept = resolveDepartmentInfo(
               data.user.department_id || staffMatch?.department_id,
-              data.user.department_name || staffMatch?.department_name
+              data.user.department_name || staffMatch?.department_name,
+              cleanIdentifier
             );
+
+            if ((mappedRole === 'department_head' || mappedRole === 'service_staff') && (!resDept.id || resDept.code === 'UNASSIGNED')) {
+              throw new Error("Department assignment could not be resolved. Please contact City Administration.");
+            }
+
             const authenticatedUser: UserProfile = {
               id: String(data.user.id || staffMatch?.id || 'staff-101'),
               full_name: data.user.name || staffMatch?.full_name || 'Municipal User',
               email: data.user.email || cleanIdentifier,
               mobile: data.user.mobile || staffMatch?.mobile || '',
               role: mappedRole,
-              department_id: data.user.department_id ? String(data.user.department_id) : resDept.id,
-              department_name: data.user.department_name || staffMatch?.department_name || resDept.fullName || resDept.name,
+              department_id: data.user.department_id ? String(data.user.department_id) : (mappedRole === 'citizen' ? undefined : resDept.id),
+              department_name: data.user.department_name || staffMatch?.department_name || (mappedRole === 'citizen' ? undefined : (resDept.fullName || resDept.name)),
+              department_code: data.user.department_code || (mappedRole === 'citizen' ? undefined : resDept.code),
               employee_id: data.user.employee_id || staffMatch?.employee_id || undefined,
-              language_pref: data.user.language_pref || 'en'
+              language_pref: data.user.language_pref || 'en',
+              must_change_password: Boolean(data.user.must_change_password)
             };
             setUser(authenticatedUser);
             localStorage.setItem('nagarsetu_token', data.token);
             localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
             return true;
           }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.message || errData.error || (response.status === 401 ? 'Invalid login credentials' : 'Authentication failed');
+          console.warn('Express Backend API returned error:', errMsg);
+          // Only throw immediately if it's not a demo identifier or demo password
+          const isDemoPass = ['head@123', 'admin@123', 'staff@123', 'password123', 'nagarsetu@123', '8788562103', 'head123', 'staff123', 'admin123', 'NagarSetu@Admin2026!'].includes((password || '').trim());
+          const isDemoEmailOrMobile = cleanIdentifier.toLowerCase().includes('nagarsetu.gov.in') || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.includes('8788562103');
+          if (!isDemoPass && !isDemoEmailOrMobile) {
+            throw new Error(errMsg);
+          }
         }
-      } catch (backendErr) {
-        console.warn('Backend API login note:', backendErr);
+      } catch (backendErr: any) {
+        if (backendErr && backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('Failed to fetch') && !backendErr.message.includes('Invalid login credentials')) {
+          throw backendErr;
+        }
       }
 
-      const cleanEmail = cleanIdentifier.includes('@') ? cleanIdentifier.toLowerCase() : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
+      let cleanEmail = cleanIdentifier.includes('@')
+        ? cleanIdentifier.toLowerCase()
+        : (targetRole === 'city_admin' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin')
+          ? 'admin@nagarsetu.gov.in'
+          : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
+
+      if (isSupabaseConfigured() && !cleanIdentifier.includes('@') && cleanEmail !== 'admin@nagarsetu.gov.in') {
+        const rawDigits = cleanIdentifier.replace(/\D/g, '');
+        const norm = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+        try {
+          const { data: matchedProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .or(`mobile.eq.${cleanIdentifier},mobile.eq.${norm}`)
+            .maybeSingle();
+          if (matchedProfile?.email) {
+            cleanEmail = matchedProfile.email.toLowerCase();
+          }
+        } catch (e) {
+          // Keep default cleanEmail on lookup error
+        }
+      }
 
       if (isSupabaseConfigured()) {
         // Check if user has an inactive department_head assignment with no active assignment
@@ -440,12 +620,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .maybeSingle();
 
         if (inactiveHead && !activeHead) {
-          throw new Error("Your Department Head access has been deactivated. Please contact City Administration.");
+          throw new Error("Department assignment could not be resolved. Please contact City Administration.");
         }
 
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
-          password: password || 'nagarsetu123'
+          password: password
         });
 
         if (!error && data?.user) {
@@ -458,11 +638,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           const profile = profRes.data;
           const deptHead = headRes.data;
-          const resolvedRole: UserRole = deptHead ? 'department_head' : (roleRes.data?.role as UserRole) || targetRole;
+          const resolvedRole: UserRole = deptHead
+            ? 'department_head'
+            : (roleRes.data?.role as UserRole) || (profile?.role as UserRole) || (cleanEmail.toLowerCase().includes('admin') ? 'city_admin' : targetRole);
           const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
-          let rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
-          let rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
-          const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName);
+          const rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
+          const rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
+          const rawDeptCode = deptHead?.departments?.code;
+          const resDept = resolveDepartmentInfo(rawDeptId, rawDeptName, cleanEmail);
+
+          if (resolvedRole === 'department_head' && (!resDept.id || resDept.code === 'UNASSIGNED')) {
+            throw new Error("Department assignment could not be resolved. Please contact City Administration.");
+          }
 
           const fetchedUser: UserProfile = {
             id: authUser.id || staffMatch?.id || 'staff-101',
@@ -472,6 +659,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role: resolvedRole,
             department_id: rawDeptId ? String(rawDeptId) : resDept.id,
             department_name: rawDeptName || resDept.fullName || resDept.name,
+            department_code: rawDeptCode || resDept.code,
             employee_id: deptHead?.employee_id || profile?.employee_id || staffMatch?.employee_id,
             language_pref: profile?.language_pref || 'en'
           };
@@ -482,87 +670,132 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (error) {
           console.warn('Supabase signInWithPassword note:', error);
-          const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-          const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
-          const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
-          const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
-
-          if (
-            cleanEmail === 'admin@nagarsetu.gov.in' ||
-            cleanEmail.includes('admin') ||
-            targetRole === 'city_admin' ||
-            password === demoAdminPass ||
-            password === demoUserPass ||
-            password === demoHeadPass ||
-            password === demoStaffPass
-          ) {
-            console.info('Supabase auth failed for demo account, using demo session fallback.');
-            if (targetRole === 'service_staff') {
-              const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
-              setUser(staffUser);
-              localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
-              return true;
-            }
-            switchRole(targetRole || 'city_admin');
-            return true;
+          const isDemoPass = ['head@123', 'admin@123', 'staff@123', 'password123', 'nagarsetu@123', '8788562103', 'head123', 'staff123', 'admin123', 'NagarSetu@Admin2026!'].includes((password || '').trim());
+          const isDemoEmailOrMobile = cleanEmail.includes('nagarsetu.gov.in') || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.includes('8788562103');
+          if (!isDemoPass && !isDemoEmailOrMobile) {
+            throw new Error(error.message || 'Authentication failed. Please check your credentials.');
           }
-          throw new Error(error.message || 'Authentication failed. Please check your credentials.');
         }
       }
 
       // Query Supabase for active department head record matching cleanEmail
       if (isSupabaseConfigured()) {
-        const { data: dhRow } = await supabase
-          .from('department_heads')
-          .select('*, departments(*)')
-          .eq('email', cleanEmail)
-          .eq('status', 'active')
-          .maybeSingle();
+        try {
+          const { data: dhRow } = await supabase
+            .from('department_heads')
+            .select('*, departments(*)')
+            .eq('email', cleanEmail)
+            .eq('status', 'active')
+            .maybeSingle();
 
-        if (dhRow) {
-          const dhUser: UserProfile = {
-            id: dhRow.user_id || `dh-${dhRow.id.slice(0, 8)}`,
-            full_name: dhRow.name,
-            email: cleanEmail,
-            mobile: dhRow.phone || '',
-            role: 'department_head',
-            department_id: dhRow.department_id,
-            department_name: dhRow.departments?.name || 'Municipal Department',
-            employee_id: dhRow.employee_id,
-            language_pref: 'en'
-          };
-          setUser(dhUser);
-          localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+          if (dhRow) {
+            const dhUser: UserProfile = {
+              id: dhRow.user_id || `dh-${String(dhRow.id).slice(0, 8)}`,
+              full_name: dhRow.name,
+              email: cleanEmail,
+              mobile: dhRow.phone || '',
+              role: 'department_head',
+              department_id: dhRow.department_id,
+              department_name: dhRow.departments?.name || 'Municipal Department',
+              department_code: dhRow.departments?.code,
+              employee_id: dhRow.employee_id,
+              language_pref: 'en'
+            };
+            setUser(dhUser);
+            localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
+            localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+            return true;
+          }
+        } catch (e) {
+          console.warn('Supabase department_heads lookup note:', e);
+        }
+      }
+
+      // Demo & Client Fallback Authentication
+      if (targetRole === 'city_admin' || cleanEmail === 'admin@nagarsetu.gov.in' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin') {
+        const adminUser: UserProfile = {
+          id: '1',
+          full_name: 'Municipal Admin',
+          email: 'admin@nagarsetu.gov.in',
+          mobile: '9876543213',
+          role: 'city_admin',
+          language_pref: 'en'
+        };
+        setUser(adminUser);
+        localStorage.setItem('nagarsetu_token', 'demo-token-city-admin');
+        localStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
+        return true;
+      }
+
+      if (targetRole === 'department_head' || cleanEmail.includes('nagarsetu.gov.in')) {
+        const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
+        if (dhMatch) {
+          setUser(dhMatch);
+          localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
+          localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
           return true;
         }
       }
 
-      if (targetRole === 'service_staff') {
-        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail) || DEFAULT_ROLE_USERS.service_staff;
-        setUser(staffUser);
-        localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+      if (targetRole === 'service_staff' || cleanEmail.includes('staff')) {
+        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
+        if (staffUser) {
+          setUser(staffUser);
+          localStorage.setItem('nagarsetu_token', 'demo-token-service-staff');
+          localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+          return true;
+        }
+      }
+
+      if (targetRole === 'citizen' || cleanIdentifier.replace(/\D/g, '').includes('8788562103')) {
+        const citizenUser: UserProfile = {
+          id: 'c-8788562103',
+          full_name: 'Pratik Dilip Tupe',
+          email: 'citizen8788@nagarsetu.gov.in',
+          mobile: '8788562103',
+          role: 'citizen',
+          language_pref: 'en'
+        };
+        setUser(citizenUser);
+        localStorage.setItem('nagarsetu_token', 'demo-token-citizen');
+        localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
         return true;
       }
 
-      switchRole(targetRole);
-      return true;
+      throw new Error("Invalid login credentials. Please check your username/email and password.");
     } catch (e: any) {
       console.warn('Supabase Auth Login error:', e);
       throw e;
     }
   };
 
-  const loginWithOtp = async (mobile: string): Promise<boolean> => {
-    const citizenUser: UserProfile = {
-      id: 'citizen-' + mobile.slice(-4),
-      full_name: 'Citizen User',
-      mobile,
-      email: `${mobile}@citizen.nagarsetu.gov.in`,
-      role: 'citizen'
-    };
-    setUser(citizenUser);
-    localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
-    return true;
+  const loginWithOtp = async (mobile: string, otp: string = '123456'): Promise<boolean> => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/auth/otp-verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: mobile.trim(), otp: otp.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.token && data.user) {
+        const citizenUser: UserProfile = {
+          id: String(data.user.id),
+          full_name: data.user.name || 'Citizen User',
+          mobile: data.user.mobile || mobile,
+          email: data.user.email || `${mobile}@citizen.nagarsetu.gov.in`,
+          role: 'citizen',
+          language_pref: data.user.language_pref || 'en'
+        };
+        setUser(citizenUser);
+        localStorage.setItem('nagarsetu_token', data.token);
+        localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
+        return true;
+      }
+      throw new Error(data.error || 'Invalid OTP code');
+    } catch (e: any) {
+      console.warn('Backend OTP verification error:', e.message);
+      throw e;
+    }
   };
 
   const registerCitizen = async (
@@ -572,6 +805,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     password?: string
   ): Promise<boolean> => {
     try {
+      // 1. Try local Express backend API registration first
+      try {
+        let response: Response;
+        try {
+          response = await fetch(`${getApiUrl()}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: fullName.trim(),
+              mobile: mobile.trim(),
+              email: email && email.trim() !== '' ? email.trim() : undefined,
+              password: password ? password.trim() : undefined,
+              role: 'citizen'
+            })
+          });
+        } catch (fetchErr: any) {
+          console.warn(`Backend API registration note (${getApiUrl()}):`, fetchErr.message);
+          if (!isSupabaseConfigured()) {
+            throw new Error(`Unable to connect to NagarSetu backend service (${getApiUrl()}). Please verify the backend API server is running and accessible.`);
+          }
+          throw fetchErr;
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.token && data.user) {
+            const registeredUser: UserProfile = {
+              id: String(data.user.id),
+              full_name: data.user.name || fullName,
+              mobile: data.user.mobile || mobile,
+              email: data.user.email || email,
+              role: 'citizen',
+              language_pref: data.user.language_pref || 'en'
+            };
+            setUser(registeredUser);
+            localStorage.setItem('nagarsetu_token', data.token);
+            localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));
+            return true;
+          }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.message || errData.error || 'Registration failed. Please check your details.';
+          throw new Error(errMsg);
+        }
+      } catch (backendErr: any) {
+        if (backendErr && backendErr.message && !backendErr.message.includes('fetch')) {
+          throw backendErr;
+        }
+        if (!isSupabaseConfigured()) {
+          throw backendErr;
+        }
+      }
+
       if (isSupabaseConfigured() && email && password) {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -611,19 +897,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      const newCitizen: UserProfile = {
-        id: 'citizen-' + Date.now(),
-        full_name: fullName || 'Registered Citizen',
-        mobile,
-        email,
-        role: 'citizen'
-      };
-      setUser(newCitizen);
-      localStorage.setItem('nagarsetu_user', JSON.stringify(newCitizen));
-      return true;
-    } catch (e) {
+      throw new Error("Registration failed. Please check details or try again.");
+    } catch (e: any) {
       console.error('Registration Error:', e);
-      return false;
+      throw e;
     }
   };
 
@@ -637,7 +914,131 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     localStorage.removeItem('nagarsetu_user');
     localStorage.removeItem('nagarsetu_token');
-    switchRole('citizen');
+    sessionStorage.removeItem('nagarsetu_user');
+    sessionStorage.removeItem('nagarsetu_token');
+    setUser(null);
+  };
+
+  const updateUserProfile = async (payload: Partial<UserProfile>): Promise<UserProfile> => {
+    try {
+      const token = localStorage.getItem('nagarsetu_token');
+      const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: payload.full_name || payload.name,
+          mobile: payload.mobile,
+          email: payload.email,
+          language_pref: payload.language_pref,
+          address: payload.address
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to update profile');
+      }
+
+      const resData = await response.json();
+      const updatedUser: UserProfile = {
+        ...(user || ({} as UserProfile)),
+        ...resData.user,
+        full_name: resData.user?.name || resData.user?.full_name || payload.full_name || payload.name || user?.full_name || '',
+        name: resData.user?.name || resData.user?.full_name || payload.name || payload.full_name || user?.name || ''
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+
+      if (isSupabaseConfigured() && user?.id) {
+        try {
+          await supabase.from('profiles').update({
+            full_name: updatedUser.full_name,
+            mobile: updatedUser.mobile,
+            email: updatedUser.email,
+            language_pref: updatedUser.language_pref
+          }).eq('id', user.id);
+        } catch (sErr) {
+          console.warn('[SUPABASE_PROFILE_SYNC_NOTE]:', sErr);
+        }
+      }
+
+      return updatedUser;
+    } catch (err: any) {
+      console.error('updateUserProfile error:', err);
+      throw err;
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    const token = sessionStorage.getItem('auth_token') || localStorage.getItem('token') || localStorage.getItem('nagarsetu_token');
+    const response = await fetch(`${getApiUrl()}/api/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || 'Failed to update password');
+    }
+
+    const resData = await response.json();
+    if (resData.token) {
+      localStorage.setItem('nagarsetu_token', resData.token);
+    }
+    if (user) {
+      const updatedUser: UserProfile = {
+        ...user,
+        ...(resData.user || {}),
+        must_change_password: false
+      };
+      setUser(updatedUser);
+      localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const refreshSession = async (): Promise<UserProfile | null> => {
+    try {
+      const token = localStorage.getItem('nagarsetu_token');
+      if (!token) return user;
+
+      const response = await fetch(`${getApiUrl()}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) return user;
+
+      const resData = await response.json();
+      if (resData.token) {
+        localStorage.setItem('nagarsetu_token', resData.token);
+      }
+      if (resData.user) {
+        const refreshed: UserProfile = {
+          ...(user || ({} as UserProfile)),
+          ...resData.user,
+          full_name: resData.user.name || resData.user.full_name || user?.full_name || '',
+          name: resData.user.name || resData.user.full_name || user?.name || ''
+        };
+        setUser(refreshed);
+        localStorage.setItem('nagarsetu_user', JSON.stringify(refreshed));
+        return refreshed;
+      }
+      return user;
+    } catch (e) {
+      console.warn('refreshSession error:', e);
+      return user;
+    }
   };
 
   if (loading) {
@@ -648,7 +1049,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         </div>
         <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 font-mono">
           <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-          <span>NAGARSETU 3.0 — Loading workspace...</span>
+          <span>NAGARSETU — Loading workspace...</span>
         </div>
         <button
           onClick={() => setLoading(false)}
@@ -664,13 +1065,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
-        role: user.role,
+        role: user ? user.role : 'citizen',
         loading,
         login,
         loginWithOtp,
         registerCitizen,
         switchRole,
-        logout
+        logout,
+        updateUserProfile,
+        changePassword,
+        refreshSession
       }}
     >
       {children}

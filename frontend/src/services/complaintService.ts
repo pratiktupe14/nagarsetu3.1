@@ -9,6 +9,73 @@ import { resolveDepartmentInfo } from './departmentService';
 const LOCAL_STORAGE_COMPLAINTS_KEY = 'nagarsetu_citizen_complaints_v3';
 const LOCAL_STORAGE_OFFLINE_DRAFTS_KEY = 'nagarsetu_offline_drafts_v3';
 
+export class HttpError extends Error {
+  status: number;
+  data: any;
+  isHttpError: boolean;
+
+  constructor(status: number, message: string, data?: any) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.data = data;
+    this.isHttpError = true;
+    Object.setPrototypeOf(this, HttpError.prototype);
+  }
+}
+
+export class AuthError extends Error {
+  isAuthError: boolean;
+  status: number;
+
+  constructor(message: string = 'Authentication required to submit complaint. Please log in.') {
+    super(message);
+    this.name = 'AuthError';
+    this.isAuthError = true;
+    this.status = 401;
+    Object.setPrototypeOf(this, AuthError.prototype);
+  }
+}
+
+/**
+ * Strict Network Failure Classifier
+ * Distinguishes true network failures (fetch threw before reaching server, offline)
+ * from valid HTTP responses (200, 201, 400, 401, 403, 404, 409, 422, 500, 502, 503).
+ */
+export function isNetworkError(err: any): boolean {
+  if (!err) return false;
+
+  // 1. If it's an HttpError or has an HTTP status code, it is an HTTP response, NOT a network failure.
+  if (err instanceof HttpError || err.isHttpError || typeof err.status === 'number' || err.statusCode) {
+    return false;
+  }
+
+  // 2. If it's an AuthError, it is an authentication issue, NOT a network failure.
+  if (err instanceof AuthError || err.isAuthError || err.message?.includes('Authentication required')) {
+    return false;
+  }
+
+  // 3. Browser explicitly reports offline
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return true;
+  }
+
+  // 4. Standard fetch network error signatures (fetch throws before receiving HTTP response)
+  const errMsg = (err.message || '').toLowerCase();
+  return (
+    errMsg.includes('failed to fetch') ||
+    errMsg.includes('networkerror') ||
+    errMsg.includes('network error') ||
+    errMsg.includes('load failed') ||
+    errMsg.includes('fetch failed') ||
+    errMsg.includes('econnrefused') ||
+    errMsg.includes('enotfound') ||
+    errMsg.includes('connection refused') ||
+    errMsg.includes('net::err') ||
+    errMsg.includes('offline')
+  );
+}
+
 export function generateComplaintNumber(): string {
   const year = new Date().getFullYear();
   const randomSeq = Math.floor(100000 + Math.random() * 900000);
@@ -42,37 +109,22 @@ export function isDemoComplaint(c: Partial<Complaint>): boolean {
 }
 
 export function getStoredComplaints(): Complaint[] {
-  // Purge legacy storage keys if present
+  // Purge legacy storage keys if present to ensure PostgreSQL is single source of truth
   LEGACY_STORAGE_KEYS.forEach((key) => {
-    if (key !== LOCAL_STORAGE_COMPLAINTS_KEY) {
-      try {
-        const legacyData = localStorage.getItem(key);
-        if (legacyData) {
-          localStorage.removeItem(key);
-        }
-      } catch (e) {}
-    }
-  });
-
-  const data = localStorage.getItem(LOCAL_STORAGE_COMPLAINTS_KEY);
-  if (data) {
     try {
-      const parsed: Complaint[] = JSON.parse(data);
-      if (Array.isArray(parsed)) {
-        const clean = parsed.filter((c) => !isDemoComplaint(c));
-        if (clean.length !== parsed.length) {
-          saveStoredComplaints(clean);
-        }
-        return clean;
+      if (localStorage.getItem(key)) {
+        localStorage.removeItem(key);
       }
     } catch (e) {}
-  }
+  });
   return [];
 }
 
-export function saveStoredComplaints(complaints: Complaint[]) {
-  const clean = complaints.filter((c) => !isDemoComplaint(c));
-  localStorage.setItem(LOCAL_STORAGE_COMPLAINTS_KEY, JSON.stringify(clean));
+export function saveStoredComplaints(_complaints: Complaint[]) {
+  // PostgreSQL is single source of truth; do not write complaints to localStorage
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);
+  } catch (e) {}
 }
 
 // Upload image to Supabase storage bucket ('issues')
@@ -101,10 +153,51 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
     }
   }
 
-  // Persistent Base64 Data URL fallback to prevent temporary blob expiration across reloads
+  // Optimize & Compress client-side to prevent Vercel 4.5MB serverless request limit violations
   return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(URL.createObjectURL(file));
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.75);
+            resolve(compressed);
+            return;
+          }
+        } catch (canvasErr) {
+          console.warn('Canvas image compression note:', canvasErr);
+        }
+        resolve(e.target?.result as string);
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
     reader.onerror = () => resolve(URL.createObjectURL(file));
     reader.readAsDataURL(file);
   });
@@ -116,9 +209,9 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   let responseStatus = 0;
   const startTime = new Date().toISOString();
 
-  // 1. Try Express Backend API first with no-cache headers
+  // 1. Try Express Backend API first with no-cache headers and scope=all
   try {
-    const res = await fetch(`${getApiUrl()}/api/complaints`, {
+    const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {
       headers: getNoCacheHeaders()
     });
     responseStatus = res.status;
@@ -133,8 +226,8 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     console.warn('Express backend getAllComplaints fallback:', err);
   }
 
-  // 2. Try Supabase if configured and backend yielded no list
-  if (list.length === 0 && isSupabaseConfigured()) {
+  // 2. Try Supabase ONLY if Express Backend API was unreachable (responseStatus !== 200)
+  if (responseStatus !== 200 && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -143,87 +236,72 @@ export async function getAllComplaints(): Promise<Complaint[]> {
 
       if (!error && data) {
         list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
-        if (responseStatus === 0) responseStatus = 200;
+        responseStatus = 200;
       }
     } catch (err) {
       console.warn('Supabase getAllComplaints fallback:', err);
     }
   }
 
-  // 3. Merge with LocalStorage cached complaints (DB state takes absolute precedence)
-  const localAll = getStoredComplaints();
-  const dbMap = new Map<string, Complaint>();
+  // 3. DB state is authoritative when backend or Supabase query succeeds
+  if (responseStatus === 200) {
+    let finalComplaints = list.filter((c) => !isDemoComplaint(c));
 
-  list.forEach((c) => {
-    const key = c.complaint_number || String(c.id);
-    if (key) dbMap.set(key, c);
-  });
+    // Audit and repair locations with a non-blocking timeout so dashboard loads instantly
+    try {
+      const repairPromise = auditAndRepairComplaintLocations(finalComplaints);
+      const timeoutPromise = new Promise<{ repairedComplaints: Complaint[] }>((resolve) =>
+        setTimeout(() => resolve({ repairedComplaints: finalComplaints }), 1200)
+      );
+      const { repairedComplaints } = await Promise.race([repairPromise, timeoutPromise]);
+      finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
+    } catch (e) {
+      console.warn('Location audit skipped or timed out:', e);
+    }
 
-  localAll.forEach((loc) => {
-    const key = loc.complaint_number || String(loc.id);
-    if (!key) return;
-    const dbRecord = dbMap.get(key);
-    if (!dbRecord) {
-      // Local draft not yet synced to backend
-      dbMap.set(key, loc);
-    } else {
-      // DB Record exists: Keep DB status, staff assignment, and timestamps as authoritative truth
-      dbMap.set(key, {
-        ...loc,
-        ...dbRecord, // DB overrides local
-        // Preserve local photo preview URLs if DB doesn't have public URLs yet
-        photo_before_url: dbRecord.photo_before_url || loc.photo_before_url,
-        photo_after_url: dbRecord.photo_after_url || loc.photo_after_url
+    if (import.meta.env.DEV) {
+      console.log('[ADMIN DATA SYNC]', {
+        apiUrl: `${getApiUrl()}/api/complaints?scope=all`,
+        fetchTime: startTime,
+        responseStatus,
+        databaseRecordCount: list.length,
+        lastUpdatedRecord: finalComplaints[0]?.updated_at || finalComplaints[0]?.created_at || 'N/A',
+        finalRecordCount: finalComplaints.length
       });
     }
-  });
 
-  const mergedList = Array.from(dbMap.values()).sort(
-    (a, b) => new Date(b.updated_at || b.created_at || Date.now()).getTime() - new Date(a.updated_at || a.created_at || Date.now()).getTime()
-  );
+    return finalComplaints;
+  }
 
-  const { repairedComplaints } = await auditAndRepairComplaintLocations(mergedList);
-  const cleanList = repairedComplaints.filter((c) => !isDemoComplaint(c));
-  saveStoredComplaints(cleanList);
-
-  // Development Diagnostic Logging
-  console.log('[ADMIN DATA SYNC]', {
-    apiUrl: `${getApiUrl()}/api/complaints`,
-    fetchTime: startTime,
-    responseStatus,
-    databaseRecordCount: list.length,
-    lastUpdatedRecord: cleanList[0]?.updated_at || cleanList[0]?.created_at || 'N/A',
-    localCacheUsed: localAll.length > 0,
-    finalRecordCount: cleanList.length
-  });
-
-  return cleanList;
+  // If both Express API and Supabase failed, throw explicit database error
+  throw new Error('Database Error: Failed to retrieve complaints from the server. Please check your network connection.');
 }
 
-// Fetch citizen complaints from backend API, Supabase & LocalStorage
+// Fetch citizen complaints directly from backend API or Supabase
 export async function getCitizenComplaints(citizenId: string): Promise<Complaint[]> {
-  let list: Complaint[] = [];
-
-  // 1. Try Express backend API first
-  try {
-    const token = localStorage.getItem('nagarsetu_token');
-    if (token) {
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  if (token) {
+    try {
       const res = await fetch(`${getApiUrl()}/api/complaints/my`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getNoCacheHeaders()
       });
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.complaints)) {
-          list = data.complaints as Complaint[];
-        }
+        const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
+        const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
+        return cleanList;
+      }
+      throw new Error(`Failed to load citizen complaints (HTTP ${res.status})`);
+    } catch (bErr: any) {
+      console.warn('Express backend getCitizenComplaints error:', bErr);
+      if (!isSupabaseConfigured()) {
+        throw bErr;
       }
     }
-  } catch (bErr) {
-    console.warn('Express backend getCitizenComplaints fallback note:', bErr);
   }
 
   // 2. Try Supabase if configured
-  if (list.length === 0 && isSupabaseConfigured() && citizenId && isValidUuid(citizenId)) {
+  if (isSupabaseConfigured() && citizenId && isValidUuid(citizenId)) {
     try {
       const { data, error } = await supabase
         .from('complaints')
@@ -232,49 +310,22 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+        return (data as Complaint[]).filter((c) => !isDemoComplaint(c));
       }
+      if (error) throw new Error(error.message);
     } catch (err) {
-      console.warn('Supabase getCitizenComplaints fallback:', err);
+      console.warn('Supabase getCitizenComplaints error:', err);
+      throw err;
     }
   }
 
-  // 3. Merge with LocalStorage cached complaints so local creations are preserved
-  const localAll = getStoredComplaints();
-  const filteredLocal = localAll.filter((c) => {
-    if (isDemoComplaint(c)) return false;
-    if (!citizenId || citizenId.trim() === '') return true;
-    return (
-      !c.citizen_id ||
-      String(c.citizen_id) === String(citizenId) ||
-      c.citizen_id === 'demo-citizen-id' ||
-      c.citizen_id === ''
-    );
-  });
-
-  const map = new Map<string, Complaint>();
-
-  // Add backend / Supabase list items
-  list.forEach((c) => {
-    const key = c.complaint_number || String(c.id);
-    if (key) map.set(key, c);
-  });
-
-  // Merge local items (preserving preview photos & local IDs)
-  filteredLocal.forEach((lc) => {
-    const key = lc.complaint_number || String(lc.id);
-    if (key) {
-      const existing = map.get(key);
-      map.set(key, existing ? { ...existing, ...lc } : lc);
-    }
-  });
-
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  if (!token) {
+    return [];
+  }
+  throw new Error('Database Error: Unable to fetch citizen complaints from the server.');
 }
 
-// Fetch staff tasks from Supabase, Express API & LocalStorage with strict staff data isolation
+// Fetch staff tasks directly from backend database API
 export async function getStaffTasks(
   staffId?: string,
   departmentName?: string,
@@ -282,140 +333,52 @@ export async function getStaffTasks(
   userName?: string,
   employeeId?: string
 ): Promise<Complaint[]> {
-  const cleanStaffId = String(staffId || '').trim().toLowerCase();
-  const cleanEmail = String(userEmail || '').trim().toLowerCase();
-  const cleanName = String(userName || '').trim().toLowerCase();
-  const cleanEmpId = String(employeeId || '').trim().toLowerCase();
-
-  const targetDept = departmentName ? resolveDepartmentInfo(undefined, departmentName) : null;
-
-  const allComplaints = await getAllComplaints();
-
-  return allComplaints.filter((c) => {
-    if (isDemoComplaint(c)) return false;
-
-    // 1. MANDATORY DEPARTMENT ISOLATION GUARD
-    // A Field Staff member can NEVER see complaints belonging to another department
-    if (targetDept && targetDept.code && targetDept.code !== 'ALL') {
-      const cDept = resolveDepartmentInfo(c.department_id, c.department_name || (c as any).department, c.category);
-      if (cDept.code !== targetDept.code) {
-        return false; // REJECT ANY COMPLAINT FROM ANOTHER DEPARTMENT IMMEDIATELY
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  if (token) {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/staff/tasks`, {
+        headers: getNoCacheHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const staffTasks: Complaint[] = Array.isArray(data) ? data : (data?.tasks || []);
+        if (Array.isArray(staffTasks)) {
+          return staffTasks.filter((c: any) => !isDemoComplaint(c));
+        }
       }
+      throw new Error(`Failed to load field tasks from database (HTTP ${res.status})`);
+    } catch (err: any) {
+      console.error('Backend /api/staff/tasks fetch error:', err);
+      throw err;
     }
+  }
 
-    // 2. STRICT STAFF ASSIGNMENT MATCHING GUARD
-    const cStaffId = String(c.assigned_staff_id || '').trim().toLowerCase();
-    const cStaffEmail = String(c.assigned_staff_email || '').trim().toLowerCase();
-    const cStaffName = String(c.assigned_staff_name || '').trim().toLowerCase();
-    const cStaffEmpId = String((c as any).assigned_staff_employee_id || (c as any).employee_id || '').trim().toLowerCase();
-
-    // If staff identity parameters are provided, the complaint MUST be assigned to THIS staff member
-    if (cleanStaffId || cleanEmail || cleanName || cleanEmpId) {
-      const matchId = Boolean(cleanStaffId && cStaffId && (cStaffId === cleanStaffId || cStaffId.includes(cleanStaffId) || cleanStaffId.includes(cStaffId)));
-      const matchEmail = Boolean(cleanEmail && cStaffEmail && (cStaffEmail === cleanEmail || cStaffEmail.includes(cleanEmail)));
-      const matchName = Boolean(cleanName && cStaffName && (
-        cStaffName === cleanName ||
-        cStaffName.includes(cleanName) ||
-        (cleanName.split(' ')[0].length >= 3 && cStaffName.includes(cleanName.split(' ')[0]))
-      ));
-      const matchEmpId = Boolean(cleanEmpId && (
-        (cStaffEmpId && (cStaffEmpId === cleanEmpId || cStaffEmpId.includes(cleanEmpId))) ||
-        (cStaffId && (cStaffId === cleanEmpId || cStaffId.includes(cleanEmpId)))
-      ));
-
-      return matchId || matchEmail || matchName || matchEmpId;
-    }
-
-    // Fallback: If no staff identity is provided, match department assigned tasks only
-    return c.assigned_staff_id != null || c.status === 'Staff Assigned' || c.status === 'In Progress' || c.status === 'Accepted';
-  });
+  return [];
 }
 
-// Fetch complaints belonging to a specific department from Supabase, Express API & LocalStorage
+// Fetch complaints belonging to a specific department directly from backend API
 export async function getDepartmentComplaints(departmentId?: string, departmentName?: string): Promise<Complaint[]> {
   if (!departmentId && !departmentName) {
     return [];
   }
-  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
 
-  // 1. Fetch entire complaint pool across Supabase, Backend, and LocalStorage
-  let allComplaints: Complaint[] = await getAllComplaints();
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
 
-  // 2. Also query Express Backend API /api/complaints if available
   try {
-    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    const res = await fetch(`${getApiUrl()}/api/complaints`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
+    const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });
     if (res.ok) {
       const data = await res.json();
       const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
-      if (backendComplaints.length > 0) {
-        const map = new Map<string, Complaint>();
-        allComplaints.forEach((c) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) map.set(key, c);
-        });
-        backendComplaints.forEach((c: Complaint) => {
-          const key = c.complaint_number || String(c.id);
-          if (key) {
-            const existing = map.get(key);
-            // DB record from backend takes authoritative precedence
-            map.set(key, existing ? { ...existing, ...c } : c);
-          }
-        });
-        allComplaints = Array.from(map.values());
+      if (Array.isArray(backendComplaints)) {
+        return backendComplaints.filter((c: any) => !isDemoComplaint(c));
       }
     }
-  } catch (e) {
-    console.warn('Backend API getDepartmentComplaints fallback:', e);
+    throw new Error(`Failed to fetch department complaints (HTTP ${res.status})`);
+  } catch (e: any) {
+    console.error('Backend API getDepartmentComplaints error:', e);
+    throw e;
   }
-
-  // 3. Authoritatively filter complaints belonging to target department
-  const filtered = allComplaints.filter((c) => {
-    if (isDemoComplaint(c)) return false;
-
-    if (departmentId && (String(c.department_id) === String(departmentId) || String(c.department_id) === targetDept.id)) {
-      return true;
-    }
-    if ((c as any).department_code && (c as any).department_code.toUpperCase() === targetDept.code) {
-      return true;
-    }
-
-    const cResolved = resolveDepartmentInfo(c.department_id, c.department_name || (c as any).department, c.category);
-    return cResolved.code === targetDept.code;
-  });
-
-  // DIAGNOSTIC LOGGING (STEP 7)
-  const totalDbCount = allComplaints.length;
-  const deptMatchCount = filtered.length;
-  const inProgressCount = filtered.filter((c) => c.status === 'In Progress' || c.status === 'Accepted' || c.status === 'On the Way' || c.status === 'Staff Assigned').length;
-  const waitingVerificationCount = filtered.filter((c) => c.status === 'Resolution Submitted' || (c.status as string) === 'Completed — Pending Verification').length;
-
-  console.log('========== DEPARTMENT HEAD QUERY DIAGNOSTIC LOG ==========');
-  console.log(`TARGET DEPARTMENT: ${targetDept.fullName} (${targetDept.code})`);
-  console.log(`TOTAL DATABASE COMPLAINTS: ${totalDbCount}`);
-  console.log(`DEPARTMENT MATCH COUNT: ${deptMatchCount}`);
-  console.log(`IN-PROGRESS COUNT: ${inProgressCount}`);
-  console.log(`WAITING-VERIFICATION COUNT: ${waitingVerificationCount}`);
-
-  const testTicket = allComplaints.find((c) => c.complaint_number === 'NS-2026-678038' || c.id === 'NS-2026-678038');
-  if (testTicket) {
-    const isDeptMatch = filtered.some((c) => c.complaint_number === 'NS-2026-678038' || c.id === 'NS-2026-678038');
-    const isVerificationMatch = testTicket.status === 'Resolution Submitted' || (testTicket.status as string) === 'Completed — Pending Verification';
-    console.log(`Complaint NS-2026-678038 Diagnostics:`);
-    console.log(`  DB status: ${testTicket.status}`);
-    console.log(`  DB department: ${testTicket.department_name || testTicket.department_id}`);
-    console.log(`  Assigned staff: ${testTicket.assigned_staff_name} (${testTicket.assigned_staff_id})`);
-    console.log(`  Included in Department: ${isDeptMatch}`);
-    console.log(`  Included in verification queue: ${isDeptMatch && isVerificationMatch}`);
-    if (!isDeptMatch || !isVerificationMatch) {
-      console.log(`  Reason for exclusion: DeptMatch=${isDeptMatch}, StatusMatch=${isVerificationMatch} (status is '${testTicket.status}')`);
-    }
-  }
-  console.log('==========================================================');
-
-  return filtered;
 }
 
 
@@ -458,17 +421,6 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
     }
   }
 
-  // 3. Try LocalStorage cached complaints fallback
-  const all = getStoredComplaints();
-  const localMatch = all.find((c) =>
-    String(c.id) === String(idOrNumber) ||
-    (c.complaint_number && c.complaint_number.toLowerCase() === idOrNumber.toLowerCase())
-  );
-
-  if (localMatch) {
-    comp = comp ? { ...localMatch, ...comp } : localMatch;
-  }
-
   if (comp) {
     if (comp.latitude != null) comp.latitude = Number(comp.latitude);
     if (comp.longitude != null) comp.longitude = Number(comp.longitude);
@@ -477,12 +429,12 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
   return comp;
 }
 
-// Insert new complaint into Supabase & LocalStorage
+// Insert new complaint into PostgreSQL & Supabase
 export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_at' | 'updated_at'>): Promise<Complaint> {
   const newComplaintNumber = payload.complaint_number || generateComplaintNumber();
   const parsedLat = payload.latitude != null ? Number(payload.latitude) : 0;
   const parsedLng = payload.longitude != null ? Number(payload.longitude) : 0;
-  const resolvedDept = resolveDepartmentInfo(payload.department_id, payload.department_name);
+  const resolvedDept = resolveDepartmentInfo(payload.department_id, payload.department_name, payload.category);
 
   const newComplaint: Complaint = {
     ...payload,
@@ -496,68 +448,9 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
     updated_at: new Date().toISOString()
   };
 
-  if (isSupabaseConfigured()) {
-    try {
-      const SUPABASE_DEPT_MAP: Record<string, string> = {
-        PWD: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
-        SAN: '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
-        WTR: 'ead370cc-459c-44f0-899f-8a97f0928beb',
-        DRN: 'ee73cb82-cc47-4333-b7d6-4491353c1354',
-        ELE: '31842723-23ac-490b-912b-9f6d9afbdfb3',
-        TRF: 'ae5e4d0c-996f-4d81-9528-d642664c93ae'
-      };
-
-      let resolvedDeptUuid = newComplaint.department_id;
-      if (!resolvedDeptUuid || !isValidUuid(resolvedDeptUuid)) {
-        const deptNameStr = (newComplaint.department_name || '').toLowerCase();
-        const catStr = (newComplaint.category || '').toLowerCase();
-
-        if (deptNameStr.includes('water') || catStr.includes('water')) resolvedDeptUuid = SUPABASE_DEPT_MAP.WTR;
-        else if (deptNameStr.includes('sanitation') || deptNameStr.includes('waste') || catStr.includes('garbage') || catStr.includes('waste')) resolvedDeptUuid = SUPABASE_DEPT_MAP.SAN;
-        else if (deptNameStr.includes('drain') || deptNameStr.includes('sewag') || catStr.includes('drain') || catStr.includes('sewag')) resolvedDeptUuid = SUPABASE_DEPT_MAP.DRN;
-        else if (deptNameStr.includes('electric') || deptNameStr.includes('light') || catStr.includes('electric') || catStr.includes('light')) resolvedDeptUuid = SUPABASE_DEPT_MAP.ELE;
-        else if (deptNameStr.includes('traffic') || catStr.includes('traffic')) resolvedDeptUuid = SUPABASE_DEPT_MAP.TRF;
-        else if (deptNameStr.includes('public works') || deptNameStr.includes('pwd') || catStr.includes('road') || catStr.includes('pothole')) resolvedDeptUuid = SUPABASE_DEPT_MAP.PWD;
-      }
-
-      const dbPayload: Record<string, any> = {
-        complaint_number: newComplaint.complaint_number,
-        photo_before_url: newComplaint.photo_before_url,
-        category: newComplaint.category,
-        title: newComplaint.title,
-        description: newComplaint.description,
-        priority: newComplaint.priority || 'Medium',
-        status: newComplaint.status || 'Submitted',
-        department_id: resolvedDeptUuid || null,
-        latitude: newComplaint.latitude,
-        longitude: newComplaint.longitude,
-        location_source: newComplaint.location_source,
-        location_address: newComplaint.location_address
-      };
-
-      if (isValidUuid(newComplaint.citizen_id)) {
-        dbPayload.citizen_id = newComplaint.citizen_id;
-      }
-
-      const { data, error } = await supabase
-        .from('complaints')
-        .insert([dbPayload])
-        .select()
-        .single();
-
-      if (!error && data) {
-        newComplaint.id = data.id;
-        if (data.department_id) newComplaint.department_id = data.department_id;
-      }
-    } catch (err) {
-      console.warn('Supabase createComplaint insert fallback:', err);
-    }
-  }
-
-
-  // Sync with Express backend API if authenticated
+  // Authoritative write via Express backend API
   try {
-    const token = localStorage.getItem('nagarsetu_token');
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
       const res = await fetch(`${getApiUrl()}/api/complaints/submit`, {
         method: 'POST',
@@ -567,7 +460,7 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
         },
         body: JSON.stringify({
           complaint_number: newComplaint.complaint_number,
-          photo_url: newComplaint.photo_before_url,
+          photo_url: newComplaint.photo_before_url || '',
           category: newComplaint.category,
           title: newComplaint.title,
           description: newComplaint.description,
@@ -576,24 +469,43 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
           longitude: newComplaint.longitude,
           location_source: newComplaint.location_source,
           location_address: newComplaint.location_address,
-          department_id: newComplaint.department_id
+          department_id: newComplaint.department_id,
+          ai_category: (newComplaint as any).ai_category || newComplaint.category,
+          ai_specific_issue: (newComplaint as any).ai_specific_issue,
+          ai_confidence: (newComplaint as any).ai_confidence,
+          ai_severity: (newComplaint as any).ai_severity,
+          ai_urgency: (newComplaint as any).ai_urgency,
+          ai_evidence: (newComplaint as any).ai_evidence,
+          ai_model: (newComplaint as any).ai_model,
+          ai_analyzed_at: (newComplaint as any).ai_analyzed_at,
+          needs_manual_verification: (newComplaint as any).needs_manual_verification
         })
       });
       if (res.ok) {
         const bData = await res.json();
         if (bData) {
-          if (bData.complaint_id) newComplaint.id = String(bData.complaint_id);
-          if (bData.complaint_number) newComplaint.complaint_number = bData.complaint_number;
+          const compInfo = bData.complaint || bData;
+          if (compInfo.id || bData.complaint_id) newComplaint.id = String(compInfo.id || bData.complaint_id);
+          if (compInfo.complaint_number || bData.complaint_number) newComplaint.complaint_number = compInfo.complaint_number || bData.complaint_number;
+          if (compInfo.status) newComplaint.status = compInfo.status;
+          if (compInfo.department?.id) newComplaint.department_id = compInfo.department.id;
+          if (compInfo.department?.name) newComplaint.department_name = compInfo.department.name;
         }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          throw new AuthError('Session expired. Please sign in again.');
+        }
+        const msg = errData.error || errData.message || (errData.details ? errData.details.join(', ') : '') || `Failed to submit complaint (HTTP ${res.status})`;
+        throw new HttpError(res.status, msg, errData);
       }
+    } else {
+      throw new AuthError('Authentication required to submit complaint. Please log in.');
     }
-  } catch (bErr) {
-    console.warn('Backend API createComplaint sync note:', bErr);
+  } catch (bErr: any) {
+    console.error('Backend API createComplaint error:', bErr);
+    throw bErr;
   }
-
-  const all = getStoredComplaints();
-  all.unshift(newComplaint);
-  saveStoredComplaints(all);
 
   pushNotification({
     user_id: newComplaint.citizen_id,
@@ -621,110 +533,199 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 }
 
 export async function acceptStaffTask(complaintId: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase
-        .from('complaints')
-        .update({ status: 'Accepted', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
-    } catch (e) {}
-  }
+  const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Accepted';
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'Task Accepted by Field Officer',
-      message: `Field officer ${comp.assigned_staff_name || 'Officer'} has accepted task ${comp.complaint_number}.`
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ status: 'Accepted' })
     });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Accepted', comp.assigned_staff_name || 'Field Staff', 'Staff accepted field task');
-    return true;
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    } else {
+      const fallbackRes = await fetch(`${getApiUrl()}/api/staff/tasks/${encodeURIComponent(targetIdStr)}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: 'Accepted' })
+      });
+      if (fallbackRes.ok) {
+        dbWriteVerified = true;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Backend acceptStaffTask API note:', apiErr);
   }
-  return false;
+
+  // 2. Try Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({ status: 'Accepted', updated_at: new Date().toISOString() });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase acceptStaffTask note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to accept task ${targetIdStr}: Server could not verify status update.`);
+  }
+
+  // 3. Broadcast and notify
+  pushNotification({
+    user_id: targetIdStr,
+    role: 'citizen',
+    complaint_id: targetIdStr,
+    complaint_number: targetIdStr,
+    type: 'staff_assigned',
+    title: 'Task Accepted by Field Officer',
+    message: `Field officer has accepted task ${targetIdStr}.`
+  });
+
+  broadcastComplaintChange(targetIdStr, undefined, 'Accepted', 'Field Staff', 'Staff accepted field task');
+
+  return true;
 }
 
 export async function startStaffTravel(complaintId: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase
-        .from('complaints')
-        .update({ status: 'On the Way', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
-    } catch (e) {}
-  }
+  const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'On the Way';
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'staff_assigned',
-      title: 'Field Staff En Route',
-      message: `Maintenance officer is traveling to ${comp.location_address || 'the complaint location'}.`
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ status: 'On the Way' })
     });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'On the Way', comp.assigned_staff_name || 'Field Staff', 'En route to site');
-    return true;
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
+  } catch (apiErr) {
+    console.warn('Backend startStaffTravel API note:', apiErr);
   }
-  return false;
+
+  // 2. Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({ status: 'On the Way', updated_at: new Date().toISOString() });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase startStaffTravel note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to update travel status for task ${targetIdStr}.`);
+  }
+
+  // 3. Broadcast and notify
+  pushNotification({
+    user_id: targetIdStr,
+    role: 'citizen',
+    complaint_id: targetIdStr,
+    complaint_number: targetIdStr,
+    type: 'staff_assigned',
+    title: 'Field Staff En Route',
+    message: 'Maintenance officer is traveling to the complaint location.'
+  });
+
+  broadcastComplaintChange(targetIdStr, undefined, 'On the Way', 'Field Staff', 'En route to site');
+
+  return true;
 }
 
 export async function startStaffWork(complaintId: string, photoBeforeWorkUrl?: string): Promise<boolean> {
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase
-        .from('complaints')
-        .update({
-          status: 'In Progress',
-          ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {}),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', complaintId);
-    } catch (e) {}
-  }
+  const targetIdStr = String(complaintId || '').trim();
+  let dbWriteVerified = false;
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'In Progress';
-    if (photoBeforeWorkUrl) comp.photo_before_work_url = photoBeforeWorkUrl;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    pushNotification({
-      user_id: comp.citizen_id,
-      role: 'citizen',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'work_started',
-      title: 'Repair Work Commenced',
-      message: `On-site repair work has started for complaint ${comp.complaint_number}.`
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        status: 'In Progress',
+        ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {})
+      })
     });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'In Progress', comp.assigned_staff_name || 'Field Staff', 'Commenced site repair');
-    return true;
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
+  } catch (apiErr) {
+    console.warn('Backend startStaffWork API note:', apiErr);
   }
-  return false;
+
+  // 2. Supabase if configured
+  if (isSupabaseConfigured() && targetIdStr) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetIdStr);
+      let supaQuery = supabase.from('complaints').update({
+        status: 'In Progress',
+        ...(photoBeforeWorkUrl ? { photo_before_work_url: photoBeforeWorkUrl } : {}),
+        updated_at: new Date().toISOString()
+      });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', targetIdStr);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', targetIdStr);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase startStaffWork note:', e);
+    }
+  }
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to commence work for task ${targetIdStr}.`);
+  }
+
+  // 3. Broadcast and notify
+  pushNotification({
+    user_id: targetIdStr,
+    role: 'citizen',
+    complaint_id: targetIdStr,
+    complaint_number: targetIdStr,
+    type: 'work_started',
+    title: 'Repair Work Commenced',
+    message: `On-site repair work has started for complaint ${targetIdStr}.`
+  });
+
+  broadcastComplaintChange(targetIdStr, undefined, 'In Progress', 'Field Staff', 'Commenced site repair');
+
+  return true;
 }
 
 export async function submitStaffResolution(
@@ -746,8 +747,7 @@ export async function submitStaffResolution(
     photoAfterUrl = photoAfterInput || '';
   }
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
+  const comp = await getComplaintById(complaintId);
   const oldStatus = comp ? comp.status : 'In Progress';
   const staffId = comp?.assigned_staff_id || '';
   const staffEmail = comp?.assigned_staff_email || '';
@@ -759,7 +759,8 @@ export async function submitStaffResolution(
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     if (token) {
-      const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(complaintId)}/resolve`;
+      const targetParam = comp?.complaint_number || complaintId;
+      const targetApiUrl = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetParam)}/resolve`;
       const apiRes = await fetch(targetApiUrl, {
         method: 'POST',
         headers: {
@@ -767,6 +768,8 @@ export async function submitStaffResolution(
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          complaint_number: comp?.complaint_number || complaintId,
+          complaint_id: comp?.id || complaintId,
           photo_after_url: photoAfterUrl,
           work_performed: workPerformed,
           materials_used: materialsUsed || '',
@@ -837,16 +840,8 @@ export async function submitStaffResolution(
     }
   }
 
-  // 3. LocalStorage persistence cache update
+  // 3. Broadcast and notify
   if (comp) {
-    comp.status = 'Resolution Submitted';
-    comp.photo_after_url = photoAfterUrl;
-    comp.work_performed = workPerformed;
-    comp.materials_used = materialsUsed;
-    comp.additional_notes = additionalNotes;
-    comp.updated_at = nowIso;
-    saveStoredComplaints(all);
-
     pushNotification({
       user_id: comp.citizen_id,
       role: 'citizen',
@@ -895,68 +890,139 @@ export async function submitStaffResolution(
   return true;
 }
 
+export async function addStaffTaskProgressNote(complaintId: string | number, note: string): Promise<boolean> {
+  const token = localStorage.getItem('nagarsetu_token');
+  const targetIdStr = String(complaintId).replace(/^CMP-/, '');
+  const url = `${getApiUrl()}/api/staff/task/${encodeURIComponent(targetIdStr)}/progress`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ note: note.trim() })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || 'Failed to record progress note in database');
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error('addStaffTaskProgressNote error:', err);
+    throw err;
+  }
+}
+
 export async function reviewResolutionAdmin(
   complaintId: string,
   approve: boolean,
   rejectionReason?: string
 ): Promise<boolean> {
   const newStatus = approve ? 'Resolved' : 'Reopened';
+  let dbWriteVerified = false;
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        status: newStatus,
+        verified_by_name: 'City Administration',
+        ...(rejectionReason ? { rework_reason: rejectionReason, reason: rejectionReason } : {})
+      })
+    });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    }
+  } catch (apiErr) {
+    console.warn('Backend reviewResolutionAdmin error:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      let supaQuery = supabase
         .from('complaints')
         .update({
           status: newStatus,
-          ...(rejectionReason ? { admin_rejection_reason: rejectionReason } : {}),
+          ...(rejectionReason ? { admin_rejection_reason: rejectionReason, rework_reason: rejectionReason } : {}),
           updated_at: new Date().toISOString()
-        })
-        .eq('id', complaintId);
-    } catch (e) {}
-  }
-
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    if (approve) {
-      comp.status = 'Resolved';
-      
-      pushNotification({
-        user_id: comp.citizen_id,
-        role: 'citizen',
-        complaint_id: comp.id,
-        complaint_number: comp.complaint_number,
-        type: 'resolved',
-        title: 'Complaint Officially Resolved',
-        message: `City Administration verified repair proof for ${comp.complaint_number}. Please rate the repair quality!`
-      });
-
-      broadcastComplaintChange(comp.id, prevStatus, 'Resolved', 'City Administration', 'Approved resolution proof & closed issue');
-    } else {
-      comp.status = 'Reopened';
-      comp.admin_rejection_reason = rejectionReason;
-      comp.description += `\n\n[ADMIN REJECT REASON (${new Date().toLocaleDateString()})]: ${rejectionReason}`;
-      
-      pushNotification({
-        user_id: comp.assigned_staff_id || '',
-        role: 'service_staff',
-        complaint_id: comp.id,
-        complaint_number: comp.complaint_number,
-        type: 'reopened',
-        title: 'Resolution Proof Rejected',
-        message: `Resolution for ${comp.complaint_number} was rejected: ${rejectionReason}. Re-inspection required.`
-      });
-
-      broadcastComplaintChange(comp.id, prevStatus, 'Reopened', 'City Administration', `Rejected resolution proof: ${rejectionReason}`);
+        });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', complaintId);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', complaintId);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase reviewResolutionAdmin error:', e);
     }
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-    return true;
   }
-  return false;
+
+  if (!dbWriteVerified) {
+    throw new Error(`Failed to update complaint status to ${newStatus}. Please check server connectivity.`);
+  }
+
+  // Broadcast and notify
+  if (approve) {
+    pushNotification({
+      user_id: complaintId,
+      role: 'citizen',
+      complaint_id: complaintId,
+      complaint_number: complaintId,
+      type: 'resolved',
+      title: 'Complaint Officially Resolved',
+      message: `City Administration verified repair proof for ${complaintId}. Please rate the repair quality!`
+    });
+    broadcastComplaintChange(complaintId, 'Resolution Submitted', 'Resolved', 'City Administration', 'Approved resolution proof & closed issue');
+  } else {
+    pushNotification({
+      user_id: complaintId,
+      role: 'service_staff',
+      complaint_id: complaintId,
+      complaint_number: complaintId,
+      type: 'reopened',
+      title: 'Resolution Proof Rejected',
+      message: `Resolution for ${complaintId} was rejected: ${rejectionReason}. Re-inspection required.`
+    });
+    broadcastComplaintChange(complaintId, 'Resolution Submitted', 'Reopened', 'City Administration', `Rejected resolution proof: ${rejectionReason}`);
+  }
+  return true;
 }
 
 export async function submitComplaintFeedback(complaintId: string, rating: number, comment: string): Promise<boolean> {
+  let backendSuccess = false;
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    if (token) {
+      const res = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ rating, comment })
+      });
+      if (res.ok) {
+        backendSuccess = true;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend feedback error:', err);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       await supabase.from('complaint_feedback').insert([{
@@ -964,73 +1030,120 @@ export async function submitComplaintFeedback(complaintId: string, rating: numbe
         rating,
         comment
       }]);
+      backendSuccess = true;
     } catch (e) {}
   }
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    comp.rating = rating;
-    comp.feedback_comment = comment;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-    return true;
-  }
-  return false;
+  return backendSuccess;
 }
 
 export async function reopenComplaint(complaintId: string, reason: string): Promise<boolean> {
+  let dbWriteVerified = false;
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(complaintId)}/reopen`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ reason })
+    });
+    if (apiRes.ok) {
+      dbWriteVerified = true;
+    } else {
+      // Fallback to department verify if available
+      const deptRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          complaint_id: complaintId,
+          status: 'Reopened',
+          rework_reason: reason
+        })
+      });
+      if (deptRes.ok) {
+        dbWriteVerified = true;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Backend reopenComplaint error:', apiErr);
+  }
+
+  // 2. Try Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      let supaQuery = supabase
         .from('complaints')
-        .update({ status: 'Reopened', updated_at: new Date().toISOString() })
-        .eq('id', complaintId);
-    } catch (e) {}
+        .update({
+          status: 'Reopened',
+          rework_reason: reason,
+          admin_rejection_reason: reason,
+          updated_at: new Date().toISOString()
+        });
+      if (isUuid) {
+        supaQuery = supaQuery.eq('id', complaintId);
+      } else {
+        supaQuery = supaQuery.eq('complaint_number', complaintId);
+      }
+      const { error } = await supaQuery;
+      if (!error) dbWriteVerified = true;
+    } catch (e) {
+      console.warn('Supabase reopenComplaint error:', e);
+    }
   }
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Reopened';
-    comp.description += `\n\n[CITIZEN REOPEN REASON (${new Date().toLocaleDateString()})]: ${reason}`;
-    comp.updated_at = new Date().toISOString();
-    saveStoredComplaints(all);
-
-    pushNotification({
-      user_id: 'admin-group',
-      role: 'city_admin',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'reopened',
-      title: 'Citizen Reopened Complaint',
-      message: `Citizen reopened complaint ${comp.complaint_number}: ${reason}`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Reopened', 'Citizen', `Citizen reopened issue: ${reason}`);
-    return true;
+  if (!dbWriteVerified) {
+    throw new Error('Failed to reopen complaint: Server rejected status update.');
   }
-  return false;
+
+  pushNotification({
+    user_id: 'admin-group',
+    role: 'city_admin',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'reopened',
+    title: 'Citizen Reopened Complaint',
+    message: `Citizen reopened complaint ${complaintId}: ${reason}`
+  });
+
+  broadcastComplaintChange(complaintId, undefined, 'Reopened', 'Citizen', `Citizen reopened issue: ${reason}`);
+  return true;
 }
 
 export async function supportDuplicateComplaint(complaintId: string): Promise<number> {
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId);
-  const count = comp ? (comp.support_count || 0) + 1 : 1;
+  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+  try {
+    const res = await fetch(`${getApiUrl()}/api/complaints/${complaintId}/support`, {
+      method: 'POST',
+      headers: getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {})
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data.support_count === 'number') {
+        return data.support_count;
+      }
+    }
+  } catch (e) {
+    console.warn('supportDuplicateComplaint API call failed, attempting fallback:', e);
+  }
 
+  let count = 1;
   if (isSupabaseConfigured()) {
     try {
+      const { data } = await supabase.from('complaints').select('support_count').eq('id', complaintId).maybeSingle();
+      count = ((data?.support_count) || 0) + 1;
       await supabase
         .from('complaints')
         .update({ support_count: count })
         .eq('id', complaintId);
     } catch (e) {}
-  }
-
-  if (comp) {
-    comp.support_count = count;
-    saveStoredComplaints(all);
   }
   return count;
 }
@@ -1059,19 +1172,59 @@ export function getStaffPerformanceMetrics(staffTasks: Complaint[]): StaffPerfor
 }
 
 export function saveOfflineDraft(draft: any) {
-  const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
-  const drafts = data ? JSON.parse(data) : [];
-  drafts.unshift({ ...draft, savedAt: new Date().toISOString() });
-  localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(drafts));
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+    const drafts = data ? JSON.parse(data) : [];
+    const draftId = draft.id || `draft-${Date.now()}`;
+    drafts.unshift({ ...draft, id: draftId, savedAt: new Date().toISOString() });
+    localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch (e) {}
 }
 
-export function getOfflineDrafts() {
-  const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
-  return data ? JSON.parse(data) : [];
+export function getOfflineDrafts(): any[] {
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 export function clearOfflineDrafts() {
-  localStorage.removeItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY);
+  } catch (e) {}
+}
+
+export function removeOfflineDraft(draftIdOrSavedAt: string) {
+  try {
+    const drafts = getOfflineDrafts();
+    const filtered = drafts.filter((d: any) => d.id !== draftIdOrSavedAt && d.savedAt !== draftIdOrSavedAt);
+    localStorage.setItem(LOCAL_STORAGE_OFFLINE_DRAFTS_KEY, JSON.stringify(filtered));
+  } catch (e) {}
+}
+
+export async function submitOfflineDraft(draft: any): Promise<Complaint> {
+  const newComplaintData: Omit<Complaint, 'id' | 'created_at' | 'updated_at'> = {
+    complaint_number: draft.complaint_number || generateComplaintNumber(),
+    citizen_id: draft.citizen_id || '',
+    category: draft.category || 'Other',
+    title: draft.title || `${draft.category || 'Civic'} Issue Reported`,
+    description: draft.description || '',
+    priority: draft.priority || 'Medium',
+    department_name: draft.department || draft.department_name || 'Public Works Department',
+    department_id: draft.department_id,
+    latitude: draft.lat != null ? Number(draft.lat) : 20.0059,
+    longitude: draft.lng != null ? Number(draft.lng) : 73.7898,
+    location_address: draft.locationAddress || 'Nashik City',
+    location_source: draft.locationSource || 'manual_pin',
+    photo_before_url: draft.photoPreviewUrl || draft.photo_before_url || '',
+    status: 'Submitted'
+  };
+
+  const created = await createComplaint(newComplaintData);
+  removeOfflineDraft(draft.id || draft.savedAt);
+  return created;
 }
 
 // Department Head Workflow Functions
@@ -1126,16 +1279,16 @@ export async function assignTaskByDepartmentHead(
       throw new Error(errJson.error || errJson.message || `Server rejected task assignment (HTTP ${apiRes.status}).`);
     }
   } catch (apiErr: any) {
-    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('REJECTED') || apiErr.message.includes('inactive') || apiErr.message.includes('failed') || apiErr.message.includes('Server rejected'))) {
-      throw apiErr;
-    }
-    console.warn('Backend assign task API fallback:', apiErr);
+    console.error('Backend assign task API error:', apiErr);
+    throw apiErr;
   }
 
+  const compIdStr = String(complaintId || '').trim();
+
   // 2. Try Supabase if configured
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && compIdStr) {
     try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(compIdStr);
       const updateFields: Record<string, any> = {
         assigned_staff_id: staffId,
         assigned_staff_name: staffName,
@@ -1148,9 +1301,9 @@ export async function assignTaskByDepartmentHead(
 
       let supaQuery = supabase.from('complaints').update(updateFields);
       if (isUuid) {
-        supaQuery = supaQuery.eq('id', complaintId);
+        supaQuery = supaQuery.eq('id', compIdStr);
       } else {
-        supaQuery = supaQuery.eq('complaint_number', complaintId);
+        supaQuery = supaQuery.eq('complaint_number', compIdStr);
       }
 
       const { data: updateRows, error: supaErr } = await supaQuery.select();
@@ -1160,9 +1313,9 @@ export async function assignTaskByDepartmentHead(
         // Read back from database to verify persistence
         let readQuery = supabase.from('complaints').select('id, complaint_number, assigned_staff_id, assigned_staff_name, assigned_staff_email, status');
         if (isUuid) {
-          readQuery = readQuery.eq('id', complaintId);
+          readQuery = readQuery.eq('id', compIdStr);
         } else {
-          readQuery = readQuery.eq('complaint_number', complaintId);
+          readQuery = readQuery.eq('complaint_number', compIdStr);
         }
 
         const { data: verifyRow } = await readQuery.maybeSingle();
@@ -1175,56 +1328,18 @@ export async function assignTaskByDepartmentHead(
     }
   }
 
-  // 3. LocalStorage persistence
-  const all = getStoredComplaints();
-  let comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
-  const prevStatus = comp ? comp.status : 'Submitted';
-
-  if (!comp) {
-    // If complaint was not yet in LocalStorage cache, create entry
-    comp = {
-      id: complaintId,
-      complaint_number: complaintId.startsWith('NS-') ? complaintId : `NS-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-      title: 'Assigned Civic Complaint',
-      description: 'Task assigned by Department Head',
-      category: 'General Civic Issue',
-      priority: 'Medium',
-      status: 'Staff Assigned',
-      location_address: 'Nashik City',
-      assigned_staff_id: staffId,
-      assigned_staff_name: staffName,
-      assigned_staff_email: staffEmail || '',
-      assigned_staff_employee_id: staffEmpId || staffId,
-      assigned_by: headId,
-      assigned_by_name: headName,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    } as unknown as Complaint;
-    all.push(comp);
-  } else {
-    comp.assigned_staff_id = staffId;
-    comp.assigned_staff_name = staffName;
-    if (staffEmail) comp.assigned_staff_email = staffEmail;
-    if (staffEmpId) (comp as any).assigned_staff_employee_id = staffEmpId;
-    comp.assigned_by = headId;
-    comp.assigned_by_name = headName;
-    comp.status = 'Staff Assigned';
-    comp.updated_at = new Date().toISOString();
-  }
-
-  saveStoredComplaints(all);
-
+  // 3. Broadcast and notify
   pushNotification({
     user_id: staffId,
     role: 'service_staff',
-    complaint_id: comp.id,
-    complaint_number: comp.complaint_number,
+    complaint_id: complaintId,
+    complaint_number: compIdStr,
     type: 'staff_assigned',
     title: 'New Field Task Assigned',
-    message: `Department Head ${headName} assigned task ${comp.complaint_number} to you.`
+    message: `Department Head ${headName} assigned task ${compIdStr} to you.`
   });
 
-  broadcastComplaintChange(comp.id, prevStatus, 'Staff Assigned', headName, `Assigned to ${staffName}`);
+  broadcastComplaintChange(complaintId, 'Submitted', 'Staff Assigned', headName, `Assigned to ${staffName}`);
   return true;
 }
 
@@ -1234,6 +1349,34 @@ export async function requestReworkDepartmentHead(
   headName: string
 ): Promise<boolean> {
   const nowIso = new Date().toISOString();
+
+  // 1. Try Express backend API first
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        complaint_id: complaintId,
+        verified_by_name: headName,
+        status: 'Reopened',
+        rework_reason: reworkReason
+      })
+    });
+    if (!apiRes.ok) {
+      const errJson = await apiRes.json().catch(() => ({}));
+      throw new Error(errJson.error || `Server rework request failed (HTTP ${apiRes.status}).`);
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('failed') || apiErr.message.includes('Server'))) {
+      throw apiErr;
+    }
+    console.warn('Backend rework task API fallback:', apiErr);
+  }
+
   if (isSupabaseConfigured()) {
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(complaintId);
@@ -1257,30 +1400,19 @@ export async function requestReworkDepartmentHead(
     }
   }
 
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Reopened';
-    comp.rework_reason = reworkReason;
-    comp.admin_rejection_reason = reworkReason;
-    comp.updated_at = nowIso;
-    saveStoredComplaints(all);
+  // 3. Broadcast and notify
+  pushNotification({
+    user_id: complaintId,
+    role: 'service_staff',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'reopened',
+    title: 'Field Work Rework Requested',
+    message: `Department Head ${headName} requested rework on ${complaintId}: ${reworkReason}`
+  });
 
-    pushNotification({
-      user_id: comp.assigned_staff_id || '',
-      role: 'service_staff',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'reopened',
-      title: 'Field Work Rework Requested',
-      message: `Department Head ${headName} requested rework on ${comp.complaint_number}: ${reworkReason}`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Reopened', headName, `Requested rework: ${reworkReason}`);
-    return true;
-  }
-  return false;
+  broadcastComplaintChange(complaintId, 'Resolution Submitted', 'Reopened', headName, `Requested rework: ${reworkReason}`);
+  return true;
 }
 
 export async function approveResolutionDepartmentHead(
@@ -1294,7 +1426,7 @@ export async function approveResolutionDepartmentHead(
   // 1. Try Express backend API first
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    await fetch(`${getApiUrl()}/api/department/verify`, {
+    const apiRes = await fetch(`${getApiUrl()}/api/department/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1307,8 +1439,15 @@ export async function approveResolutionDepartmentHead(
         status: 'Resolved'
       })
     });
-  } catch (e) {
-    // Graceful fallback
+    if (!apiRes.ok) {
+      const errJson = await apiRes.json().catch(() => ({}));
+      throw new Error(errJson.error || `Server verification failed (HTTP ${apiRes.status}).`);
+    }
+  } catch (apiErr: any) {
+    if (apiErr.message && (apiErr.message.includes('Forbidden') || apiErr.message.includes('failed') || apiErr.message.includes('Server'))) {
+      throw apiErr;
+    }
+    console.warn('Backend verify task API fallback:', apiErr);
   }
 
   // 2. Try Supabase if configured
@@ -1352,55 +1491,62 @@ export async function approveResolutionDepartmentHead(
     }
   }
 
-  // 3. LocalStorage persistence
-  const all = getStoredComplaints();
-  const comp = all.find((c) => c.id === complaintId || c.complaint_number === complaintId);
-  if (comp) {
-    const prevStatus = comp.status;
-    comp.status = 'Resolved';
-    (comp as any).verified_by = headId || '';
-    (comp as any).verified_by_name = headName;
-    (comp as any).verified_at = nowIso;
-    comp.updated_at = nowIso;
-    saveStoredComplaints(all);
+  // 3. Broadcast and notify
+  pushNotification({
+    user_id: complaintId,
+    role: 'citizen',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'resolved',
+    title: 'Complaint Officially Verified & Resolved',
+    message: `Department Head ${headName} verified field repair proof and resolved ticket ${complaintId}.`
+  });
 
-    // Push Notifications (Citizen, Field Staff, City Admin)
-    if (comp.citizen_id) {
-      pushNotification({
-        user_id: comp.citizen_id,
-        role: 'citizen',
-        complaint_id: comp.id,
-        complaint_number: comp.complaint_number,
-        type: 'resolved',
-        title: 'Complaint Officially Verified & Resolved',
-        message: `Department Head ${headName} verified field repair proof and resolved ticket ${comp.complaint_number}.`
-      });
+  pushNotification({
+    user_id: 'admin-group',
+    role: 'city_admin',
+    complaint_id: complaintId,
+    complaint_number: complaintId,
+    type: 'resolved',
+    title: 'Department Resolution Approved',
+    message: `Department Head ${headName} approved field resolution for ${complaintId}.`
+  });
+
+  broadcastComplaintChange(complaintId, 'Resolution Submitted', 'Resolved', headName, 'Approved field repair proof & closed ticket');
+  return true;
+}
+
+export async function purgeAllComplaints(): Promise<boolean> {
+  // 1. Clear LocalStorage cached complaints
+  try {
+    saveStoredComplaints([]);
+    localStorage.removeItem(LOCAL_STORAGE_COMPLAINTS_KEY);
+    LEGACY_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+
+  // 2. Call backend API purge endpoint
+  try {
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    const res = await fetch(`${getApiUrl()}/api/complaints/purge-all`, { method: 'DELETE', headers });
+    if (!res.ok) {
+      console.warn('Backend purge complaints endpoint returned status:', res.status);
     }
-
-    if (comp.assigned_staff_id) {
-      pushNotification({
-        user_id: comp.assigned_staff_id,
-        role: 'service_staff',
-        complaint_id: comp.id,
-        complaint_number: comp.complaint_number,
-        type: 'resolved',
-        title: 'Work Verified & Closed',
-        message: `Department Head ${headName} verified your repair work proof for ${comp.complaint_number}.`
-      });
-    }
-
-    pushNotification({
-      user_id: 'admin-group',
-      role: 'city_admin',
-      complaint_id: comp.id,
-      complaint_number: comp.complaint_number,
-      type: 'resolved',
-      title: 'Department Resolution Approved',
-      message: `Department Head ${headName} approved field resolution for ${comp.complaint_number}.`
-    });
-
-    broadcastComplaintChange(comp.id, prevStatus, 'Resolved', headName, 'Approved field repair proof & closed ticket');
-    return true;
+  } catch (e) {
+    console.warn('Backend purge complaints note:', e);
   }
-  return false;
+
+  // 3. Purge Supabase table rows if configured
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase.from('feedback').delete().neq('id', 0);
+      await supabase.from('assignments').delete().neq('id', 0);
+      await supabase.from('complaint_status_history').delete().neq('id', 0);
+      await supabase.from('complaints').delete().neq('id', 0);
+    } catch (e) {}
+  }
+
+  return true;
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -36,6 +37,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export const AdminInProgressComplaintsPage: React.FC = () => {
+  const { toast } = useNotification();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,12 +105,14 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
 
   // Filter Logic
   const filteredComplaints = inProgressList.filter((c) => {
+    const q = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.assigned_staff_name && c.assigned_staff_name.toLowerCase().includes(searchQuery.toLowerCase()));
+      !q ||
+      (c.complaint_number || '').toLowerCase().includes(q) ||
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.category || '').toLowerCase().includes(q) ||
+      (c.location_address && c.location_address.toLowerCase().includes(q)) ||
+      (c.assigned_staff_name && c.assigned_staff_name.toLowerCase().includes(q));
     const matchesDepartment = departmentFilter === 'All' || (c.department_name && c.department_name.includes(departmentFilter));
     const matchesCategory = categoryFilter === 'All' || c.category === categoryFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
@@ -205,7 +209,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
             
             <div className="relative flex-1 min-w-[240px]">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaints..."
                 type="text"
                 placeholder="Search complaints..."
                 value={searchQuery}
@@ -218,7 +222,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -229,7 +233,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -240,7 +244,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -252,7 +256,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 <option value="Critical">Critical</option>
               </select>
 
-              <select
+              <select aria-label="sla  filter"
                 value={slaFilter}
                 onChange={(e) => { setSlaFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
@@ -262,7 +266,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 <option value="Overdue">Overdue</option>
               </select>
 
-              <input
+              <input aria-label="date  filter"
                 type="date"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
@@ -579,7 +583,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => alert(`Department supervisor notified regarding ${selectedComplaint.complaint_number}.`)}
+                    onClick={() => toast.info(`Department supervisor notified regarding ${selectedComplaint.complaint_number}.`)}
                     className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px]"
                   >
                     Ping Field Officer

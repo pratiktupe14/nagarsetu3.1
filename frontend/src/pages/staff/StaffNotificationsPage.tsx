@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications
+  markAllNotificationsAsRead, getStoredNotifications, saveStoredNotifications,
+  syncNotificationsFromBackend
 } from '../../services/notificationService';
 import {
   getStaffTasks, acceptStaffTask, startStaffTravel, startStaffWork,
@@ -45,11 +47,12 @@ const SEED_STAFF_NOTIFICATIONS: NotificationItem[] = [];
 
 export const StaffNotificationsPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   // Staff Identity & Department
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -77,22 +80,15 @@ export const StaffNotificationsPage: React.FC = () => {
   const [submittingResolution, setSubmittingResolution] = useState(false);
 
   // Load Notifications for Staff
-  const loadNotifications = useCallback(() => {
+  const loadNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
-      
-      // Ensure seed staff notifications exist if list is sparse
-      const existingIds = new Set(list.map((n) => n.id));
-      const missingSeeds = SEED_STAFF_NOTIFICATIONS.filter((s) => !existingIds.has(s.id));
-      if (missingSeeds.length > 0) {
-        const allStored = getStoredNotifications();
-        const merged = [...missingSeeds, ...allStored];
-        saveStoredNotifications(merged);
-        list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
-      }
+      setNotifications(list);
 
+      await syncNotificationsFromBackend();
+      list = getNotificationsForRole(user?.id || 'staff-101', 'service_staff');
       setNotifications(list);
     } catch (e) {
       console.error(e);
@@ -216,7 +212,7 @@ export const StaffNotificationsPage: React.FC = () => {
       loadNotifications();
     } catch (err) {
       console.error(err);
-      alert('Error updating task status.');
+      toast.error('Unable to update task status.');
     }
   };
 
@@ -239,7 +235,7 @@ export const StaffNotificationsPage: React.FC = () => {
       setDetailModalTask(updatedTask);
     } catch (err) {
       console.error(err);
-      alert('Error posting update.');
+      toast.error('Unable to post progress update.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -248,7 +244,7 @@ export const StaffNotificationsPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailModalTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -268,10 +264,10 @@ export const StaffNotificationsPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       loadNotifications();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }
@@ -379,7 +375,7 @@ export const StaffNotificationsPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search notifications..."
                 type="text"
                 placeholder="Search notifications..."
                 value={searchQuery}
@@ -714,7 +710,7 @@ export const StaffNotificationsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -726,7 +722,7 @@ export const StaffNotificationsPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

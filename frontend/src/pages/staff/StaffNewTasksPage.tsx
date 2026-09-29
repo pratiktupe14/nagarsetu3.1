@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -84,9 +85,10 @@ const getDepartmentInfo = (departmentName: string) => {
 export const StaffNewTasksPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useNotification();
 
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -260,7 +262,7 @@ export const StaffNewTasksPage: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      alert('Error starting task.');
+      toast.error('Unable to start task. Please try again.');
     }
   };
 
@@ -399,7 +401,7 @@ export const StaffNewTasksPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue, location..."
                 type="text"
                 placeholder="Search complaint ID, issue, location..."
                 value={searchQuery}
@@ -409,7 +411,7 @@ export const StaffNewTasksPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -421,7 +423,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Low">Low</option>
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -437,7 +439,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Other">Other</option>
               </select>
 
-              <select
+              <select aria-label="sla  filter"
                 value={slaFilter}
                 onChange={(e) => setSlaFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -449,7 +451,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Overdue">Overdue</option>
               </select>
 
-              <select
+              <select aria-label="date  filter"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -460,7 +462,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 <option value="Older">Older</option>
               </select>
 
-              <select
+              <select aria-label="location  filter"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500 max-w-[160px] truncate"

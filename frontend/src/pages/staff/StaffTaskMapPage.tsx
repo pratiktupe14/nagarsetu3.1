@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -91,10 +92,11 @@ function MapFlyToController({ center, zoom }: { center: [number, number] | null;
 
 export const StaffTaskMapPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useNotification();
 
   // Staff Identity & Department
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -271,10 +273,10 @@ export const StaffTaskMapPage: React.FC = () => {
 
       await loadTasks();
       const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
-      setDetailModalTask(updatedList.find((t) => t.id === taskId) || null);
+      setDetailModalTask(updatedList.find((t) => String(t.id) === String(taskId) || t.complaint_number === taskId) || null);
     } catch (err) {
       console.error(err);
-      alert('Error updating task status.');
+      toast.error('Unable to update task status. Please try again.');
     }
   };
 
@@ -299,7 +301,7 @@ export const StaffTaskMapPage: React.FC = () => {
       setDetailModalTask(updatedList.find((t) => t.id === detailModalTask.id) || null);
     } catch (err) {
       console.error(err);
-      alert('Error adding progress note.');
+      toast.error('Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -309,7 +311,7 @@ export const StaffTaskMapPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailModalTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -329,10 +331,10 @@ export const StaffTaskMapPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadTasks();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }
@@ -440,7 +442,7 @@ export const StaffTaskMapPage: React.FC = () => {
             {/* Search Input */}
             <div className="relative sm:col-span-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue..."
                 type="text"
                 placeholder="Search complaint ID, issue..."
                 value={searchQuery}
@@ -456,7 +458,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Status Filter */}
             <div>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -471,7 +473,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Priority Filter */}
             <div>
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -486,7 +488,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
             {/* Category Filter */}
             <div>
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
@@ -875,7 +877,7 @@ export const StaffTaskMapPage: React.FC = () => {
                 <form onSubmit={handleAddProgressNote} className="space-y-2 border-t border-gray-200 pt-3 text-xs">
                   <span className="font-bold text-gray-700 block">Add On-Site Progress Update Note</span>
                   <div className="flex gap-2">
-                    <input
+                    <input aria-label="e.g. Damaged section identified. Repair work has started."
                       type="text"
                       placeholder="e.g. Damaged section identified. Repair work has started."
                       value={progressNote}
@@ -966,7 +968,7 @@ export const StaffTaskMapPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -978,7 +980,7 @@ export const StaffTaskMapPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

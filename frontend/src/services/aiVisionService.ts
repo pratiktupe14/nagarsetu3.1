@@ -16,12 +16,13 @@ export const CIVIC_CATEGORIES = [
 export type CivicCategory = typeof CIVIC_CATEGORIES[number];
 
 export const OFFICIAL_DEPARTMENTS = [
-  'Roads & Public Works Department (PWD)',
-  'Sanitation & Solid Waste Management',
+  'Public Works Department',
+  'Sanitation & Waste Management',
   'Water Supply & Sewerage Board',
-  'Electrical & Public Lighting Department',
-  'Drainage & Sewerage Department',
-  'Traffic Engineering & Control Department'
+  'Drainage & Sewage Department',
+  'Electrical & Street Lighting',
+  'Traffic Management Department',
+  'Maintenance Department'
 ] as const;
 
 export type OfficialDepartment = typeof OFFICIAL_DEPARTMENTS[number];
@@ -34,22 +35,16 @@ export function normalizeDepartment(dept?: string, category?: string): string {
   const str = (dept || '').toLowerCase();
   const cat = (category || '').toLowerCase();
 
-  if (str.includes('electrical') || str.includes('light') || str.includes('street light') || str.includes('streetlight') || cat.includes('streetlight') || cat.includes('electrical')) {
-    return 'Electrical & Public Lighting Department';
-  }
   if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
-    return 'Sanitation & Solid Waste Management';
+    return 'Sanitation & Waste Management';
   }
   if (str.includes('water supply') || str.includes('water leakage') || str.includes('pipeline') || (str.includes('water') && !str.includes('drain') && !str.includes('sew')) || (cat.includes('water') && !cat.includes('drain'))) {
     return 'Water Supply & Sewerage Board';
   }
-  if (str.includes('sanitation') || str.includes('garbage') || str.includes('solid waste') || str.includes('waste') || cat.includes('garbage') || cat.includes('waste')) {
-    return 'Sanitation & Waste Management';
-  }
   if (str.includes('drain') || str.includes('sewag') || str.includes('sewer') || cat.includes('drainage') || cat.includes('sewage')) {
     return 'Drainage & Sewage Department';
   }
-  if (str.includes('electric') || str.includes('streetlight') || str.includes('lighting') || cat.includes('streetlight') || cat.includes('electrical')) {
+  if (str.includes('electrical') || str.includes('electric') || str.includes('light') || str.includes('street light') || str.includes('lighting') || cat.includes('streetlight') || cat.includes('electrical')) {
     return 'Electrical & Street Lighting';
   }
   if (str.includes('traffic') || str.includes('signal') || cat.includes('traffic')) {
@@ -151,12 +146,12 @@ export async function checkAiHealth(): Promise<{ configured: boolean; model: str
       return await res.json();
     } else {
       const errText = await res.text();
-      return { configured: true, model: 'gemini-3.6-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
+      return { configured: true, model: 'gemini-2.5-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };
     }
   } catch (err: any) {
     return {
       configured: false,
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       reachable: false,
       error: `Express Backend server is not reachable (${err.message}).`
     };
@@ -295,9 +290,11 @@ export async function extractVisualFeatures(imageInput: File | string): Promise<
       vector
     };
   } catch (err) {
-    const mockHash = typeof imageInput === 'string' ? imageInput.substring(0, 16) : 'a1b2c3d4e5f60718';
+    const fallbackSeed = typeof imageInput === 'string' && imageInput.length > 5 
+      ? imageInput.substring(imageInput.length - 16) 
+      : `${Date.now().toString(16)}${Math.floor(Math.random() * 0xffffff).toString(16)}`.substring(0, 16);
     return {
-      dHash: mockHash,
+      dHash: fallbackSeed.padStart(16, '0'),
       brightness: 120,
       contrast: 65,
       dominantColors: ['#475569', '#059669'],
@@ -614,18 +611,18 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
     errorMessage = 'Backend server is offline or unreachable.';
   }
 
-  const errorResult: AIVisionResult = {
+  const fallbackResult: AIVisionResult = {
     mode: 'production',
     analysis_id: crypto.randomUUID(),
     image_hash: imageHash,
     category: 'Other Civic Issue',
-    issue_type: 'AI Vision Analysis Unavailable',
-    confidence: 0.0,
+    issue_type: 'Manual Selection Required',
+    confidence: 0,
     confidence_level: 'Low',
     priority: 'Medium',
-    department: 'Roads & Public Works Department (PWD)',
-    title: '', // CLEAN TITLE - DO NOT FILL WITH ERROR TEXT
-    description: '', // CLEAN DESCRIPTION - DO NOT FILL WITH ERROR TEXT
+    department: 'Maintenance Department',
+    title: '',
+    description: '',
     error_code: errorCode,
     error_message: errorMessage,
     is_available: false,
@@ -633,12 +630,11 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
     detected_objects: [],
     quality_check: {
       isUsable: true,
-      warning: errorMessage,
       brightness: visualFeatures.brightness,
       contrast: visualFeatures.contrast
     },
     analysis_time_ms: Math.round(endTime - startTime)
   };
 
-  return errorResult;
+  return fallbackResult;
 }

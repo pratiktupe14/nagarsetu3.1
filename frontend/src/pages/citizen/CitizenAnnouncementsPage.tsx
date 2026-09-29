@@ -57,7 +57,7 @@ export const CitizenAnnouncementsPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-              <input
+              <input aria-label="Search announcements by title, area, or description..."
                 type="text"
                 placeholder="Search announcements by title, area, or description..."
                 value={searchQuery}
@@ -67,7 +67,7 @@ export const CitizenAnnouncementsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-3">
-              <select
+              <select aria-label="selected Priority"
                 value={selectedPriority}
                 onChange={(e) => setSelectedPriority(e.target.value)}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2.5 font-semibold text-gray-800 focus:border-emerald-500 min-h-[44px]"

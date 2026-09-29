@@ -148,7 +148,7 @@ export async function reverseGeocodeCoordinates(
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'NagarSetu-CivicApp/3.0'
+        'User-Agent': 'NagarSetu-CivicApp'
       }
     });
     if (res.ok) {
@@ -183,10 +183,9 @@ function setGeocodeCache(key: string, data: { latitude: number; longitude: numbe
 }
 
 const getBackendMapsUrl = () => `${getApiUrl()}/api/maps`;
-const getPythonMapsUrl = () => `${getApiUrl()}/api/maps/google-maps`;
 
 /**
- * Reverse Geocoding using Google Maps API (Backend Python package integration)
+ * Reverse Geocoding using Google Maps API (via Backend maps service)
  */
 export async function reverseGeocodeGoogleMaps(
   latitude: number,
@@ -194,7 +193,6 @@ export async function reverseGeocodeGoogleMaps(
 ): Promise<{ formatted_address: string; is_within_service_area?: boolean } | null> {
   if (latitude == null || longitude == null || isNaN(latitude) || isNaN(longitude)) return null;
 
-  // Try Express backend first, then Python microservice
   try {
     const res = await fetch(`${getBackendMapsUrl()}/reverse-geocode`, {
       method: 'POST',
@@ -208,19 +206,7 @@ export async function reverseGeocodeGoogleMaps(
       }
     }
   } catch (e) {
-    try {
-      const pyRes = await fetch(`${getPythonMapsUrl()}/reverse-geocode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude, longitude })
-      });
-      if (pyRes.ok) {
-        const pyData = await pyRes.json();
-        if (pyData.status === 'OK' && pyData.formatted_address) {
-          return { formatted_address: pyData.formatted_address, is_within_service_area: pyData.is_within_service_area };
-        }
-      }
-    } catch (err) {}
+    // Network or API failure fallback handled by reverseGeocodeCoordinates
   }
   return null;
 }
@@ -314,7 +300,7 @@ export async function geocodeNashikAddress(
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryAddress)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'NagarSetu-CivicApp/3.0'
+        'User-Agent': 'NagarSetu-CivicApp'
       }
     });
 
@@ -669,24 +655,28 @@ export async function auditAndRepairComplaintLocations(
     } else if (address.length > 3) {
       // Only attempt fallback geocoding if coordinates are completely missing (null/NaN)
       mismatchedCount++;
-      const geoResult = await geocodeAddress(address);
-      if (geoResult) {
-        correctedCount++;
-        repairedComplaints[i] = {
-          ...c,
-          latitude: geoResult.latitude,
-          longitude: geoResult.longitude,
-          location_source: 'geocoded',
-          location_address: address || geoResult.formatted_address
-        };
-      } else {
-        locationUnavailableCount++;
-        repairedComplaints[i] = {
-          ...c,
-          location_address: address,
-          location_source: 'geocode_failed'
-        };
+      if (correctedCount < 3) {
+        try {
+          const geoResult = await geocodeAddress(address);
+          if (geoResult) {
+            correctedCount++;
+            repairedComplaints[i] = {
+              ...c,
+              latitude: geoResult.latitude,
+              longitude: geoResult.longitude,
+              location_source: 'geocoded',
+              location_address: address || geoResult.formatted_address
+            };
+            continue;
+          }
+        } catch (e) {}
       }
+      locationUnavailableCount++;
+      repairedComplaints[i] = {
+        ...c,
+        location_address: address,
+        location_source: 'geocode_failed'
+      };
     }
   }
 

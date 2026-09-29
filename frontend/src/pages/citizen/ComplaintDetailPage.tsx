@@ -345,7 +345,7 @@ export const ComplaintDetailPage: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="block text-gray-700 font-bold">Feedback / Repair Quality Note</label>
-                    <textarea
+                    <textarea aria-label="feedback Comment"
                       rows={3}
                       value={feedbackComment}
                       onChange={(e) => setFeedbackComment(e.target.value)}
@@ -403,7 +403,7 @@ export const ComplaintDetailPage: React.FC = () => {
               <form onSubmit={handleReopenSubmit} className="space-y-4 text-xs">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Reopen Reason *</label>
-                  <textarea
+                  <textarea aria-label="reopen Reason"
                     rows={3}
                     required
                     value={reopenReason}

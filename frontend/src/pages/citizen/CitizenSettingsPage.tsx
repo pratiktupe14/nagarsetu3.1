@@ -19,7 +19,7 @@ export const CitizenSettingsPage: React.FC = () => {
   >('general');
 
   // General Settings State
-  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_language') || 'en');
+  const [language, setLanguage] = useState(user?.language_pref || localStorage.getItem('nagarsetu_lang') || localStorage.getItem('nagarsetu_language') || 'en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
   const [timeFormat, setTimeFormat] = useState('12 Hours (AM/PM)');
 
@@ -162,7 +162,7 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Date Format</label>
-                      <select
+                      <select aria-label="date Format"
                         value={dateFormat}
                         onChange={(e) => setDateFormat(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold min-h-[44px]"
@@ -174,7 +174,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Time Format</label>
-                      <select
+                      <select aria-label="time Format"
                         value={timeFormat}
                         onChange={(e) => setTimeFormat(e.target.value)}
                         className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold min-h-[44px]"
@@ -285,7 +285,7 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Default Search Radius for Nearby Issues</label>
                     <p className="text-[11px] text-gray-500 mb-2">Controls default radius when opening the Nearby Issues civic map.</p>
-                    <select
+                    <select aria-label="default Radius"
                       value={defaultRadius}
                       onChange={(e) => {
                         const val = Number(e.target.value);
@@ -474,7 +474,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900 font-outfit text-sm">{user?.full_name || user?.email || 'Citizen User'}</span>
+                    <span className="font-bold text-gray-900 font-outfit text-sm">{user?.full_name || (user as any)?.name || 'Citizen'}</span>
                     <span className="font-mono text-[10px] font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
                       Role: Citizen
                     </span>
@@ -483,11 +483,11 @@ export const CitizenSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-600">
                     <div className="flex items-center space-x-1">
                       <Mail className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{user?.email || 'rahul@citizen.nagarsetu.gov.in'}</span>
+                      <span>{user?.email || 'N/A'}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Smartphone className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{user?.mobile || '9876543210'}</span>
+                      <span>{user?.mobile || 'N/A'}</span>
                     </div>
                   </div>
 
@@ -509,7 +509,7 @@ export const CitizenSettingsPage: React.FC = () => {
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4 text-xs">
                 <div className="flex items-center space-x-2 border-b border-gray-100 pb-3">
                   <Info className="w-5 h-5 text-emerald-600" />
-                  <h2 className="text-lg font-extrabold text-gray-900 font-outfit">About NAGARSETU 3.0</h2>
+                  <h2 className="text-lg font-extrabold text-gray-900 font-outfit">About NAGARSETU</h2>
                 </div>
 
                 <p className="text-gray-600 leading-relaxed">
@@ -518,7 +518,7 @@ export const CitizenSettingsPage: React.FC = () => {
 
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between font-mono text-[11px]">
                   <span>System Version:</span>
-                  <span className="font-bold text-emerald-800">NAGARSETU v3.0.0</span>
+                  <span className="font-bold text-emerald-800">NAGARSETU</span>
                 </div>
               </div>
             )}

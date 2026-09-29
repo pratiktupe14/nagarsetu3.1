@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -37,6 +38,7 @@ const DEPARTMENT_OPTIONS = [
 
 export const AdminPortal: React.FC = () => {
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
+  const { toast } = useNotification();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export const AdminPortal: React.FC = () => {
   const [editPriority, setEditPriority] = useState<PriorityLevel>('Medium');
   const [editDepartment, setEditDepartment] = useState<string>('Public Works Department (PWD)');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [slaHours, setSlaHours] = useState<number>(24);
+
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -95,7 +97,7 @@ export const AdminPortal: React.FC = () => {
     if (!selectedComplaint) return;
     setSubmittingAction(true);
     await verifyAndApproveComplaint(selectedComplaint.id, editPriority, editDepartment);
-    alert(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
+    toast.success(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
     await loadComplaints();
     const updated = await getAllComplaints();
     setSelectedComplaint(updated.find((c) => c.id === selectedComplaint.id) || null);
@@ -115,15 +117,15 @@ export const AdminPortal: React.FC = () => {
 
   const handleAssignStaff = async () => {
     if (!selectedComplaint || !selectedStaffId) {
-      alert('Please select a department staff member to assign.');
+      toast.warning('Please select a department staff member to assign.');
       return;
     }
     const roster = getDepartmentStaffRoster(editDepartment);
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
 
     setSubmittingAction(true);
-    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    alert(`Task assigned to ${staff.name} with ${slaHours}h SLA deadline.`);
+    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name);
+    toast.success(`Task assigned to ${staff.name} with system-defined SLA deadline.`);
     await loadComplaints();
     const updated = await getAllComplaints();
     setSelectedComplaint(updated.find((c) => c.id === selectedComplaint.id) || null);
@@ -133,7 +135,7 @@ export const AdminPortal: React.FC = () => {
   const handleApproveResolution = async (complaintId: string) => {
     setSubmittingAction(true);
     await reviewResolutionAdmin(complaintId, true);
-    alert('Resolution Approved! Complaint officially marked as Resolved.');
+    toast.success('Resolution Approved! Complaint officially marked as Resolved.');
     setSelectedComplaint(null);
     await loadComplaints();
     setSubmittingAction(false);
@@ -144,7 +146,7 @@ export const AdminPortal: React.FC = () => {
     if (!selectedComplaint || !rejectionReason) return;
     setSubmittingAction(true);
     await reviewResolutionAdmin(selectedComplaint.id, false, rejectionReason);
-    alert('Resolution Rejected. Rejection feedback sent to field staff.');
+    toast.info('Resolution Rejected. Rejection feedback sent to field staff.');
     setShowRejectModal(false);
     setSelectedComplaint(null);
     setRejectionReason('');
@@ -160,13 +162,16 @@ export const AdminPortal: React.FC = () => {
   const resolutionReviewsList = complaints.filter((c) => c.status === 'Resolution Submitted');
 
   const filteredComplaints = complaints.filter((c) => {
+    if (!c) return false;
     if (activeTab === 'Resolution Reviews') {
       return c.status === 'Resolution Submitted';
     }
-    const matchesSearch = c.complaint_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (c.location_address && c.location_address.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = (searchQuery || '').toLowerCase();
+    const matchesSearch = !q ||
+                          (c.complaint_number || '').toLowerCase().includes(q) ||
+                          (c.title || '').toLowerCase().includes(q) ||
+                          (c.category || '').toLowerCase().includes(q) ||
+                          (c.location_address && c.location_address.toLowerCase().includes(q));
     const matchesStatus = statusFilter === 'All' || c.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
@@ -326,7 +331,7 @@ export const AdminPortal: React.FC = () => {
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="relative">
                   <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                  <input
+                  <input aria-label="search"
                     type="text"
                     placeholder={t('searchPlaceholderAdmin')}
                     value={searchQuery}
@@ -335,7 +340,7 @@ export const AdminPortal: React.FC = () => {
                   />
                 </div>
 
-                <select
+                <select aria-label="status  filter"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -348,7 +353,7 @@ export const AdminPortal: React.FC = () => {
                   <option value="Resolved">{translateStatus('Resolved')}</option>
                 </select>
 
-                <select
+                <select aria-label="priority  filter"
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:border-emerald-500 font-semibold"
@@ -714,7 +719,7 @@ export const AdminPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('overridePriorityLevel')}</label>
-                  <select
+                  <select aria-label="edit Priority"
                     value={editPriority}
                     onChange={(e) => setEditPriority(e.target.value as PriorityLevel)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -728,7 +733,7 @@ export const AdminPortal: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('overrideDepartment')}</label>
-                  <select
+                  <select aria-label="edit Department"
                     value={editDepartment}
                     onChange={(e) => handleChangeDepartment(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -756,7 +761,7 @@ export const AdminPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('departmentStaffRoster')}</label>
-                  <select
+                  <select aria-label="selected Staff Id"
                     value={selectedStaffId}
                     onChange={(e) => setSelectedStaffId(e.target.value)}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500"
@@ -766,20 +771,6 @@ export const AdminPortal: React.FC = () => {
                         {staff.name} ({staff.employee_id}) • Workload: {staff.active_workload_count} tasks
                       </option>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">{t('slaResolutionHours')}</label>
-                  <select
-                    value={slaHours}
-                    onChange={(e) => setSlaHours(Number(e.target.value))}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500"
-                  >
-                    <option value={4}>4 Hours (Emergency SLA)</option>
-                    <option value={8}>8 Hours (High Priority SLA)</option>
-                    <option value={24}>24 Hours (Standard SLA)</option>
-                    <option value={48}>48 Hours (Low Priority SLA)</option>
                   </select>
                 </div>
               </div>
@@ -813,7 +804,7 @@ export const AdminPortal: React.FC = () => {
 
             <div className="space-y-2 text-xs">
               <label className="block font-bold text-gray-700">{t('rejectionReasonForStaff')}</label>
-              <textarea
+              <textarea aria-label="rejection Reason"
                 required
                 rows={3}
                 value={rejectionReason}

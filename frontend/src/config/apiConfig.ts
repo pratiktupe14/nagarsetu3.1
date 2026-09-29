@@ -1,13 +1,25 @@
 /**
  * Centralized API URL Resolver for NAGARSETU 3.1
- * Resolves API URL dynamically in both Development (localhost via Vite proxy) and Vercel Production (same-origin).
+ * Resolves API URL dynamically in both Development (localhost) and Vercel Production.
  */
 export const getApiUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.trim() !== '') {
     return envUrl.trim().replace(/\/$/, '');
   }
-  // When unified in NagarSetuSegue, use same-origin relative URLs:
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
+    }
+    // If running under unified NagarSetuSegue project, use same-origin relative URLs:
+    if (window.location.hostname.includes('nagarsetusegue')) {
+      return '';
+    }
+    if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app')) {
+      return 'https://nagarsetu-backend-api.vercel.app';
+    }
+    return '';
+  }
   return '';
 };
 
@@ -29,4 +41,15 @@ export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...additionalHeaders
   };
+};
+
+export const handleApiResponse = async (res: Response): Promise<any> => {
+  if (res.status === 429) {
+    throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+  }
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || errorBody.message || `API Error (${res.status})`);
+  }
+  return res.json();
 };

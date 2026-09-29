@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
 import {
@@ -20,7 +21,18 @@ import {
   CIVIC_CATEGORIES,
   CivicCategory
 } from '../../services/aiVisionService';
-import { createComplaint, uploadComplaintImage, generateComplaintNumber, saveOfflineDraft, getStoredComplaints } from '../../services/complaintService';
+import {
+  createComplaint,
+  uploadComplaintImage,
+  generateComplaintNumber,
+  saveOfflineDraft,
+  clearOfflineDrafts,
+  getOfflineDrafts,
+  getAllComplaints,
+  HttpError,
+  AuthError,
+  isNetworkError
+} from '../../services/complaintService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
@@ -38,6 +50,7 @@ interface AdditionalPhotoItem {
 export const ReportIssuePage: React.FC = () => {
   const { user } = useAuth();
   const { t, translateCategory, translatePriority, translateDepartment } = useLanguage();
+  const { toast } = useNotification();
   const navigate = useNavigate();
 
   // Primary Photo & AI State
@@ -56,7 +69,7 @@ export const ReportIssuePage: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [priority, setPriority] = useState<PriorityLevel>('Medium');
-  const [department, setDepartment] = useState<string>('Roads & Public Works Department (PWD)');
+  const [department, setDepartment] = useState<string>('Public Works Department');
   const [isManuallyEdited, setIsManuallyEdited] = useState<boolean>(false);
 
   // Location States
@@ -75,10 +88,28 @@ export const ReportIssuePage: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
 
-  // Initial AI Health & Location Check
+  // Initial AI Health & Location Check & Resume Offline Draft if present
   React.useEffect(() => {
     checkAiHealth().then(setAiHealth).catch(() => setAiHealth({ reachable: false, configured: false, model: 'Offline' }));
     requestFreshLocation();
+
+    try {
+      const drafts = getOfflineDrafts();
+      if (drafts && drafts.length > 0) {
+        const latest = drafts[0];
+        if (latest) {
+          if (latest.category) setCategory(latest.category as CivicCategory);
+          if (latest.title) setTitle(latest.title);
+          if (latest.description) setDescription(latest.description);
+          if (latest.priority) setPriority(latest.priority);
+          if (latest.department) setDepartment(latest.department);
+          if (latest.lat != null && !isNaN(Number(latest.lat))) setLat(Number(latest.lat));
+          if (latest.lng != null && !isNaN(Number(latest.lng))) setLng(Number(latest.lng));
+          if (latest.locationAddress) setLocationAddress(latest.locationAddress);
+          if (latest.photoPreviewUrl) setPhotoPreviewUrl(latest.photoPreviewUrl);
+        }
+      }
+    } catch (e) {}
   }, []);
 
   // Request Fresh Live GPS Location
@@ -177,7 +208,7 @@ export const ReportIssuePage: React.FC = () => {
   // Handle Additional Photo Upload / Different Angle Analysis
   const handleAdditionalPhotoSelect = async (file: File) => {
     if (additionalPhotos.length >= 4) {
-      alert('Maximum of 5 photos (1 primary + 4 additional angles) allowed per complaint.');
+      toast.warning('Maximum of 5 photos (1 primary + 4 additional angles) allowed per complaint.');
       return;
     }
 
@@ -234,10 +265,14 @@ export const ReportIssuePage: React.FC = () => {
     setAdditionalPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const runDuplicateCheck = (checkLat: number, checkLng: number) => {
-    const existing = getStoredComplaints();
-    const dups = findDuplicateComplaints(checkLat, checkLng, existing, 100);
-    setNearbyDuplicates(dups);
+  const runDuplicateCheck = async (checkLat: number, checkLng: number) => {
+    try {
+      const existing = await getAllComplaints();
+      const dups = findDuplicateComplaints(checkLat, checkLng, existing, 100);
+      setNearbyDuplicates(dups);
+    } catch {
+      setNearbyDuplicates([]);
+    }
   };
 
   const handleSaveDraft = () => {
@@ -294,25 +329,49 @@ export const ReportIssuePage: React.FC = () => {
         } : undefined,
         category,
         title: title || `${category} Issue Reported`,
-        description: description || `Civic issue reported via NAGARSETU 3.0 at ${locationAddress}`,
+        description: description || `Civic issue reported via NAGARSETU at ${locationAddress}`,
         priority,
-        status: 'Submitted' as const,
+        status: (aiResult && aiResult.confidence < 0.80) ? ('NEEDS_VERIFICATION' as const) : ('Submitted' as const),
         department_name: department,
         latitude: lat,
         longitude: lng,
         location_source: locationSource,
-        location_address: locationAddress
+        location_address: locationAddress,
+        ai_category: aiResult?.category || category,
+        ai_specific_issue: aiResult?.issue_type || category,
+        ai_confidence: aiResult?.confidence ?? 0.0,
+        ai_severity: aiResult?.priority || priority,
+        ai_urgency: aiResult?.priority || priority,
+        ai_evidence: aiResult?.description || description,
+        ai_model: aiResult?.mode || 'gemini-3.6-flash',
+        ai_analyzed_at: new Date().toISOString(),
+        needs_manual_verification: !aiResult || aiResult.confidence < 0.80 || aiResult.is_available === false
       };
 
       const created = await createComplaint(newComplaintData);
+      clearOfflineDrafts();
       setShowReviewModal(false);
       navigate('/citizen/success', { state: { complaint: created } });
-    } catch (err) {
-      console.error(err);
-      saveOfflineDraft({
-        category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
-      });
-      alert('Network issue detected. Complaint saved to offline drafts on your device.');
+    } catch (err: any) {
+      console.error('Complaint submission error:', err);
+
+      if (isNetworkError(err)) {
+        // True network failure: fetch threw before receiving an HTTP response, or browser offline
+        saveOfflineDraft({
+          category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
+        });
+        toast.info('Network issue detected. Complaint saved to offline drafts on your device.');
+      } else if (err instanceof AuthError || err.isAuthError || err.status === 401 || err.status === 403) {
+        // Authentication or authorization error
+        toast.error(err.message || 'Authentication required. Please log in again.');
+      } else if (err instanceof HttpError || err.isHttpError || err.status) {
+        // HTTP response received (400, 404, 409, 422, 500, 502, 503, etc.)
+        const detailStr = err.data?.details && Array.isArray(err.data.details) ? ` (${err.data.details.join(', ')})` : '';
+        toast.error(`${err.message || 'Server error processing complaint.'}${detailStr}`);
+      } else {
+        // Other unexpected client-side error
+        toast.error(err.message || 'Failed to submit complaint. Please verify your details.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -778,7 +837,7 @@ export const ReportIssuePage: React.FC = () => {
               {/* ADDRESS & COORDINATES DISPLAY */}
               <div className="p-3 bg-slate-50 rounded-xl border border-gray-200 space-y-1.5">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">{t('locationAddressLandmark')}</span>
-                <input
+                <input aria-label="location Address"
                   type="text"
                   value={locationAddress}
                   onChange={(e) => setLocationAddress(e.target.value)}
@@ -815,7 +874,7 @@ export const ReportIssuePage: React.FC = () => {
               
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('category')}</label>
-                <select
+                <select aria-label="category"
                   value={category}
                   onChange={(e) => {
                     setCategory(e.target.value as CivicCategory);
@@ -831,7 +890,7 @@ export const ReportIssuePage: React.FC = () => {
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('complaintTitle')}</label>
-                <input
+                <input aria-label="complaint title input"
                   type="text"
                   id="complaint-title-input"
                   value={title}
@@ -846,7 +905,7 @@ export const ReportIssuePage: React.FC = () => {
 
               <div>
                 <label className="block font-bold text-gray-700 mb-1">{t('description')}</label>
-                <textarea
+                <textarea aria-label="description"
                   rows={4}
                   value={description}
                   onChange={(e) => {
@@ -861,7 +920,7 @@ export const ReportIssuePage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('priority')}</label>
-                  <select
+                  <select aria-label="priority"
                     value={priority}
                     onChange={(e) => {
                       setPriority(e.target.value as PriorityLevel);
@@ -878,7 +937,7 @@ export const ReportIssuePage: React.FC = () => {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">{t('myDepartment')}</label>
-                  <select
+                  <select aria-label="department"
                     value={department}
                     onChange={(e) => {
                       setDepartment(e.target.value);
@@ -926,7 +985,7 @@ export const ReportIssuePage: React.FC = () => {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => alert(`Thank you! Your support for complaint ${nearbyDuplicates[0].complaint.complaint_number} has been recorded.`)}
+                      onClick={() => toast.success(`Thank you! Your support for complaint ${nearbyDuplicates[0].complaint.complaint_number} has been recorded.`)}
                       className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 min-h-[44px]"
                     >
                       {t('supportExisting')}
@@ -987,7 +1046,7 @@ export const ReportIssuePage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('locationAddressLandmark')}</label>
-              <input
+              <input aria-label="location Address"
                 type="text"
                 value={locationAddress}
                 onChange={(e) => setLocationAddress(e.target.value)}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -38,6 +39,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export const AdminComplaintsPage: React.FC = () => {
+  const { toast } = useNotification();
   const location = useLocation();
   const isNewComplaintsPage = location.pathname.includes('/new');
 
@@ -65,7 +67,7 @@ export const AdminComplaintsPage: React.FC = () => {
   const [editPriority, setEditPriority] = useState<PriorityLevel>('Medium');
   const [editDepartment, setEditDepartment] = useState<string>('Roads & Public Works');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [slaHours, setSlaHours] = useState<number>(24);
+
   const [submittingAction, setSubmittingAction] = useState(false);
   const [showFullImageModal, setShowFullImageModal] = useState(false);
 
@@ -153,7 +155,7 @@ export const AdminComplaintsPage: React.FC = () => {
     if (!selectedComplaint) return;
     setSubmittingAction(true);
     await verifyAndApproveComplaint(selectedComplaint.id, editPriority, editDepartment);
-    alert(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
+    toast.success(`Complaint ${selectedComplaint.complaint_number} Verified & Approved!`);
     await loadComplaints();
     const list = await getAllComplaints();
     setSelectedComplaint(list.find((item) => item.id === selectedComplaint.id) || null);
@@ -163,14 +165,14 @@ export const AdminComplaintsPage: React.FC = () => {
   // Handle Assign Staff
   const handleAssignStaff = async () => {
     if (!selectedComplaint || !selectedStaffId) {
-      alert('Please select a department staff member.');
+      toast.warning('Please select a department staff member.');
       return;
     }
     const roster = getDepartmentStaffRoster(editDepartment);
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
     setSubmittingAction(true);
-    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name, slaHours);
-    alert(`Task assigned to ${staff.name} with ${slaHours}h SLA.`);
+    await assignStaffToTask(selectedComplaint.id, staff.id, staff.name);
+    toast.success(`Task assigned to ${staff.name} with system-defined SLA.`);
     await loadComplaints();
     const list = await getAllComplaints();
     setSelectedComplaint(list.find((item) => item.id === selectedComplaint.id) || null);
@@ -271,7 +273,7 @@ export const AdminComplaintsPage: React.FC = () => {
             
             <div className="relative flex-1 min-w-[220px]">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue or location..."
                 type="text"
                 placeholder="Search complaint ID, issue or location..."
                 value={searchQuery}
@@ -284,7 +286,7 @@ export const AdminComplaintsPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
@@ -299,7 +301,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 <option value="Reopened">Reopened</option>
               </select>
 
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
@@ -311,7 +313,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 <option value="Critical">Critical</option>
               </select>
 
-              <select
+              <select aria-label="department  filter"
                 value={departmentFilter}
                 onChange={(e) => { setDepartmentFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
@@ -322,7 +324,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 min-h-[44px]"
@@ -333,7 +335,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 ))}
               </select>
 
-              <input
+              <input aria-label="date  filter"
                 type="date"
                 value={dateFilter}
                 onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
@@ -368,7 +370,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => alert(`Bulk Action: Assign Department triggered for ${selectedIds.length} complaints.`)}
+                  onClick={() => toast.info(`Bulk Action: Assign Department triggered for ${selectedIds.length} complaints.`)}
                   className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 min-h-[44px]"
                 >
                   Assign Department
@@ -393,7 +395,7 @@ export const AdminComplaintsPage: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50 border-b border-gray-200 text-[11px] font-extrabold text-gray-600 uppercase tracking-wider font-outfit">
                   <th className="p-3.5 w-8">
-                    <input
+                    <input aria-label="Select item"
                       type="checkbox"
                       checked={selectedIds.length === paginatedComplaints.length && paginatedComplaints.length > 0}
                       onChange={handleSelectAll}
@@ -444,7 +446,7 @@ export const AdminComplaintsPage: React.FC = () => {
                     return (
                       <tr key={c.id} className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-emerald-50/40' : ''}`}>
                         <td className="p-3.5">
-                          <input
+                          <input aria-label="Select item"
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => handleSelectOne(c.id)}
@@ -685,9 +687,9 @@ export const AdminComplaintsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center space-x-2 pt-1">
-                    <button type="button" onClick={() => alert(`Viewing existing master complaint ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
-                    <button type="button" onClick={() => alert(`Complaint linked to master ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
-                    <button type="button" onClick={() => alert('Marked as separate complaint')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Keep Separate</button>
+                    <button type="button" onClick={() => toast.info(`Viewing existing master complaint ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 min-h-[44px]">View Existing</button>
+                    <button type="button" onClick={() => toast.success(`Complaint linked to master ${selectedComplaint.duplicate_of_id || selectedComplaint.complaint_number}`)} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Link Complaint</button>
+                    <button type="button" onClick={() => toast.info('Marked as separate complaint')} className="px-3 py-1.5 rounded-lg bg-white border border-amber-400 font-bold text-xs hover:bg-amber-100 min-h-[44px]">Keep Separate</button>
                   </div>
                 </div>
 
@@ -699,23 +701,23 @@ export const AdminComplaintsPage: React.FC = () => {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-semibold text-gray-800">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkImage} onChange={(e) => setCheckImage(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkImage} onChange={(e) => setCheckImage(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Issue Image Valid</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkLocation} onChange={(e) => setCheckLocation(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkLocation} onChange={(e) => setCheckLocation(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Location Confirmed</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkCategory} onChange={(e) => setCheckCategory(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkCategory} onChange={(e) => setCheckCategory(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Category Correct</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkPriority} onChange={(e) => setCheckPriority(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkPriority} onChange={(e) => setCheckPriority(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Priority Verified</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" checked={checkDuplicate} onChange={(e) => setCheckDuplicate(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
+                      <input aria-label="Select item" type="checkbox" checked={checkDuplicate} onChange={(e) => setCheckDuplicate(e.target.checked)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                       <span>✓ Duplicate Checked</span>
                     </label>
                   </div>
@@ -725,7 +727,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Final Department Assignment</label>
-                    <select
+                    <select aria-label="edit Department"
                       value={editDepartment}
                       onChange={(e) => {
                         setEditDepartment(e.target.value);
@@ -742,7 +744,7 @@ export const AdminComplaintsPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Final Priority Level</label>
-                    <select
+                    <select aria-label="edit Priority"
                       value={editPriority}
                       onChange={(e) => setEditPriority(e.target.value as PriorityLevel)}
                       className="w-full bg-white border border-gray-300 rounded-xl p-2.5 font-bold text-gray-900 min-h-[44px]"
@@ -768,14 +770,14 @@ export const AdminComplaintsPage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => alert('Complaint rejected with feedback sent to citizen.')}
+                      onClick={() => toast.info('Complaint rejected with feedback sent to citizen.')}
                       className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[44px]"
                     >
                       Reject
                     </button>
                     <button
                       type="button"
-                      onClick={() => alert('Information request sent to citizen.')}
+                      onClick={() => toast.info('Information request sent to citizen.')}
                       className="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 min-h-[44px]"
                     >
                       Request Info

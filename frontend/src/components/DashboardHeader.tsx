@@ -1,29 +1,38 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
 import { UserRole } from '../types/database.types';
 import {
-  Menu, Search, User, Building2, Wrench, ChevronDown, ShieldCheck, Zap
+  Menu, Search, User, Building2, Wrench, ChevronDown, ShieldCheck, Zap, LogOut
 } from 'lucide-react';
 
 interface DashboardHeaderProps {
   title?: string;
   onMobileMenuOpen: () => void;
+  isMobileMenuOpen?: boolean;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   title = 'Dashboard',
-  onMobileMenuOpen
+  onMobileMenuOpen,
+  isMobileMenuOpen = false
 }) => {
-  const { user, role, switchRole } = useAuth();
+  const { user, role, switchRole, logout } = useAuth();
+  const navigate = useNavigate();
   const activeRole: UserRole = role || user?.role || 'citizen';
 
-  const handleRoleSwitch = (targetRole: UserRole) => {
-    switchRole(targetRole);
-    if (targetRole === 'citizen') window.location.href = '/citizen/portal';
-    if (targetRole === 'city_admin') window.location.href = '/admin/portal';
-    if (targetRole === 'service_staff') window.location.href = '/staff/portal';
+  const handleRoleSwitch = async (targetRole: UserRole) => {
+    await switchRole(targetRole);
+    if (targetRole === 'citizen') navigate('/citizen/portal');
+    if (targetRole === 'city_admin') navigate('/admin/portal');
+    if (targetRole === 'service_staff') navigate('/staff/portal');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -35,6 +44,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           onClick={onMobileMenuOpen}
           className="md:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           title="Open Menu"
+          aria-label="Open navigation menu"
+          aria-expanded={isMobileMenuOpen}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -44,55 +55,85 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </h1>
       </div>
 
-      {/* RIGHT: LANGUAGE SELECTOR, NOTIFICATIONS & USER ROLE SWITCHER */}
+      {/* RIGHT: LANGUAGE SELECTOR, NOTIFICATIONS, USER PROFILE & LOGOUT */}
       <div className="flex items-center space-x-2.5">
         
         {/* COMPACT LANGUAGE SELECTOR */}
         <LanguageSelector variant="compact" />
 
         {/* DEMO ROLE SWITCHER DROPDOWN */}
-        <div className="relative group">
-          <button className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="capitalize">{activeRole.replace('_', ' ')}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-          </button>
+        {activeRole !== 'department_head' && (
+          <div className="relative group">
+            <button aria-label="Switch User Role" className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="capitalize">{activeRole.replace('_', ' ')}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+            </button>
 
-          <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
-            <button
-              onClick={() => handleRoleSwitch('citizen')}
-              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-            >
-              <User className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Citizen View</span>
-            </button>
-            <button
-              onClick={() => handleRoleSwitch('city_admin')}
-              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-            >
-              <Building2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>City Administration View</span>
-            </button>
-            <button
-              onClick={() => handleRoleSwitch('service_staff')}
-              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-            >
-              <Wrench className="w-3.5 h-3.5 text-amber-600" />
-              <span>Field Staff View</span>
-            </button>
+            <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
+              <button
+                onClick={() => handleRoleSwitch('citizen')}
+                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+              >
+                <User className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Citizen View</span>
+              </button>
+              <button
+                onClick={() => handleRoleSwitch('city_admin')}
+                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>City Administration View</span>
+              </button>
+              <button
+                onClick={() => handleRoleSwitch('service_staff')}
+                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                <span>Field Staff View</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* NOTIFICATION CENTER */}
         <NotificationCenter />
 
-        {/* USER PROFILE BADGE */}
-        <div className="hidden sm:flex items-center space-x-2 pl-2 border-l border-gray-200 text-right">
+        {/* USER PROFILE BADGE & LOGOUT BUTTON */}
+        <div className="hidden sm:flex items-center space-x-3 pl-2 border-l border-gray-200 text-right">
           <div>
-            <span className="text-xs font-bold text-gray-900 block leading-tight">{user?.full_name || 'Demo Context'}</span>
-            <span className="text-[10px] text-gray-500 capitalize">{activeRole.replace('_', ' ')}</span>
+            <span className="text-xs font-bold text-gray-900 block leading-tight">
+              {activeRole === 'citizen' 
+                ? (user?.full_name || (user as any)?.name || 'Citizen')
+                : (user?.full_name || (user as any)?.name || 'Officer')}
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium block capitalize">
+              {activeRole === 'citizen' || user?.department_name === 'Unassigned Department' || !user?.department_name
+                ? 'Citizen'
+                : user.department_name.split('(')[0].trim()}
+            </span>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center space-x-1.5"
+            title="Logout"
+            aria-label="Logout"
+          >
+            <LogOut className="w-4 h-4 text-gray-500 hover:text-rose-600" />
+            <span className="hidden lg:inline text-xs font-bold text-gray-600 hover:text-rose-600">Logout</span>
+          </button>
         </div>
+
+        {/* MOBILE LOGOUT BUTTON */}
+        <button
+          onClick={handleLogout}
+          className="flex sm:hidden p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] items-center justify-center"
+          title="Logout"
+          aria-label="Logout"
+        >
+          <LogOut className="w-4 h-4 text-gray-500" />
+        </button>
 
       </div>
 

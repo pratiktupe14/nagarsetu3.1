@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getNotificationsForRole, getUnreadNotificationCount, markNotificationAsRead,
-  markAllNotificationsAsRead
+  markAllNotificationsAsRead, syncNotificationsFromBackend
 } from '../services/notificationService';
 import { NotificationItem, NotificationType } from '../types/database.types';
 import { subscribeToRealtimeComplaints } from '../services/realtimeService';
@@ -44,6 +44,13 @@ export const NotificationCenter: React.FC = () => {
     const list = getNotificationsForRole(user?.id, role);
     setNotifications(list);
     setUnreadCount(getUnreadNotificationCount(user?.id, role));
+
+    // Authoritative sync from PostgreSQL backend
+    syncNotificationsFromBackend().then(() => {
+      const updated = getNotificationsForRole(user?.id, role);
+      setNotifications(updated);
+      setUnreadCount(getUnreadNotificationCount(user?.id, role));
+    }).catch(() => {});
   }, [user, role]);
 
   useEffect(() => {
@@ -73,10 +80,13 @@ export const NotificationCenter: React.FC = () => {
     setIsOpen(false);
     if (!complaintId) return;
 
-    if (role === 'city_admin') {
+    const roleStr = String(role);
+    if (roleStr === 'city_admin' || roleStr === 'admin') {
       navigate('/admin/portal');
-    } else if (role === 'service_staff') {
-      navigate('/staff/portal');
+    } else if (roleStr === 'department_head') {
+      navigate(`/department-head/complaints?id=${complaintId}`);
+    } else if (roleStr === 'service_staff' || roleStr === 'staff') {
+      navigate('/staff/tasks');
     } else {
       navigate(`/citizen/complaint/${complaintId}`);
     }

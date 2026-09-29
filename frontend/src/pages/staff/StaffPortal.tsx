@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -13,9 +14,9 @@ import {
   submitStaffResolution
 } from '../../services/complaintService';
 import { resolveDepartmentInfo } from '../../services/departmentService';
-import { formatSlaRemainingTime, logActivity, getComplaintActivityLogs } from '../../services/adminService';
-import { getNotificationsForRole, markNotificationAsRead } from '../../services/notificationService';
-import { Complaint, ComplaintStatus, NotificationItem } from '../../types/database.types';
+import { formatSlaRemainingTime, logActivity, fetchComplaintActivityLogs } from '../../services/adminService';
+import { getNotificationsForRole, syncNotificationsFromBackend, markNotificationAsRead } from '../../services/notificationService';
+import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import {
@@ -125,6 +126,7 @@ const createStatusMarkerIcon = (status: ComplaintStatus, isOverdue: boolean = fa
 export const StaffPortal: React.FC = () => {
   const { user } = useAuth();
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
+  const { toast } = useNotification();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -139,7 +141,7 @@ export const StaffPortal: React.FC = () => {
 
   // Department-wise & Staff-specific identity
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -187,6 +189,7 @@ export const StaffPortal: React.FC = () => {
   const [workNotes, setWorkNotes] = useState('');
   const [materialsUsed, setMaterialsUsed] = useState('');
   const [submittingResolution, setSubmittingResolution] = useState(false);
+  const [recentActivities, setRecentActivities] = useState<ComplaintActivityLog[]>([]);
 
   // Auto-set default activeTab based on sub-route
   useEffect(() => {
@@ -205,8 +208,16 @@ export const StaffPortal: React.FC = () => {
       const list = await getStaffTasks(user?.id, staffDepartmentFull, user?.email, user?.full_name, user?.employee_id);
       setTasks(list);
 
-      const notifs = getNotificationsForRole(user?.id, 'service_staff');
+      const notifs = await syncNotificationsFromBackend().catch(() => getNotificationsForRole(user?.id, 'service_staff'));
       setNotifications(notifs);
+
+      if (list.length > 0) {
+        fetchComplaintActivityLogs(list[0].id)
+          .then((logs) => setRecentActivities(logs.slice(0, 4)))
+          .catch(() => setRecentActivities([]));
+      } else {
+        setRecentActivities([]);
+      }
     } catch (e) {
       console.error(e);
       setError('Unable to load dashboard data.');
@@ -350,12 +361,6 @@ export const StaffPortal: React.FC = () => {
     );
   }, [tasks]);
 
-  // RECENT ACTIVITY LOGS
-  const recentActivities = useMemo(() => {
-    if (tasks.length === 0) return [];
-    const firstCompId = tasks[0].id;
-    return getComplaintActivityLogs(firstCompId).slice(0, 4);
-  }, [tasks]);
 
   // FILTERED TASKS FOR LIST VIEW
   const filteredTasks = useMemo(() => {
@@ -469,10 +474,10 @@ export const StaffPortal: React.FC = () => {
 
       await loadData();
       const updatedList = await getStaffTasks(user?.id || 'staff-101', staffDepartmentFull);
-      setSelectedTask(updatedList.find((t) => t.id === taskId) || null);
+      setSelectedTask(updatedList.find((t) => String(t.id) === String(taskId) || t.complaint_number === taskId) || null);
     } catch (err) {
       console.error(err);
-      alert('Error updating task status.');
+      toast.error('Unable to update task status. Please try again.');
     }
   };
 
@@ -497,7 +502,7 @@ export const StaffPortal: React.FC = () => {
       setSelectedTask(updatedList.find((t) => t.id === selectedTask.id) || null);
     } catch (err) {
       console.error(err);
-      alert('Error adding progress note.');
+      toast.error('Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -506,7 +511,7 @@ export const StaffPortal: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -526,10 +531,10 @@ export const StaffPortal: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadData();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }
@@ -805,7 +810,7 @@ export const StaffPortal: React.FC = () => {
                 <span className="text-[11px] text-gray-500 block">No pending priority tasks assigned.</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {priorityTasksList.map((t) => {
                   const slaInfo = formatSlaRemainingTime(t.sla_deadline);
                   const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
@@ -1299,7 +1304,7 @@ export const StaffPortal: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                      <input
+                      <input aria-label="work Notes"
                         type="text"
                         required
                         value={workNotes}
@@ -1311,7 +1316,7 @@ export const StaffPortal: React.FC = () => {
 
                     <div>
                       <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                      <input
+                      <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
                         onChange={(e) => setMaterialsUsed(e.target.value)}

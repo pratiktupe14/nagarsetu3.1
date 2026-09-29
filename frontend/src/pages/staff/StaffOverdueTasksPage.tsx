@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -84,9 +85,10 @@ const getDepartmentInfo = (departmentName: string) => {
 export const StaffOverdueTasksPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useNotification();
 
   const staffName = user?.full_name || 'Field Officer';
-  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${user.id.slice(0, 4).toUpperCase()}` : 'STF-001');
+  const staffEmployeeId = user?.employee_id || (user?.id ? `STF-${String(user.id).slice(0, 4).toUpperCase()}` : 'STF-001');
 
   const resolvedDept = useMemo(
     () => resolveDepartmentInfo(user?.department_id, user?.department_name),
@@ -235,7 +237,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
       await loadData();
     } catch (err) {
       console.error(err);
-      alert('Error adding progress note.');
+      toast.error('Unable to add progress note.');
     } finally {
       setSubmittingProgressNote(false);
     }
@@ -244,7 +246,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
   const handleSubmitResolutionProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask || (!photoAfterPreview && !photoAfterFile)) {
-      alert('Please upload or select an "AFTER" repair proof photo.');
+      toast.warning('Please upload or select an "AFTER" repair proof photo.');
       return;
     }
 
@@ -264,10 +266,10 @@ export const StaffOverdueTasksPage: React.FC = () => {
       setWorkNotes('');
       setMaterialsUsed('');
       await loadData();
-      alert('Task resolution proof submitted successfully! Awaiting Department Head verification.');
+      toast.success('Task resolution proof submitted successfully! Awaiting Department Head verification.');
     } catch (err: any) {
       console.error('Task resolution submission error:', err);
-      alert(err?.message || 'Error submitting resolution proof.');
+      toast.error(err?.message || 'Error submitting resolution proof.');
     } finally {
       setSubmittingResolution(false);
     }
@@ -393,7 +395,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
+              <input aria-label="Search complaint ID, issue, location..."
                 type="text"
                 placeholder="Search complaint ID, issue, location..."
                 value={searchQuery}
@@ -403,7 +405,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <select aria-label="priority  filter"
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -415,7 +417,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
                 <option value="Low">Low</option>
               </select>
 
-              <select
+              <select aria-label="category  filter"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -431,7 +433,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
                 <option value="Other">Other</option>
               </select>
 
-              <select
+              <select aria-label="date  filter"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
@@ -442,7 +444,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
                 <option value="Older">Older</option>
               </select>
 
-              <select
+              <select aria-label="location  filter"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500 max-w-[160px] truncate"
@@ -671,7 +673,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
               <form onSubmit={handleAddProgressNote} className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-3 text-xs">
                 <span className="font-extrabold text-gray-900 font-outfit block">Field Work Progress Log</span>
                 <div className="flex gap-2">
-                  <input
+                  <input aria-label="progress Note"
                     type="text"
                     required
                     value={progressNote}
@@ -783,7 +785,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
-                    <input
+                    <input aria-label="work Notes"
                       type="text"
                       required
                       value={workNotes}
@@ -795,7 +797,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
 
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
-                    <input
+                    <input aria-label="materials Used"
                       type="text"
                       value={materialsUsed}
                       onChange={(e) => setMaterialsUsed(e.target.value)}

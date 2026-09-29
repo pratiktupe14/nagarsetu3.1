@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { UserPlus, User, Smartphone, Mail, Key, ArrowRight } from 'lucide-react';
+import { UserPlus, User, Smartphone, Mail, Key, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { registerCitizen, loading } = useAuth();
@@ -15,6 +15,7 @@ export const RegisterPage: React.FC = () => {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,11 +26,13 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    const success = await registerCitizen(fullName, mobile, email, password);
-    if (success) {
-      navigate('/citizen/portal');
-    } else {
-      setErrorMessage('Registration failed. Please check details or try again.');
+    try {
+      const success = await registerCitizen(fullName, mobile, email, password);
+      if (success) {
+        navigate('/citizen/portal');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Registration failed. Please check details or try again.');
     }
   };
 
@@ -59,7 +62,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('fullName')}</label>
               <div className="relative">
                 <User className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="full Name"
                   type="text"
                   required
                   value={fullName}
@@ -74,7 +77,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('mobileNumber')}</label>
               <div className="relative">
                 <Smartphone className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="mobile"
                   type="tel"
                   required
                   value={mobile}
@@ -89,7 +92,7 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('emailAddress')}</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
+                <input aria-label="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -103,14 +106,22 @@ export const RegisterPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 mb-1">{t('password')}</label>
               <div className="relative">
                 <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
-                  type="password"
+                <input aria-label="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-10 py-2.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none p-0.5"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4 text-gray-500" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                </button>
               </div>
             </div>
 

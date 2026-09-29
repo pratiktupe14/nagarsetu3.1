@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth, getPortalForRole } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types/database.types';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
-import { Shield, User, Building2, Wrench, Smartphone, Mail, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { getApiUrl } from '../config/apiConfig';
+import { Shield, User, Building2, Wrench, Smartphone, Mail, Lock, ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { t } = useLanguage();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('citizen');
-  const [identifier, setIdentifier] = useState('9876543210');
-  const [password, setPassword] = useState('password123');
+  const [identifier, setIdentifier] = useState('8788562103');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [useOtp, setUseOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -25,34 +28,52 @@ export const LoginPage: React.FC = () => {
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
     setErrorMsg('');
-    const demoAdminPass = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-    const demoUserPass = import.meta.env.VITE_DEMO_USER_PASSWORD || 'password123';
-    const demoHeadPass = import.meta.env.VITE_DEMO_HEAD_PASSWORD || 'head123';
-    const demoStaffPass = import.meta.env.VITE_DEMO_STAFF_PASSWORD || 'staff123';
 
     if (role === 'citizen') {
-      setIdentifier('9876543210');
-      setPassword(demoUserPass);
+      setIdentifier('8788562103');
     } else if (role === 'city_admin') {
       setIdentifier('admin@nagarsetu.gov.in');
-      setPassword(demoAdminPass);
     } else if (role === 'department_head') {
       setIdentifier('rahul.kumar@nagarsetu.gov.in');
-      setPassword(demoHeadPass);
     } else if (role === 'service_staff') {
       setIdentifier('staff@nagarsetu.gov.in');
-      setPassword(demoStaffPass);
     }
+    setPassword('');
   };
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const roleParam = searchParams.get('role');
+    if (roleParam) {
+      let target: UserRole = 'citizen';
+      if (roleParam === 'city_admin' || roleParam === 'admin') target = 'city_admin';
+      else if (roleParam === 'department_head' || roleParam === 'dept_head') target = 'department_head';
+      else if (roleParam === 'service_staff' || roleParam === 'staff') target = 'service_staff';
+      handleRoleChange(target);
+    }
+  }, [location.search]);
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier || identifier.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile number.');
       return;
     }
-    setOtpSent(true);
     setErrorMsg('');
+    try {
+      const res = await fetch(`${getApiUrl()}/api/auth/otp-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: identifier.trim() })
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to send OTP');
+      }
+      setOtpSent(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Unable to send OTP');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,9 +83,22 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (useOtp && selectedRole === 'citizen') {
-        if (otpCode !== '123456') {
-          setErrorMsg('Invalid OTP. Please enter 123456 for demo verification.');
-          setLoading(false);
+        const res = await fetch(`${getApiUrl()}/api/auth/otp-verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile: identifier.trim(), otp: otpCode.trim() })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Invalid OTP code');
+        }
+        if (data.token && data.user) {
+          localStorage.setItem('nagarsetu_token', data.token);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(data.user));
+          navigate('/citizen/portal');
+          return;
+        } else if (data.needsRegistration) {
+          navigate('/register?mobile=' + encodeURIComponent(identifier.trim()));
           return;
         }
       }
@@ -93,7 +127,7 @@ export const LoginPage: React.FC = () => {
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
               <Shield className="w-4 h-4 text-emerald-600" />
-              <span>NAGARSETU 3.0 — {t('tagline')}</span>
+              <span>NAGARSETU — {t('tagline')}</span>
             </div>
 
             <div className="space-y-3">
@@ -210,7 +244,7 @@ export const LoginPage: React.FC = () => {
                     ) : (
                       <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                     )}
-                    <input
+                    <input aria-label="identifier"
                       type="text"
                       required
                       value={identifier}
@@ -225,20 +259,28 @@ export const LoginPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="font-bold text-gray-700">{t('password')}</label>
-                    <a href="#" className="text-[11px] text-emerald-600 font-semibold hover:underline">
+                    <button type="button" onClick={(e) => { e.preventDefault(); alert('Please contact Municipal Admin to reset password.'); }} className="text-[11px] text-emerald-600 font-semibold hover:underline cursor-pointer">
                       {t('forgotPassword')}
-                    </a>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                    <input
-                      type="password"
+                    <input aria-label="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500"
+                      className="w-full bg-white border border-gray-300 rounded-xl pl-9 pr-10 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none p-0.5"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4 text-gray-500" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                    </button>
                   </div>
                 </div>
 
@@ -254,11 +296,13 @@ export const LoginPage: React.FC = () => {
 
               {/* Citizen Registration Link */}
               {selectedRole === 'citizen' && (
-                <div className="text-center pt-2 border-t border-gray-100 text-xs text-gray-600">
-                  {t('dontHaveAccount')}{' '}
-                  <Link to="/register" className="text-emerald-700 font-bold hover:underline">
-                    {t('registerTitle')}
-                  </Link>
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="text-center text-xs text-gray-600">
+                    {t('dontHaveAccount')}{' '}
+                    <Link to="/register" className="text-emerald-700 font-bold hover:underline">
+                      {t('registerTitle')}
+                    </Link>
+                  </div>
                 </div>
               )}
 

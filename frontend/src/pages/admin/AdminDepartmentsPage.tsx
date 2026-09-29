@@ -5,6 +5,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   getMunicipalDepartments, saveOrUpdateMunicipalDepartment,
+  saveMunicipalDepartmentApi, deleteMunicipalDepartmentApi,
   getDepartmentStaffRoster, formatSlaRemainingTime, MunicipalDepartmentRecord
 } from '../../services/adminService';
 import { Complaint } from '../../types/database.types';
@@ -161,9 +162,9 @@ export const AdminDepartmentsPage: React.FC = () => {
 
   // Helper function to match complaint to department name
   const isComplaintInDept = useCallback((c: Complaint, deptName: string) => {
-    if (!c.department_name) return false;
-    const cDept = c.department_name.toLowerCase();
-    const dName = deptName.toLowerCase();
+    if (!c || !c.department_name) return false;
+    const cDept = String(c.department_name || '').toLowerCase();
+    const dName = String(deptName || '').toLowerCase();
     
     // Extract key token like PWD, Sanitation, Water, Electrical, Drainage, Traffic, Parks
     if (dName.includes('pwd') || dName.includes('road')) return cDept.includes('pwd') || cDept.includes('road');
@@ -388,17 +389,19 @@ export const AdminDepartmentsPage: React.FC = () => {
 
     setSubmittingForm(true);
     try {
-      const saved = saveOrUpdateMunicipalDepartment({
+      const saved = await saveMunicipalDepartmentApi({
         id: editingDept?.id,
         ...formData
       });
 
-      setToastMessage(editingDept ? `Department '${saved.name}' updated successfully.` : `New Department '${saved.name}' created.`);
+      setToastMessage(editingDept ? `Department '${saved.name}' updated in database.` : `New Department '${saved.name}' created in database.`);
       setShowAddEditModal(false);
-      loadData();
+      await loadData();
       setTimeout(() => setToastMessage(null), 4000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setToastMessage(`Error: ${e.message || 'Failed to save department'}`);
+      setTimeout(() => setToastMessage(null), 5000);
     } finally {
       setSubmittingForm(false);
     }
@@ -533,7 +536,7 @@ export const AdminDepartmentsPage: React.FC = () => {
             {/* Search Bar */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
+              <input aria-label="Search department name, code, or department head..."
                 type="text"
                 placeholder="Search department name, code, or department head..."
                 value={searchQuery}
@@ -578,7 +581,7 @@ export const AdminDepartmentsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Status
               </label>
-              <select
+              <select aria-label="status  filter"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -594,7 +597,7 @@ export const AdminDepartmentsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Complaint Load
               </label>
-              <select
+              <select aria-label="load  filter"
                 value={loadFilter}
                 onChange={(e) => { setLoadFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -611,7 +614,7 @@ export const AdminDepartmentsPage: React.FC = () => {
               <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1 font-outfit">
                 Performance / SLA
               </label>
-              <select
+              <select aria-label="performance  filter"
                 value={performanceFilter}
                 onChange={(e) => { setPerformanceFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-emerald-500"
@@ -914,7 +917,10 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                                 {/* Deactivate */}
                                 <button
-                                  onClick={() => handleOpenEditModal(dept)}
+                                  onClick={() => {
+                                    setDeleteModalDept(dept);
+                                    setDeleteError(null);
+                                  }}
                                   className="px-2 py-1 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 font-bold rounded-lg text-xs transition-colors"
                                   title="Deactivate Department"
                                 >
@@ -1418,7 +1424,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Department Name *</label>
-                  <input
+                  <input aria-label="e.g. Roads & Public Works (PWD)"
                     type="text"
                     required
                     placeholder="e.g. Roads & Public Works (PWD)"
@@ -1431,7 +1437,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Department Code *</label>
-                    <input
+                    <input aria-label="e.g. PWD-01"
                       type="text"
                       required
                       placeholder="e.g. PWD-01"
@@ -1443,7 +1449,7 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Department Status</label>
-                    <select
+                    <select aria-label="status"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as 'Active' | 'Inactive' })}
                       className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold focus:ring-2 focus:ring-emerald-500"
@@ -1456,7 +1462,7 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Department Head (HOD) *</label>
-                  <input
+                  <input aria-label="e.g. Er. Rajesh Sharma"
                     type="text"
                     required
                     placeholder="e.g. Er. Rajesh Sharma"
@@ -1469,7 +1475,7 @@ export const AdminDepartmentsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Contact Number</label>
-                    <input
+                    <input aria-label="+91 98220 11201"
                       type="text"
                       placeholder="+91 98220 11201"
                       value={formData.contact_number}
@@ -1480,7 +1486,7 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Official Email</label>
-                    <input
+                    <input aria-label="pwd.admin@nagarsetu.gov.in"
                       type="email"
                       placeholder="pwd.admin@nagarsetu.gov.in"
                       value={formData.email}
@@ -1492,7 +1498,7 @@ export const AdminDepartmentsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Department Description & Scope</label>
-                  <textarea
+                  <textarea aria-label="Brief description of municipal duties and scope of civic work..."
                     rows={3}
                     placeholder="Brief description of municipal duties and scope of civic work..."
                     value={formData.description}
