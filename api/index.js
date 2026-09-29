@@ -1,14 +1,31 @@
-module.exports = (req, res) => {
+let app;
+let dbInitPromise = null;
+
+module.exports = async (req, res) => {
   try {
-    const app = require('../backend/src/app');
+    if (!app) {
+      app = require('../backend/src/app');
+    }
+
+    if (!dbInitPromise) {
+      try {
+        const { initDatabase } = require('../backend/src/config/db');
+        dbInitPromise = initDatabase().catch(err => {
+          console.warn('[SERVERLESS DB INIT WARN]', err.message);
+        });
+      } catch (dbErr) {
+        console.warn('[SERVERLESS DB LOAD WARN]', dbErr.message);
+        dbInitPromise = Promise.resolve();
+      }
+    }
+
+    await dbInitPromise;
     return app(req, res);
   } catch (err) {
-    console.error('[DIAGNOSTIC SERVERLESS ERROR]', err);
-    return res.status(200).json({
-      diagnosticError: true,
-      message: err.message,
-      stack: err.stack
+    console.error('[SERVERLESS FATAL ERROR]', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Serverless Function Error: ' + err.message
     });
   }
 };
-
