@@ -69,6 +69,6 @@ npm run dev
 | Role | Mobile / Login | Password | Initial View |
 | :--- | :--- | :--- | :--- |
 | **Citizen** | `8788562103` *(or via `/register`)* | `8788562103` | Report Issue & My Complaints |
-| **Department Head / Officer** | `rahul.kumar@nagarsetu.gov.in` / `9876543211` | `head@123` | Department Command & Staff Management |
-| **Field Maintenance Staff** | `staff@nagarsetu.gov.in` / `9876543212` | `staff@123` | Assigned Tasks & Resolution Upload |
+| **Department Head / Officer** | `rahul.kumar@nagarsetu.gov.in` / `9876543211` | `nagarsetu@123` *(or `head@123`)* | Department Command & Staff Management |
+| **Field Maintenance Staff** | `staff@nagarsetu.gov.in` / `9876543212` | `nagarsetu@123` *(or `staff@123`)* | Assigned Tasks & Resolution Upload |
 | **Municipal Admin** | `admin@nagarsetu.gov.in` / `9876543213` | `admin@123` | Executive Analytics & Hotspot Map |
