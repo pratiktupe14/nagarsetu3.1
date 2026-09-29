@@ -702,6 +702,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               language_pref: 'en'
             };
             setUser(dhUser);
+            localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
             localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
             return true;
           }
@@ -721,6 +722,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           language_pref: 'en'
         };
         setUser(adminUser);
+        localStorage.setItem('nagarsetu_token', 'demo-token-city-admin');
         localStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
         return true;
       }
@@ -729,6 +731,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
         if (dhMatch) {
           setUser(dhMatch);
+          localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
           localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
           return true;
         }
@@ -738,6 +741,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
         if (staffUser) {
           setUser(staffUser);
+          localStorage.setItem('nagarsetu_token', 'demo-token-service-staff');
           localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
           return true;
         }
@@ -753,6 +757,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           language_pref: 'en'
         };
         setUser(citizenUser);
+        localStorage.setItem('nagarsetu_token', 'demo-token-citizen');
         localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
         return true;
       }
