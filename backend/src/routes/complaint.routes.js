@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const { uploadSingleImage } = require('../middleware/upload');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuthenticateToken } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
@@ -347,8 +347,8 @@ router.get('/my', authenticateToken, async (req, res) => {
   }
 });
 
-// Get single complaint by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+// Get single complaint by ID (supports authenticated or public tracking)
+router.get('/:id', optionalAuthenticateToken, async (req, res) => {
   try {
     const idParam = req.params.id;
     const sql = `
@@ -392,12 +392,17 @@ router.get('/:id', authenticateToken, async (req, res) => {
             if (citizenId === 'c-8788562103' || req.user?.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
               citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
             }
-            let { data: latestList } = await supabase
-              .from('complaints')
-              .select('*, departments(name)')
-              .or(`citizen_id.eq.${citizenId},citizen_id.eq.c-8788562103`)
-              .order('created_at', { ascending: false })
-              .limit(1);
+            const isCitizenUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(citizenId);
+            let latestList = null;
+            if (isCitizenUuid) {
+              const { data: cList } = await supabase
+                .from('complaints')
+                .select('*, departments(name)')
+                .eq('citizen_id', citizenId)
+                .order('created_at', { ascending: false })
+                .limit(1);
+              latestList = cList;
+            }
 
             if (!latestList || latestList.length === 0) {
               const { data: anyLatest } = await supabase

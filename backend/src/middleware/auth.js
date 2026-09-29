@@ -259,10 +259,37 @@ function requireRole(roles = []) {
   };
 }
 
+async function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    req.user = { ...DEMO_USER_TOKENS['demo-token-citizen'] };
+    return next();
+  }
+
+  if (DEMO_USER_TOKENS[token]) {
+    req.user = { ...DEMO_USER_TOKENS[token] };
+    return next();
+  }
+
+  try {
+    const verifiedUser = jwt.verify(token, JWT_SECRET);
+    if (verifiedUser) {
+      req.user = verifiedUser;
+      return next();
+    }
+  } catch (e) {}
+
+  req.user = { ...DEMO_USER_TOKENS['demo-token-citizen'] };
+  return next();
+}
+
 module.exports = {
   JWT_SECRET,
   generateToken,
   authenticateToken,
+  optionalAuthenticateToken,
   requireRole,
   getSupabaseClient
 };
