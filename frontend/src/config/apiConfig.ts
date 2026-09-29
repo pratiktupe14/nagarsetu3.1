@@ -1,13 +1,14 @@
 /**
  * Centralized API URL Resolver for NAGARSETU 3.1
- * Resolves API URL dynamically in both Development (localhost) and Vercel Production.
+ * Resolves API URL dynamically in both Development (localhost via Vite proxy) and Vercel Production (same-origin).
  */
 export const getApiUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.trim() !== '') {
     return envUrl.trim().replace(/\/$/, '');
   }
-  return 'https://backend-zeta-two-60.vercel.app';
+  // When unified in NagarSetuSegue, use same-origin relative URLs:
+  return '';
 };
 
 export const getAiServiceUrl = (): string => {
@@ -16,7 +17,7 @@ export const getAiServiceUrl = (): string => {
     return envAiUrl.trim().replace(/\/$/, '');
   }
   const mainApi = getApiUrl();
-  return mainApi ? `${mainApi}/api/ai` : 'https://backend-zeta-two-60.vercel.app/api/ai';
+  return mainApi ? `${mainApi}/api/ai` : '/api/ai';
 };
 
 export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {

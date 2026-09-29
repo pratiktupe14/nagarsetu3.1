@@ -55,36 +55,6 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
 
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
-    // Fallback: If user not found in users table, check department_heads table
-    if (!user) {
-      const dhFallback = await query(
-        `SELECT dh.*, d.name as dept_name FROM department_heads dh LEFT JOIN departments d ON d.id = dh.department_id WHERE LOWER(dh.email) = ? ORDER BY dh.id DESC LIMIT 1`,
-        [cleanIdentifier]
-      );
-      if (dhFallback.rows && dhFallback.rows.length > 0) {
-        const dh = dhFallback.rows[0];
-        const salt = await bcrypt.genSalt(10);
-        const newHash = await bcrypt.hash(password, salt);
-        const insUser = await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, department_id, employee_id, status) VALUES (?, ?, ?, ?, 'department_head', ?, ?, ?)`,
-          [dh.name, dh.phone || '', cleanIdentifier, newHash, dh.department_id, dh.employee_id || '', dh.status || 'active']
-        );
-        const newUserId = insUser.rows[0].id;
-        user = {
-          id: newUserId,
-          name: dh.name,
-          mobile: dh.phone || '',
-          email: cleanIdentifier,
-          password_hash: newHash,
-          role: 'department_head',
-          department_id: dh.department_id,
-          employee_id: dh.employee_id || '',
-          status: dh.status || 'active',
-          language_pref: 'en'
-        };
-      }
-    }
-
     if (!user) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
@@ -164,16 +134,29 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   }
 });
 
-// OTP Request (Simulated)
+// OTP Request
 router.post('/otp-request', validateInput(otpRequestSchema), (req, res) => {
   const { mobile } = req.body;
-  return res.json({ message: 'OTP sent successfully to ' + mobile, demoOtp: '123456' });
+  const isDev = process.env.NODE_ENV !== 'production';
+  const responseData = { message: 'OTP sent successfully to ' + mobile };
+  if (isDev) {
+    responseData.demoOtp = '123456';
+  }
+  return res.json(responseData);
 });
 
-// OTP Verify (Simulated)
+// OTP Verify
 router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
   try {
     const { mobile, otp } = req.body;
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    if (!isDev) {
+      return res.status(501).json({
+        error: 'Live SMS OTP gateway is not configured for production. Please log in using your registered mobile/email and password.'
+      });
+    }
+
     if (otp !== '123456') {
       return res.status(400).json({ error: 'Invalid OTP code' });
     }

@@ -86,6 +86,22 @@ export interface ResolvedDepartment {
   fullName: string;
 }
 
+export const DEFAULT_OFFICIAL_HEADS_MAP: Record<string, {
+  name: string;
+  email: string;
+  phone: string;
+  employeeId: string;
+  designation: string;
+}> = {
+  PWD: { name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001', employeeId: 'EMP-PWD-001', designation: 'Department Head' },
+  SAN: { name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002', employeeId: 'EMP-SAN-001', designation: 'Department Head' },
+  WTR: { name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003', employeeId: 'EMP-WTR-001', designation: 'Department Head' },
+  DRN: { name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004', employeeId: 'EMP-DRN-001', designation: 'Department Head' },
+  ELE: { name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005', employeeId: 'EMP-ELE-001', designation: 'Department Head' },
+  TRF: { name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006', employeeId: 'EMP-TRF-001', designation: 'Department Head' },
+  MNT: { name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007', employeeId: 'EMP-MNT-001', designation: 'Department Head' }
+};
+
 export function resolveDepartmentInfo(
   departmentId?: string | number,
   departmentName?: string,
@@ -95,24 +111,24 @@ export function resolveDepartmentInfo(
   const dName = String(departmentName || '').trim().toLowerCase();
   const dCat = String(category || '').trim().toLowerCase();
 
-  // 1. Electrical & Street Lighting (ELE) - ID 5 (also accepts 4)
+  // 1. Public Works Department (PWD) - ID 1
   if (
-    dId === '5' || dId === '4' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
-    dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
-    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light')
+    dId === '1' || dId === 'pwd' || dId === 'dept-pwd' || dId === 'pwd-01' || dId === 'dept-1' ||
+    dName.includes('public works') || dName.includes('road') || dName === 'pwd' ||
+    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works')
   ) {
     return {
-      id: '5',
-      code: 'ELE',
-      name: 'Electrical & Street Lighting',
-      fullName: 'Electrical & Street Lighting (ELE)'
+      id: '1',
+      code: 'PWD',
+      name: 'Public Works Department',
+      fullName: 'Public Works Department (PWD)'
     };
   }
 
   // 2. Sanitation & Waste Management (SAN) - ID 2
   if (
-    dId === '2' || dId === 'san' || dId === 'dept-san' || dId.includes('san') ||
-    dName.includes('sanitat') || dName.includes('waste') || dName.includes('san') ||
+    dId === '2' || dId === 'san' || dId === 'dept-san' || dId === 'san-01' || dId === 'dept-2' ||
+    dName.includes('sanitat') || dName.includes('waste') || dName === 'san' ||
     dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat')
   ) {
     return {
@@ -125,8 +141,8 @@ export function resolveDepartmentInfo(
 
   // 3. Water Supply & Sewerage Board (WTR) - ID 3
   if (
-    dId === '3' || dId === 'wtr' || dId === 'wssb' || dId === 'dept-wtr' || dId.includes('wtr') ||
-    dName.includes('water') || dName.includes('sewerage board') || dName.includes('wtr') ||
+    dId === '3' || dId === 'wtr' || dId === 'wssb' || dId === 'dept-wtr' || dId === 'wtr-01' || dId === 'dept-3' ||
+    dName.includes('water supply') || dName.includes('sewerage board') || (dName.includes('water') && !dName.includes('drain')) || dName === 'wtr' ||
     dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage')
   ) {
     return {
@@ -137,10 +153,10 @@ export function resolveDepartmentInfo(
     };
   }
 
-  // 4. Drainage & Sewage Department (DRN) - ID 4 (also accepts 7)
+  // 4. Drainage & Sewage Department (DRN) - ID 4
   if (
-    dId === '4' || dId === '7' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
-    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
+    dId === '4' || dId === 'drn' || dId === 'dept-drn' || dId === 'drn-01' || dId === 'dept-4' ||
+    dName.includes('drain') || dName.includes('sewage') || dName === 'drn' ||
     dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter')
   ) {
     return {
@@ -151,10 +167,24 @@ export function resolveDepartmentInfo(
     };
   }
 
-  // 5. Traffic Management Department (TRF) - ID 6 (also accepts 5)
+  // 5. Electrical & Street Lighting (ELE) - ID 5
   if (
-    dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
-    dName.includes('traffic') || dName.includes('trf') ||
+    dId === '5' || dId === 'ele' || dId === 'dept-ele' || dId === 'ele-01' || dId === 'dept-5' ||
+    dName.includes('electric') || dName.includes('light') || dName === 'ele' ||
+    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light')
+  ) {
+    return {
+      id: '5',
+      code: 'ELE',
+      name: 'Electrical & Street Lighting',
+      fullName: 'Electrical & Street Lighting (ELE)'
+    };
+  }
+
+  // 6. Traffic Management Department (TRF) - ID 6
+  if (
+    dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId === 'trf-01' || dId === 'dept-6' ||
+    dName.includes('traffic') || dName === 'trf' ||
     dCat.includes('traffic') || dCat.includes('signal')
   ) {
     return {
@@ -165,10 +195,10 @@ export function resolveDepartmentInfo(
     };
   }
 
-  // 6. Maintenance Department (MNT) - ID 7 (also accepts 6)
+  // 7. Maintenance Department (MNT) - ID 7
   if (
-    dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
-    dName.includes('mainten') || dName.includes('mnt') ||
+    dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId === 'mnt-01' || dId === 'dept-7' ||
+    dName.includes('mainten') || dName === 'mnt' ||
     dCat.includes('mainten') || dCat.includes('building')
   ) {
     return {
@@ -176,20 +206,6 @@ export function resolveDepartmentInfo(
       code: 'MNT',
       name: 'Maintenance Department',
       fullName: 'Maintenance Department (MNT)'
-    };
-  }
-
-  // 7. Public Works Department (PWD) - ID 1
-  if (
-    dId === '1' || dId === 'pwd' || dId === 'dept-pwd' || dId.includes('pwd') ||
-    dName.includes('public works') || dName.includes('road') || dName.includes('pwd') ||
-    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works')
-  ) {
-    return {
-      id: '1',
-      code: 'PWD',
-      name: 'Public Works Department',
-      fullName: 'Public Works Department (PWD)'
     };
   }
 
@@ -523,14 +539,16 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
       return pDept.code === deptCode || String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id;
     });
 
-    const hasActiveHead = Boolean(activeHeadRow && (activeHeadRow.status || '').toLowerCase() === 'active') || Boolean(headProf);
-    const headName = activeHeadRow?.name || headProf?.full_name || headProf?.name || (hasActiveHead ? 'Department Head' : 'Unassigned');
-    const headEmail = activeHeadRow?.email || headProf?.email || (hasActiveHead ? 'head@nagarsetu.gov.in' : 'N/A');
-    const headPhone = activeHeadRow?.phone || headProf?.mobile || (hasActiveHead ? '+91 98220 00000' : 'N/A');
-    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || (hasActiveHead ? `EMP-${deptCode}-001` : 'N/A');
+    const defaultHead = DEFAULT_OFFICIAL_HEADS_MAP[deptCode];
 
-    const designation = activeHeadRow?.designation || (hasActiveHead ? 'Department Head' : 'Unassigned');
-    const status: 'Active' | 'Inactive' | 'No Active Head' = hasActiveHead ? 'Active' : 'No Active Head';
+    const hasActiveHead = Boolean(activeHeadRow && (activeHeadRow.status || '').toLowerCase() === 'active') || Boolean(headProf) || Boolean(defaultHead);
+    const headName = activeHeadRow?.name || headProf?.full_name || headProf?.name || defaultHead?.name || 'Department Head';
+    const headEmail = activeHeadRow?.email || headProf?.email || defaultHead?.email || 'head@nagarsetu.gov.in';
+    const headPhone = activeHeadRow?.phone || headProf?.mobile || defaultHead?.phone || '+91 98220 00000';
+    const employeeId = activeHeadRow?.employee_id || headProf?.employee_id || defaultHead?.employeeId || `EMP-${deptCode}-001`;
+
+    const designation = activeHeadRow?.designation || defaultHead?.designation || 'Department Head';
+    const status: 'Active' | 'Inactive' | 'No Active Head' = (activeHeadRow?.status && activeHeadRow.status.toLowerCase() === 'inactive') ? 'Inactive' : 'Active';
 
     // Calculate Real Staff Count for department from Express API, profiles, or fallback staff records
     const fallbackStaffRecords = getAllServiceStaffRecords();

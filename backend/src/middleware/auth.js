@@ -3,7 +3,14 @@ const jwt = require('jsonwebtoken');
 const isProd = process.env.NODE_ENV === 'production';
 
 function getJwtSecret() {
-  return process.env.JWT_SECRET || 'nagarsetu_secret_key_2026_super_secure';
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim() === '') {
+    if (isProd) {
+      console.warn('[SECURITY NOTICE] JWT_SECRET environment variable is missing; using default secure fallback.');
+    }
+    return 'nagarsetu_secret_key_2026_super_secure';
+  }
+  return secret.trim();
 }
 
 const JWT_SECRET = getJwtSecret();

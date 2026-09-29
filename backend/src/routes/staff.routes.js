@@ -27,7 +27,7 @@ router.get('/tasks', async (req, res) => {
     const params = [staffId, req.user.email || '', req.user.name || ''];
 
     if (userDeptId) {
-      sql += ` AND (c.department_id = $3 OR d.id = $3)`;
+      sql += ` AND (c.department_id = $4 OR d.id = $4)`;
       params.push(userDeptId);
     }
 

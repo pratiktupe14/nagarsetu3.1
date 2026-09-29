@@ -191,13 +191,16 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 });
 
 // Get all complaints for Admin / Portals
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
+    const isCitizen = req.user.role === 'citizen';
     const sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
+      ${!isCitizen ? ', u.name as citizen_name, u.mobile as citizen_mobile' : ''}
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
+      ${!isCitizen ? 'LEFT JOIN users u ON c.citizen_id = u.id' : ''}
       ORDER BY c.created_at DESC
     `;
     const result = await query(sql);
@@ -246,6 +249,18 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     const complaint = result.rows[0];
+
+    // IDOR Protection: Redact citizen mobile and mask name for other citizens
+    const userRole = req.user.role || 'citizen';
+    const isOwner = String(complaint.citizen_id) === String(req.user.id);
+    const isPrivileged = ['officer', 'admin', 'city_admin', 'department_head', 'staff', 'service_staff'].includes(userRole);
+
+    if (!isOwner && !isPrivileged) {
+      delete complaint.citizen_mobile;
+      if (complaint.citizen_name) {
+        complaint.citizen_name = 'Citizen';
+      }
+    }
 
     // Fetch assignment details if any
     const assignSql = `
