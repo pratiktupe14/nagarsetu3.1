@@ -93,7 +93,7 @@ export const SubmissionSuccessPage: React.FC = () => {
 
           <div className="pt-2 space-y-3">
             <button
-              onClick={() => navigate(complaint ? `/citizen/complaint/${complaint.id}` : '/citizen/portal')}
+              onClick={() => navigate(complaint ? `/citizen/complaint/${complaint.complaint_number || complaint.id}` : '/citizen/portal')}
               className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all"
             >
               <span>Track Complaint</span>
