@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { LocationPicker } from './LocationPicker';
+import { NagarSetuMap } from './NagarSetuMap';
 
 // Fix standard Leaflet marker icon asset issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -75,6 +77,15 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
   const [position, setPosition] = useState<[number, number]>([initialLat, initialLng]);
   const markerRef = useRef<L.Marker | null>(null);
 
+  const hasGoogleMapsKey = Boolean(
+    (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
+    (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
+  );
+
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
+    hasGoogleMapsKey ? 'google' : 'leaflet'
+  );
+
   useEffect(() => {
     if (initialLat != null && initialLng != null && !isNaN(initialLat) && !isNaN(initialLng)) {
       setPosition([initialLat, initialLng]);
@@ -103,71 +114,126 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
   );
 
   return (
-    <div className="w-full h-full min-h-[450px] rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
-      <MapContainer
-        center={position}
-        zoom={16}
-        scrollWheelZoom={false}
-        className="w-full h-full"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-        />
+    <div className="w-full flex flex-col space-y-2">
+      {/* Engine Switcher Bar */}
+      {hasGoogleMapsKey && (
+        <div className="flex items-center justify-between px-1 text-xs">
+          <span className="font-bold text-gray-500 text-[11px] font-outfit uppercase tracking-wider">
+            Map Provider
+          </span>
+          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setMapEngine('google')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all min-h-[30px] ${
+                mapEngine === 'google'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Google Maps
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapEngine('leaflet')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all min-h-[30px] ${
+                mapEngine === 'leaflet'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              OpenStreetMap GIS
+            </button>
+          </div>
+        </div>
+      )}
 
-        <MapController center={position} zoom={16} />
-
-        {/* GPS Accuracy Circle */}
-        {accuracyMeters && accuracyMeters > 0 && (
-          <Circle
-            center={position}
-            radius={accuracyMeters}
-            pathOptions={{ color: '#3b82f6', fillColor: '#60a5fa', fillOpacity: 0.15, weight: 1.5 }}
+      {/* GOOGLE MAPS ENGINE */}
+      {mapEngine === 'google' && hasGoogleMapsKey ? (
+        interactive ? (
+          <LocationPicker
+            initialPosition={{ lat: position[0], lng: position[1] }}
+            onChange={(pos) => handleSelect(pos.lat, pos.lng)}
+            height="440px"
           />
-        )}
+        ) : (
+          <div className="w-full h-full min-h-[300px] rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
+            <NagarSetuMap
+              center={{ lat: position[0], lng: position[1] }}
+              selectedPosition={{ lat: position[0], lng: position[1] }}
+              height="300px"
+            />
+          </div>
+        )
+      ) : (
+        /* LEAFLET / OPENSTREETMAP ENGINE */
+        <div className="w-full h-full min-h-[420px] rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
+          <MapContainer
+            center={position}
+            zoom={16}
+            scrollWheelZoom={false}
+            className="w-full h-full min-h-[420px]"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
 
-        {/* Selected Location Marker (Draggable) */}
-        <Marker
-          position={position}
-          icon={customIcon}
-          draggable={interactive}
-          eventHandlers={eventHandlers}
-          ref={markerRef}
-        >
-          <Popup>
-            <div className="text-xs font-semibold text-gray-900 font-sans">
-              📍 Selected Complaint Location<br />
-              <span className="font-mono text-[10px] text-emerald-700 font-bold block pt-0.5">
-                {position[0].toFixed(6)}, {position[1].toFixed(6)}
-              </span>
-              {interactive && (
-                <span className="text-[10px] text-gray-400 block pt-0.5 font-normal">
-                  (Drag pin or tap map to adjust)
+            <MapController center={position} zoom={16} />
+
+            {/* GPS Accuracy Circle */}
+            {accuracyMeters && accuracyMeters > 0 && (
+              <Circle
+                center={position}
+                radius={accuracyMeters}
+                pathOptions={{ color: '#3b82f6', fillColor: '#60a5fa', fillOpacity: 0.15, weight: 1.5 }}
+              />
+            )}
+
+            {/* Selected Location Marker (Draggable) */}
+            <Marker
+              position={position}
+              icon={customIcon}
+              draggable={interactive}
+              eventHandlers={eventHandlers}
+              ref={markerRef}
+            >
+              <Popup>
+                <div className="text-xs font-semibold text-gray-900 font-sans">
+                  📍 Selected Complaint Location<br />
+                  <span className="font-mono text-[10px] text-emerald-700 font-bold block pt-0.5">
+                    {position[0].toFixed(6)}, {position[1].toFixed(6)}
+                  </span>
+                  {interactive && (
+                    <span className="text-[10px] text-gray-400 block pt-0.5 font-normal">
+                      (Drag pin or tap map to adjust)
+                    </span>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+
+            {showDuplicateRadius && (
+              <Circle
+                center={position}
+                radius={100}
+                pathOptions={{ color: '#059669', fillColor: '#10b981', fillOpacity: 0.15 }}
+              />
+            )}
+
+            {interactive && <MapClickEvents onSelectLocation={handleSelect} />}
+          </MapContainer>
+
+          {interactive && (
+            <div className="absolute bottom-2 left-2 right-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] text-emerald-800 font-semibold z-[400] text-center shadow-xs flex items-center justify-between">
+              <span className="truncate">📍 Tap anywhere on map or drag pin to adjust location</span>
+              {accuracyStatusText && (
+                <span className="ml-2 font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+                  {accuracyStatusText}
                 </span>
               )}
             </div>
-          </Popup>
-        </Marker>
-
-        {showDuplicateRadius && (
-          <Circle
-            center={position}
-            radius={100}
-            pathOptions={{ color: '#059669', fillColor: '#10b981', fillOpacity: 0.15 }}
-          />
-        )}
-
-        {interactive && <MapClickEvents onSelectLocation={handleSelect} />}
-      </MapContainer>
-
-      {interactive && (
-        <div className="absolute bottom-2 left-2 right-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] text-emerald-800 font-semibold z-[400] text-center shadow-xs flex items-center justify-between">
-          <span className="truncate">📍 Tap anywhere on map or drag pin to adjust location</span>
-          {accuracyStatusText && (
-            <span className="ml-2 font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
-              {accuracyStatusText}
-            </span>
           )}
         </div>
       )}

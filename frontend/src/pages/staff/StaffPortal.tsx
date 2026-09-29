@@ -19,6 +19,7 @@ import { getNotificationsForRole, syncNotificationsFromBackend, markNotification
 import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+import { openGoogleMapsDirections } from '../../utils/navigation';
 import {
   Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
   Camera, Check, Play, Navigation, Eye, UserCheck, ShieldCheck, Zap, X,
@@ -1169,15 +1170,14 @@ export const StaffPortal: React.FC = () => {
                     )}
 
                     {/* Step 2: Navigate to Location */}
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${selectedTask.latitude},${selectedTask.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
+                    <button
+                      type="button"
+                      onClick={() => openGoogleMapsDirections({ lat: Number(selectedTask.latitude), lng: Number(selectedTask.longitude) })}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px] cursor-pointer"
                     >
                       <Navigation className="w-4 h-4" />
-                      <span>Navigate to Location</span>
-                    </a>
+                      <span>Navigate via Google Maps</span>
+                    </button>
 
                     {/* Step 3: Mark On the Way */}
                     {selectedTask.status === 'Accepted' && (

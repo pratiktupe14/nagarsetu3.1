@@ -28,6 +28,8 @@ import { Complaint, ComplaintStatus, UserProfile, NotificationItem } from '../..
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { NagarSetuMap } from '../../components/NagarSetuMap';
+import { openGoogleMapsDirections } from '../../utils/navigation';
 import {
   Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
   Camera, Check, Play, Navigation, Eye, UserCheck, ShieldCheck, Zap, X,
@@ -287,6 +289,14 @@ export const DepartmentHeadPortal: React.FC = () => {
   const [mapCenter, setMapCenter] = useState<[number, number] | null>([20.0059, 73.7898]);
   const [mapZoom, setMapZoom] = useState<number>(12);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+
+  const hasGoogleMapsKey = Boolean(
+    (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
+    (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
+  );
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
+    hasGoogleMapsKey ? 'google' : 'leaflet'
+  );
 
   // Extract staff ID if viewing single staff member
   const staffIdFromPath = isStaffDetailView ? currentPath.split('/department-head/staff/')[1] : null;
@@ -2074,12 +2084,38 @@ export const DepartmentHeadPortal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 3. CLASSIC LEAFLET MAP CONTAINER */}
+                  {/* 3. GIS DEPARTMENT MAP CONTAINER */}
                   <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-xs space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center space-x-2">
                         <MapPin className="w-5 h-5 text-emerald-700" />
                         <span className="font-extrabold text-gray-900 font-outfit text-sm">Interactive GIS Department Map</span>
+                        {hasGoogleMapsKey && (
+                          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 ml-2">
+                            <button
+                              type="button"
+                              onClick={() => setMapEngine('google')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all min-h-[28px] ${
+                                mapEngine === 'google'
+                                  ? 'bg-white text-emerald-700 shadow-xs'
+                                  : 'text-gray-500 hover:text-gray-900'
+                              }`}
+                            >
+                              Google Maps
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMapEngine('leaflet')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all min-h-[28px] ${
+                                mapEngine === 'leaflet'
+                                  ? 'bg-white text-emerald-700 shadow-xs'
+                                  : 'text-gray-500 hover:text-gray-900'
+                              }`}
+                            >
+                              OpenStreetMap
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <span className="text-xs font-mono font-bold text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded border border-gray-200">
                         {mappedComplaints.length} Active Mapped Locations
@@ -2098,6 +2134,29 @@ export const DepartmentHeadPortal: React.FC = () => {
                           <h4 className="font-extrabold text-gray-800 text-base font-outfit">No Mapped Complaints</h4>
                           <p className="text-xs text-gray-500 max-w-sm">Complaints with available location data in {deptInfo.fullName} will appear on this interactive map.</p>
                         </div>
+                      ) : mapEngine === 'google' && hasGoogleMapsKey ? (
+                        <NagarSetuMap
+                          complaints={mappedComplaints.map((c) => ({
+                            id: c.id,
+                            complaintNumber: c.complaint_number,
+                            category: c.category,
+                            title: c.title,
+                            description: c.description,
+                            priority: c.priority,
+                            status: c.status,
+                            latitude: parseFloat(c.latitude as any),
+                            longitude: parseFloat(c.longitude as any),
+                            department_name: c.department_name || deptInfo.fullName,
+                            location_address: c.location_address
+                          }))}
+                          center={mapCenter ? { lat: mapCenter[0], lng: mapCenter[1] } : undefined}
+                          zoom={mapZoom}
+                          height="100%"
+                          onComplaintSelect={(mc) => {
+                            const matched = mappedComplaints.find((c) => c.id === mc.id);
+                            if (matched) setDetailModalComplaint(matched);
+                          }}
+                        />
                       ) : (
                         <MapContainer
                           center={mapCenter || [20.0059, 73.7898]}

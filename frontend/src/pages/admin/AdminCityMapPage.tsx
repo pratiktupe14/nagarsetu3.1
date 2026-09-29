@@ -16,6 +16,9 @@ import { calculateHotspotClusters } from '../../services/analyticsService';
 import { calculateDistanceMeters } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
+import { NagarSetuMap } from '../../components/NagarSetuMap';
+import { openGoogleMapsDirections } from '../../utils/navigation';
+import { NagarSetuComplaint } from '../../types/maps';
 import {
   Search, RefreshCw, MapPin, Flame, Filter, Users, Maximize2, Minimize2,
   Eye, AlertTriangle, Building2, CheckCircle2, X, Layers, ShieldCheck,
@@ -102,6 +105,14 @@ export const AdminCityMapPage: React.FC = () => {
   const [mapMode, setMapMode] = useState<'complaints' | 'hotspots' | 'staff'>('complaints');
   const [showStaffOverlay, setShowStaffOverlay] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const hasGoogleMapsKey = Boolean(
+    (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
+    (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
+  );
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
+    hasGoogleMapsKey ? 'google' : 'leaflet'
+  );
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -352,6 +363,34 @@ export const AdminCityMapPage: React.FC = () => {
               </button>
             </div>
 
+            {/* Engine Switcher */}
+            {hasGoogleMapsKey && (
+              <div className="inline-flex rounded-xl border border-gray-200 bg-gray-100 p-0.5 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setMapEngine('google')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
+                    mapEngine === 'google'
+                      ? 'bg-white text-emerald-700 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Google Maps
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapEngine('leaflet')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
+                    mapEngine === 'leaflet'
+                      ? 'bg-white text-emerald-700 shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  OpenStreetMap
+                </button>
+              </div>
+            )}
+
             <button
               onClick={loadData}
               disabled={loading}
@@ -539,6 +578,29 @@ export const AdminCityMapPage: React.FC = () => {
           ) : null}
 
           <div className="w-full h-full relative">
+            {mapEngine === 'google' && hasGoogleMapsKey ? (
+              <NagarSetuMap
+                complaints={filteredComplaints.map((c) => ({
+                  id: c.id,
+                  complaintNumber: c.complaint_number,
+                  category: c.category,
+                  title: c.title,
+                  description: c.description,
+                  priority: c.priority,
+                  status: c.status,
+                  latitude: Number(c.latitude),
+                  longitude: Number(c.longitude),
+                  department_name: c.department_name,
+                  location_address: c.location_address
+                }))}
+                center={{ lat: mapCenter[0], lng: mapCenter[1] }}
+                zoom={mapZoom}
+                height="100%"
+                onComplaintSelect={(c) => {
+                  navigate(`/citizen/complaint/${c.id}`);
+                }}
+              />
+            ) : (
             <MapContainer
               center={mapCenter}
               zoom={mapZoom}
@@ -713,6 +775,7 @@ export const AdminCityMapPage: React.FC = () => {
                   );
                 })}
             </MapContainer>
+            )}
 
             {/* ================================================== */}
             {/* 14. MAP LEGEND OVERLAY (Bottom-left of map) */}

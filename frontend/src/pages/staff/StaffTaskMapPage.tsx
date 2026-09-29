@@ -16,6 +16,9 @@ import { formatSlaRemainingTime, logActivity } from '../../services/adminService
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+import { NagarSetuMap } from '../../components/NagarSetuMap';
+import { openGoogleMapsDirections } from '../../utils/navigation';
+import { NagarSetuComplaint } from '../../types/maps';
 import {
   Map, MapPin, Search, RefreshCw, Navigation, Eye, UserCheck, CheckCircle2,
   AlertTriangle, Clock, Building2, User, Lock, Crosshair, Compass, Wrench, X,
@@ -126,6 +129,14 @@ export const StaffTaskMapPage: React.FC = () => {
   const [mapZoom, setMapZoom] = useState<number>(13);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  const hasGoogleMapsKey = Boolean(
+    (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
+    (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
+  );
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
+    hasGoogleMapsKey ? 'google' : 'leaflet'
+  );
 
   // Field Execution Form State
   const [progressNote, setProgressNote] = useState('');
@@ -602,6 +613,34 @@ export const StaffTaskMapPage: React.FC = () => {
                 {/* MAP TOP TOOLBAR */}
                 <div className="absolute top-3 right-3 z-[400] flex items-center space-x-2">
                   
+                  {/* ENGINE SWITCHER */}
+                  {hasGoogleMapsKey && (
+                    <div className="inline-flex rounded-xl border border-gray-200 bg-white p-0.5 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setMapEngine('google')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[40px] ${
+                          mapEngine === 'google'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Google Maps
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapEngine('leaflet')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[40px] ${
+                          mapEngine === 'leaflet'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        OpenStreetMap
+                      </button>
+                    </div>
+                  )}
+
                   {/* 15. MY LOCATION BUTTON */}
                   <button
                     onClick={handleGetMyLocation}
@@ -654,100 +693,130 @@ export const StaffTaskMapPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* LEAFLET MAP CONTAINER */}
-                <MapContainer
-                  center={mapCenter || defaultCenter}
-                  zoom={mapZoom}
-                  scrollWheelZoom={true}
-                  className="w-full h-full"
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                {/* GOOGLE MAPS ENGINE */}
+                {mapEngine === 'google' && hasGoogleMapsKey ? (
+                  <NagarSetuMap
+                    complaints={tasksWithGps.map((t) => ({
+                      id: t.id,
+                      complaintNumber: t.complaint_number,
+                      category: t.category,
+                      title: t.title,
+                      description: t.description,
+                      priority: t.priority,
+                      status: t.status,
+                      latitude: Number(t.latitude),
+                      longitude: Number(t.longitude),
+                      department_name: t.department_name,
+                      location_address: t.location_address
+                    }))}
+                    center={
+                      mapCenter
+                        ? { lat: mapCenter[0], lng: mapCenter[1] }
+                        : { lat: defaultCenter[0], lng: defaultCenter[1] }
+                    }
+                    zoom={mapZoom}
+                    height="100%"
+                    onComplaintSelect={(t) => {
+                      setSelectedTaskId(t.id);
+                      const matched = tasks.find((x) => x.id === t.id);
+                      if (matched) setDetailModalTask(matched);
+                    }}
                   />
+                ) : (
+                  /* LEAFLET MAP CONTAINER */
+                  <MapContainer
+                    center={mapCenter || defaultCenter}
+                    zoom={mapZoom}
+                    scrollWheelZoom={true}
+                    className="w-full h-full"
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
 
-                  <MapFlyToController center={mapCenter} zoom={mapZoom} />
+                    <MapFlyToController center={mapCenter} zoom={mapZoom} />
 
-                  {/* STAFF LIVE LOCATION MARKER */}
-                  {userLocation && (
-                    <Marker position={userLocation} icon={createStaffUserLocationIcon()}>
-                      <Popup>
-                        <div className="text-xs font-bold text-gray-900 font-sans">
-                          📍 Your Current Location
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )}
-
-                  {/* 8. REAL TASK MARKERS */}
-                  {tasksWithGps.map((t) => {
-                    const slaInfo = formatSlaRemainingTime(t.sla_deadline);
-                    const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
-                    const markerIcon = createStatusMarkerIcon(t.status, isOverdue);
-
-                    return (
-                      <Marker
-                        key={t.id}
-                        position={[Number(t.latitude), Number(t.longitude)]}
-                        icon={markerIcon}
-                        eventHandlers={{
-                          click: () => {
-                            setSelectedTaskId(t.id);
-                          }
-                        }}
-                      >
-                        {/* 9. MARKER POPUP */}
+                    {/* STAFF LIVE LOCATION MARKER */}
+                    {userLocation && (
+                      <Marker position={userLocation} icon={createStaffUserLocationIcon()}>
                         <Popup>
-                          <div className="p-1 space-y-2 font-sans max-w-[260px] text-xs">
-                            <div className="flex items-center justify-between border-b border-gray-100 pb-1">
-                              <span className="font-mono font-extrabold text-emerald-700 text-xs">
-                                {t.complaint_number}
-                              </span>
-                              <StatusBadge status={t.status} />
-                            </div>
-
-                            <div>
-                              <h4 className="font-extrabold text-gray-900 text-xs font-outfit leading-tight">
-                                {t.title}
-                              </h4>
-                              <p className="text-[11px] text-gray-600 mt-0.5">{t.location_address}</p>
-                            </div>
-
-                            <div className="flex items-center justify-between text-[10px] font-mono bg-gray-50 p-1.5 rounded">
-                              <PriorityBadge priority={t.priority} />
-                              <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>
-                                {slaInfo.text}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 pt-1">
-                              {/* 16. GOOGLE MAPS NAVIGATION LINK */}
-                              <a
-                                href={`https://www.google.com/maps/dir/?api=1&destination=${t.latitude},${t.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 py-1.5 px-2 bg-blue-600 text-white font-bold text-[11px] rounded-md text-center hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
-                              >
-                                <Navigation className="w-3 h-3" />
-                                <span>Navigate</span>
-                              </a>
-
-                              {/* VIEW TASK DETAIL MODAL BUTTON */}
-                              <button
-                                onClick={() => setDetailModalTask(t)}
-                                className="flex-1 py-1.5 px-2 bg-emerald-600 text-white font-bold text-[11px] rounded-md text-center hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-1"
-                              >
-                                <Eye className="w-3 h-3" />
-                                <span>View Task</span>
-                              </button>
-                            </div>
+                          <div className="text-xs font-bold text-gray-900 font-sans">
+                            📍 Your Current Location
                           </div>
                         </Popup>
                       </Marker>
-                    );
-                  })}
+                    )}
 
-                </MapContainer>
+                    {/* 8. REAL TASK MARKERS */}
+                    {tasksWithGps.map((t) => {
+                      const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+                      const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+                      const markerIcon = createStatusMarkerIcon(t.status, isOverdue);
+
+                      return (
+                        <Marker
+                          key={t.id}
+                          position={[Number(t.latitude), Number(t.longitude)]}
+                          icon={markerIcon}
+                          eventHandlers={{
+                            click: () => {
+                              setSelectedTaskId(t.id);
+                            }
+                          }}
+                        >
+                          {/* 9. MARKER POPUP */}
+                          <Popup>
+                            <div className="p-1 space-y-2 font-sans max-w-[260px] text-xs">
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                                <span className="font-mono font-extrabold text-emerald-700 text-xs">
+                                  {t.complaint_number}
+                                </span>
+                                <StatusBadge status={t.status} />
+                              </div>
+
+                              <div>
+                                <h4 className="font-extrabold text-gray-900 text-xs font-outfit leading-tight">
+                                  {t.title}
+                                </h4>
+                                <p className="text-[11px] text-gray-600 mt-0.5">{t.location_address}</p>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[10px] font-mono bg-gray-50 p-1.5 rounded">
+                                <PriorityBadge priority={t.priority} />
+                                <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-700'}>
+                                  {slaInfo.text}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 pt-1">
+                                {/* 16. GOOGLE MAPS NAVIGATION LINK */}
+                                <button
+                                  type="button"
+                                  onClick={() => openGoogleMapsDirections({ lat: Number(t.latitude), lng: Number(t.longitude) })}
+                                  className="flex-1 py-1.5 px-2 bg-blue-600 text-white font-bold text-[11px] rounded-md text-center hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                                >
+                                  <Navigation className="w-3 h-3" />
+                                  <span>Navigate</span>
+                                </button>
+
+                                {/* VIEW TASK DETAIL MODAL BUTTON */}
+                                <button
+                                  onClick={() => setDetailModalTask(t)}
+                                  className="flex-1 py-1.5 px-2 bg-emerald-600 text-white font-bold text-[11px] rounded-md text-center hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-1 cursor-pointer"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>View Task</span>
+                                </button>
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+
+                  </MapContainer>
+                )}
               </div>
             </div>
 
