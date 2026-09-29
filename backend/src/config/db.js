@@ -104,7 +104,7 @@ async function createTablesPostgres() {
       CREATE TABLE IF NOT EXISTS complaints (
         id SERIAL PRIMARY KEY,
         complaint_number TEXT,
-        citizen_id INTEGER REFERENCES users(id),
+        citizen_id TEXT,
         photo_before_url TEXT NOT NULL,
         photo_after_url TEXT,
         category TEXT NOT NULL,
@@ -122,6 +122,10 @@ async function createTablesPostgres() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Safe column migrations for existing Postgres database
+    await pgPool.query(`ALTER TABLE complaints DROP CONSTRAINT IF EXISTS complaints_citizen_id_fkey;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ALTER COLUMN citizen_id TYPE TEXT;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
@@ -147,7 +151,7 @@ async function createTablesPostgres() {
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id TEXT,
         complaint_id INTEGER REFERENCES complaints(id),
         channel TEXT DEFAULT 'in_app',
         message TEXT NOT NULL,
@@ -155,6 +159,9 @@ async function createTablesPostgres() {
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await pgPool.query(`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_user_id_fkey;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE notifications ALTER COLUMN user_id TYPE TEXT;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS complaint_status_history (

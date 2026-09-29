@@ -69,12 +69,65 @@ function generateToken(user) {
   );
 }
 
+const DEMO_USER_TOKENS = {
+  'demo-token-citizen': {
+    id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
+    name: 'Pratik Dilip Tupe',
+    mobile: '8788562103',
+    email: 'citizen8788@nagarsetu.gov.in',
+    role: 'citizen',
+    language_pref: 'en'
+  },
+  'demo-token-city-admin': {
+    id: 1,
+    name: 'Municipal Admin',
+    mobile: '9876543213',
+    email: 'admin@nagarsetu.gov.in',
+    role: 'city_admin',
+    language_pref: 'en'
+  },
+  'demo-token-dept-head': {
+    id: 1,
+    name: 'Rahul Kumar',
+    mobile: '+91 9822000001',
+    email: 'rahul.kumar@nagarsetu.gov.in',
+    role: 'department_head',
+    department_id: 1,
+    department_name: 'Public Works Department (PWD)',
+    language_pref: 'en'
+  },
+  'demo-token-service-staff': {
+    id: 101,
+    name: 'Amit Patil',
+    mobile: '9822010001',
+    email: 'amit.patil@nagarsetu.gov.in',
+    role: 'service_staff',
+    department_id: 1,
+    department_name: 'Public Works Department (PWD)',
+    language_pref: 'en'
+  },
+  'demo-token': {
+    id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
+    name: 'Pratik Dilip Tupe',
+    mobile: '8788562103',
+    email: 'citizen8788@nagarsetu.gov.in',
+    role: 'citizen',
+    language_pref: 'en'
+  }
+};
+
 async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
+  }
+
+  // 0. Demo & Testing token recognition for citizen & staff portals
+  if (DEMO_USER_TOKENS[token]) {
+    req.user = { ...DEMO_USER_TOKENS[token] };
+    return next();
   }
 
   // 1. Synchronously attempt Express JWT verification using JWT_SECRET

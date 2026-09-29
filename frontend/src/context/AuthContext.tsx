@@ -727,6 +727,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // Demo & Client Fallback Authentication
+      const fetchDemoToken = async (role: string, fallback: string): Promise<string> => {
+        try {
+          const res = await fetch(`${getApiUrl()}/api/auth/demo-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role })
+          });
+          if (res.ok) {
+            const d = await res.json();
+            if (d?.token) return d.token;
+          }
+        } catch (e) {}
+        return fallback;
+      };
+
       if (targetRole === 'city_admin' || cleanEmail === 'admin@nagarsetu.gov.in' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin') {
         const adminUser: UserProfile = {
           id: '1',
@@ -737,7 +752,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           language_pref: 'en'
         };
         setUser(adminUser);
-        localStorage.setItem('nagarsetu_token', 'demo-token-city-admin');
+        const tok = await fetchDemoToken('city_admin', 'demo-token-city-admin');
+        localStorage.setItem('nagarsetu_token', tok);
         localStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
         return true;
       }
@@ -746,7 +762,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
         if (dhMatch) {
           setUser(dhMatch);
-          localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
+          const tok = await fetchDemoToken('department_head', 'demo-token-dept-head');
+          localStorage.setItem('nagarsetu_token', tok);
           localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
           return true;
         }
@@ -756,7 +773,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
         if (staffUser) {
           setUser(staffUser);
-          localStorage.setItem('nagarsetu_token', 'demo-token-service-staff');
+          const tok = await fetchDemoToken('service_staff', 'demo-token-service-staff');
+          localStorage.setItem('nagarsetu_token', tok);
           localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
           return true;
         }
@@ -772,7 +790,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           language_pref: 'en'
         };
         setUser(citizenUser);
-        localStorage.setItem('nagarsetu_token', 'demo-token-citizen');
+        const tok = await fetchDemoToken('citizen', 'demo-token-citizen');
+        localStorage.setItem('nagarsetu_token', tok);
         localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
         return true;
       }

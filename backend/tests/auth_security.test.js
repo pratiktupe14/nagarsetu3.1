@@ -175,4 +175,17 @@ describe('NAGARSETU Cryptographic Authentication Security Audit', () => {
     assert.strictEqual(nextCalled, true, 'city_admin role must be granted access');
   });
 
+  test('9. Recognized Demo Tokens must authenticate citizen with next() and valid profile', async () => {
+    const req = { headers: { authorization: 'Bearer demo-token-citizen' } };
+    const res = { status: () => ({ json: () => {} }) };
+    let nextCalled = false;
+
+    await authenticateToken(req, res, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, true, 'demo-token-citizen must invoke next()');
+    assert.strictEqual(req.user?.role, 'citizen');
+    assert.strictEqual(req.user?.email, 'citizen8788@nagarsetu.gov.in');
+    assert.strictEqual(req.user?.mobile, '8788562103');
+  });
+
 });

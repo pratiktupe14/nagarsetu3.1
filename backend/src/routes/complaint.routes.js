@@ -99,7 +99,13 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     // Default department mapping if not provided
     let finalDeptId = department_id;
-    if (!finalDeptId) {
+    if (finalDeptId && isNaN(Number(finalDeptId))) {
+      const dRes = await query(`SELECT id FROM departments WHERE code = ? OR name LIKE ? LIMIT 1`, [finalDeptId, `%${finalDeptId}%`]);
+      if (dRes.rows && dRes.rows.length > 0) {
+        finalDeptId = dRes.rows[0].id;
+      }
+    }
+    if (!finalDeptId || isNaN(Number(finalDeptId))) {
       let deptCode = 'PWD';
       const catLower = (category || '').toLowerCase();
       if (catLower.includes('water') || catLower.includes('pipeline')) deptCode = 'WTR';
@@ -117,9 +123,12 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
         const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
         finalDeptId = fallbackRes.rows?.[0]?.id || 1;
       }
+    } else {
+      finalDeptId = parseInt(finalDeptId, 10);
     }
 
-
+    const finalPhotoUrl = photo_url || '/uploads/civic-default.jpg';
+    const citizenId = req.user?.id ? String(req.user.id) : 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
 
     const insertSql = `
       INSERT INTO complaints (
@@ -131,8 +140,8 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
 
     const result = await query(insertSql, [
       finalComplaintNumber,
-      req.user.id,
-      photo_url,
+      citizenId,
+      finalPhotoUrl,
       category,
       title,
       description || '',
@@ -160,7 +169,9 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     }
 
     // Send initial submission notification
-    await notifyStatusChange(complaintId, 'Submitted', req.user.id);
+    await notifyStatusChange(complaintId, 'Submitted', citizenId).catch(nErr => {
+      console.warn('Initial submission notification note:', nErr.message);
+    });
 
     return res.status(201).json({
       message: 'Complaint submitted successfully',
