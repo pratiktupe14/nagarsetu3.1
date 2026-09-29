@@ -91,8 +91,8 @@ async function seed7DemoDepartmentHeads(queryFn) {
 
       for (const term of dMeta.searchTerms) {
         const findRes = await q(
-          `SELECT id, name FROM departments WHERE LOWER(name) LIKE ? LIMIT 1`,
-          [`%${term.toLowerCase()}%`]
+          `SELECT id, name, code FROM departments WHERE code = ? OR LOWER(name) LIKE ? LIMIT 1`,
+          [dMeta.code, `%${term.toLowerCase()}%`]
         ).catch(() => ({ rows: [] }));
         if (findRes.rows && findRes.rows.length > 0) {
           deptId = findRes.rows[0].id;
@@ -102,15 +102,18 @@ async function seed7DemoDepartmentHeads(queryFn) {
 
       if (!deptId) {
         const insRes = await q(
-          `INSERT INTO departments (name, description) VALUES (?, ?)`,
-          [dMeta.name, dMeta.description]
-        ).catch(() => ({ rows: [] }));
+          `INSERT INTO departments (name, code, description) VALUES (?, ?, ?)`,
+          [dMeta.name, dMeta.code, dMeta.description]
+        ).catch((err) => {
+          console.error(`Error inserting department ${dMeta.code}:`, err.message);
+          return { rows: [] };
+        });
         deptId = insRes.rows?.[0]?.id || deptIdMap[dMeta.code];
         console.log(`Created department: '${dMeta.name}' (ID: ${deptId})`);
       } else {
         await q(
-          `UPDATE departments SET name = ?, description = ? WHERE id = ?`,
-          [dMeta.name, dMeta.description, deptId]
+          `UPDATE departments SET name = ?, code = ?, description = ? WHERE id = ?`,
+          [dMeta.name, dMeta.code, dMeta.description, deptId]
         ).catch(() => {});
       }
 

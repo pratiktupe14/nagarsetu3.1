@@ -103,15 +103,16 @@ export function resolveDepartmentInfo(
   const dId = String(departmentId || '').trim().toLowerCase();
   const dName = String(departmentName || '').trim().toLowerCase();
   const dCat = String(category || '').trim().toLowerCase();
+  const actualId = departmentId ? String(departmentId) : '';
 
   // 1. Public Works Department (PWD) - ID 1
   if (
     dId === '1' || dId === 'pwd' || dId === 'dept-pwd' || dId.includes('pwd') ||
     dName.includes('public works') || dName.includes('road') || dName.includes('pwd') ||
-    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works')
+    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works') || dCat.includes('pwd')
   ) {
     return {
-      id: '1',
+      id: actualId || '1',
       code: 'PWD',
       name: 'Public Works Department',
       fullName: 'Public Works Department (PWD)'
@@ -122,10 +123,10 @@ export function resolveDepartmentInfo(
   if (
     dId === '2' || dId === 'san' || dId === 'dept-san' || dId.includes('san') ||
     dName.includes('sanitat') || dName.includes('waste') || dName.includes('san') ||
-    dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat')
+    dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat') || dCat.includes('san')
   ) {
     return {
-      id: '2',
+      id: actualId || '2',
       code: 'SAN',
       name: 'Sanitation & Waste Management',
       fullName: 'Sanitation & Waste Management (SAN)'
@@ -136,10 +137,10 @@ export function resolveDepartmentInfo(
   if (
     dId === '3' || dId === 'wtr' || dId === 'wssb' || dId === 'dept-wtr' || dId.includes('wtr') ||
     dName.includes('water') || dName.includes('sewerage board') || dName.includes('wtr') ||
-    dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage')
+    dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage') || dCat.includes('wtr')
   ) {
     return {
-      id: '3',
+      id: actualId || '3',
       code: 'WTR',
       name: 'Water Supply & Sewerage Board',
       fullName: 'Water Supply & Sewerage Board (WTR)'
@@ -150,10 +151,10 @@ export function resolveDepartmentInfo(
   if (
     dId === '4' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
     dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
-    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter')
+    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter') || dCat.includes('drn')
   ) {
     return {
-      id: '4',
+      id: actualId || '4',
       code: 'DRN',
       name: 'Drainage & Sewage Department',
       fullName: 'Drainage & Sewage Department (DRN)'
@@ -164,10 +165,10 @@ export function resolveDepartmentInfo(
   if (
     dId === '5' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
     dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
-    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light')
+    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light') || dCat.includes('ele')
   ) {
     return {
-      id: '5',
+      id: actualId || '5',
       code: 'ELE',
       name: 'Electrical & Street Lighting',
       fullName: 'Electrical & Street Lighting (ELE)'
@@ -178,10 +179,10 @@ export function resolveDepartmentInfo(
   if (
     dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
     dName.includes('traffic') || dName.includes('trf') ||
-    dCat.includes('traffic') || dCat.includes('signal')
+    dCat.includes('traffic') || dCat.includes('signal') || dCat.includes('trf')
   ) {
     return {
-      id: '6',
+      id: actualId || '6',
       code: 'TRF',
       name: 'Traffic Management Department',
       fullName: 'Traffic Management Department (TRF)'
@@ -192,13 +193,22 @@ export function resolveDepartmentInfo(
   if (
     dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
     dName.includes('mainten') || dName.includes('mnt') ||
-    dCat.includes('mainten') || dCat.includes('building')
+    dCat.includes('mainten') || dCat.includes('building') || dCat.includes('mnt')
   ) {
     return {
-      id: '7',
+      id: actualId || '7',
       code: 'MNT',
       name: 'Maintenance Department',
       fullName: 'Maintenance Department (MNT)'
+    };
+  }
+
+  if (actualId) {
+    return {
+      id: actualId,
+      code: 'GEN',
+      name: departmentName || 'Municipal Department',
+      fullName: departmentName || 'Municipal Department'
     };
   }
 
