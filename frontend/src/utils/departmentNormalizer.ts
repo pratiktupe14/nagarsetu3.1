@@ -12,7 +12,14 @@ export const CANONICAL_DEPARTMENTS: Record<string, CanonicalDepartment> = {
   '4': { id: '4', code: 'DRN', name: 'Drainage & Sewage', fullName: 'Drainage & Sewage Department' },
   '5': { id: '5', code: 'ELE', name: 'Electrical & Lighting', fullName: 'Electrical & Street Lighting' },
   '6': { id: '6', code: 'TRF', name: 'Traffic Management', fullName: 'Traffic Management Department' },
-  '7': { id: '7', code: 'MNT', name: 'Maintenance', fullName: 'Maintenance Department' }
+  '7': { id: '7', code: 'MNT', name: 'Maintenance', fullName: 'Maintenance Department' },
+  '8ed9f760-1314-427c-a515-c2a54d6df6d8': { id: '1', code: 'PWD', name: 'Public Works Department', fullName: 'Public Works Department (PWD)' },
+  '9cabc1f2-fd10-48dd-a5cb-01d05197de22': { id: '2', code: 'SAN', name: 'Sanitation & Waste', fullName: 'Sanitation & Waste Management' },
+  'ead370cc-459c-44f0-899f-8a97f0928beb': { id: '3', code: 'WTR', name: 'Water Supply', fullName: 'Water Supply & Sewerage Board' },
+  'ee73cb82-cc47-4333-b7d6-4491353c1354': { id: '4', code: 'DRN', name: 'Drainage & Sewage', fullName: 'Drainage & Sewage Department' },
+  '31842723-23ac-490b-912b-9f6d9afbdfb3': { id: '5', code: 'ELE', name: 'Electrical & Lighting', fullName: 'Electrical & Street Lighting' },
+  'ae5e4d0c-996f-4d81-9528-d642664c93ae': { id: '6', code: 'TRF', name: 'Traffic Management', fullName: 'Traffic Management Department' },
+  '71542723-23ac-490b-912b-9f6d9afbdfb7': { id: '7', code: 'MNT', name: 'Maintenance', fullName: 'Maintenance Department' }
 };
 
 export function normalizeDepartment(identifier?: string | number | null): CanonicalDepartment {

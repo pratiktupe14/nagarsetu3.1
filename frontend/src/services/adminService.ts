@@ -60,9 +60,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-ELE',
     name: 'Electrical & Lighting Dept',
     code: 'ELE-01',
-    department_head: 'Kunal Kulkarni',
+    department_head: 'Aditya Joshi',
     contact_number: '+91 98220 00005',
-    email: 'kunal.kulkarni@nagarsetu.gov.in',
+    email: 'aditya.joshi@nagarsetu.gov.in',
     description: 'LED streetlights, junction box repairs, feeder pillar cabinets, and municipal electrical grid maintenance.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -93,9 +93,9 @@ const DEFAULT_MUNICIPAL_DEPARTMENTS: MunicipalDepartmentRecord[] = [
     id: 'dept-MNT',
     name: 'Maintenance Department',
     code: 'MNT-01',
-    department_head: 'Aditya Joshi',
+    department_head: 'Kunal Kulkarni',
     contact_number: '+91 98220 00007',
-    email: 'aditya.joshi@nagarsetu.gov.in',
+    email: 'kunal.kulkarni@nagarsetu.gov.in',
     description: 'General civic facility repairs, building maintenance, public asset upkeep, and municipal asset management.',
     status: 'Active',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString()
@@ -136,6 +136,16 @@ export async function fetchMunicipalDepartmentsApi(): Promise<MunicipalDepartmen
           status: (d.status === 'Inactive' || d.status === 'inactive') ? 'Inactive' : 'Active',
           created_at: d.created_at || new Date().toISOString()
         }));
+
+        DEFAULT_MUNICIPAL_DEPARTMENTS.forEach((def) => {
+          const exists = fetchedDepts.some(
+            (fd) => fd.code.startsWith(def.code.split('-')[0]) || fd.name.toLowerCase().includes(def.name.toLowerCase().split(' ')[0])
+          );
+          if (!exists) {
+            fetchedDepts.push(def);
+          }
+        });
+
         setMemoryMunicipalDepartments(fetchedDepts);
         return fetchedDepts;
       }
@@ -143,6 +153,48 @@ export async function fetchMunicipalDepartmentsApi(): Promise<MunicipalDepartmen
   } catch (err) {
     console.warn('fetchMunicipalDepartmentsApi error:', err);
   }
+
+  // Supabase fallback
+  if (isSupabaseConfigured()) {
+    try {
+      const [deptRes, headRes] = await Promise.all([
+        supabase.from('departments').select('*'),
+        supabase.from('department_heads').select('*')
+      ]);
+
+      if (deptRes.data && deptRes.data.length > 0) {
+        const sbDepts: MunicipalDepartmentRecord[] = deptRes.data.map((d: any) => {
+          const matchingHead = headRes.data?.find((h: any) => h.department_id === d.id || (h.employee_id && h.employee_id.includes(d.code)));
+          return {
+            id: String(d.id),
+            name: d.name,
+            code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+            department_head: matchingHead?.name || 'Department Head',
+            contact_number: matchingHead?.phone || '+91 98220 00000',
+            email: matchingHead?.email || 'dept@nagarsetu.gov.in',
+            description: d.description || '',
+            status: (matchingHead?.status === 'inactive') ? 'Inactive' : 'Active',
+            created_at: d.created_at || new Date().toISOString()
+          };
+        });
+
+        DEFAULT_MUNICIPAL_DEPARTMENTS.forEach((def) => {
+          const exists = sbDepts.some(
+            (sd) => sd.code.startsWith(def.code.split('-')[0]) || sd.name.toLowerCase().includes(def.name.toLowerCase().split(' ')[0])
+          );
+          if (!exists) {
+            sbDepts.push(def);
+          }
+        });
+
+        setMemoryMunicipalDepartments(sbDepts);
+        return sbDepts;
+      }
+    } catch (e) {
+      console.warn('Supabase fallback fetchMunicipalDepartmentsApi error:', e);
+    }
+  }
+
   return memoryDepartments;
 }
 
@@ -296,6 +348,7 @@ export async function fetchDepartmentStaffApi(params?: {
 
     if (res.ok) {
       const data = await res.json();
+      if (Array.isArray(data.staff) && data.staff.length > 0) {
         const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => {
           const resolvedDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
           return {
@@ -328,12 +381,129 @@ export async function fetchDepartmentStaffApi(params?: {
           }
         };
       }
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Failed to fetch department staff (HTTP ${res.status})`);
-    } catch (err: any) {
-      console.error('Failed to fetch staff from API:', err);
-      throw err;
     }
+  } catch (err: any) {
+    console.warn('Backend fetchDepartmentStaffApi note:', err);
+  }
+
+  // Resilient Supabase Fallback
+  if (isSupabaseConfigured()) {
+    try {
+      const [profRes, compRes, deptRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('role', 'service_staff'),
+        supabase.from('complaints').select('id, assigned_staff_id, assigned_staff_email, assigned_staff_name, status, sla_deadline'),
+        supabase.from('departments').select('*')
+      ]);
+
+      if (profRes.data && Array.isArray(profRes.data) && profRes.data.length > 0) {
+        const complaints = compRes.data || [];
+        const depts = deptRes.data || [];
+        const now = new Date();
+
+        let mapped: DepartmentStaffApiItem[] = profRes.data.map((p: any) => {
+          const resolved = resolveDepartmentInfo(p.department_id || p.employee_id, p.department_name);
+          const deptObj = depts.find((d: any) => d.id === p.department_id || d.code === resolved.code);
+          const deptName = deptObj?.name || resolved.name;
+
+          const staffIdStr = String(p.id);
+          const staffEmail = (p.email || '').toLowerCase();
+          const staffName = p.full_name || p.name || '';
+
+          const staffComplaints = complaints.filter((c: any) => {
+            return (c.assigned_staff_id && String(c.assigned_staff_id) === staffIdStr) ||
+                   (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === staffEmail) ||
+                   (c.assigned_staff_name && c.assigned_staff_name === staffName);
+          });
+
+          const activeTasks = staffComplaints.filter((c: any) =>
+            ['Assigned', 'In Progress', 'Accepted', 'On the Way', 'Staff Assigned', 'Department Assigned', 'Verified'].includes(c.status)
+          ).length;
+          const completedTasks = staffComplaints.filter((c: any) => c.status === 'Resolved').length;
+          const overdueTasks = staffComplaints.filter((c: any) => {
+            if (c.status === 'Resolved' || c.status === 'Rejected' || !c.sla_deadline) return false;
+            return new Date(c.sla_deadline) < now;
+          }).length;
+
+          return {
+            id: String(p.id),
+            name: p.full_name || p.name || 'Staff Member',
+            email: p.email || 'staff@nagarsetu.gov.in',
+            mobile: p.mobile || p.phone_number || '+91 98220 00000',
+            contact_number: p.mobile || p.phone_number || '+91 98220 00000',
+            employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
+            designation: p.designation || 'Field Service Staff',
+            department_id: p.department_id || resolved.id,
+            department_name: deptName,
+            status: (p.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Inactive',
+            active_tasks: activeTasks,
+            completed_tasks: completedTasks,
+            overdue_tasks: overdueTasks,
+            language: p.language_pref || 'en',
+            joined_date: p.created_at || new Date().toISOString(),
+            created_at: p.created_at || new Date().toISOString()
+          };
+        });
+
+        // Apply filters
+        if (params?.department_id) {
+          const targetDept = resolveDepartmentInfo(params.department_id);
+          mapped = mapped.filter((s) => {
+            const sDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+            return sDept.code === targetDept.code || String(s.department_id) === String(params.department_id);
+          });
+        }
+
+        if (params?.status && params.status !== 'all') {
+          const st = params.status.toLowerCase();
+          mapped = mapped.filter((s) => s.status.toLowerCase() === st);
+        }
+
+        if (params?.search) {
+          const q = params.search.toLowerCase();
+          mapped = mapped.filter((s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.email.toLowerCase().includes(q) ||
+            s.mobile.toLowerCase().includes(q) ||
+            s.employee_id.toLowerCase().includes(q) ||
+            (s.department_name && s.department_name.toLowerCase().includes(q))
+          );
+        }
+
+        const summary: DepartmentStaffApiSummary = {
+          totalStaff: mapped.length,
+          activeStaff: mapped.filter((s) => s.status === 'Active').length,
+          inactiveStaff: mapped.filter((s) => s.status === 'Inactive').length,
+          activeTasks: mapped.reduce((acc, s) => acc + s.active_tasks, 0)
+        };
+
+        memoryStaffRecords = mapped.map((s) => ({
+          id: s.id,
+          name: s.name,
+          employee_id: s.employee_id,
+          department_name: s.department_name || 'Municipal Department',
+          role: s.designation || 'Service Staff',
+          status: s.status === 'Active' ? 'Available' : 'Offline',
+          contact_number: s.contact_number,
+          email: s.email,
+          ward_area: 'Nashik City',
+          joined_date: s.joined_date,
+          created_at: s.created_at,
+          active_tasks: s.active_tasks,
+          completed_tasks: s.completed_tasks,
+          overdue_tasks: s.overdue_tasks
+        }));
+
+        return { staff: mapped, summary };
+      }
+    } catch (sbErr) {
+      console.warn('Supabase fallback staff fetch error:', sbErr);
+    }
+  }
+
+  return {
+    staff: [],
+    summary: { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
+  };
   }
 
 export async function createServiceStaffApi(payload: {
@@ -1095,29 +1265,45 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
 
   // Target 7 Municipal Departments
   const SEVEN_MUNICIPAL_TARGETS = [
-    { code: 'PWD', name: 'Public Works Department', defaultHead: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001', empId: 'EMP-PWD-001' },
+    { code: 'PWD', name: 'Roads & Public Works (PWD)', defaultHead: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 98220 00001', empId: 'EMP-PWD-001' },
     { code: 'SAN', name: 'Sanitation & Waste Management', defaultHead: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 98220 00002', empId: 'EMP-SAN-001' },
     { code: 'WTR', name: 'Water Supply & Sewerage Board', defaultHead: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 98220 00003', empId: 'EMP-WTR-001' },
     { code: 'DRN', name: 'Drainage & Sewage Department', defaultHead: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 98220 00004', empId: 'EMP-DRN-001' },
-    { code: 'ELE', name: 'Electrical & Street Lighting', defaultHead: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
-    { code: 'TRF', name: 'Traffic Management Department', defaultHead: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006', empId: 'EMP-TRF-001' },
-    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
+    { code: 'ELE', name: 'Electrical & Lighting Dept', defaultHead: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 98220 00005', empId: 'EMP-ELE-001' },
+    { code: 'TRF', name: 'Traffic Management Dept', defaultHead: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 98220 00006', empId: 'EMP-TRF-001' },
+    { code: 'MNT', name: 'Maintenance Department', defaultHead: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 98220 00007', empId: 'EMP-MNT-001' }
   ];
 
+  const allCodes = new Set<string>();
+  const dynamicTargets: any[] = [];
 
-  const dynamicTargets = departments.length > 0
-    ? departments.map((d) => ({
-        code: d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT'),
+  departments.forEach((d) => {
+    const code = d.code || (d.name ? d.name.substring(0, 3).toUpperCase() : 'DEPT');
+    if (!allCodes.has(code)) {
+      allCodes.add(code);
+      dynamicTargets.push({
+        code,
         name: d.name,
         defaultHead: d.department_head || 'Department Head',
         email: d.email || 'head@nagarsetu.gov.in',
         phone: d.contact_number || '+91 98220 00000',
-        empId: `EMP-${d.code || 'DEPT'}-001`
-      }))
-    : SEVEN_MUNICIPAL_TARGETS;
+        empId: `EMP-${code}-001`,
+        id: d.id
+      });
+    }
+  });
+
+  SEVEN_MUNICIPAL_TARGETS.forEach((canon) => {
+    if (!allCodes.has(canon.code)) {
+      allCodes.add(canon.code);
+      dynamicTargets.push({
+        ...canon,
+        id: `dept-${canon.code.toLowerCase()}`
+      });
+    }
+  });
 
   return dynamicTargets.map((target) => {
-
     // Match department record by code or name
     const deptObj = departments.find(
       (d) => d.code === target.code || (d.name && d.name.toLowerCase().includes(target.code.toLowerCase()))
@@ -1126,10 +1312,21 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
 
     // Match active head record from department_heads or profiles
     const activeHeadRow = deptHeads.find(
-      (h) => (h.department_id === deptId || h.email === target.email) && h.status === 'active'
+      (h) => (
+        (h.employee_id && h.employee_id.toUpperCase().includes(target.code)) ||
+        (h.email && h.email.toLowerCase().includes(target.code.toLowerCase())) ||
+        h.department_id === deptId ||
+        h.email === target.email
+      ) && (h.status || 'active').toLowerCase() === 'active'
     );
     const headProf = profiles.find(
-      (p) => p.role === 'department_head' && (p.department_id === deptId || p.email === target.email || p.id === activeHeadRow?.user_id)
+      (p) => p.role === 'department_head' && (
+        (p.employee_id && p.employee_id.toUpperCase().includes(target.code)) ||
+        (p.email && p.email.toLowerCase().includes(target.code.toLowerCase())) ||
+        p.department_id === deptId ||
+        p.email === target.email ||
+        p.id === activeHeadRow?.user_id
+      )
     );
 
     const headName = activeHeadRow?.name || headProf?.full_name || target.defaultHead;
@@ -1141,7 +1338,11 @@ export async function fetchDepartmentHeadsFromSupabase(): Promise<DepartmentHead
 
     // Calculate Real Staff Count for department
     const deptStaff = profiles
-      .filter((p) => p.role === 'service_staff' && (p.department_id === deptId || (p.department_name && p.department_name.toLowerCase().includes(target.code.toLowerCase()))))
+      .filter((p) => {
+        if (p.role !== 'service_staff' && p.role !== 'staff') return false;
+        const resolved = resolveDepartmentInfo(p.department_id || p.employee_id, p.department_name);
+        return resolved.code === target.code || (p.employee_id && p.employee_id.toUpperCase().startsWith(target.code)) || p.department_id === deptId;
+      })
       .map((p) => ({
         id: p.id,
         name: p.full_name || 'Staff Member',

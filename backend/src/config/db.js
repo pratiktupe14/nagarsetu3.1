@@ -409,6 +409,11 @@ function createTablesSqlite() {
       safeAddSqliteColumn('announcements', "created_by_role TEXT DEFAULT 'city_admin'");
       safeAddSqliteColumn('announcements', 'expires_at DATETIME');
 
+      safeAddSqliteColumn('complaints', 'assigned_staff_id TEXT');
+      safeAddSqliteColumn('complaints', 'assigned_staff_name TEXT');
+      safeAddSqliteColumn('complaints', 'assigned_staff_email TEXT');
+      safeAddSqliteColumn('complaints', 'sla_deadline DATETIME');
+
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS announcement_reads (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,16 +447,67 @@ function createTablesSqlite() {
 
 const memStore = {
   departments: [
-    { id: 1, name: 'Public Works Department (PWD)', description: 'Road repairs, potholes, and asphalt infrastructure' },
-    { id: 2, name: 'Sanitation & Waste Management', description: 'Garbage pickup, trash overflow, and public cleanliness' },
-    { id: 3, name: 'Water Supply & Sewerage Board', description: 'Pipeline leakages, drainage overflows, and water supply' },
-    { id: 4, name: 'Drainage & Sewage Department', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
-    { id: 5, name: 'Electrical & Street Lighting', description: 'Streetlight repair, electrical poles, and public lighting' },
-    { id: 6, name: 'Traffic Management Department', description: 'Traffic signal repairs, road signage, and junction issues' },
-    { id: 7, name: 'Maintenance Department', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
+    { id: 1, name: 'Public Works Department (PWD)', code: 'PWD', description: 'Road repairs, potholes, and asphalt infrastructure' },
+    { id: 2, name: 'Sanitation & Waste Management', code: 'SAN', description: 'Garbage pickup, trash overflow, and public cleanliness' },
+    { id: 3, name: 'Water Supply & Sewerage Board', code: 'WTR', description: 'Pipeline leakages, drainage overflows, and water supply' },
+    { id: 4, name: 'Drainage & Sewage Department', code: 'DRN', description: 'Drainage blockage, sewage overflow, open drains, and culverts' },
+    { id: 5, name: 'Electrical & Street Lighting', code: 'ELE', description: 'Streetlight repair, electrical poles, and public lighting' },
+    { id: 6, name: 'Traffic Management Department', code: 'TRF', description: 'Traffic signal repairs, road signage, and junction issues' },
+    { id: 7, name: 'Maintenance Department', code: 'MNT', description: 'General civic facility repairs, building maintenance, and public asset upkeep' }
   ],
-  users: [],
-  department_heads: [],
+  department_heads: [
+    { id: 1, department_id: 1, name: 'Rahul Kumar', email: 'rahul.kumar@nagarsetu.gov.in', phone: '+91 9822000001', employee_id: 'EMP-PWD-001', designation: 'Department Head', status: 'active', department_name: 'Public Works Department (PWD)' },
+    { id: 2, department_id: 2, name: 'Amit Sharma', email: 'amit.sharma@nagarsetu.gov.in', phone: '+91 9822000002', employee_id: 'EMP-SAN-001', designation: 'Department Head', status: 'active', department_name: 'Sanitation & Waste Management' },
+    { id: 3, department_id: 3, name: 'Vikram Patil', email: 'vikram.patil@nagarsetu.gov.in', phone: '+91 9822000003', employee_id: 'EMP-WTR-001', designation: 'Department Head', status: 'active', department_name: 'Water Supply & Sewerage Board' },
+    { id: 4, department_id: 4, name: 'Sanjay More', email: 'sanjay.more@nagarsetu.gov.in', phone: '+91 9822000004', employee_id: 'EMP-DRN-001', designation: 'Department Head', status: 'active', department_name: 'Drainage & Sewage Department' },
+    { id: 5, department_id: 5, name: 'Aditya Joshi', email: 'aditya.joshi@nagarsetu.gov.in', phone: '+91 9822000005', employee_id: 'EMP-ELE-001', designation: 'Department Head', status: 'active', department_name: 'Electrical & Street Lighting' },
+    { id: 6, department_id: 6, name: 'Rohan Deshmukh', email: 'rohan.deshmukh@nagarsetu.gov.in', phone: '+91 9822000006', employee_id: 'EMP-TRF-001', designation: 'Department Head', status: 'active', department_name: 'Traffic Management Department' },
+    { id: 7, department_id: 7, name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 9822000007', employee_id: 'EMP-MNT-001', designation: 'Department Head', status: 'active', department_name: 'Maintenance Department' }
+  ],
+  users: [
+    { id: 101, name: 'Amit Patil', employee_id: 'PWD-STF-001', email: 'amit.patil@nagarsetu.gov.in', mobile: '9822010001', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 102, name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', email: 'sagar.jadhav@nagarsetu.gov.in', mobile: '9822010002', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 103, name: 'Nikhil Shinde', employee_id: 'PWD-STF-003', email: 'nikhil.shinde@nagarsetu.gov.in', mobile: '9822010003', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 104, name: 'Rohit More', employee_id: 'PWD-STF-004', email: 'rohit.more@nagarsetu.gov.in', mobile: '9822010004', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 105, name: 'Akash Pawar', employee_id: 'PWD-STF-005', email: 'akash.pawar@nagarsetu.gov.in', mobile: '9822010005', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 106, name: 'Prashant Mane', employee_id: 'SAN-STF-001', email: 'prashant.mane@nagarsetu.gov.in', mobile: '9822010006', role: 'service_staff', department_id: 2, department_name: 'Sanitation & Waste Management', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 107, name: 'Ganesh Chavan', employee_id: 'SAN-STF-002', email: 'ganesh.chavan@nagarsetu.gov.in', mobile: '9822010007', role: 'service_staff', department_id: 2, department_name: 'Sanitation & Waste Management', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 108, name: 'Mahesh Kadam', employee_id: 'SAN-STF-003', email: 'mahesh.kadam@nagarsetu.gov.in', mobile: '9822010008', role: 'service_staff', department_id: 2, department_name: 'Sanitation & Waste Management', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 109, name: 'Swapnil Bhosale', employee_id: 'SAN-STF-004', email: 'swapnil.bhosale@nagarsetu.gov.in', mobile: '9822010009', role: 'service_staff', department_id: 2, department_name: 'Sanitation & Waste Management', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 110, name: 'Deepak Wagh', employee_id: 'SAN-STF-005', email: 'deepak.wagh@nagarsetu.gov.in', mobile: '9822010010', role: 'service_staff', department_id: 2, department_name: 'Sanitation & Waste Management', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 111, name: 'Kiran Patil', employee_id: 'WTR-STF-001', email: 'kiran.patil@nagarsetu.gov.in', mobile: '9822010011', role: 'service_staff', department_id: 3, department_name: 'Water Supply & Sewerage Board', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 112, name: 'Manoj Shinde', employee_id: 'WTR-STF-002', email: 'manoj.shinde@nagarsetu.gov.in', mobile: '9822010012', role: 'service_staff', department_id: 3, department_name: 'Water Supply & Sewerage Board', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 113, name: 'Sachin More', employee_id: 'WTR-STF-003', email: 'sachin.more@nagarsetu.gov.in', mobile: '9822010013', role: 'service_staff', department_id: 3, department_name: 'Water Supply & Sewerage Board', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 114, name: 'Ajay Jadhav', employee_id: 'WTR-STF-004', email: 'ajay.jadhav@nagarsetu.gov.in', mobile: '9822010014', role: 'service_staff', department_id: 3, department_name: 'Water Supply & Sewerage Board', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 115, name: 'Vivek Pawar', employee_id: 'WTR-STF-005', email: 'vivek.pawar@nagarsetu.gov.in', mobile: '9822010015', role: 'service_staff', department_id: 3, department_name: 'Water Supply & Sewerage Board', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 116, name: 'Sunil Patil', employee_id: 'DRN-STF-001', email: 'sunil.patil@nagarsetu.gov.in', mobile: '9822010016', role: 'service_staff', department_id: 4, department_name: 'Drainage & Sewage Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 117, name: 'Ramesh More', employee_id: 'DRN-STF-002', email: 'ramesh.more@nagarsetu.gov.in', mobile: '9822010017', role: 'service_staff', department_id: 4, department_name: 'Drainage & Sewage Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 118, name: 'Santosh Jadhav', employee_id: 'DRN-STF-003', email: 'santosh.jadhav@nagarsetu.gov.in', mobile: '9822010018', role: 'service_staff', department_id: 4, department_name: 'Drainage & Sewage Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 119, name: 'Dinesh Shinde', employee_id: 'DRN-STF-004', email: 'dinesh.shinde@nagarsetu.gov.in', mobile: '9822010019', role: 'service_staff', department_id: 4, department_name: 'Drainage & Sewage Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 120, name: 'Pravin Pawar', employee_id: 'DRN-STF-005', email: 'pravin.pawar@nagarsetu.gov.in', mobile: '9822010020', role: 'service_staff', department_id: 4, department_name: 'Drainage & Sewage Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 121, name: 'Rahul Joshi', employee_id: 'ELE-STF-001', email: 'rahul.joshi@nagarsetu.gov.in', mobile: '9822010021', role: 'service_staff', department_id: 5, department_name: 'Electrical & Street Lighting', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 122, name: 'Sameer Kulkarni', employee_id: 'ELE-STF-002', email: 'sameer.kulkarni@nagarsetu.gov.in', mobile: '9822010022', role: 'service_staff', department_id: 5, department_name: 'Electrical & Street Lighting', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 123, name: 'Tejas Deshmukh', employee_id: 'ELE-STF-003', email: 'tejas.deshmukh@nagarsetu.gov.in', mobile: '9822010023', role: 'service_staff', department_id: 5, department_name: 'Electrical & Street Lighting', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 124, name: 'Omkar Patil', employee_id: 'ELE-STF-004', email: 'omkar.patil@nagarsetu.gov.in', mobile: '9822010024', role: 'service_staff', department_id: 5, department_name: 'Electrical & Street Lighting', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 125, name: 'Harshad More', employee_id: 'ELE-STF-005', email: 'harshad.more@nagarsetu.gov.in', mobile: '9822010025', role: 'service_staff', department_id: 5, department_name: 'Electrical & Street Lighting', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 126, name: 'Rohan Patil', employee_id: 'TRF-STF-001', email: 'rohan.patil@nagarsetu.gov.in', mobile: '9822010026', role: 'service_staff', department_id: 6, department_name: 'Traffic Management Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 127, name: 'Vishal Jadhav', employee_id: 'TRF-STF-002', email: 'vishal.jadhav@nagarsetu.gov.in', mobile: '9822010027', role: 'service_staff', department_id: 6, department_name: 'Traffic Management Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 128, name: 'Tushar More', employee_id: 'TRF-STF-003', email: 'tushar.more@nagarsetu.gov.in', mobile: '9822010028', role: 'service_staff', department_id: 6, department_name: 'Traffic Management Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 129, name: 'Nitin Shinde', employee_id: 'TRF-STF-004', email: 'nitin.shinde@nagarsetu.gov.in', mobile: '9822010029', role: 'service_staff', department_id: 6, department_name: 'Traffic Management Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 130, name: 'Amol Pawar', employee_id: 'TRF-STF-005', email: 'amol.pawar@nagarsetu.gov.in', mobile: '9822010030', role: 'service_staff', department_id: 6, department_name: 'Traffic Management Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+
+    { id: 131, name: 'Kunal Patil', employee_id: 'MNT-STF-001', email: 'kunal.patil@nagarsetu.gov.in', mobile: '9822010031', role: 'service_staff', department_id: 7, department_name: 'Maintenance Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 132, name: 'Ganesh More', employee_id: 'MNT-STF-002', email: 'ganesh.more@nagarsetu.gov.in', mobile: '9822010032', role: 'service_staff', department_id: 7, department_name: 'Maintenance Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 133, name: 'Mayur Jadhav', employee_id: 'MNT-STF-003', email: 'mayur.jadhav@nagarsetu.gov.in', mobile: '9822010033', role: 'service_staff', department_id: 7, department_name: 'Maintenance Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 134, name: 'Sachin Pawar', employee_id: 'MNT-STF-004', email: 'sachin.pawar@nagarsetu.gov.in', mobile: '9822010034', role: 'service_staff', department_id: 7, department_name: 'Maintenance Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 135, name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', email: 'yogesh.shinde@nagarsetu.gov.in', mobile: '9822010035', role: 'service_staff', department_id: 7, department_name: 'Maintenance Department', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
+    { id: 136, name: 'Ramesh Kumar (Field Staff)', employee_id: 'STF-GEN-001', email: 'staff@nagarsetu.gov.in', mobile: '9876543212', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 }
+  ],
   complaints: [],
   assignments: [],
   feedback: [],

@@ -296,11 +296,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return;
             }
           } else if (res.status === 401 || res.status === 403 || res.status === 404) {
-            localStorage.removeItem('nagarsetu_token');
-            localStorage.removeItem('nagarsetu_user');
-            sessionStorage.removeItem('nagarsetu_token');
-            sessionStorage.removeItem('nagarsetu_user');
-            if (isMounted) setUser(null);
+            if (!isSupabaseConfigured()) {
+              localStorage.removeItem('nagarsetu_token');
+              localStorage.removeItem('nagarsetu_user');
+              sessionStorage.removeItem('nagarsetu_token');
+              sessionStorage.removeItem('nagarsetu_user');
+              if (isMounted) setUser(null);
+            }
           }
         } catch (backendErr) {
           console.warn('Authoritative backend /api/auth/me check note:', backendErr);
@@ -382,6 +384,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
               return fetchedUser;
             });
+            if (session.access_token) {
+              localStorage.setItem('nagarsetu_token', session.access_token);
+            }
             localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
           }
         }
@@ -462,6 +467,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             return updatedUser;
           });
+          if (session?.access_token) {
+            localStorage.setItem('nagarsetu_token', session.access_token);
+          }
           localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
         }
       });
@@ -664,6 +672,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             language_pref: profile?.language_pref || 'en'
           };
           setUser(fetchedUser);
+          if (data.session?.access_token) {
+            localStorage.setItem('nagarsetu_token', data.session.access_token);
+          }
           localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
           return true;
         }

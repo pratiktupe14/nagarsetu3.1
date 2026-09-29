@@ -108,14 +108,24 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
         DRN: 4, 'DEPT-4': 4, 'DEPT-DRN': 4,
         ELE: 5, 'DEPT-5': 5, 'DEPT-ELE': 5,
         TRF: 6, 'DEPT-6': 6, 'DEPT-TRF': 6,
-        MNT: 7, 'DEPT-7': 7, 'DEPT-MNT': 7
+        MNT: 7, 'DEPT-7': 7, 'DEPT-MNT': 7,
+        '8ED9F760-1314-427C-A515-C2A54D6DF6D8': 1,
+        '9CABC1F2-FD10-48DD-A5CB-01D05197DE22': 2,
+        'EAD370CC-459C-44F0-899F-8A97F0928BEB': 3,
+        'EE73CB82-CC47-4333-B7D6-4491353C1354': 4,
+        '31842723-23AC-490B-912B-9F6D9AFBDFB3': 5,
+        'AE5E4D0C-996F-4D81-9528-D642664C93AE': 6,
+        '71542723-23AC-490B-912B-9F6D9AFBDFB7': 7
       };
       if (typeof deptFilterId === 'string') {
-        const cleanCode = deptFilterId.toUpperCase().split('-')[0].replace('DEPT', '').trim();
-        if (codeToIdMap[cleanCode]) {
-          deptFilterId = codeToIdMap[cleanCode];
-        } else if (codeToIdMap[deptFilterId.toUpperCase()]) {
-          deptFilterId = codeToIdMap[deptFilterId.toUpperCase()];
+        const cleanUpper = deptFilterId.toUpperCase().trim();
+        if (codeToIdMap[cleanUpper]) {
+          deptFilterId = codeToIdMap[cleanUpper];
+        } else {
+          const cleanCode = cleanUpper.split('-')[0].replace('DEPT', '').trim();
+          if (codeToIdMap[cleanCode]) {
+            deptFilterId = codeToIdMap[cleanCode];
+          }
         }
       }
       sql += ` AND u.department_id = $1`;
@@ -139,8 +149,75 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
     sql += ` ORDER BY u.created_at DESC`;
 
     const result = await query(sql, params);
+    let staffRows = result.rows;
 
-    const staffList = result.rows.map((row) => ({
+    if (staffRows.length === 0) {
+      try {
+        const { getSupabaseClient } = require('../middleware/auth');
+        const sb = getSupabaseClient();
+        if (sb) {
+          const { data: sbProfiles } = await sb.from('profiles').select('*').eq('role', 'service_staff');
+          if (sbProfiles && sbProfiles.length > 0) {
+            staffRows = sbProfiles.map((p) => {
+              let deptId = null;
+              let deptName = 'Municipal Department';
+              const empId = p.employee_id || '';
+              if (empId.startsWith('PWD') || p.department_id === '8ed9f760-1314-427c-a515-c2a54d6df6d8') { deptId = 1; deptName = 'Roads & Public Works (PWD)'; }
+              else if (empId.startsWith('SAN') || p.department_id === '9cabc1f2-fd10-48dd-a5cb-01d05197de22') { deptId = 2; deptName = 'Sanitation & Waste Management'; }
+              else if (empId.startsWith('WTR') || p.department_id === 'ead370cc-459c-44f0-899f-8a97f0928beb') { deptId = 3; deptName = 'Water Supply & Sewerage Board'; }
+              else if (empId.startsWith('DRN') || p.department_id === 'ee73cb82-cc47-4333-b7d6-4491353c1354') { deptId = 4; deptName = 'Drainage & Sewage Department'; }
+              else if (empId.startsWith('ELE') || p.department_id === '31842723-23ac-490b-912b-9f6d9afbdfb3') { deptId = 5; deptName = 'Electrical & Lighting Dept'; }
+              else if (empId.startsWith('TRF') || p.department_id === 'ae5e4d0c-996f-4d81-9528-d642664c93ae') { deptId = 6; deptName = 'Traffic Management Dept'; }
+              else if (empId.startsWith('MNT') || p.department_id === '71542723-23ac-490b-912b-9f6d9afbdfb7') { deptId = 7; deptName = 'Maintenance Department'; }
+
+              return {
+                id: p.id,
+                name: p.full_name || p.name || 'Staff Member',
+                email: p.email || '',
+                mobile: p.mobile || '',
+                employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
+                designation: 'Field Service Staff',
+                department_id: deptId,
+                department_name: deptName,
+                status: p.status || 'active',
+                language_pref: p.language_pref || 'en',
+                created_at: p.created_at,
+                active_tasks: 0,
+                completed_tasks: 0,
+                overdue_tasks: 0
+              };
+            });
+
+            if (!isAdmin) {
+              staffRows = staffRows.filter(s => s.department_id == userDeptId);
+            } else if (req.query.department_id) {
+              const filterId = codeToIdMap[String(req.query.department_id).toUpperCase()] || req.query.department_id;
+              staffRows = staffRows.filter(s => s.department_id == filterId);
+            }
+
+            if (filterStatus === 'active') {
+              staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'active');
+            } else if (filterStatus === 'inactive') {
+              staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'inactive');
+            }
+
+            if (searchQuery) {
+              const q = searchQuery.toLowerCase();
+              staffRows = staffRows.filter(s =>
+                s.name.toLowerCase().includes(q) ||
+                s.email.toLowerCase().includes(q) ||
+                s.mobile.toLowerCase().includes(q) ||
+                s.employee_id.toLowerCase().includes(q)
+              );
+            }
+          }
+        }
+      } catch (sbErr) {
+        console.warn('Supabase fallback staff query note:', sbErr);
+      }
+    }
+
+    const staffList = staffRows.map((row) => ({
       id: String(row.id),
       name: row.name,
       email: row.email || '',
@@ -180,6 +257,15 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       if (st === 'inactive') inactiveStaff += cnt;
       if (st !== 'archived') totalStaff += cnt;
     });
+
+    if (totalStaff === 0 && staffList.length > 0) {
+      staffList.forEach((s) => {
+        const st = (s.status || '').toLowerCase();
+        if (st === 'active') activeStaff++;
+        if (st === 'inactive') inactiveStaff++;
+        if (st !== 'archived') totalStaff++;
+      });
+    }
 
     // Total Active Tasks Across Department Staff
     let taskSql = `

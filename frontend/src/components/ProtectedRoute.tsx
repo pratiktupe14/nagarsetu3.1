@@ -41,7 +41,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   try {
     const parts = token.split('.');
     if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1]));
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded));
       if (payload.exp && payload.exp * 1000 < Date.now()) {
         localStorage.removeItem('nagarsetu_token');
         localStorage.removeItem('nagarsetu_user');
@@ -49,9 +51,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
       }
     }
   } catch (e) {
-    localStorage.removeItem('nagarsetu_token');
-    localStorage.removeItem('nagarsetu_user');
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    console.warn('Token validation parse note in ProtectedRoute:', e);
   }
 
   if (!user || !user.role) {

@@ -108,8 +108,10 @@ export function resolveDepartmentInfo(
   // 1. Public Works Department (PWD) - ID 1
   if (
     dId === '1' || dId === 'pwd' || dId === 'dept-pwd' || dId.includes('pwd') ||
+    dId === '8ed9f760-1314-427c-a515-c2a54d6df6d8' || dId.includes('8ed9f760') ||
     dName.includes('public works') || dName.includes('road') || dName.includes('pwd') ||
-    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works') || dCat.includes('pwd')
+    dCat.includes('pothole') || dCat.includes('road') || dCat.includes('public works') || dCat.includes('pwd') ||
+    dCat.includes('emp-pwd') || dCat.includes('pwd-stf')
   ) {
     return {
       id: actualId || '1',
@@ -122,8 +124,10 @@ export function resolveDepartmentInfo(
   // 2. Sanitation & Waste Management (SAN) - ID 2
   if (
     dId === '2' || dId === 'san' || dId === 'dept-san' || dId.includes('san') ||
+    dId === '9cabc1f2-fd10-48dd-a5cb-01d05197de22' || dId.includes('9cabc1f2') ||
     dName.includes('sanitat') || dName.includes('waste') || dName.includes('san') ||
-    dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat') || dCat.includes('san')
+    dCat.includes('garbage') || dCat.includes('waste') || dCat.includes('dustbin') || dCat.includes('sanitat') || dCat.includes('san') ||
+    dCat.includes('emp-san') || dCat.includes('san-stf')
   ) {
     return {
       id: actualId || '2',
@@ -136,8 +140,10 @@ export function resolveDepartmentInfo(
   // 3. Water Supply & Sewerage Board (WTR) - ID 3
   if (
     dId === '3' || dId === 'wtr' || dId === 'wssb' || dId === 'dept-wtr' || dId.includes('wtr') ||
+    dId === 'ead370cc-459c-44f0-899f-8a97f0928beb' || dId.includes('ead370cc') ||
     dName.includes('water') || dName.includes('sewerage board') || dName.includes('wtr') ||
-    dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage') || dCat.includes('wtr')
+    dCat.includes('water') || dCat.includes('pipeline') || dCat.includes('leakage') || dCat.includes('wtr') ||
+    dCat.includes('emp-wtr') || dCat.includes('wtr-stf')
   ) {
     return {
       id: actualId || '3',
@@ -150,8 +156,10 @@ export function resolveDepartmentInfo(
   // 4. Drainage & Sewage Department (DRN) - ID 4
   if (
     dId === '4' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
+    dId === 'ee73cb82-cc47-4333-b7d6-4491353c1354' || dId.includes('ee73cb82') ||
     dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
-    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter') || dCat.includes('drn')
+    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter') || dCat.includes('drn') ||
+    dCat.includes('emp-drn') || dCat.includes('drn-stf')
   ) {
     return {
       id: actualId || '4',
@@ -164,8 +172,10 @@ export function resolveDepartmentInfo(
   // 5. Electrical & Street Lighting (ELE) - ID 5
   if (
     dId === '5' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
+    dId === '31842723-23ac-490b-912b-9f6d9afbdfb3' || dId.includes('31842723') ||
     dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
-    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light') || dCat.includes('ele')
+    dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light') || dCat.includes('ele') ||
+    dCat.includes('emp-ele') || dCat.includes('ele-stf')
   ) {
     return {
       id: actualId || '5',
@@ -178,8 +188,10 @@ export function resolveDepartmentInfo(
   // 6. Traffic Management Department (TRF) - ID 6
   if (
     dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
+    dId === 'ae5e4d0c-996f-4d81-9528-d642664c93ae' || dId.includes('ae5e4d0c') ||
     dName.includes('traffic') || dName.includes('trf') ||
-    dCat.includes('traffic') || dCat.includes('signal') || dCat.includes('trf')
+    dCat.includes('traffic') || dCat.includes('signal') || dCat.includes('trf') ||
+    dCat.includes('emp-trf') || dCat.includes('trf-stf')
   ) {
     return {
       id: actualId || '6',
@@ -192,8 +204,10 @@ export function resolveDepartmentInfo(
   // 7. Maintenance Department (MNT) - ID 7
   if (
     dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
+    dId === '71542723-23ac-490b-912b-9f6d9afbdfb7' || dId.includes('71542723') ||
     dName.includes('mainten') || dName.includes('mnt') ||
-    dCat.includes('mainten') || dCat.includes('building') || dCat.includes('mnt')
+    dCat.includes('mainten') || dCat.includes('building') || dCat.includes('mnt') ||
+    dCat.includes('emp-mnt') || dCat.includes('mnt-stf')
   ) {
     return {
       id: actualId || '7',
@@ -224,11 +238,18 @@ export function resolveDepartmentInfo(
  * Get all municipal departments from Supabase
  */
 export async function getDepartments(): Promise<MunicipalDepartment[]> {
+  let list: MunicipalDepartment[] = [];
+
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase.from('departments').select('*').order('name');
       if (!error && data && data.length > 0) {
-        return data;
+        list = data.map((d: any) => ({
+          id: String(d.id),
+          name: d.name,
+          code: d.code || d.name.substring(0, 3).toUpperCase(),
+          description: d.description || ''
+        }));
       }
     } catch (e) {
       console.warn('Supabase fetch departments error:', e);
@@ -236,30 +257,43 @@ export async function getDepartments(): Promise<MunicipalDepartment[]> {
   }
 
   // Backend API fallback
-  try {
-    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
-    const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
-    const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });
+  if (list.length === 0) {
+    try {
+      const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+      const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+      const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });
 
-    if (res.ok) {
-      const bData = await res.json();
-      if (bData && bData.departments && bData.departments.length > 0) {
-        return bData.departments.map((d: any) => ({
-          id: String(d.id),
-          name: d.name,
-          code: d.code || d.name.substring(0, 3).toUpperCase(),
-          description: d.description || ''
-        }));
+      if (res.ok) {
+        const bData = await res.json();
+        if (bData && bData.departments && bData.departments.length > 0) {
+          list = bData.departments.map((d: any) => ({
+            id: String(d.id),
+            name: d.name,
+            code: d.code || d.name.substring(0, 3).toUpperCase(),
+            description: d.description || ''
+          }));
+        }
       }
-    }
-  } catch (bErr) {}
+    } catch (bErr) {}
+  }
 
-  return TARGET_MUNICIPAL_DEPARTMENTS.map((d) => ({
-    id: `dept-${d.code.toLowerCase()}`,
-    name: d.name,
-    code: d.code,
-    description: `${d.name} civic services`
-  }));
+  // Ensure all 7 canonical departments are included
+  TARGET_MUNICIPAL_DEPARTMENTS.forEach((target) => {
+    const exists = list.some((d) => {
+      const resolved = resolveDepartmentInfo(d.id, d.name || d.code);
+      return resolved.code === target.code;
+    });
+    if (!exists) {
+      list.push({
+        id: `dept-${target.code.toLowerCase()}`,
+        name: target.name,
+        code: target.code,
+        description: `${target.name} civic operations and maintenance.`
+      });
+    }
+  });
+
+  return list;
 }
 
 /**
@@ -352,7 +386,7 @@ export function isStaffInDepartment(s: any, deptId: string | number, deptCode: s
   if (!s) return false;
 
   const targetResolved = resolveDepartmentInfo(deptId, deptName, undefined);
-  const staffResolved = resolveDepartmentInfo(s.department_id, s.department_name, undefined);
+  const staffResolved = resolveDepartmentInfo(s.department_id, s.department_name, s.employee_id || s.email);
 
   if (targetResolved.code !== 'UNASSIGNED' && staffResolved.code !== 'UNASSIGNED') {
     if (targetResolved.code === staffResolved.code || targetResolved.id === staffResolved.id) {
@@ -523,9 +557,32 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     }
   }
 
-  const targets = departments.length > 0
-    ? departments
-    : TARGET_MUNICIPAL_DEPARTMENTS.map((t) => ({ id: `dept-${t.code.toLowerCase()}`, name: t.name, code: t.code }));
+  // Ensure all 7 canonical departments are present
+  const allDeptCodes = new Set<string>();
+  const targets: any[] = [];
+
+  departments.forEach((d) => {
+    const resolved = resolveDepartmentInfo(d.id, d.name || d.code);
+    if (!allDeptCodes.has(resolved.code)) {
+      allDeptCodes.add(resolved.code);
+      targets.push({
+        id: d.id,
+        name: d.name || resolved.name,
+        code: resolved.code
+      });
+    }
+  });
+
+  TARGET_MUNICIPAL_DEPARTMENTS.forEach((t) => {
+    if (!allDeptCodes.has(t.code)) {
+      allDeptCodes.add(t.code);
+      targets.push({
+        id: `dept-${t.code.toLowerCase()}`,
+        name: t.name,
+        code: t.code
+      });
+    }
+  });
 
   // Also attempt to fetch staff from Express API
   let apiStaffRecords: any[] = [];
@@ -550,6 +607,8 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
     // Match active head record from department_heads authoritatively (prioritizing most recently updated/created)
     const matchingHeads = deptHeads.filter((h) => {
+      if (h.employee_id && h.employee_id.toUpperCase().includes(deptCode)) return true;
+      if (h.email && h.email.toLowerCase().includes(deptCode.toLowerCase())) return true;
       const hDept = resolveDepartmentInfo(h.department_id, h.department_name);
       return hDept.code === deptCode || String(h.department_id) === String(deptId) || String(h.department_id) === String(rawDeptId);
     });
@@ -565,6 +624,8 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
 
     const headProf = profiles.find((p) => {
       if (p.role !== 'department_head') return false;
+      if (p.employee_id && p.employee_id.toUpperCase().includes(deptCode)) return true;
+      if (p.email && p.email.toLowerCase().includes(deptCode.toLowerCase())) return true;
       const pDept = resolveDepartmentInfo(p.department_id, p.department_name);
       return pDept.code === deptCode || String(p.department_id) === String(deptId) || p.id === activeHeadRow?.user_id;
     });
@@ -582,7 +643,11 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
     const matchedApiStaff = apiStaffRecords.filter((s) => isStaffInDepartment(s, deptId, deptCode, deptName));
 
     const profDeptStaff = profiles
-      .filter((p) => (p.role === 'service_staff' || p.role === 'staff') && isStaffInDepartment(p, deptId, deptCode, deptName))
+      .filter((p) => {
+        if (p.role !== 'service_staff' && p.role !== 'staff') return false;
+        const resolved = resolveDepartmentInfo(p.department_id || p.employee_id, p.department_name);
+        return resolved.code === deptCode || (p.employee_id && p.employee_id.toUpperCase().startsWith(deptCode)) || isStaffInDepartment(p, deptId, deptCode, deptName);
+      })
       .map((p) => ({
         id: p.id,
         name: p.full_name || p.name || 'Staff Member',

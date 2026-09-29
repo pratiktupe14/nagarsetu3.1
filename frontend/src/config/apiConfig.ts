@@ -11,12 +11,9 @@ export const getApiUrl = (): string => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:5000';
     }
-    // If running under unified NagarSetuSegue project, use same-origin relative URLs:
-    if (window.location.hostname.includes('nagarsetusegue')) {
-      return '';
-    }
+    // Unified NagarSetu deployment uses same-origin relative URLs for /api:
     if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app')) {
-      return 'https://nagarsetu-backend-api.vercel.app';
+      return '';
     }
     return '';
   }
