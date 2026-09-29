@@ -465,6 +465,7 @@ const memStore = {
     { id: 7, department_id: 7, name: 'Kunal Kulkarni', email: 'kunal.kulkarni@nagarsetu.gov.in', phone: '+91 9822000007', employee_id: 'EMP-MNT-001', designation: 'Department Head', status: 'active', department_name: 'Maintenance Department' }
   ],
   users: [
+    { id: 1, name: 'Municipal Admin', employee_id: 'ADM-001', email: 'admin@nagarsetu.gov.in', mobile: '9876543213', role: 'city_admin', department_id: null, department_name: 'City Administration', designation: 'City Administrator', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
     { id: 101, name: 'Amit Patil', employee_id: 'PWD-STF-001', email: 'amit.patil@nagarsetu.gov.in', mobile: '9822010001', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
     { id: 102, name: 'Sagar Jadhav', employee_id: 'PWD-STF-002', email: 'sagar.jadhav@nagarsetu.gov.in', mobile: '9822010002', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
     { id: 103, name: 'Nikhil Shinde', employee_id: 'PWD-STF-003', email: 'nikhil.shinde@nagarsetu.gov.in', mobile: '9822010003', role: 'service_staff', department_id: 1, department_name: 'Public Works Department (PWD)', designation: 'Field Service Staff', status: 'active', active_tasks: 0, completed_tasks: 0, overdue_tasks: 0 },
