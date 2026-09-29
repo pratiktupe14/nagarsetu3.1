@@ -235,6 +235,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const parsed = JSON.parse(cached);
         if (parsed && parsed.role && parsed.id) {
+          if (parsed.role === 'citizen' && (parsed.id === 'c-8788562103' || parsed.mobile === '8788562103' || (parsed.email && parsed.email.includes('8788')))) {
+            parsed.id = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
+            localStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+          }
           if (parsed.role === 'service_staff' && (!parsed.department_id || !parsed.department_name)) {
             const resolved = findServiceStaffByIdentifier(parsed.email || parsed.employee_id || parsed.id || '');
             if (resolved) {
@@ -760,7 +764,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (targetRole === 'citizen' || cleanIdentifier.replace(/\D/g, '').includes('8788562103')) {
         const citizenUser: UserProfile = {
-          id: 'c-8788562103',
+          id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
           full_name: 'Pratik Dilip Tupe',
           email: 'citizen8788@nagarsetu.gov.in',
           mobile: '8788562103',

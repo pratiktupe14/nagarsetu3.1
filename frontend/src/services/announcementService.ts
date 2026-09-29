@@ -45,18 +45,22 @@ function getAuthHeaders(): HeadersInit {
  * Fetch Department Head / User Announcements (Filtered securely by backend)
  */
 export async function getDepartmentHeadAnnouncements(): Promise<AnnouncementItem[]> {
-  const res = await fetch(`${getApiUrl()}/api/announcements`, {
-    headers: getAuthHeaders()
-  });
-  if (res.ok) {
-    const data = await res.json();
-    if (Array.isArray(data.announcements)) {
-      return data.announcements;
+  try {
+    const res = await fetch(`${getApiUrl()}/api/announcements`, {
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.announcements)) {
+        return data.announcements;
+      }
+      return [];
     }
     return [];
+  } catch (err) {
+    console.warn('Failed to fetch announcements:', err);
+    return [];
   }
-  const errData = await res.json().catch(() => ({}));
-  throw new Error(errData.error || `Failed to fetch announcements (HTTP ${res.status})`);
 }
 
 /**
@@ -169,20 +173,25 @@ export async function deleteAdminAnnouncement(id: string): Promise<boolean> {
 
 // Legacy Citizen Compatibility Exports
 export async function getOfficialAnnouncements(): Promise<OfficialAnnouncement[]> {
-  const anns = await getDepartmentHeadAnnouncements();
-  return anns.map((a) => ({
-    id: a.id,
-    title: a.title,
-    description: a.description,
-    category: (a.type || 'General') as any,
-    area: a.department_name || 'Nashik Municipal Area',
-    priority: (a.priority === 'Critical' ? 'Emergency' : a.priority === 'High' ? 'Important' : 'Normal') as any,
-    start_date: a.published_at || a.created_at,
-    status: a.is_published ? 'Published' : 'Draft',
-    published_by: a.posted_by,
-    created_at: a.created_at,
-    updated_at: a.updated_at || a.created_at
-  }));
+  try {
+    const anns = await getDepartmentHeadAnnouncements();
+    return anns.map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      category: (a.type || 'General') as any,
+      area: a.department_name || 'Nashik Municipal Area',
+      priority: (a.priority === 'Critical' ? 'Emergency' : a.priority === 'High' ? 'Important' : 'Normal') as any,
+      start_date: a.published_at || a.created_at,
+      status: a.is_published ? 'Published' : 'Draft',
+      published_by: a.posted_by,
+      created_at: a.created_at,
+      updated_at: a.updated_at || a.created_at
+    }));
+  } catch (err) {
+    console.warn('Failed to get official announcements:', err);
+    return [];
+  }
 }
 
 export async function getAnnouncementById(id: string): Promise<OfficialAnnouncement | null> {

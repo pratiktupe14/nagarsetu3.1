@@ -44,9 +44,18 @@ export const CitizenPortal: React.FC = () => {
     setErrorMsg(null);
     try {
       const [list, anns, works] = await Promise.all([
-        getCitizenComplaints(user?.id || ''),
-        getOfficialAnnouncements(),
-        getMaintenanceWorks()
+        getCitizenComplaints(user?.id || '').catch((e) => {
+          console.warn('CitizenPortal getCitizenComplaints caught:', e);
+          return [];
+        }),
+        getOfficialAnnouncements().catch((e) => {
+          console.warn('CitizenPortal getOfficialAnnouncements caught:', e);
+          return [];
+        }),
+        getMaintenanceWorks().catch((e) => {
+          console.warn('CitizenPortal getMaintenanceWorks caught:', e);
+          return [];
+        })
       ]);
       setComplaints(Array.isArray(list) ? list : []);
       setAnnouncements(Array.isArray(anns) ? anns.slice(0, 3) : []);
