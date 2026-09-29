@@ -273,8 +273,16 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     return finalComplaints;
   }
 
-  // If both Express API and Supabase failed, throw explicit database error
-  throw new Error('Database Error: Failed to retrieve complaints from the server. Please check your network connection.');
+  // If both Express API and Supabase failed, fall back to locally stored complaints
+  try {
+    const local = getStoredComplaints();
+    if (local && local.length > 0) {
+      return local.filter((c) => !isDemoComplaint(c));
+    }
+  } catch (e) {}
+
+  // Gracefully return empty list rather than crashing citizen / dashboard UI
+  return [];
 }
 
 // Fetch citizen complaints directly from backend API or Supabase
@@ -289,9 +297,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
         const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
-        if (cleanList.length > 0) {
-          return cleanList;
-        }
+        return cleanList;
       }
     } catch (bErr: any) {
       console.warn('Express backend getCitizenComplaints error:', bErr);
@@ -352,6 +358,14 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
       return [];
     }
   }
+
+  // 3. Fallback to LocalStorage stored complaints for offline capability
+  try {
+    const local = getStoredComplaints();
+    if (local && local.length > 0) {
+      return local.filter((c) => !isDemoComplaint(c));
+    }
+  } catch (e) {}
 
   return [];
 }
@@ -450,6 +464,14 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
     } catch (err) {
       console.warn('Supabase getComplaintById fallback:', err);
     }
+  }
+
+  // 3. Fallback to LocalStorage stored complaints
+  if (!comp) {
+    try {
+      const local = getStoredComplaints();
+      comp = local.find((c) => c.id === idOrNumber || c.complaint_number === idOrNumber) || null;
+    } catch (e) {}
   }
 
   if (comp) {

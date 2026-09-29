@@ -124,7 +124,7 @@ export const NearbyIssuesPage: React.FC = () => {
       setAllComplaints(Array.isArray(list) ? list : []);
     } catch (e) {
       console.error(e);
-      setErrorMsg('Unable to load nearby complaints.');
+      setAllComplaints([]);
     } finally {
       setLoading(false);
     }

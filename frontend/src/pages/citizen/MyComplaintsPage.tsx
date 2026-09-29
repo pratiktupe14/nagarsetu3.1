@@ -86,14 +86,10 @@ export const MyComplaintsPage: React.FC = () => {
     setErrorMsg(null);
     try {
       const list = await getCitizenComplaints(user?.id || '');
-      if (Array.isArray(list)) {
-        setComplaints(list);
-      } else {
-        setComplaints([]);
-      }
+      setComplaints(Array.isArray(list) ? list : []);
     } catch (e: any) {
       console.error('Error loading complaints:', e);
-      setErrorMsg('Unable to load your complaints.');
+      setComplaints([]);
     } finally {
       setLoading(false);
     }

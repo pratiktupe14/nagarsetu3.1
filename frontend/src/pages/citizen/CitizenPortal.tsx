@@ -62,7 +62,9 @@ export const CitizenPortal: React.FC = () => {
       setMaintenanceWorks(Array.isArray(works) ? works.slice(0, 3) : []);
     } catch (e: any) {
       console.error('Error in CitizenPortal loadComplaints:', e);
-      setErrorMsg(t('unableToLoadData'));
+      setComplaints([]);
+      setAnnouncements([]);
+      setMaintenanceWorks([]);
     } finally {
       if (isInitial) setLoading(false);
     }
