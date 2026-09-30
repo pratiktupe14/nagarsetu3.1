@@ -11,41 +11,65 @@ const PORT = process.env.PORT || 5000;
 // Initial Seed Users for fast demo testing
 async function seedDefaultUsers() {
   try {
-    const resCount = await query(`SELECT COUNT(*) as count FROM users`);
-    if (resCount.rows && resCount.rows[0].count === 0) {
-      console.log('Seeding default demo users (Citizen, Officer, Staff, Admin)...');
-      const salt = await bcrypt.genSalt(10);
-      const userPass = process.env.DEMO_USER_PASSWORD || 'password123';
-      const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      const defaultHash = await bcrypt.hash(userPass, salt);
-      const adminHash = await bcrypt.hash(adminPass, salt);
+    const salt = await bcrypt.genSalt(10);
+    const citizenPass = process.env.DEMO_CITIZEN_PASSWORD || '8788562103';
+    const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'admin@123';
+    const citizenHash = await bcrypt.hash(citizenPass, salt);
+    const adminHash = await bcrypt.hash(adminPass, salt);
+    const defaultPass = process.env.DEMO_USER_PASSWORD || 'password123';
+    const defaultHash = await bcrypt.hash(defaultPass, salt);
 
-      const usersToSeed = [
-        { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en', passHash: defaultHash },
-        { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en', passHash: defaultHash },
-        { name: 'Ramesh Kumar (Field Staff)', mobile: '9876543212', email: 'staff@nagarsetu.gov.in', role: 'staff', lang: 'en', passHash: defaultHash },
-        { name: 'Municipal Admin', mobile: '9876543213', email: 'admin@nagarsetu.gov.in', role: 'admin', lang: 'en', passHash: adminHash }
-      ];
-
-      for (const u of usersToSeed) {
-        await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
-          [u.name, u.mobile, u.email, u.passHash, u.role, u.lang]
-        );
-      }
-      console.log('Default demo users seeded successfully.');
+    // 1. Citizen Seed Account (8788562103 / 8788562103)
+    const citizenCheck = await query(
+      `SELECT id FROM users WHERE mobile = '8788562103' OR mobile = '+918788562103' LIMIT 1`
+    );
+    if (citizenCheck.rows && citizenCheck.rows.length > 0) {
+      await query(
+        `UPDATE users SET password_hash = ?, role = 'citizen', status = 'active' WHERE id = ?`,
+        [citizenHash, citizenCheck.rows[0].id]
+      );
+      console.log('Seeded citizen 8788562103 updated with bcrypt hash.');
     } else {
-      // Ensure Municipal Admin exists even if DB already has other users
-      const adminCheck = await query(`SELECT * FROM users WHERE email = 'admin@nagarsetu.gov.in'`);
-      if (!adminCheck.rows || adminCheck.rows.length === 0) {
-        const salt = await bcrypt.genSalt(10);
-        const adminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-        const adminHash = await bcrypt.hash(adminPass, salt);
-        await query(
-          `INSERT INTO users (name, mobile, email, password_hash, role, language_pref) VALUES (?, ?, ?, ?, ?, ?)`,
-          ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash, 'admin', 'en']
-        );
-        console.log('Municipal Admin user added.');
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, language_pref, status) VALUES (?, ?, ?, ?, 'citizen', 'en', 'active')`,
+        ['Demo Citizen', '8788562103', 'citizen8788562103@nagarsetu.gov.in', citizenHash]
+      );
+      console.log('Seeded citizen 8788562103 inserted.');
+    }
+
+    // 2. City Admin (admin@nagarsetu.gov.in / admin@123)
+    const adminCheck = await query(
+      `SELECT id FROM users WHERE LOWER(email) = 'admin@nagarsetu.gov.in' OR mobile = '9876543213' LIMIT 1`
+    );
+    if (adminCheck.rows && adminCheck.rows.length > 0) {
+      await query(
+        `UPDATE users SET password_hash = ?, role = 'city_admin', status = 'active' WHERE id = ?`,
+        [adminHash, adminCheck.rows[0].id]
+      );
+      console.log('City Admin updated with admin@123 bcrypt hash.');
+    } else {
+      await query(
+        `INSERT INTO users (name, mobile, email, password_hash, role, language_pref, status) VALUES (?, ?, ?, ?, 'city_admin', 'en', 'active')`,
+        ['Municipal Admin', '9876543213', 'admin@nagarsetu.gov.in', adminHash]
+      );
+      console.log('City Admin inserted.');
+    }
+
+    // 3. Initial generic users if empty
+    const resCount = await query(`SELECT COUNT(*) as count FROM users`);
+    if (resCount.rows && resCount.rows[0].count <= 2) {
+      const extraUsers = [
+        { name: 'Rahul Sharma (Citizen)', mobile: '9876543210', email: 'rahul@citizen.nagarsetu.gov.in', role: 'citizen', lang: 'en', passHash: defaultHash },
+        { name: 'Inspector V. K. Patil (Officer)', mobile: '9876543211', email: 'officer@nagarsetu.gov.in', role: 'officer', lang: 'en', passHash: defaultHash }
+      ];
+      for (const u of extraUsers) {
+        const uCheck = await query(`SELECT id FROM users WHERE mobile = ? OR email = ? LIMIT 1`, [u.mobile, u.email]);
+        if (!uCheck.rows || uCheck.rows.length === 0) {
+          await query(
+            `INSERT INTO users (name, mobile, email, password_hash, role, language_pref, status) VALUES (?, ?, ?, ?, ?, ?, 'active')`,
+            [u.name, u.mobile, u.email, u.passHash, u.role, u.lang]
+          );
+        }
       }
     }
   } catch (err) {
@@ -56,19 +80,31 @@ async function seedDefaultUsers() {
 const seed7DemoDepartmentHeads = require('./scripts/seedDemoDepartmentHeads');
 const seedServiceStaff = require('./scripts/seedServiceStaff');
 
-// Start Server after DB Init
-initDatabase()
-  .then(async () => {
-    await seedDefaultUsers();
-    await seed7DemoDepartmentHeads();
-    await seedServiceStaff();
-    app.listen(PORT, () => {
-      console.log(`=======================================================`);
-      console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);
-      console.log(`=======================================================`);
+async function seedAll() {
+  await seedDefaultUsers();
+  await seed7DemoDepartmentHeads();
+  await seedServiceStaff();
+}
+
+if (require.main === module) {
+  initDatabase()
+    .then(async () => {
+      await seedAll();
+      app.listen(PORT, () => {
+        console.log(`=======================================================`);
+        console.log(`  NAGARSETU Backend API running on http://localhost:${PORT}`);
+        console.log(`=======================================================`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to initialize database:', err);
     });
-  })
-  .catch((err) => {
-    console.error('Failed to initialize database:', err);
-  });
+}
+
+module.exports = {
+  seedDefaultUsers,
+  seed7DemoDepartmentHeads,
+  seedServiceStaff,
+  seedAll
+};
 

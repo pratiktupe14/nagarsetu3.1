@@ -153,7 +153,11 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     }
 
     const deptInfo = departmentId ? DEPT_MAP[departmentId] : null;
-    const userRole = user.role === 'admin' ? 'city_admin' : user.role;
+    const userRole = (user.role === 'admin' || user.role === 'city_admin')
+      ? 'city_admin'
+      : (user.role === 'staff' || user.role === 'service_staff')
+      ? 'service_staff'
+      : user.role;
 
     const userObj = {
       id: user.id,

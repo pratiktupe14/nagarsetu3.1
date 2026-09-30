@@ -55,7 +55,7 @@ const SERVICE_STAFF_DEFINITIONS = [
   { deptCode: 'MNT', search: 'Maintenance', name: 'Yogesh Shinde', employee_id: 'MNT-STF-005', email: 'yogesh.shinde@nagarsetu.gov.in', mobile: '9822010035' }
 ];
 
-const DEMO_PASSWORD = 'nagarsetu@123';
+const DEMO_PASSWORD = process.env.DEMO_STAFF_PASSWORD || 'staff@123';
 
 async function seedServiceStaff() {
   await initDatabase();

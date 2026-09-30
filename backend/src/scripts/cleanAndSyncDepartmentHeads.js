@@ -75,7 +75,7 @@ const OFFICIAL_DEPARTMENTS = [
 ];
 
 const OFFICIAL_EMAILS = OFFICIAL_DEPARTMENTS.map((d) => d.email.toLowerCase());
-const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || 'head123';
+const DEMO_PASSWORD = process.env.DEMO_HEAD_PASSWORD || 'head@123';
 
 function isValidUuid(str) {
   if (!str || typeof str !== 'string') return false;
