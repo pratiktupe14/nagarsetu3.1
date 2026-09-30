@@ -1,10 +1,11 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { DashboardLayout } from './components/DashboardLayout';
 
 // Public Landing Page (Eagerly loaded for instant First Contentful Paint)
 import { LandingPage } from './pages/LandingPage';
@@ -60,17 +61,33 @@ const DepartmentHeadPortal = React.lazy(() => import('./pages/departmentHead/Dep
 const AnnouncementsWorkspacePage = React.lazy(() => import('./pages/announcements/AnnouncementsWorkspacePage').then(m => ({ default: m.AnnouncementsWorkspacePage })));
 const StaffManagementWorkspacePage = React.lazy(() => import('./pages/departmentHead/StaffManagementWorkspacePage').then(m => ({ default: m.StaffManagementWorkspacePage })));
 
-// Lightweight Route Suspense Fallback
+// Lightweight Route Suspense Fallback (Eliminates dark viewport flash)
 const PageFallback: React.FC = () => (
-  <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 font-sans">
-    <div className="p-6 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex flex-col items-center space-y-4 max-w-sm w-full text-center">
-      <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+  <div className="min-h-screen bg-white text-gray-900 flex flex-col items-center justify-center p-6 font-sans">
+    <div className="flex flex-col items-center space-y-4 max-w-sm w-full text-center">
+      <div className="w-8 h-8 border-2 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin" />
       <div className="space-y-1">
-        <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU</h3>
-        <p className="text-xs text-slate-400 font-medium">Loading workspace...</p>
+        <h3 className="text-base font-extrabold font-outfit text-gray-900 tracking-wider">NAGARSETU</h3>
+        <p className="text-xs text-gray-500 font-medium">Loading workspace...</p>
       </div>
     </div>
   </div>
+);
+
+// Lightweight Content Area Fallback (Preserves header and sidebar during section navigation)
+const PortalContentFallback: React.FC = () => (
+  <div className="flex-1 w-full p-8 flex items-center justify-center min-h-[350px]">
+    <div className="w-8 h-8 border-2 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin" />
+  </div>
+);
+
+// Shared Persistent Portal Layout with Content-Scoped Suspense Boundary
+const PortalLayout: React.FC = () => (
+  <DashboardLayout>
+    <Suspense fallback={<PortalContentFallback />}>
+      <Outlet />
+    </Suspense>
+  </DashboardLayout>
 );
 
 export default function App() {
@@ -82,461 +99,132 @@ export default function App() {
             <BrowserRouter>
               <Suspense fallback={<PageFallback />}>
                 <Routes>
-            {/* Public Landing & Auth Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+                  {/* Public Landing & Auth Routes */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
 
-            {/* Citizen Protected Routes */}
-            <Route
-              path="/citizen/portal"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenPortal />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/complaints"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <MyComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/nearby"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <NearbyIssuesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/announcements"
-              element={
-                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
-                  <AnnouncementsWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/announcements"
-              element={
-                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
-                  <AnnouncementsWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/department-head/announcements"
-              element={
-                <ProtectedRoute allowedRoles={['department_head', 'city_admin']}>
-                  <AnnouncementsWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/announcements"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff', 'city_admin']}>
-                  <AnnouncementsWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/announcements/:id"
-              element={
-                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
-                  <AnnouncementDetailPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/work"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenWorkPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/work/:id"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <MaintenanceDetailPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/notifications"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenNotificationsPage />
-                </ProtectedRoute>
-              }
-            />
+                  {/* General Shared Announcements Route */}
+                  <Route
+                    path="/announcements"
+                    element={
+                      <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'department_head', 'service_staff']}>
+                        <AnnouncementsWorkspacePage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-            <Route
-              path="/citizen/report"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <ReportIssuePage />
-                </ProtectedRoute>
-              }
-            />
+                  {/* Citizen Protected Portal Layout & Routes */}
+                  <Route
+                    element={
+                      <ProtectedRoute allowedRoles={['citizen']}>
+                        <PortalLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/citizen/portal" element={<CitizenPortal />} />
+                    <Route path="/citizen/dashboard" element={<CitizenPortal />} />
+                    <Route path="/citizen/complaints" element={<MyComplaintsPage />} />
+                    <Route path="/citizen/nearby" element={<NearbyIssuesPage />} />
+                    <Route path="/citizen/announcements" element={<AnnouncementsWorkspacePage />} />
+                    <Route path="/citizen/announcements/:id" element={<AnnouncementDetailPage />} />
+                    <Route path="/citizen/work" element={<CitizenWorkPage />} />
+                    <Route path="/citizen/work/:id" element={<MaintenanceDetailPage />} />
+                    <Route path="/citizen/notifications" element={<CitizenNotificationsPage />} />
+                    <Route path="/citizen/report" element={<ReportIssuePage />} />
+                    <Route path="/citizen/success" element={<SubmissionSuccessPage />} />
+                    <Route path="/citizen/complaint/:id" element={<ComplaintDetailPage />} />
+                    <Route path="/citizen/track" element={<TrackComplaintPage />} />
+                    <Route path="/citizen/track/:id" element={<TrackComplaintPage />} />
+                    <Route path="/citizen/profile" element={<CitizenProfilePage />} />
+                    <Route path="/citizen/settings" element={<CitizenSettingsPage />} />
+                  </Route>
 
-            <Route
-              path="/citizen/success"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <SubmissionSuccessPage />
-                </ProtectedRoute>
-              }
-            />
+                  {/* City Admin Protected Portal Layout & Routes */}
+                  <Route
+                    element={
+                      <ProtectedRoute allowedRoles={['city_admin']}>
+                        <PortalLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/admin/dashboard" element={<AdminPortal />} />
+                    <Route path="/admin/portal" element={<AdminPortal />} />
+                    <Route path="/admin/announcements" element={<AnnouncementsWorkspacePage />} />
+                    <Route path="/admin/complaints" element={<AdminComplaintsPage />} />
+                    <Route path="/admin/complaints/new" element={<AdminNewComplaintsPage />} />
+                    <Route path="/admin/complaints/pending" element={<AdminPendingComplaintsPage />} />
+                    <Route path="/admin/complaints/in-progress" element={<AdminInProgressComplaintsPage />} />
+                    <Route path="/admin/complaints/resolved" element={<AdminResolvedComplaintsPage />} />
+                    <Route path="/admin/complaints/overdue" element={<AdminOverdueComplaintsPage />} />
+                    <Route path="/admin/departments" element={<AdminDepartmentsPage />} />
+                    <Route path="/admin/department-heads" element={<AdminDepartmentHeadsPage />} />
+                    <Route path="/admin/departments/dashboard" element={<AdminDepartmentDashboardPage />} />
+                    <Route path="/admin/staff" element={<StaffManagementWorkspacePage />} />
+                    <Route path="/admin/map" element={<AdminCityMapPage />} />
+                    <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+                    <Route path="/admin/reports" element={<AdminReportsPage />} />
+                    <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+                    <Route path="/admin/settings" element={<AdminSettingsPage />} />
+                  </Route>
 
-            <Route
-              path="/citizen/complaint/:id"
-              element={
-                <ProtectedRoute allowedRoles={['citizen', 'city_admin', 'service_staff']}>
-                  <ComplaintDetailPage />
-                </ProtectedRoute>
-              }
-            />
+                  {/* Department Head Protected Portal Layout & Routes */}
+                  <Route
+                    element={
+                      <ProtectedRoute allowedRoles={['department_head']}>
+                        <PortalLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/department-head/announcements" element={<AnnouncementsWorkspacePage />} />
+                    <Route path="/department-head/staff" element={<StaffManagementWorkspacePage />} />
+                    {[
+                      '/department/portal',
+                      '/department-head/portal',
+                      '/department/tasks',
+                      '/department/tasks/in-progress',
+                      '/department-head/complaints',
+                      '/department-head/tasks/assign',
+                      '/department-head/tasks/in-progress',
+                      '/department-head/tasks/completed',
+                      '/department-head/tasks/overdue',
+                      '/department/tasks/overdue',
+                      '/department-head/staff/:staffId',
+                      '/department-head/map',
+                      '/department/map',
+                      '/department-head/notifications',
+                      '/department-head/profile',
+                      '/department-head/settings'
+                    ].map((path) => (
+                      <Route key={path} path={path} element={<DepartmentHeadPortal />} />
+                    ))}
+                  </Route>
 
-            <Route
-              path="/citizen/track"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <TrackComplaintPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/track/:id"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <TrackComplaintPage />
-                </ProtectedRoute>
-              }
-            />
+                  {/* Service Staff Protected Portal Layout & Routes */}
+                  <Route
+                    element={
+                      <ProtectedRoute allowedRoles={['service_staff']}>
+                        <PortalLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/staff/announcements" element={<AnnouncementsWorkspacePage />} />
+                    <Route path="/staff/portal" element={<StaffPortal />} />
+                    <Route path="/staff/dashboard" element={<StaffPortal />} />
+                    <Route path="/staff/tasks" element={<StaffPortal />} />
+                    <Route path="/staff/tasks/new" element={<StaffNewTasksPage />} />
+                    <Route path="/staff/tasks/in-progress" element={<StaffInProgressTasksPage />} />
+                    <Route path="/staff/tasks/overdue" element={<StaffOverdueTasksPage />} />
+                    <Route path="/staff/tasks/completed" element={<StaffCompletedTasksPage />} />
+                    <Route path="/staff/map" element={<StaffTaskMapPage />} />
+                    <Route path="/staff/tasks/map" element={<StaffTaskMapPage />} />
+                    <Route path="/staff/notifications" element={<StaffNotificationsPage />} />
+                    <Route path="/staff/settings" element={<StaffSettingsPage />} />
+                    <Route path="/staff/profile" element={<StaffSettingsPage />} />
+                  </Route>
 
-            <Route
-              path="/citizen/profile"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/citizen/settings"
-              element={
-                <ProtectedRoute allowedRoles={['citizen']}>
-                  <CitizenSettingsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* City Admin Protected Portal & Navigation Sub-routes */}
-            <Route
-              path="/admin/announcements"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AnnouncementsWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints/new"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminNewComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints/pending"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminPendingComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints/in-progress"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminInProgressComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints/resolved"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminResolvedComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints/overdue"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminOverdueComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/complaints"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminComplaintsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/departments"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminDepartmentsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/department-heads"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminDepartmentHeadsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/departments/dashboard"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminDepartmentDashboardPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/staff"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <StaffManagementWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/map"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminCityMapPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/analytics"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminAnalyticsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/reports"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminReportsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/notifications"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminNotificationsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/admin/settings"
-              element={
-                <ProtectedRoute allowedRoles={['city_admin']}>
-                  <AdminSettingsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Citizen Protected Portal Aliases */}
-            {[
-              '/citizen/dashboard'
-            ].map((path) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute allowedRoles={['citizen']}>
-                    <CitizenPortal />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-
-            {/* City Admin Protected Portal Aliases */}
-            {[
-              '/admin/dashboard',
-              '/admin/portal'
-            ].map((path) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute allowedRoles={['city_admin']}>
-                    <AdminPortal />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-
-            {/* Service Staff Protected Routes */}
-            {['/staff/portal', '/staff/dashboard', '/staff/tasks'].map((path) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute allowedRoles={['service_staff']}>
-                    <StaffPortal />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-
-            <Route
-              path="/staff/tasks/new"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffNewTasksPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/tasks/in-progress"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffInProgressTasksPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/tasks/overdue"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffOverdueTasksPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/tasks/completed"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffCompletedTasksPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/staff/map"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffTaskMapPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/tasks/map"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffTaskMapPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/staff/notifications"
-              element={
-                <ProtectedRoute allowedRoles={['service_staff']}>
-                  <StaffNotificationsPage />
-                </ProtectedRoute>
-              }
-            />
-            {['/staff/settings', '/staff/profile'].map((path) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute allowedRoles={['service_staff']}>
-                    <StaffSettingsPage />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-
-            <Route
-              path="/department-head/staff"
-              element={
-                <ProtectedRoute allowedRoles={['department_head']}>
-                  <StaffManagementWorkspacePage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Department Head Protected Portal & Navigation Sub-routes */}
-            {[
-              '/department/portal',
-              '/department-head/portal',
-              '/department/tasks',
-              '/department/tasks/in-progress',
-              '/department-head/complaints',
-              '/department-head/tasks/assign',
-              '/department-head/tasks/in-progress',
-              '/department-head/tasks/completed',
-              '/department-head/tasks/overdue',
-              '/department/tasks/overdue',
-              '/department-head/staff/:staffId',
-              '/department-head/map',
-              '/department/map',
-              '/department-head/notifications',
-              '/department-head/profile',
-              '/department-head/settings'
-            ].map((path) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute allowedRoles={['department_head']}>
-                    <DepartmentHeadPortal />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-
-            {/* Catch-all redirect to Landing */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+                  {/* Catch-all redirect to Landing */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>

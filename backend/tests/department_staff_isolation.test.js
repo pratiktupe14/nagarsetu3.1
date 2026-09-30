@@ -58,11 +58,9 @@ describe('Department Head Staff Isolation & Security Suite', () => {
     });
   });
 
-  after((done) => {
+  after(async () => {
     if (server) {
-      server.close(done);
-    } else {
-      done();
+      await new Promise((resolve) => server.close(resolve));
     }
   });
 
