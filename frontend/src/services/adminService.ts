@@ -500,11 +500,40 @@ export async function fetchDepartmentStaffApi(params?: {
     }
   }
 
+  const defaultMapped: DepartmentStaffApiItem[] = DEFAULT_SERVICE_STAFF.map((s) => {
+    const resolved = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+    return {
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      mobile: s.contact_number,
+      contact_number: s.contact_number,
+      employee_id: s.employee_id,
+      designation: s.role,
+      department_id: resolved.id,
+      department_name: s.department_name,
+      status: 'Active',
+      active_tasks: s.active_tasks || 0,
+      completed_tasks: s.completed_tasks || 0,
+      overdue_tasks: s.overdue_tasks || 0,
+      language: 'en',
+      joined_date: s.joined_date,
+      created_at: s.created_at
+    };
+  });
+
+  memoryStaffRecords = DEFAULT_SERVICE_STAFF;
+
   return {
-    staff: [],
-    summary: { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 }
+    staff: defaultMapped,
+    summary: {
+      totalStaff: defaultMapped.length,
+      activeStaff: defaultMapped.length,
+      inactiveStaff: 0,
+      activeTasks: 0
+    }
   };
-  }
+}
 
 export async function createServiceStaffApi(payload: {
   name: string;

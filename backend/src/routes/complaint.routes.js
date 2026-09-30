@@ -289,7 +289,41 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY c.created_at DESC
     `;
     const result = await query(sql);
-    return res.json({ complaints: result.rows });
+    if (result.rows && result.rows.length > 0) {
+      return res.json({ complaints: result.rows });
+    }
+
+    // Supabase fallback if local database has 0 rows (e.g. serverless /tmp container)
+    try {
+      const { getSupabaseClient } = require('../middleware/auth');
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('complaints')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          let deptMap = {};
+          try {
+            const { data: depts } = await supabase.from('departments').select('id, name');
+            if (depts) {
+              depts.forEach((d) => { deptMap[d.id] = d.name; });
+            }
+          } catch (e) {}
+
+          const formatted = data.map((c) => ({
+            ...c,
+            department_name: deptMap[c.department_id] || c.department_name || 'Public Works Department (PWD)'
+          }));
+          return res.json({ complaints: formatted });
+        }
+      }
+    } catch (sErr) {
+      console.warn('Supabase fallback in GET / warning:', sErr.message);
+    }
+
+    return res.json({ complaints: result.rows || [] });
   } catch (err) {
     console.error('Fetch all complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });

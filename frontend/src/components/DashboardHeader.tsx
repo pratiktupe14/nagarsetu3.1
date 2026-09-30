@@ -103,14 +103,16 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <div className="hidden sm:flex items-center space-x-3 pl-2 border-l border-gray-200 text-right">
           <div>
             <span className="text-xs font-bold text-gray-900 block leading-tight">
-              {activeRole === 'citizen' 
-                ? (user?.full_name || (user as any)?.name || 'Citizen')
-                : (user?.full_name || (user as any)?.name || 'Officer')}
+              {user?.full_name || (user as any)?.name || (activeRole === 'city_admin' ? 'Municipal Admin' : activeRole === 'citizen' ? 'Citizen' : 'Officer')}
             </span>
             <span className="text-[10px] text-gray-500 font-medium block capitalize">
-              {activeRole === 'citizen' || user?.department_name === 'Unassigned Department' || !user?.department_name
-                ? 'Citizen'
-                : user.department_name.split('(')[0].trim()}
+              {activeRole === 'city_admin'
+                ? 'City Administrator'
+                : activeRole === 'department_head'
+                  ? (user?.department_name ? `${user.department_name.split('(')[0].trim()} Head` : 'Department Head')
+                  : activeRole === 'service_staff'
+                    ? (user?.department_name ? `${user.department_name.split('(')[0].trim()} Staff` : 'Field Staff')
+                    : 'Citizen'}
             </span>
           </div>
 
