@@ -39,7 +39,8 @@ import { resolveDepartmentInfo } from '../../services/departmentService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult, ComplaintAngle, ComplaintAnglePhoto } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
-  ArrowRight, ArrowLeft, RefreshCw, ShieldCheck, WifiOff, FileText, X, Edit3, Save, ThumbsUp, Plus, Image as ImageIcon, Eye, ZoomIn
+  ArrowRight, ArrowLeft, RefreshCw, ShieldCheck, WifiOff, FileText, X, Edit3, Save, ThumbsUp, Plus, Image as ImageIcon, Eye, ZoomIn,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface AngleSlotData {
@@ -51,6 +52,7 @@ interface AngleConfig {
   angle: ComplaintAngle;
   number: number;
   title: string;
+  recommendedView: string;
   badge: string;
   subtitle: string;
   recommended?: boolean;
@@ -61,6 +63,7 @@ const ANGLE_CONFIGS: AngleConfig[] = [
     angle: 'front',
     number: 1,
     title: '1. Front View',
+    recommendedView: 'Front View',
     badge: 'Recommended / Primary',
     subtitle: 'Primary overview of defect and street context',
     recommended: true
@@ -69,6 +72,7 @@ const ANGLE_CONFIGS: AngleConfig[] = [
     angle: 'left',
     number: 2,
     title: '2. Left View',
+    recommendedView: 'Left View',
     badge: 'Perspective & Depth',
     subtitle: 'Left-side perspective showing depth & footpath'
   },
@@ -76,15 +80,17 @@ const ANGLE_CONFIGS: AngleConfig[] = [
     angle: 'right',
     number: 3,
     title: '3. Right View',
+    recommendedView: 'Right View',
     badge: 'Traffic & Context',
     subtitle: 'Right-side perspective showing oncoming lane & surroundings'
   },
   {
     angle: 'closeup',
     number: 4,
-    title: '4. Close-Up Detail',
+    title: '4. Top View',
+    recommendedView: 'Top View',
     badge: 'Defect Severity',
-    subtitle: 'Macro shot of crack depth, pothole crater, or defect severity'
+    subtitle: 'Top view or macro angle showing defect crater and depth'
   }
 ];
 
@@ -101,6 +107,34 @@ export const ReportIssuePage: React.FC = () => {
     right: { file: null, previewUrl: '' },
     closeup: { file: null, previewUrl: '' },
   });
+  const [currentSlotIndex, setCurrentSlotIndex] = useState<number>(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const minSwipeDistance = 45;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe && currentSlotIndex < ANGLE_CONFIGS.length - 1) {
+      setCurrentSlotIndex((prev) => prev + 1);
+    }
+    if (isRightSwipe && currentSlotIndex > 0) {
+      setCurrentSlotIndex((prev) => prev - 1);
+    }
+  };
+
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
@@ -568,179 +602,297 @@ export const ReportIssuePage: React.FC = () => {
           {/* LEFT 50% PANEL: IMAGE & AI ANALYSIS & LOCATION BADGE */}
           <div className="lg:col-span-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 lg:sticky lg:top-20">
             
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider flex items-center space-x-2">
-                  <Camera className="w-4 h-4 text-emerald-600" />
-                  <span>Complaint Evidence Photos (4 Angles)</span>
-                </h2>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  Capture up to 4 angles for swift municipal verification. Front View is recommended as primary.
-                </p>
-              </div>
-              <span className={`text-[11px] font-mono font-extrabold px-2.5 py-1 rounded-full border ${
-                Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length > 0
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-gray-100 text-gray-600 border-gray-200'
-              }`}>
-                {Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length} / 4 Added
-              </span>
-            </div>
+            {/* EVIDENCE PHOTOS HEADER & CAROUSEL */}
+            {(() => {
+              const addedCount = Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length;
+              const cfg = ANGLE_CONFIGS[currentSlotIndex] || ANGLE_CONFIGS[0];
+              const slot = angleSlots[cfg.angle];
+              const isFront = cfg.angle === 'front';
+              const hasImage = Boolean(slot.previewUrl);
 
-            {/* 4-ANGLE EVIDENCE SLOTS GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {ANGLE_CONFIGS.map((cfg) => {
-                const slot = angleSlots[cfg.angle];
-                const isFront = cfg.angle === 'front';
-                const hasImage = Boolean(slot.previewUrl);
+              return (
+                <div className="space-y-4">
+                  {/* Header with Title and Dynamic Badge Counter */}
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <div>
+                      <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider flex items-center space-x-2">
+                        <Camera className="w-4 h-4 text-emerald-600" />
+                        <span>Complaint Evidence Photos</span>
+                      </h2>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Swipe or navigate through 4 angles. Front View is recommended as primary.
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <span className={`text-xs font-mono font-extrabold px-2.5 py-1 rounded-full border shadow-2xs ${
+                        addedCount > 0
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-200'
+                          : 'bg-gray-100 text-gray-600 border-gray-200'
+                      }`}>
+                        {addedCount} / 4 Added
+                      </span>
+                    </div>
+                  </div>
 
-                return (
+                  {/* Carousel Step / Dot Navigation Tabs */}
+                  <div className="flex items-center justify-between gap-1.5 p-1.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center space-x-1.5 flex-1 overflow-x-auto py-0.5">
+                      {ANGLE_CONFIGS.map((c, idx) => {
+                        const isFilled = Boolean(angleSlots[c.angle]?.previewUrl);
+                        const isActive = currentSlotIndex === idx;
+                        return (
+                          <button
+                            key={c.angle}
+                            type="button"
+                            onClick={() => setCurrentSlotIndex(idx)}
+                            className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1 border ${
+                              isActive
+                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                                : isFilled
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            <span className="font-mono text-[11px]">{idx + 1}.</span>
+                            <span className="truncate">{c.recommendedView.replace(' View', '')}</span>
+                            {isFilled && <span className="text-[10px] text-emerald-600">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="shrink-0 pl-1">
+                      <span className={`text-[11px] font-mono font-extrabold px-2 py-0.5 rounded-md border ${
+                        addedCount > 0
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : 'bg-gray-200 text-gray-600 border-gray-300'
+                      }`}>
+                        {addedCount}/4
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Single Image Slot Carousel View with Touch Swipe Support */}
                   <div
-                    key={cfg.angle}
-                    className={`rounded-2xl border p-3.5 flex flex-col justify-between transition-all ${
-                      hasImage
-                        ? 'bg-white border-emerald-300 shadow-xs ring-1 ring-emerald-100'
-                        : isFront
-                        ? 'bg-emerald-50/40 border-dashed border-emerald-300'
-                        : 'bg-gray-50/70 border-dashed border-gray-300'
-                    }`}
+                    className="relative overflow-hidden touch-pan-y"
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
                   >
-                    {/* Angle Card Header */}
-                    <div className="flex items-start justify-between gap-1 mb-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-1.5 flex-wrap">
-                          <span className="font-extrabold text-xs text-gray-900 font-outfit">
-                            {cfg.title}
+                    <div
+                      key={cfg.angle}
+                      className={`rounded-2xl border p-4 flex flex-col justify-between transition-all min-h-[350px] ${
+                        hasImage
+                          ? 'bg-white border-emerald-300 shadow-sm ring-1 ring-emerald-100'
+                          : isFront
+                          ? 'bg-emerald-50/40 border-2 border-dashed border-emerald-300'
+                          : 'bg-gray-50/70 border-2 border-dashed border-gray-300'
+                      }`}
+                    >
+                      {/* Top Popup / Label showing recommended view & dynamic counter */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 shadow-2xs text-xs font-bold font-outfit">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>Recommended: {cfg.recommendedView}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-1.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-mono font-extrabold shadow-2xs">
+                            {addedCount}/4
                           </span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
                             isFront
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                               : 'bg-slate-100 text-slate-700 border border-slate-200'
                           }`}>
-                            {cfg.badge}
+                            Slot {currentSlotIndex + 1} of 4
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                      </div>
+
+                      {/* Title & Subtitle description */}
+                      <div className="mb-2">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-extrabold text-sm text-gray-900 font-outfit">
+                            {cfg.title}
+                          </h3>
+                          <span className="text-[10px] text-gray-500 font-medium font-mono">({cfg.badge})</span>
+                          {hasImage && (
+                            <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 ml-auto">
+                              ✓ Saved
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
                           {cfg.subtitle}
                         </p>
                       </div>
 
-                      {hasImage && (
-                        <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
-                          ✓ Saved
-                        </span>
+                      {/* Angle Slot Body: Preview or Capture Controls */}
+                      {hasImage ? (
+                        <div className="space-y-3 my-auto">
+                          <div
+                            className="relative aspect-16/10 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group cursor-pointer shadow-xs"
+                            onClick={() => setZoomImageUrl(slot.previewUrl)}
+                            title="Click to view larger"
+                          >
+                            <img
+                              src={slot.previewUrl}
+                              alt={cfg.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                              <ZoomIn className="w-6 h-6 drop-shadow" />
+                            </div>
+                            {isFront && analyzingAI && (
+                              <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-xs font-bold space-y-1.5">
+                                <Sparkles className="w-5 h-5 animate-spin text-emerald-400" />
+                                <span>AI Analyzing...</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action buttons: Retake / Replace / Remove */}
+                          <div className="flex items-center space-x-2 pt-1">
+                            <label
+                              htmlFor={`citizen-angle-camera-${cfg.angle}`}
+                              className="flex-1 py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs text-center border border-gray-300 cursor-pointer min-h-[40px] flex items-center justify-center space-x-1.5 shadow-2xs"
+                              title="Retake photo using camera"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Retake</span>
+                            </label>
+
+                            <label
+                              htmlFor={`citizen-angle-upload-${cfg.angle}`}
+                              className="flex-1 py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs text-center border border-gray-300 cursor-pointer min-h-[40px] flex items-center justify-center space-x-1.5 shadow-2xs"
+                              title="Replace with file from device"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Replace</span>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => removeAnglePhoto(cfg.angle)}
+                              className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[40px] flex items-center justify-center shadow-2xs"
+                              title="Remove this photo"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 py-6 my-auto text-center">
+                          <div className="w-14 h-14 rounded-2xl bg-white text-emerald-600 flex items-center justify-center mx-auto border border-gray-200 shadow-2xs">
+                            <Camera className="w-7 h-7 text-emerald-600" />
+                          </div>
+
+                          <div>
+                            <p className="text-xs font-bold text-gray-800 font-outfit">Add photo for {cfg.recommendedView}</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">Use camera or choose file from device gallery</p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+                            <label
+                              htmlFor={`citizen-angle-camera-${cfg.angle}`}
+                              className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs text-center cursor-pointer shadow-xs min-h-[44px] flex items-center justify-center space-x-2"
+                            >
+                              <Camera className="w-4 h-4 shrink-0" />
+                              <span>Camera</span>
+                            </label>
+
+                            <label
+                              htmlFor={`citizen-angle-upload-${cfg.angle}`}
+                              className="py-2.5 px-3 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-800 font-bold text-xs text-center border border-gray-300 shadow-2xs cursor-pointer min-h-[44px] flex items-center justify-center space-x-2"
+                            >
+                              <Upload className="w-4 h-4 shrink-0 text-gray-600" />
+                              <span>Upload</span>
+                            </label>
+                          </div>
+                        </div>
                       )}
+
+                      {/* Navigation Controls: Previous / Next controls & swipe indicator */}
+                      <div className="flex items-center justify-between pt-3 mt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentSlotIndex((prev) => Math.max(0, prev - 1))}
+                          disabled={currentSlotIndex === 0}
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
+                            currentSlotIndex === 0
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200 border border-gray-200 shadow-2xs'
+                          }`}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Previous</span>
+                        </button>
+
+                        <div className="flex items-center space-x-1">
+                          {ANGLE_CONFIGS.map((_, dotIdx) => (
+                            <button
+                              key={`dot-${dotIdx}`}
+                              type="button"
+                              onClick={() => setCurrentSlotIndex(dotIdx)}
+                              className={`h-2 rounded-full transition-all ${
+                                currentSlotIndex === dotIdx
+                                  ? 'w-6 bg-emerald-600'
+                                  : 'w-2 bg-gray-300 hover:bg-gray-400'
+                              }`}
+                              title={`Go to Slot ${dotIdx + 1}`}
+                            />
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setCurrentSlotIndex((prev) => Math.min(ANGLE_CONFIGS.length - 1, prev + 1))}
+                          disabled={currentSlotIndex === ANGLE_CONFIGS.length - 1}
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] ${
+                            currentSlotIndex === ANGLE_CONFIGS.length - 1
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200 shadow-2xs'
+                          }`}
+                        >
+                          <span>Next</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Angle Slot Body: Preview or Capture Controls */}
-                    {hasImage ? (
-                      <div className="space-y-2 mt-auto">
-                        <div
-                          className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group cursor-pointer"
-                          onClick={() => setZoomImageUrl(slot.previewUrl)}
-                          title="Click to view larger"
-                        >
-                          <img
-                            src={slot.previewUrl}
-                            alt={cfg.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                            <ZoomIn className="w-5 h-5 drop-shadow" />
-                          </div>
-                          {isFront && analyzingAI && (
-                            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold space-y-1">
-                              <Sparkles className="w-4 h-4 animate-spin text-emerald-400" />
-                              <span>AI Analyzing...</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Action buttons: Retake / Replace / Remove */}
-                        <div className="flex items-center space-x-1.5 pt-1">
-                          <label
-                            htmlFor={`citizen-angle-camera-${cfg.angle}`}
-                            className="flex-1 py-1.5 px-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 cursor-pointer min-h-[36px] flex items-center justify-center space-x-1"
-                            title="Retake photo using camera"
-                          >
-                            <Camera className="w-3 h-3 text-emerald-600" />
-                            <span>Retake</span>
-                          </label>
-
-                          <label
-                            htmlFor={`citizen-angle-upload-${cfg.angle}`}
-                            className="py-1.5 px-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 cursor-pointer min-h-[36px] flex items-center justify-center"
-                            title="Replace with file from device"
-                          >
-                            <Upload className="w-3 h-3 text-blue-600" />
-                          </label>
-
-                          <button
-                            type="button"
-                            onClick={() => removeAnglePhoto(cfg.angle)}
-                            className="py-1.5 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] border border-rose-200 min-h-[36px] flex items-center justify-center"
-                            title="Remove this photo"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 py-3 mt-auto">
-                        <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center mx-auto border border-gray-200 shadow-2xs">
-                          <Camera className="w-5 h-5 text-gray-500" />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <label
-                            htmlFor={`citizen-angle-camera-${cfg.angle}`}
-                            className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-[11px] text-center cursor-pointer shadow-xs min-h-[44px] flex items-center justify-center space-x-1.5"
-                          >
-                            <Camera className="w-3.5 h-3.5 shrink-0" />
-                            <span>Camera</span>
-                          </label>
-
-                          <label
-                            htmlFor={`citizen-angle-upload-${cfg.angle}`}
-                            className="py-2.5 px-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 shadow-2xs cursor-pointer min-h-[44px] flex items-center justify-center space-x-1.5"
-                          >
-                            <Upload className="w-3.5 h-3.5 shrink-0 text-gray-600" />
-                            <span>Upload</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Camera direct input */}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      id={`citizen-angle-camera-${cfg.angle}`}
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleAnglePhotoSelect(cfg.angle, e.target.files[0]);
-                        }
-                      }}
-                    />
-
-                    {/* Standard gallery file input */}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/jpg"
-                      id={`citizen-angle-upload-${cfg.angle}`}
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleAnglePhotoSelect(cfg.angle, e.target.files[0]);
-                        }
-                      }}
-                    />
+                    {/* Persistent Camera & Upload Hidden Inputs for all 4 slots */}
+                    {ANGLE_CONFIGS.map((c) => (
+                      <React.Fragment key={`inputs-${c.angle}`}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          id={`citizen-angle-camera-${c.angle}`}
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleAnglePhotoSelect(c.angle, e.target.files[0]);
+                            }
+                          }}
+                        />
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/jpg"
+                          id={`citizen-angle-upload-${c.angle}`}
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleAnglePhotoSelect(c.angle, e.target.files[0]);
+                            }
+                          }}
+                        />
+                      </React.Fragment>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })()}
 
             {/* AI ANALYSIS RESULT CARD */}
             {aiResult && (aiResult.confidence === 0 || aiResult.is_available === false) ? (
