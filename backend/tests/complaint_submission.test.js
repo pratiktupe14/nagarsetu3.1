@@ -134,8 +134,9 @@ describe('Citizen Complaint Submission Flow with Demo & JWT Auth', () => {
     assert.strictEqual(getRes.status, 200);
     const getBody = await getRes.json();
     const myComplaints = Array.isArray(getBody) ? getBody : (getBody.complaint || getBody.complaints || []);
-    const saved = myComplaints.find((c) => c.complaint_number === complaintNum);
-    assert.ok(saved, `Saved complaint ${complaintNum} should be returned in my complaints`);
+    const serverComplaintNumber = body.complaint_number || body.complaint?.complaint_number;
+    const saved = myComplaints.find((c) => String(c.id) === String(body.complaint_id) || (serverComplaintNumber && c.complaint_number === serverComplaintNumber));
+    assert.ok(saved, `Saved complaint ${serverComplaintNumber || body.complaint_id} should be returned in my complaints`);
     assert.strictEqual(saved.photo_front_url, 'https://example.com/front-photo.jpg');
     assert.strictEqual(saved.photo_left_url, 'https://example.com/left-photo.jpg');
     assert.strictEqual(saved.photo_right_url, 'https://example.com/right-photo.jpg');

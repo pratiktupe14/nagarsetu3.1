@@ -191,10 +191,8 @@ const submitComplaintHandler = async (req, res) => {
       duplicate_of_id
     } = req.body;
 
-    // Respect client-provided complaint_number if provided (e.g. multi-angle submissions), or generate authoritatively
-    const finalComplaintNumber = (complaint_number && typeof complaint_number === 'string' && complaint_number.trim())
-      ? complaint_number.trim()
-      : `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Always generate complaint_number authoritatively on the server side
+    const finalComplaintNumber = `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // Authoritatively resolve canonical department
     let resolvedDept = null;

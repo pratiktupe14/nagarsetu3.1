@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const express = require('express');
 const http = require('http');
 const { initDatabase } = require('../src/config/db');
+const { seedAll } = require('../src/server');
 const authRoutes = require('../src/routes/auth.routes');
 const adminRoutes = require('../src/routes/admin.routes');
 
@@ -12,6 +13,9 @@ describe('Role-Routing and Authentication Verification Suite', () => {
 
   before(async () => {
     await initDatabase();
+    if (seedAll) {
+      await seedAll();
+    }
     const app = express();
     app.use(express.json());
     app.use('/api/auth', authRoutes);
