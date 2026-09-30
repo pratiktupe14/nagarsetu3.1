@@ -162,4 +162,57 @@ describe('Role-Routing and Authentication Verification Suite', () => {
     const data = await res.json();
     assert.strictEqual(data.user.role, 'citizen', 'Database citizen user must have citizen role');
   });
+
+  test('8. Public registration with role: "admin" cannot create an admin account', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Malicious Actor',
+        mobile: '9999888877',
+        email: 'attacker@example.com',
+        password: 'Password@123',
+        role: 'admin'
+      })
+    });
+
+    // Joi schema validation with allowUnknown: false rejects unpermitted 'role' field
+    assert.strictEqual(res.status, 400, 'Public registration attempting role: admin must be rejected with HTTP 400');
+    const data = await res.json();
+    assert.strictEqual(data.details?.some(d => d.includes('role')), true, 'Validation error must mention role');
+    assert.strictEqual(data.user, undefined, 'Admin user must never be created');
+  });
+
+  test('9. Public registration with only { role: "admin" } cannot create an admin account', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: 'admin'
+      })
+    });
+
+    assert.strictEqual(res.status, 400, 'Public registration payload { role: "admin" } must return HTTP 400');
+    const data = await res.json();
+    assert.strictEqual(data.user, undefined, 'No user should be created');
+  });
+
+  test('10. Public registration creates strictly citizen role accounts', async () => {
+    const uniqueMobile = '9199' + Math.floor(100000 + Math.random() * 900000);
+    const res = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Honest Citizen',
+        mobile: uniqueMobile,
+        email: `citizen_${uniqueMobile}@example.com`,
+        password: 'Password@123'
+      })
+    });
+
+    assert.strictEqual(res.status, 201, 'Public registration must succeed with HTTP 201');
+    const data = await res.json();
+    assert.ok(data.token, 'Must return signed token');
+    assert.strictEqual(data.user.role, 'citizen', 'Created account must strictly have citizen role');
+  });
 });

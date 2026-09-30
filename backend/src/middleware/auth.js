@@ -5,13 +5,17 @@ const isProd = process.env.NODE_ENV === 'production';
 
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
-  if (!secret || secret.trim() === '') {
-    if (isProd) {
-      console.warn('[SECURITY NOTICE] JWT_SECRET environment variable is missing; using default secure fallback.');
+  if (isProd) {
+    if (!secret || secret.trim() === '') {
+      throw new Error('[SECURITY FATAL] JWT_SECRET environment variable is missing in production.');
     }
-    return 'nagarsetu_secret_key_2026_super_secure';
+    if (secret.trim().length < 32) {
+      throw new Error('[SECURITY FATAL] JWT_SECRET in production must be at least 32 characters long.');
+    }
+    return secret.trim();
   }
-  return secret.trim();
+  // Marked local-only development and test fallback
+  return (secret && secret.trim()) ? secret.trim() : 'dev_test_only_local_fallback_secret_key_2026_minimum_32_characters';
 }
 
 const JWT_SECRET = getJwtSecret();
@@ -68,7 +72,7 @@ function generateToken(user) {
       language_pref: user.language_pref
     },
     JWT_SECRET,
-    { expiresIn: '30d' }
+    { expiresIn: '8h' }
   );
 }
 
@@ -128,8 +132,9 @@ async function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  // 0. Demo & Testing token recognition for citizen & staff portals
-  if (DEMO_USER_TOKENS[token]) {
+  // 0. Demo & Testing token recognition (strictly gated to development and test environments)
+  const isDevOrTest = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  if (isDevOrTest && DEMO_USER_TOKENS[token]) {
     req.user = { ...DEMO_USER_TOKENS[token] };
     return next();
   }
@@ -268,12 +273,7 @@ async function optionalAuthenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    req.user = { ...DEMO_USER_TOKENS['demo-token-citizen'] };
-    return next();
-  }
-
-  if (DEMO_USER_TOKENS[token]) {
-    req.user = { ...DEMO_USER_TOKENS[token] };
+    req.user = null;
     return next();
   }
 
@@ -285,7 +285,7 @@ async function optionalAuthenticateToken(req, res, next) {
     }
   } catch (e) {}
 
-  req.user = { ...DEMO_USER_TOKENS['demo-token-citizen'] };
+  req.user = null;
   return next();
 }
 

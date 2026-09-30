@@ -104,37 +104,18 @@ function authRateLimiter(req, res, next) {
 
   next();
 }
-
-const jwt = require('jsonwebtoken');
+// TODO: Use a shared Redis/Upstash rate-limit store for distributed/serverless production.
 
 /**
  * Granular client identifier helper for authenticated actions and complaint submissions.
- * Resolves authenticated user ID / email, bearer token snippet, or IP address.
- * Ensures users on shared IPs, NAT, or localhost dev environments have isolated buckets.
+ * Resolves verified authenticated user ID (req.user.id) or falls back to client IP.
+ * Does NOT trust unverified token decodes from headers.
  */
 function getAuthedClientKey(req) {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
-  if (req.user && (req.user.id || req.user.email)) {
-    const id = req.user.id || req.user.email;
-    return `user_${id}_${ip}`;
-  }
-
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-  if (authHeader && typeof authHeader === 'string') {
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token) {
-      try {
-        const decoded = jwt.decode(token);
-        if (decoded && (decoded.id || decoded.email || decoded.sub)) {
-          const userKey = decoded.id || decoded.email || decoded.sub;
-          return `user_${userKey}_${ip}`;
-        }
-      } catch (e) {}
-
-      // Fallback for non-jwt tokens (e.g. demo-token-citizen)
-      return `tok_${token.length > 24 ? token.slice(-24) : token}_${ip}`;
-    }
+  if (req.user && req.user.id) {
+    return `user_${req.user.id}_${ip}`;
   }
 
   return `ip_${ip}`;

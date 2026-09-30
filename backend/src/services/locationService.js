@@ -106,20 +106,55 @@ async function resolveLocation(filePath, liveLat, liveLng, manualLat, manualLng)
   };
 }
 
+function isValidCoordinate(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+  if (isNaN(lat) || isNaN(lng)) return false;
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function normalizeCategory(cat) {
+  if (!cat || typeof cat !== 'string') return '';
+  return cat.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 // Find potential duplicate open complaints within radius (e.g. 100 meters)
 async function checkForDuplicates(latitude, longitude, category, radiusMeters = 100) {
   try {
-    // Fetch all active/open complaints
+    if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
+      return [];
+    }
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const normCat = normalizeCategory(category);
+
+    // Bounding box prefilter: 1 deg lat ~= 111,000m
+    const latDelta = (radiusMeters * 1.5) / 111000;
+    const lngDelta = (radiusMeters * 1.5) / (111000 * Math.cos((lat * Math.PI) / 180) || 1);
+
+    const minLat = lat - latDelta;
+    const maxLat = lat + latDelta;
+    const minLng = lng - Math.abs(lngDelta);
+    const maxLng = lng + Math.abs(lngDelta);
+
+    // Fetch active/unresolved complaints within bounding box
     const sql = `
       SELECT id, title, category, priority, status, latitude, longitude, created_at
       FROM complaints
-      WHERE status NOT IN ('Resolved', 'Rejected')
+      WHERE status NOT IN ('Resolved', 'Rejected', 'Closed')
+        AND latitude BETWEEN ? AND ?
+        AND longitude BETWEEN ? AND ?
     `;
-    const res = await query(sql);
+    const res = await query(sql, [minLat, maxLat, minLng, maxLng]);
     const duplicates = [];
 
-    for (const row of res.rows) {
-      const dist = calculateDistanceMeters(latitude, longitude, row.latitude, row.longitude);
+    for (const row of (res.rows || [])) {
+      // Must match normalized category: a pothole must not match a streetlight complaint
+      if (normCat && normalizeCategory(row.category) !== normCat) {
+        continue;
+      }
+
+      const dist = calculateDistanceMeters(lat, lng, row.latitude, row.longitude);
       if (dist <= radiusMeters) {
         duplicates.push({
           complaint_id: row.id,
@@ -142,5 +177,7 @@ module.exports = {
   calculateDistanceMeters,
   extractExifGps,
   resolveLocation,
-  checkForDuplicates
+  checkForDuplicates,
+  isValidCoordinate,
+  normalizeCategory
 };

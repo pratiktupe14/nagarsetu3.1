@@ -1,6 +1,7 @@
 import os
 import sys
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import secrets
+from fastapi import FastAPI, File, UploadFile, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -13,13 +14,29 @@ app = FastAPI(
     version="3.0.0"
 )
 
+cors_allowed = os.getenv("CORS_ALLOWED_ORIGINS", "")
+allowed_origins = [orig.strip() for orig in cors_allowed.split(",") if orig.strip()]
+if not allowed_origins:
+    allowed_origins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5000", "http://127.0.0.1:5000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+async def verify_internal_api_key(x_internal_api_key: Optional[str] = Header(None, alias="X-Internal-API-Key")):
+    expected_key = os.getenv("AI_INTERNAL_API_KEY")
+    if not expected_key:
+        return True
+    if not x_internal_api_key or not secrets.compare_digest(x_internal_api_key, expected_key):
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid or missing X-Internal-API-Key")
+    return True
+
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 class AnalysisResponse(BaseModel):
     analysis_id: Optional[str] = None
@@ -63,12 +80,18 @@ def health_check():
         "google_maps_configured": bool(os.getenv("GOOGLE_MAPS_API_KEY"))
     }
 
-@app.post("/analyze", response_model=AnalysisResponse)
+@app.post("/analyze", response_model=AnalysisResponse, dependencies=[Depends(verify_internal_api_key)])
 async def analyze_photo(file: UploadFile = File(...)):
+    if file.content_type and file.content_type.lower() not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=415, detail=f"Unsupported Media Type: {file.content_type}. Allowed: JPEG, PNG, WebP.")
+
     try:
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
+
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Payload Too Large: Maximum allowed file size is 10 MB.")
         
         # Magic bytes check for JPEG, PNG, or WebP
         if len(content) < 4:
@@ -80,7 +103,7 @@ async def analyze_photo(file: UploadFile = File(...)):
         is_webp = header.startswith(b'RIFF') and content[8:12] == b'WEBP'
 
         if not (is_jpeg or is_png or is_webp):
-            raise HTTPException(status_code=400, detail="Invalid image binary signature. Must be JPEG, PNG, or WebP.")
+            raise HTTPException(status_code=415, detail="Invalid image binary signature. Must be JPEG, PNG, or WebP.")
 
         result = analyze_complaint_image(content, filename=file.filename or "")
         return result
@@ -91,7 +114,7 @@ async def analyze_photo(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="AI Processing Error. Please try again later.")
 
 # GOOGLE MAPS ENDPOINTS
-@app.post("/google-maps/geocode")
+@app.post("/google-maps/geocode", dependencies=[Depends(verify_internal_api_key)])
 def geocode(req: GeocodeRequest):
     return gms.geocode_address(req.address)
 
@@ -99,7 +122,7 @@ def geocode(req: GeocodeRequest):
 def reverse_geocode(req: ReverseGeocodeRequest):
     return gms.reverse_geocode(req.latitude, req.longitude)
 
-@app.post("/google-maps/directions")
+@app.post("/google-maps/directions", dependencies=[Depends(verify_internal_api_key)])
 def get_directions(req: DirectionsRequest):
     return gms.get_directions(
         req.origin_latitude,

@@ -279,14 +279,12 @@ function resolveInitialUser(): UserProfile | null {
       try {
         const parsed = JSON.parse(roleSavedRaw);
         if (parsed && parsed.role === pathRole) {
-          sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
           const savedToken = localStorage.getItem(`nagarsetu_token_${pathRole}`);
           if (savedToken) {
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
             sessionStorage.setItem('nagarsetu_token', savedToken);
-          } else {
-            sessionStorage.setItem('nagarsetu_token', getDemoTokenForRole(pathRole));
+            return parsed;
           }
-          return parsed;
         }
       } catch (e) {}
     }
@@ -296,20 +294,17 @@ function resolveInitialUser(): UserProfile | null {
       try {
         const parsed = JSON.parse(generalUserRaw);
         if (parsed && parsed.role === pathRole) {
-          sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
-          const genToken = localStorage.getItem('nagarsetu_token') || getDemoTokenForRole(pathRole);
-          sessionStorage.setItem('nagarsetu_token', genToken);
-          return parsed;
+          const genToken = localStorage.getItem('nagarsetu_token');
+          if (genToken) {
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+            sessionStorage.setItem('nagarsetu_token', genToken);
+            return parsed;
+          }
         }
       } catch (e) {}
     }
 
-    const defaultUser = DEFAULT_ROLE_USERS[pathRole];
-    if (defaultUser) {
-      sessionStorage.setItem('nagarsetu_user', JSON.stringify(defaultUser));
-      sessionStorage.setItem('nagarsetu_token', getDemoTokenForRole(pathRole));
-      return defaultUser;
-    }
+    return null;
   }
 
   // 3. For public / non-role pages, check general localStorage
@@ -389,13 +384,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return;
             }
           } else if (res.status === 401 || res.status === 403 || res.status === 404) {
-            if (!isSupabaseConfigured()) {
-              sessionStorage.removeItem('nagarsetu_token');
-              sessionStorage.removeItem('nagarsetu_user');
-              localStorage.removeItem('nagarsetu_token');
-              localStorage.removeItem('nagarsetu_user');
-              if (isMounted) setUser(null);
-            }
+            sessionStorage.removeItem('nagarsetu_token');
+            sessionStorage.removeItem('nagarsetu_user');
+            localStorage.removeItem('nagarsetu_token');
+            localStorage.removeItem('nagarsetu_user');
+            if (isMounted) setUser(null);
           }
         } catch (backendErr) {
           console.warn('Authoritative backend /api/auth/me check note:', backendErr);
@@ -593,27 +586,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const switchRole = async (newRole: UserRole) => {
-    let roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
     const roleSavedRaw = localStorage.getItem(`nagarsetu_user_${newRole}`);
-    if (roleSavedRaw) {
+    const token = localStorage.getItem(`nagarsetu_token_${newRole}`);
+    if (roleSavedRaw && token) {
       try {
         const parsed = JSON.parse(roleSavedRaw);
-        if (parsed && parsed.role === newRole) roleUser = parsed;
+        if (parsed && parsed.role === newRole) {
+          setUser(parsed);
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+          sessionStorage.setItem('nagarsetu_token', token);
+          return;
+        }
       } catch (e) {}
     }
-    if (newRole === 'service_staff' && user && user.email) {
-      const resolved = findServiceStaffByIdentifier(user.email);
-      if (resolved) roleUser = resolved;
-    }
-    if (newRole === 'department_head' && user && user.email) {
-      const resolvedHead = findDepartmentHeadByIdentifier(user.email);
-      if (resolvedHead) roleUser = resolvedHead;
-    }
-
-    setUser(roleUser);
-    sessionStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
-    const token = localStorage.getItem(`nagarsetu_token_${newRole}`) || getDemoTokenForRole(newRole);
-    sessionStorage.setItem('nagarsetu_token', token);
   };
 
   const login = async (identifier: string, password: string, _targetRole?: UserRole): Promise<boolean> => {
@@ -848,112 +833,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      // Demo & Client Fallback Authentication
-      const fetchDemoToken = async (role: string, fallback: string): Promise<string> => {
-        try {
-          const res = await fetch(`${getApiUrl()}/api/auth/demo-token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role })
-          });
-          if (res.ok) {
-            const d = await res.json();
-            if (d?.token) return d.token;
-          }
-        } catch (e) {}
-        return fallback;
-      };
-
-      const cleanPhoneDigits = cleanIdentifier.replace(/\D/g, '');
-      const isAdminIdentifier = cleanEmail === 'admin@nagarsetu.gov.in' || cleanPhoneDigits.endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin';
-      if (isAdminIdentifier) {
-        const validAdminPass = ['NagarSetu@Admin2026!', 'admin123', 'Admin@123'].includes((password || '').trim());
-        if (!validAdminPass) {
-          throw new Error('Invalid login credentials. Please check your admin password.');
-        }
-        const adminUser: UserProfile = {
-          id: '4',
-          full_name: 'Municipal Admin',
-          email: 'admin@nagarsetu.gov.in',
-          mobile: '9876543213',
-          role: 'city_admin',
-          language_pref: 'en'
-        };
-        setUser(adminUser);
-        const tok = await fetchDemoToken('city_admin', 'demo-token-city-admin');
-        sessionStorage.setItem('nagarsetu_token', tok);
-        sessionStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
-        localStorage.setItem('nagarsetu_token', tok);
-        localStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
-        localStorage.setItem('nagarsetu_token_city_admin', tok);
-        localStorage.setItem('nagarsetu_user_city_admin', JSON.stringify(adminUser));
-        return true;
-      }
-
-      const isDeptHeadIdentifier = cleanEmail.includes('kumar') || cleanEmail.includes('sharma') || cleanPhoneDigits.endsWith('9822000001');
-      if (isDeptHeadIdentifier) {
-        const validHeadPass = ['head123', 'head@123'].includes((password || '').trim());
-        if (!validHeadPass) {
-          throw new Error('Invalid login credentials. Please check your department head password.');
-        }
-        const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
-        if (dhMatch) {
-          setUser(dhMatch);
-          const tok = await fetchDemoToken('department_head', 'demo-token-dept-head');
-          sessionStorage.setItem('nagarsetu_token', tok);
-          sessionStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
-          localStorage.setItem('nagarsetu_token', tok);
-          localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
-          localStorage.setItem('nagarsetu_token_department_head', tok);
-          localStorage.setItem('nagarsetu_user_department_head', JSON.stringify(dhMatch));
-          return true;
-        }
-      }
-
-      const isStaffIdentifier = cleanEmail.includes('staff') || cleanPhoneDigits.endsWith('9822010001') || cleanPhoneDigits.endsWith('9876543212');
-      if (isStaffIdentifier) {
-        const validStaffPass = ['staff123', 'staff@123'].includes((password || '').trim());
-        if (!validStaffPass) {
-          throw new Error('Invalid login credentials. Please check your staff password.');
-        }
-        const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
-        if (staffUser) {
-          setUser(staffUser);
-          const tok = await fetchDemoToken('service_staff', 'demo-token-service-staff');
-          sessionStorage.setItem('nagarsetu_token', tok);
-          sessionStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
-          localStorage.setItem('nagarsetu_token', tok);
-          localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
-          localStorage.setItem('nagarsetu_token_service_staff', tok);
-          localStorage.setItem('nagarsetu_user_service_staff', JSON.stringify(staffUser));
-          return true;
-        }
-      }
-
-      const isCitizenIdentifier = cleanPhoneDigits.includes('8788562103') || cleanPhoneDigits.endsWith('9876543210') || cleanEmail.includes('citizen') || cleanEmail.includes('tupe');
-      if (isCitizenIdentifier) {
-        const validCitizenPass = ['password123', 'citizen123', 'nagarsetu@123', '8788562103'].includes((password || '').trim());
-        if (!validCitizenPass) {
-          throw new Error('Invalid login credentials. Please check your citizen password.');
-        }
-        const citizenUser: UserProfile = {
-          id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-          full_name: 'Pratik Dilip Tupe',
-          email: 'citizen8788@nagarsetu.gov.in',
-          mobile: '8788562103',
-          role: 'citizen',
-          language_pref: 'en'
-        };
-        setUser(citizenUser);
-        const tok = await fetchDemoToken('citizen', 'demo-token-citizen');
-        sessionStorage.setItem('nagarsetu_token', tok);
-        sessionStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
-        localStorage.setItem('nagarsetu_token', tok);
-        localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
-        localStorage.setItem('nagarsetu_token_citizen', tok);
-        localStorage.setItem('nagarsetu_user_citizen', JSON.stringify(citizenUser));
-        return true;
-      }
+      // Clear invalid auth state and reject
+      sessionStorage.removeItem('nagarsetu_token');
+      sessionStorage.removeItem('nagarsetu_user');
+      localStorage.removeItem('nagarsetu_token');
+      localStorage.removeItem('nagarsetu_user');
+      setUser(null);
 
       throw new Error("Invalid login credentials. Please check your username/email and password.");
     } catch (e: any) {
@@ -1013,8 +898,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               name: fullName.trim(),
               mobile: mobile.trim(),
               email: email && email.trim() !== '' ? email.trim() : undefined,
-              password: password ? password.trim() : undefined,
-              role: 'citizen'
+              password: password ? password.trim() : undefined
             })
           });
         } catch (fetchErr: any) {

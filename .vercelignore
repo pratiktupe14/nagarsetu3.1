@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+tests
+backend/tests
+ai_service
+*.sqlite
+backend/nagarsetu.sqlite*
+*.log

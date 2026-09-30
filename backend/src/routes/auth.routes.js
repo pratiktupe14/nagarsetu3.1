@@ -6,10 +6,12 @@ const { generateToken, authenticateToken, getSupabaseClient } = require('../midd
 const validateInput = require('../middleware/validateInput');
 const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
 
-// Register endpoint (Citizen, Officer, Staff, Admin)
+// Register endpoint (Public registration strictly creates citizen accounts only)
 router.post('/register', validateInput(registerSchema), async (req, res) => {
   try {
-    const { name, mobile, email, password, role = 'citizen', language_pref = 'en' } = req.body;
+    const { name, mobile, email, password, language_pref = 'en' } = req.body;
+    // Public registration must strictly create citizen users only; ignore any client-supplied role
+    const role = 'citizen';
 
     // Check existing user
     const checkSql = `SELECT id FROM users WHERE mobile = ? OR (email IS NOT NULL AND email = ?)`;
@@ -83,90 +85,18 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     }
 
     if (!user) {
-      if (cleanIdentifier === 'admin@nagarsetu.gov.in' || cleanIdentifier === 'admin' || normMobile === '9876543213') {
-        user = {
-          id: 4,
-          name: 'Municipal Admin',
-          mobile: '9876543213',
-          email: 'admin@nagarsetu.gov.in',
-          role: 'city_admin',
-          status: 'active',
-          language_pref: 'en'
-        };
-      } else if (normMobile === '8788562103' || cleanIdentifier === 'citizen8788@nagarsetu.gov.in' || cleanIdentifier.includes('8788') || cleanIdentifier.includes('citizen') || normMobile === '9876543210') {
-        user = {
-          id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-          name: 'Pratik Dilip Tupe',
-          mobile: '8788562103',
-          email: 'citizen8788@nagarsetu.gov.in',
-          role: 'citizen',
-          status: 'active',
-          language_pref: 'en'
-        };
-      } else if (cleanIdentifier.includes('rahul.kumar') || normMobile === '9822000001') {
-        user = {
-          id: 13,
-          name: 'Rahul Kumar',
-          mobile: '9822000001',
-          email: 'rahul.kumar@nagarsetu.gov.in',
-          role: 'department_head',
-          department_id: 1,
-          status: 'active',
-          language_pref: 'en'
-        };
-      } else if (cleanIdentifier.includes('staff@nagarsetu.gov.in') || normMobile === '9822010001' || normMobile === '9876543212') {
-        user = {
-          id: 20,
-          name: 'Amit Patil',
-          mobile: '9822010001',
-          email: 'amit.patil@nagarsetu.gov.in',
-          role: 'service_staff',
-          department_id: 1,
-          status: 'active',
-          language_pref: 'en'
-        };
-      } else {
-        return res.status(401).json({ error: 'Invalid login credentials' });
-      }
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
     if (user.status === 'inactive') {
       return res.status(401).json({ error: 'Account is inactive. Please contact City Administration.' });
     }
 
-    let isMatch = false;
-    if (user.password_hash) {
-      isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!user.password_hash) {
+      return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
-    // Role-specific demo fallback credential check (strict password matching per role)
-    if (!isMatch) {
-      const userRole = (user.role === 'admin' || user.role === 'city_admin') ? 'city_admin' : user.role;
-      const trimmedPass = (password || '').trim();
-
-      if (userRole === 'city_admin') {
-        const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-        if (trimmedPass === devAdminPass || trimmedPass === 'admin123' || trimmedPass === 'Admin@123') {
-          isMatch = true;
-        }
-      } else if (userRole === 'department_head') {
-        const devHeadPass = process.env.DEMO_HEAD_PASSWORD || 'head123';
-        if (trimmedPass === devHeadPass || trimmedPass === 'head@123') {
-          isMatch = true;
-        }
-      } else if (userRole === 'service_staff') {
-        const devStaffPass = process.env.DEMO_STAFF_PASSWORD || 'staff123';
-        if (trimmedPass === devStaffPass || trimmedPass === 'staff@123') {
-          isMatch = true;
-        }
-      } else if (userRole === 'citizen') {
-        const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
-        if (trimmedPass === devUserPass || trimmedPass === 'citizen123' || trimmedPass === 'nagarsetu@123' || trimmedPass === '8788562103') {
-          isMatch = true;
-        }
-      }
-    }
-
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
@@ -318,8 +248,11 @@ router.get('/me', authenticateToken, (req, res) => {
   return res.json({ user: req.user });
 });
 
-// Quick demo token generation endpoint for seamless offline/fallback portals
+// Quick demo token generation endpoint for seamless offline/fallback portals (development & test only)
 router.post('/demo-token', (req, res) => {
+  if (process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test") {
+    return res.status(404).json({ error: "Not found" });
+  }
   const role = req.body?.role || 'citizen';
   let userObj;
   if (role === 'citizen') {

@@ -45,17 +45,37 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
   try {
     const { status } = req.body;
 
-    const compRes = await query(`SELECT citizen_id FROM complaints WHERE id = ?`, [req.params.id]);
+    const compRes = await query(
+      `SELECT c.id, c.citizen_id, c.assigned_staff_id, c.assigned_staff_email, c.assigned_staff_name
+       FROM complaints c
+       WHERE c.id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?`,
+      [req.params.id, req.params.id, req.params.id]
+    );
     if (!compRes.rows || compRes.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
 
-    await query(`UPDATE complaints SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, req.params.id]);
+    const complaint = compRes.rows[0];
+    const isStaffRole = req.user.role === 'staff' || req.user.role === 'service_staff';
+    if (isStaffRole) {
+      const assignRes = await query(
+        `SELECT id FROM assignments WHERE (CAST(complaint_id AS TEXT) = ? OR complaint_id = ?) AND (CAST(staff_id AS TEXT) = ? OR staff_id = ?)`,
+        [String(complaint.id), req.params.id, String(req.user.id), req.user.id]
+      );
+      const isAssigned = (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(req.user.id)) ||
+        (complaint.assigned_staff_email && complaint.assigned_staff_email.toLowerCase() === (req.user.email || '').toLowerCase()) ||
+        (assignRes.rows && assignRes.rows.length > 0);
+      if (!isAssigned) {
+        return res.status(403).json({ error: 'Forbidden: You are not assigned to this task' });
+      }
+    }
+
+    await query(`UPDATE complaints SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, complaint.id]);
     await query(
       `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
-      [req.params.id, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
+      [complaint.id, status, `Field staff updated task status to ${status}.`, 'Field Operations', req.user.name || 'Field Staff']
     ).catch(() => {});
-    await notifyStatusChange(req.params.id, status, compRes.rows[0].citizen_id);
+    await notifyStatusChange(complaint.id, status, complaint.citizen_id);
 
     return res.json({ message: `Task status updated to ${status}` });
   } catch (err) {
@@ -65,7 +85,7 @@ router.post('/task/:id/status', validateInput(updateTaskStatusSchema), async (re
 });
 
 // Resolve Task with "After" Photo Proof
-router.post('/task/:id/resolve', async (req, res) => {
+router.post('/task/:id/resolve', uploadSingleImage('photo'), async (req, res) => {
   const targetId = req.params.id;
   const dbType = process.env.DB_TYPE || 'postgres';
   let updateErrMessage = 'NONE';
@@ -73,12 +93,12 @@ router.post('/task/:id/resolve', async (req, res) => {
   let oldStatus = 'Unknown';
 
   try {
-    let photoAfterUrl = req.body?.photo_after_url || '';
+    let photoAfterUrl = req.body?.photo_after_url || req.body?.photo_after || '';
     if (req.file) {
       photoAfterUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : photoAfterUrl);
     }
-    if (!photoAfterUrl && !req.body?.photo_after) {
-      photoAfterUrl = '/uploads/temp-after.jpg';
+    if (!photoAfterUrl || photoAfterUrl.trim() === '') {
+      return res.status(400).json({ error: 'Resolution photo proof is required to resolve this task' });
     }
 
     const workPerformed = req.body?.work_performed || req.body?.work_notes || 'Field work completed on site.';
@@ -117,6 +137,20 @@ router.post('/task/:id/resolve', async (req, res) => {
     }
 
     const complaint = compRes.rows[0];
+    const isStaffRole = req.user.role === 'staff' || req.user.role === 'service_staff';
+    if (isStaffRole) {
+      const assignRes = await query(
+        `SELECT id FROM assignments WHERE (CAST(complaint_id AS TEXT) = $1 OR complaint_id = $2) AND (CAST(staff_id AS TEXT) = $3 OR staff_id = $4)`,
+        [String(complaint.id), String(targetId), String(req.user.id), String(req.user.id)]
+      );
+      const isAssigned = (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(req.user.id)) ||
+        (complaint.assigned_staff_email && complaint.assigned_staff_email.toLowerCase() === (req.user.email || '').toLowerCase()) ||
+        (assignRes.rows && assignRes.rows.length > 0);
+      if (!isAssigned) {
+        return res.status(403).json({ error: 'Forbidden: You are not assigned to this task' });
+      }
+    }
+
     oldStatus = complaint.status || 'In Progress';
     const primaryKeyId = String(complaint.id);
     const complaintNum = complaint.complaint_number || '';
@@ -185,7 +219,7 @@ router.post('/task/:id/resolve', async (req, res) => {
     ).catch(() => {});
 
     await query(
-      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 OR staff_id = $2)`,
+      `UPDATE assignments SET resolved_at = CURRENT_TIMESTAMP WHERE (CAST(complaint_id AS TEXT) = $1 AND (CAST(staff_id AS TEXT) = $2 OR staff_id = $2))`,
       [primaryKeyId, req.user.id]
     ).catch(() => {});
 

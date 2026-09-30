@@ -20,7 +20,7 @@ router.use((req, res, next) => {
 });
 
 // Dedicated photo upload endpoint for complaints (persists to /uploads or Supabase storage)
-router.post('/upload', optionalAuthenticateToken, uploadSingleImage('photo'), async (req, res) => {
+router.post('/upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
@@ -191,7 +191,8 @@ const submitComplaintHandler = async (req, res) => {
       duplicate_of_id
     } = req.body;
 
-    const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Always generate complaint_number authoritatively on the server side
+    const finalComplaintNumber = `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // Authoritatively resolve canonical department
     let resolvedDept = null;
@@ -451,15 +452,56 @@ const submitComplaintHandler = async (req, res) => {
 router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
 router.post('/', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
 
-// Get complaint status history timeline
+// Get complaint status history timeline with role-aware authorization
 router.get('/:id/history', authenticateToken, async (req, res) => {
   try {
+    const compRes = await query(
+      `SELECT id, citizen_id, department_id, assigned_staff_id, assigned_staff_email 
+       FROM complaints 
+       WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`,
+      [req.params.id, req.params.id, req.params.id]
+    );
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+    const user = req.user;
+    const userRole = user?.role || 'citizen';
+    const isOwner = String(complaint.citizen_id) === String(user?.id);
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isDeptHeadOrOfficer = ['department_head', 'officer'].includes(userRole);
+    const isStaff = ['staff', 'service_staff'].includes(userRole);
+
+    if (userRole === 'citizen') {
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Forbidden: You can only view your own complaints history' });
+      }
+    } else if (isStaff) {
+      const isAssigned = (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(user.id)) ||
+        (complaint.assigned_staff_email && complaint.assigned_staff_email.toLowerCase() === (user.email || '').toLowerCase());
+      if (!isAssigned) {
+        const assignCheck = await query(
+          `SELECT id FROM assignments WHERE (complaint_id = ? OR CAST(complaint_id AS TEXT) = ?) AND (staff_id = ? OR CAST(staff_id AS TEXT) = ?)`,
+          [complaint.id, String(complaint.id), user.id, String(user.id)]
+        );
+        if (!assignCheck.rows || assignCheck.rows.length === 0) {
+          return res.status(403).json({ error: 'Forbidden: You are not assigned to this complaint' });
+        }
+      }
+    } else if (isDeptHeadOrOfficer) {
+      if (user.department_id && complaint.department_id && String(user.department_id) !== String(complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: Access denied for this department' });
+      }
+    } else if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access' });
+    }
+
     const historyRes = await query(
       `SELECT h.* FROM complaint_status_history h
-       LEFT JOIN complaints c ON h.complaint_id = c.id
-       WHERE h.complaint_id = ? OR c.complaint_number = ? OR CAST(c.id AS TEXT) = ?
+       WHERE h.complaint_id = ? OR CAST(h.complaint_id AS TEXT) = ?
        ORDER BY h.created_at ASC`,
-      [req.params.id, req.params.id, req.params.id]
+      [complaint.id, String(complaint.id)]
     );
     return res.json({ history: historyRes.rows || [] });
   } catch (err) {
@@ -468,20 +510,25 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all complaints for Admin / Portals
+// Get all complaints for Admin / Portals (Citizens only list their own complaints)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const isCitizen = req.user && req.user.role === 'citizen';
-    const sql = `
+    let sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
       ${!isCitizen ? ', u.name as citizen_name, u.mobile as citizen_mobile' : ''}
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
       ${!isCitizen ? 'LEFT JOIN users u ON c.citizen_id = u.id' : ''}
-      ORDER BY c.created_at DESC
     `;
-    const result = await query(sql);
+    const params = [];
+    if (isCitizen) {
+      sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
+      params.push(req.user.id, String(req.user.id));
+    }
+    sql += ` ORDER BY c.created_at DESC`;
+    const result = await query(sql, params);
     if (result.rows && result.rows.length > 0) {
       return res.json({ complaints: result.rows.map(c => normalizeComplaintPhotoUrls(c, req)) });
     }
@@ -491,10 +538,16 @@ router.get('/', authenticateToken, async (req, res) => {
       const { getSupabaseClient } = require('../middleware/auth');
       const supabase = getSupabaseClient();
       if (supabase) {
-        const { data, error } = await supabase
+        let supaQuery = supabase
           .from('complaints')
           .select('*')
           .order('created_at', { ascending: false });
+
+        if (isCitizen) {
+          supaQuery = supaQuery.eq('citizen_id', req.user.id);
+        }
+
+        const { data, error } = await supaQuery;
 
         if (!error && Array.isArray(data) && data.length > 0) {
           let deptMap = {};
@@ -574,8 +627,8 @@ router.get('/my', authenticateToken, async (req, res) => {
   }
 });
 
-// Get single complaint by ID (supports authenticated or public tracking)
-router.get('/:id', optionalAuthenticateToken, async (req, res) => {
+// Get single complaint by ID with strict role-aware authorization
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const idParam = req.params.id;
     const sql = `
@@ -613,39 +666,6 @@ router.get('/:id', optionalAuthenticateToken, async (req, res) => {
               ...supaData,
               department_name: supaData.departments?.name || supaData.department_name
             };
-          } else if (idParam === '1' || !isNaN(Number(idParam))) {
-            // For ID "1" or small integer, resolve to user's most recent complaint
-            let citizenId = req.user?.id || 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-            if (citizenId === 'c-8788562103' || req.user?.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
-              citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-            }
-            const isCitizenUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(citizenId);
-            let latestList = null;
-            if (isCitizenUuid) {
-              const { data: cList } = await supabase
-                .from('complaints')
-                .select('*, departments(name)')
-                .eq('citizen_id', citizenId)
-                .order('created_at', { ascending: false })
-                .limit(1);
-              latestList = cList;
-            }
-
-            if (!latestList || latestList.length === 0) {
-              const { data: anyLatest } = await supabase
-                .from('complaints')
-                .select('*, departments(name)')
-                .order('created_at', { ascending: false })
-                .limit(1);
-              latestList = anyLatest;
-            }
-
-            if (latestList && latestList.length > 0) {
-              complaint = {
-                ...latestList[0],
-                department_name: latestList[0].departments?.name || latestList[0].department_name
-              };
-            }
           }
         }
       } catch (sErr) {
@@ -657,22 +677,50 @@ router.get('/:id', optionalAuthenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Complaint not found' });
     }
 
-    // IDOR Protection: Redact citizen mobile and mask name for other citizens
-    const userRole = req.user.role || 'citizen';
-    const isOwner = String(complaint.citizen_id) === String(req.user.id);
-    const isPrivileged = ['officer', 'admin', 'city_admin', 'department_head', 'staff', 'service_staff'].includes(userRole);
+    const user = req.user;
+    const userRole = user?.role || 'citizen';
+    const isOwner = String(complaint.citizen_id) === String(user?.id);
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isDeptHeadOrOfficer = ['department_head', 'officer'].includes(userRole);
+    const isStaff = ['staff', 'service_staff'].includes(userRole);
 
-    if (!isOwner && !isPrivileged) {
+    if (userRole === 'citizen') {
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Forbidden: You can only view your own complaints' });
+      }
+    } else if (isStaff) {
+      const isAssigned = (complaint.assigned_staff_id && String(complaint.assigned_staff_id) === String(user.id)) ||
+        (complaint.assigned_staff_email && complaint.assigned_staff_email.toLowerCase() === (user.email || '').toLowerCase());
+      if (!isAssigned) {
+        const assignCheck = await query(
+          `SELECT id FROM assignments WHERE (complaint_id = ? OR CAST(complaint_id AS TEXT) = ?) AND (staff_id = ? OR CAST(staff_id AS TEXT) = ?)`,
+          [complaint.id, String(complaint.id), user.id, String(user.id)]
+        );
+        if (!assignCheck.rows || assignCheck.rows.length === 0) {
+          return res.status(403).json({ error: 'Forbidden: You are not assigned to this complaint' });
+        }
+      }
+    } else if (isDeptHeadOrOfficer) {
+      if (user.department_id && complaint.department_id && String(user.department_id) !== String(complaint.department_id)) {
+        return res.status(403).json({ error: 'Forbidden: Access denied for this department' });
+      }
+    } else if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access' });
+    }
+
+    // IDOR Protection: Redact citizen mobile and private details for non-owners
+    if (!isOwner) {
       delete complaint.citizen_mobile;
       if (complaint.citizen_name) {
         complaint.citizen_name = 'Citizen';
       }
     }
 
-    // Fetch assignment details if any
+    // Fetch assignment details if any (without exposing staff mobile)
     try {
       const assignSql = `
-        SELECT a.*, s.name as staff_name, s.mobile as staff_mobile, o.name as officer_name
+        SELECT a.id, a.complaint_id, a.staff_id, a.assigned_by, a.assigned_at, a.resolved_at,
+               s.name as staff_name, o.name as officer_name
         FROM assignments a
         LEFT JOIN users s ON a.staff_id = s.id
         LEFT JOIN users o ON a.assigned_by = o.id
@@ -696,12 +744,41 @@ router.get('/:id', optionalAuthenticateToken, async (req, res) => {
 router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema), async (req, res) => {
   try {
     const { rating, comment } = req.body;
+    if (req.user?.role !== 'citizen') {
+      return res.status(403).json({ error: 'Only citizens can submit complaint feedback' });
+    }
+
+    const compRes = await query(
+      `SELECT id, citizen_id, status FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`,
+      [req.params.id, req.params.id, req.params.id]
+    );
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+    if (String(complaint.citizen_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Forbidden: You can only provide feedback for your own complaint' });
+    }
+
+    const resolvedStatuses = ['Resolved', 'Closed', 'Completed', 'Resolution Submitted', 'Completed — Pending Verification'];
+    if (!resolvedStatuses.includes(complaint.status)) {
+      return res.status(400).json({ error: 'Feedback can only be submitted for resolved or completed complaints' });
+    }
+
+    const existingFeedback = await query(
+      `SELECT id FROM feedback WHERE complaint_id = ? OR CAST(complaint_id AS TEXT) = ?`,
+      [complaint.id, String(complaint.id)]
+    );
+    if (existingFeedback.rows && existingFeedback.rows.length > 0) {
+      return res.status(400).json({ error: 'Feedback has already been submitted for this complaint' });
+    }
 
     const insertSql = `
       INSERT INTO feedback (complaint_id, rating, comment)
       VALUES (?, ?, ?)
     `;
-    await query(insertSql, [req.params.id, rating, comment || '']);
+    await query(insertSql, [complaint.id, rating, comment || '']);
 
     return res.json({ message: 'Feedback submitted successfully' });
   } catch (err) {

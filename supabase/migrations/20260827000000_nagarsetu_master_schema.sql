@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.departments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Seed Initial 5 Municipal Departments
+-- Seed Initial 6 Municipal Departments
 INSERT INTO public.departments (name, code, description) VALUES
   ('Public Works Department (PWD)', 'PWD', 'Potholes, asphalt repairs, road damage, public infrastructure'),
   ('Sanitation & Waste Management', 'SAN', 'Garbage collection, overflowing dustbins, street sweeping, solid waste'),
@@ -61,6 +61,42 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Profiles -> auth.users Relationship (Idempotent Foreign Key DO Block)
+DO $$
+DECLARE
+  orphan_count INT := 0;
+  fk_exists BOOLEAN := false;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'profiles_id_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'profiles'
+  ) INTO fk_exists;
+
+  IF NOT fk_exists THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'auth' AND table_name = 'users'
+    ) THEN
+      SELECT COUNT(*) INTO orphan_count
+      FROM public.profiles p
+      WHERE NOT EXISTS (
+        SELECT 1 FROM auth.users u WHERE u.id = p.id
+      );
+
+      IF orphan_count = 0 THEN
+        ALTER TABLE public.profiles
+          ADD CONSTRAINT profiles_id_fkey
+          FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+      ELSE
+        -- TODO: Orphan profiles exist. Reconciliation required with auth.users before applying profiles_id_fkey constraint.
+        RAISE NOTICE 'Orphan profiles found (count: %): reconciliation required before adding profiles_id_fkey', orphan_count;
+      END IF;
+    END IF;
+  END IF;
+END $$;
 
 -- 4. User Roles Table
 CREATE TABLE IF NOT EXISTS public.user_roles (
@@ -93,6 +129,12 @@ CREATE TABLE IF NOT EXISTS public.complaints (
   citizen_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   photo_before_url TEXT NOT NULL,
   photo_after_url TEXT,
+  photo_front_url TEXT,
+  photo_left_url TEXT,
+  photo_right_url TEXT,
+  photo_closeup_url TEXT,
+  angle_photos JSONB,
+  additional_photos JSONB,
   category TEXT NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
@@ -105,23 +147,116 @@ CREATE TABLE IF NOT EXISTS public.complaints (
   location_address TEXT,
   duplicate_of_id UUID REFERENCES public.complaints(id) ON DELETE SET NULL,
   support_count INT DEFAULT 0,
+  ai_category TEXT,
+  ai_specific_issue TEXT,
+  ai_confidence NUMERIC(5,4),
+  ai_severity TEXT,
+  ai_urgency TEXT,
+  ai_evidence TEXT,
+  ai_model TEXT,
+  ai_analyzed_at TIMESTAMP WITH TIME ZONE,
+  assigned_staff_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  assigned_staff_name TEXT,
+  assigned_staff_email TEXT,
+  assigned_staff_employee_id TEXT,
+  assigned_at TIMESTAMP WITH TIME ZONE,
+  sla_deadline TIMESTAMP WITH TIME ZONE,
+  work_performed TEXT,
+  materials_used TEXT,
+  additional_notes TEXT,
+  resolution_notes TEXT,
+  resolution_submitted_at TIMESTAMP WITH TIME ZONE,
+  resolved_at TIMESTAMP WITH TIME ZONE,
+  verified_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  verified_by_name TEXT,
+  verified_at TIMESTAMP WITH TIME ZONE,
+  rejection_reason TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 7. Task Assignments Table
+-- Idempotent Column Additions for Complaints Table
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS photo_front_url TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS photo_left_url TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS photo_right_url TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS photo_closeup_url TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS angle_photos JSONB;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS additional_photos JSONB;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_category TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_specific_issue TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_confidence NUMERIC(5,4);
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_severity TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_urgency TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_evidence TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_model TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS ai_analyzed_at TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS assigned_staff_id UUID;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS assigned_staff_name TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS assigned_staff_email TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS assigned_staff_employee_id TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS sla_deadline TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS work_performed TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS materials_used TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS additional_notes TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS resolution_notes TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS resolution_submitted_at TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS verified_by UUID;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS verified_by_name TEXT;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'complaints_assigned_staff_id_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'complaints'
+  ) THEN
+    ALTER TABLE public.complaints
+      ADD CONSTRAINT complaints_assigned_staff_id_fkey
+      FOREIGN KEY (assigned_staff_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'complaints_verified_by_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'complaints'
+  ) THEN
+    ALTER TABLE public.complaints
+      ADD CONSTRAINT complaints_verified_by_fkey
+      FOREIGN KEY (verified_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- 7. Task Assignments Table (Canonical)
 CREATE TABLE IF NOT EXISTS public.task_assignments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   complaint_id UUID NOT NULL REFERENCES public.complaints(id) ON DELETE CASCADE,
   staff_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   assigned_by UUID REFERENCES public.profiles(id),
   sla_deadline TIMESTAMP WITH TIME ZONE,
+  assigned_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
   accepted_at TIMESTAMP WITH TIME ZONE,
   started_at TIMESTAMP WITH TIME ZONE,
   submitted_at TIMESTAMP WITH TIME ZONE,
+  resolved_at TIMESTAMP WITH TIME ZONE,
   status TEXT DEFAULT 'Assigned',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Idempotent Column Additions for Task Assignments Table
+ALTER TABLE public.task_assignments ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.task_assignments ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+
+-- Compatibility View for Legacy "assignments" References
+CREATE OR REPLACE VIEW public.assignments
+WITH (security_invoker = true)
+AS SELECT * FROM public.task_assignments;
 
 -- 8. Complaint Feedback Table
 CREATE TABLE IF NOT EXISTS public.complaint_feedback (
@@ -133,6 +268,9 @@ CREATE TABLE IF NOT EXISTS public.complaint_feedback (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Unique index to prevent duplicate feedback per complaint
+CREATE UNIQUE INDEX IF NOT EXISTS idx_complaint_feedback_complaint_id ON public.complaint_feedback(complaint_id);
+
 -- 9. Notifications Table
 CREATE TABLE IF NOT EXISTS public.notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -140,12 +278,19 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   role TEXT NOT NULL DEFAULT 'citizen',
   complaint_id UUID REFERENCES public.complaints(id) ON DELETE CASCADE,
   complaint_number TEXT,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'in_app',
+  type TEXT NOT NULL DEFAULT 'general',
+  title TEXT NOT NULL DEFAULT 'Notification',
   message TEXT NOT NULL,
   is_read BOOLEAN DEFAULT FALSE,
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS channel TEXT DEFAULT 'in_app';
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.notifications ALTER COLUMN type SET DEFAULT 'general';
+ALTER TABLE public.notifications ALTER COLUMN title SET DEFAULT 'Notification';
 
 -- 10. Complaint Status History Table
 CREATE TABLE IF NOT EXISTS public.complaint_status_history (
@@ -170,7 +315,86 @@ CREATE TABLE IF NOT EXISTS public.department_leadership_audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 12. Enable Row Level Security (RLS) & Public Policies
+-- 12. Safe Role & Department Helper Functions (SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS app_role
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.current_user_role() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.current_user_department()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT department_id FROM public.profiles WHERE id = auth.uid() LIMIT 1),
+    (SELECT department_id FROM public.department_heads WHERE user_id = auth.uid() LIMIT 1)
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.current_user_department() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_department() TO authenticated;
+
+-- 13. Auto-Create Profile Trigger for New Auth Users (Defaults to 'citizen')
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email, role)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'Citizen User'),
+    NEW.email,
+    'citizen'::app_role
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (NEW.id, 'citizen'::app_role)
+  ON CONFLICT (user_id, role) DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+    DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  END IF;
+END $$;
+
+-- 14. Performance & Query Optimization Indexes
+CREATE INDEX IF NOT EXISTS idx_complaints_citizen_id ON public.complaints(citizen_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_department_id ON public.complaints(department_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_assigned_staff_id ON public.complaints(assigned_staff_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON public.complaints(created_at);
+CREATE INDEX IF NOT EXISTS idx_complaints_category_status ON public.complaints(category, status);
+
+CREATE INDEX IF NOT EXISTS idx_task_assignments_complaint_id ON public.task_assignments(complaint_id);
+CREATE INDEX IF NOT EXISTS idx_task_assignments_staff_id ON public.task_assignments(staff_id);
+CREATE INDEX IF NOT EXISTS idx_task_assignments_staff_id_status ON public.task_assignments(staff_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id_sent_at ON public.notifications(user_id, sent_at);
+
+-- 15. Enable Row Level Security (RLS)
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
@@ -182,18 +406,234 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaint_status_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.department_leadership_audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow Public/Authenticated Select Operations for App Features
-CREATE POLICY IF NOT EXISTS "Public select departments" ON public.departments FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select profiles" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select user_roles" ON public.user_roles FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select department_heads" ON public.department_heads FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select complaints" ON public.complaints FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select task_assignments" ON public.task_assignments FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select complaint_feedback" ON public.complaint_feedback FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select notifications" ON public.notifications FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Public select status_history" ON public.complaint_status_history FOR SELECT USING (true);
+-- 16. Drop Dangerous / Legacy RLS Policies
+DROP POLICY IF EXISTS "Public select departments" ON public.departments;
+DROP POLICY IF EXISTS "Public select profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Public select user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Public select department_heads" ON public.department_heads;
+DROP POLICY IF EXISTS "Public select complaints" ON public.complaints;
+DROP POLICY IF EXISTS "Public select task_assignments" ON public.task_assignments;
+DROP POLICY IF EXISTS "Public select complaint_feedback" ON public.complaint_feedback;
+DROP POLICY IF EXISTS "Public select notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Public select status_history" ON public.complaint_status_history;
 
--- Enable Realtime for Tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.complaints;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.department_heads;
+DROP POLICY IF EXISTS "Profiles select policy" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles update policy" ON public.profiles;
+DROP POLICY IF EXISTS "User roles select policy" ON public.user_roles;
+DROP POLICY IF EXISTS "User roles admin manage policy" ON public.user_roles;
+DROP POLICY IF EXISTS "Department heads select policy" ON public.department_heads;
+DROP POLICY IF EXISTS "Complaints select policy" ON public.complaints;
+DROP POLICY IF EXISTS "Complaints insert policy" ON public.complaints;
+DROP POLICY IF EXISTS "Complaints update policy" ON public.complaints;
+DROP POLICY IF EXISTS "Task assignments select policy" ON public.task_assignments;
+DROP POLICY IF EXISTS "Task assignments update policy" ON public.task_assignments;
+DROP POLICY IF EXISTS "Task assignments admin manage" ON public.task_assignments;
+DROP POLICY IF EXISTS "Complaint feedback select policy" ON public.complaint_feedback;
+DROP POLICY IF EXISTS "Complaint feedback insert policy" ON public.complaint_feedback;
+DROP POLICY IF EXISTS "Notifications select policy" ON public.notifications;
+DROP POLICY IF EXISTS "Notifications update policy" ON public.notifications;
+DROP POLICY IF EXISTS "Complaint status history select policy" ON public.complaint_status_history;
+
+-- 17. Recreate Hardened RLS Policies
+
+-- Departments: Publicly readable for category / routing selection
+CREATE POLICY "Public select departments" ON public.departments
+  FOR SELECT USING (true);
+
+-- Profiles: Own profile, city_admin all, department_head for own department; update own only
+CREATE POLICY "Profiles select policy" ON public.profiles
+  FOR SELECT TO authenticated
+  USING (
+    id = auth.uid()
+    OR current_user_role() = 'city_admin'
+    OR (current_user_role() = 'department_head' AND department_id = current_user_department())
+  );
+
+CREATE POLICY "Profiles update policy" ON public.profiles
+  FOR UPDATE TO authenticated
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
+
+-- User Roles: Own roles or city_admin; manage restricted to city_admin
+CREATE POLICY "User roles select policy" ON public.user_roles
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+  );
+
+CREATE POLICY "User roles admin manage policy" ON public.user_roles
+  FOR ALL TO authenticated
+  USING (current_user_role() = 'city_admin')
+  WITH CHECK (current_user_role() = 'city_admin');
+
+-- Department Heads: Own record, or admin / department leadership
+CREATE POLICY "Department heads select policy" ON public.department_heads
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR current_user_role() IN ('city_admin', 'department_head')
+  );
+
+-- Complaints:
+-- SELECT: Citizen own, assigned staff, city_admin, department head for own department
+CREATE POLICY "Complaints select policy" ON public.complaints
+  FOR SELECT TO authenticated
+  USING (
+    citizen_id = auth.uid()
+    OR assigned_staff_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+    OR (current_user_role() = 'department_head' AND department_id = current_user_department())
+  );
+
+-- INSERT: Authenticated citizen can only insert complaint with citizen_id = auth.uid()
+CREATE POLICY "Complaints insert policy" ON public.complaints
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    citizen_id = auth.uid()
+  );
+
+-- UPDATE: Only city_admin, department head for own dept, assigned staff for assigned complaint
+CREATE POLICY "Complaints update policy" ON public.complaints
+  FOR UPDATE TO authenticated
+  USING (
+    current_user_role() = 'city_admin'
+    OR (current_user_role() = 'department_head' AND department_id = current_user_department())
+    OR (current_user_role() = 'service_staff' AND assigned_staff_id = auth.uid())
+  )
+  WITH CHECK (
+    current_user_role() = 'city_admin'
+    OR (current_user_role() = 'department_head' AND department_id = current_user_department())
+    OR (current_user_role() = 'service_staff' AND assigned_staff_id = auth.uid())
+  );
+
+-- Task Assignments:
+-- SELECT: Staff own assignments, city_admin, department_head for department complaints
+CREATE POLICY "Task assignments select policy" ON public.task_assignments
+  FOR SELECT TO authenticated
+  USING (
+    staff_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+    OR (
+      current_user_role() = 'department_head'
+      AND EXISTS (
+        SELECT 1 FROM public.complaints c
+        WHERE c.id = task_assignments.complaint_id
+          AND c.department_id = current_user_department()
+      )
+    )
+  );
+
+-- UPDATE: Staff own, city_admin, or department_head for department complaints
+CREATE POLICY "Task assignments update policy" ON public.task_assignments
+  FOR UPDATE TO authenticated
+  USING (
+    staff_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+    OR (
+      current_user_role() = 'department_head'
+      AND EXISTS (
+        SELECT 1 FROM public.complaints c
+        WHERE c.id = task_assignments.complaint_id
+          AND c.department_id = current_user_department()
+      )
+    )
+  )
+  WITH CHECK (
+    staff_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+    OR (
+      current_user_role() = 'department_head'
+      AND EXISTS (
+        SELECT 1 FROM public.complaints c
+        WHERE c.id = task_assignments.complaint_id
+          AND c.department_id = current_user_department()
+      )
+    )
+  );
+
+CREATE POLICY "Task assignments admin manage" ON public.task_assignments
+  FOR ALL TO authenticated
+  USING (current_user_role() = 'city_admin')
+  WITH CHECK (current_user_role() = 'city_admin');
+
+-- Complaint Feedback:
+-- Citizen may read/insert only if linked complaint belongs to auth.uid() and is resolved/completed
+CREATE POLICY "Complaint feedback select policy" ON public.complaint_feedback
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.complaints c
+      WHERE c.id = complaint_feedback.complaint_id
+        AND (c.citizen_id = auth.uid() OR current_user_role() = 'city_admin')
+    )
+  );
+
+CREATE POLICY "Complaint feedback insert policy" ON public.complaint_feedback
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.complaints c
+      WHERE c.id = complaint_feedback.complaint_id
+        AND c.citizen_id = auth.uid()
+        AND c.status IN ('Resolved', 'Resolution Submitted')
+    )
+  );
+
+-- Notifications:
+-- User can read and update own notifications; city_admin can read all
+CREATE POLICY "Notifications select policy" ON public.notifications
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR current_user_role() = 'city_admin'
+  );
+
+CREATE POLICY "Notifications update policy" ON public.notifications
+  FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Complaint Status History:
+-- Visible only to complaint owner, assigned staff, department head, or city_admin
+CREATE POLICY "Complaint status history select policy" ON public.complaint_status_history
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.complaints c
+      WHERE c.id = complaint_status_history.complaint_id
+        AND (
+          c.citizen_id = auth.uid()
+          OR c.assigned_staff_id = auth.uid()
+          OR (current_user_role() = 'department_head' AND c.department_id = current_user_department())
+          OR current_user_role() = 'city_admin'
+        )
+    )
+  );
+
+-- 18. Idempotent Realtime Publications
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'complaints'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.complaints;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'notifications'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'department_heads'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.department_heads;
+    END IF;
+  END IF;
+END $$;

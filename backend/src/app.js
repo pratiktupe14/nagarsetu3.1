@@ -19,23 +19,48 @@ const aiRoutes = require('./routes/ai.routes');
 
 const app = express();
 
+// Security Headers: Helmet (if installed)
+try {
+  const helmet = require('helmet');
+  app.use(helmet({ crossOriginResourcePolicy: false }));
+} catch (e) {
+  // TODO: Helmet is not installed. Add 'helmet' to dependencies for production security headers.
+}
+
 // Security Headers & Core Middleware
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'https://nagarsetu3-1-87or2o4na-pratik-dilip-tupes-projects.vercel.app',
-  'https://nagarsetu3-1.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173'
-].filter(Boolean);
+const isDev = process.env.NODE_ENV !== 'production';
+
+function resolveAllowedOrigins() {
+  const list = [];
+  if (process.env.FRONTEND_URL) {
+    list.push(process.env.FRONTEND_URL.trim());
+  }
+  if (process.env.CORS_ALLOWED_ORIGINS) {
+    process.env.CORS_ALLOWED_ORIGINS.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((s) => list.push(s));
+  }
+  if (isDev) {
+    list.push('http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:4173');
+  }
+  return list;
+}
+
+const allowedOrigins = resolveAllowedOrigins();
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(null, true);
+    if (!origin) {
+      return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    if (isDev && (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin))) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS Error: Origin '${origin}' is not authorized.`));
   },
   credentials: true
 }));

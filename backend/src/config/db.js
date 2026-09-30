@@ -21,36 +21,57 @@ let useSqlite = false;
 const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
 
 function initDatabase() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const isProduction = process.env.NODE_ENV === 'production';
     const isPostgres = DB_TYPE === 'postgres' || isProduction;
-
     const dbUrl = process.env.DATABASE_URL;
+
+    // SSL rejectUnauthorized: production default is true unless explicitly set to false
+    const rejectUnauthorized = isProduction
+      ? process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+      : process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
 
     if (isPostgres && dbUrl) {
       console.log('Connecting to PostgreSQL database...');
       try {
         pgPool = new Pool({
           connectionString: dbUrl,
-          ssl: { rejectUnauthorized: false }
+          ssl: { rejectUnauthorized }
         });
         pgPool.query('SELECT NOW()', (err, res) => {
           if (err) {
+            if (isProduction) {
+              console.error('[DATABASE FATAL] PostgreSQL connection check failed in production:', err.message);
+              return reject(err);
+            }
             console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback SQLite):', err.message);
             setupSqlite(resolve, resolve);
           } else {
             console.log('PostgreSQL connected successfully.');
             createTablesPostgres().then(resolve).catch(e => {
+              if (isProduction) {
+                console.error('[DATABASE FATAL] PostgreSQL table init failed in production:', e.message);
+                return reject(e);
+              }
               console.warn('[DATABASE TABLE INIT NOTE]', e.message);
               setupSqlite(resolve, resolve);
             });
           }
         });
       } catch (e) {
+        if (isProduction) {
+          console.error('[DATABASE FATAL] PostgreSQL pool initialization failed in production:', e.message);
+          return reject(e);
+        }
         console.warn('[DATABASE POOL INIT NOTE]', e.message);
         setupSqlite(resolve, resolve);
       }
     } else {
+      if (isProduction) {
+        const err = new Error('[DATABASE FATAL] DATABASE_URL missing or PostgreSQL unconfigured in production.');
+        console.error(err.message);
+        return reject(err);
+      }
       console.log('Initializing local development SQLite database...');
       setupSqlite(resolve, resolve);
     }
@@ -236,6 +257,12 @@ async function createTablesPostgres() {
 
 
 function setupSqlite(resolve, reject) {
+  if (process.env.NODE_ENV === 'production') {
+    const err = new Error('[DATABASE FATAL] SQLite fallback is disabled in production.');
+    console.error(err.message);
+    if (reject) return reject(err);
+    throw err;
+  }
   useSqlite = true;
   const sqliteMod = getSqlite3();
   if (!sqliteMod) {
@@ -550,6 +577,9 @@ const memStore = {
 };
 
 function runMemQuery(sql, params = []) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[DATABASE FATAL] In-memory database fallback is disabled in production.');
+  }
   const s = sql.trim();
   const upper = s.toUpperCase();
 
@@ -639,6 +669,10 @@ async function query(sql, params = []) {
 
       return await pgPool.query(pgSql, params);
     } catch (err) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[DATABASE ERROR] PostgreSQL query failed in production:', err.message);
+        throw err;
+      }
       console.warn('[DATABASE QUERY WARN] PostgreSQL query failed, activating SQLite/Mem fallback:', err.message);
       if (!sqliteDb) {
         await new Promise(r => setupSqlite(r, r));

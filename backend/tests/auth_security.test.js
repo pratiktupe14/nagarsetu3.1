@@ -1,3 +1,4 @@
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const jwt = require('jsonwebtoken');
@@ -186,6 +187,79 @@ describe('NAGARSETU Cryptographic Authentication Security Audit', () => {
     assert.strictEqual(req.user?.role, 'citizen');
     assert.strictEqual(req.user?.email, 'citizen8788@nagarsetu.gov.in');
     assert.strictEqual(req.user?.mobile, '8788562103');
+  });
+
+  test('10. In Production: Hardcoded demo bearer tokens must be rejected with 403', async () => {
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const demoTokens = [
+        'demo-token',
+        'demo-token-citizen',
+        'demo-token-city-admin',
+        'demo-token-dept-head',
+        'demo-token-service-staff'
+      ];
+
+      for (const dToken of demoTokens) {
+        let statusCode = null;
+        const req = { headers: { authorization: `Bearer ${dToken}` } };
+        const res = {
+          status: (code) => {
+            statusCode = code;
+            return { json: () => {} };
+          }
+        };
+        let nextCalled = false;
+
+        await authenticateToken(req, res, () => { nextCalled = true; });
+
+        assert.strictEqual(statusCode, 403, `In production, ${dToken} must be rejected with HTTP 403`);
+        assert.strictEqual(nextCalled, false, `In production, ${dToken} must not call next()`);
+        assert.strictEqual(req.user, undefined, `In production, ${dToken} must not set req.user`);
+      }
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
+  });
+
+  test('11. In Production: POST /api/auth/demo-token must return 404 Not Found', async () => {
+    const origEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const express = require('express');
+      const http = require('http');
+      const authRoutes = require('../src/routes/auth.routes');
+      const app = express();
+      app.use(express.json());
+      app.use('/api/auth', authRoutes);
+
+      let server;
+      let baseUrl;
+      await new Promise((resolve) => {
+        server = http.createServer(app);
+        server.listen(0, '127.0.0.1', () => {
+          baseUrl = `http://127.0.0.1:${server.address().port}`;
+          resolve();
+        });
+      });
+
+      try {
+        const res = await fetch(`${baseUrl}/api/auth/demo-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'citizen' })
+        });
+
+        assert.strictEqual(res.status, 404, 'In production, /api/auth/demo-token must return HTTP 404');
+        const data = await res.json();
+        assert.strictEqual(data.error, 'Not found');
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+    } finally {
+      process.env.NODE_ENV = origEnv;
+    }
   });
 
 });

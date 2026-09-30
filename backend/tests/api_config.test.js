@@ -5,7 +5,6 @@ const path = require('path');
 
 describe('API URL Resolver Configuration Contract', () => {
   const apiConfigPath = path.join(__dirname, '../../frontend/src/config/apiConfig.ts');
-  const envProdPath = path.join(__dirname, '../../frontend/.env.production');
   const envPath = path.join(__dirname, '../../frontend/.env');
 
   test('apiConfig.ts must not fall back to stale backend-zeta-two-60 URL', () => {
@@ -26,13 +25,13 @@ describe('API URL Resolver Configuration Contract', () => {
     );
   });
 
-  test('.env and .env.production must not point to stale backend-zeta-two-60 URL', () => {
-    const prodEnv = fs.existsSync(envProdPath) ? fs.readFileSync(envProdPath, 'utf8') : '';
+  test('Environment configuration must not point to stale backend-zeta-two-60 URL', () => {
     const localEnv = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    const viteApiUrl = process.env.VITE_API_URL || '';
     assert.strictEqual(
-      prodEnv.includes('backend-zeta-two-60.vercel.app'),
+      viteApiUrl.includes('backend-zeta-two-60.vercel.app'),
       false,
-      '.env.production still points to backend-zeta-two-60.vercel.app'
+      'process.env.VITE_API_URL points to backend-zeta-two-60.vercel.app'
     );
     assert.strictEqual(
       localEnv.includes('backend-zeta-two-60.vercel.app'),

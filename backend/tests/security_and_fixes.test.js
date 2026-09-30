@@ -36,9 +36,9 @@ describe('NAGARSETU Security & Reliability Audit Verification', () => {
     const authMiddlewareFile = fs.readFileSync(path.join(__dirname, '../src/middleware/auth.js'), 'utf8');
     
     assert.strictEqual(
-      authMiddlewareFile.includes('[SECURITY NOTICE] JWT_SECRET environment variable is missing; using default secure fallback.'),
+      authMiddlewareFile.includes('[SECURITY FATAL] JWT_SECRET environment variable is missing in production.'),
       true,
-      'JWT_SECRET must log security notice in production mode if missing'
+      'JWT_SECRET must throw fatal security error in production mode if missing'
     );
   });
 
@@ -84,4 +84,98 @@ describe('NAGARSETU Security & Reliability Audit Verification', () => {
     );
   });
 
+  test('7. Demo bearer token rejected in production', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalSecret = process.env.JWT_SECRET;
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'test_production_secret_32_chars_long!!';
+    try {
+      // Clear require cache to ensure clean re-initialization
+      delete require.cache[require.resolve('../src/middleware/auth')];
+      const { authenticateToken } = require('../src/middleware/auth');
+      const req = {
+        headers: { authorization: 'Bearer demo-token-city-admin' }
+      };
+      let statusCode = 0;
+      let nextCalled = false;
+      const res = {
+        status(code) {
+          statusCode = code;
+          return this;
+        },
+        json(payload) {
+          this.body = payload;
+          return this;
+        }
+      };
+      const next = () => {
+        nextCalled = true;
+      };
+
+      await authenticateToken(req, res, next);
+      assert.strictEqual(nextCalled, false, 'next() should not be called for demo token in production');
+      assert.strictEqual(statusCode === 401 || statusCode === 403, true, `Status should be 401 or 403, got ${statusCode}`);
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      process.env.JWT_SECRET = originalSecret;
+      delete require.cache[require.resolve('../src/middleware/auth')];
+    }
+  });
+
+  test('8. Demo token endpoint returns 404 in production', () => {
+    const authRouteFile = fs.readFileSync(path.join(__dirname, '../src/routes/auth.routes.js'), 'utf8');
+    assert.strictEqual(
+      authRouteFile.includes('if (process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test")'),
+      true,
+      'demo-token endpoint must check environment and block production'
+    );
+    assert.strictEqual(
+      authRouteFile.includes('return res.status(404).json({ error: "Not found" })'),
+      true,
+      'demo-token endpoint must return 404 in production'
+    );
+  });
+
+  test('9. Public registration enforces citizen role and rejects privilege escalation', () => {
+    const authRouteFile = fs.readFileSync(path.join(__dirname, '../src/routes/auth.routes.js'), 'utf8');
+    assert.strictEqual(
+      authRouteFile.includes("const role = 'citizen';"),
+      true,
+      'Public registration must strictly force citizen role'
+    );
+  });
+
+  test('10. Optional auth leaves req.user null for anonymous or invalid tokens', async () => {
+    const { optionalAuthenticateToken } = require('../src/middleware/auth');
+    
+    // Case A: No token
+    let reqA = { headers: {} };
+    let nextA = false;
+    await optionalAuthenticateToken(reqA, {}, () => { nextA = true; });
+    assert.strictEqual(nextA, true);
+    assert.strictEqual(reqA.user, null, 'req.user must be null when no token provided');
+
+    // Case B: Invalid/malformed token
+    let reqB = { headers: { authorization: 'Bearer invalid-junk-token' } };
+    let nextB = false;
+    await optionalAuthenticateToken(reqB, {}, () => { nextB = true; });
+    assert.strictEqual(nextB, true);
+    assert.strictEqual(reqB.user, null, 'req.user must not become a demo citizen for invalid token');
+  });
+
+  test('11. Complaint lookup returns 404 and has no latest-complaint fallback', () => {
+    const complaintRouteFile = fs.readFileSync(path.join(__dirname, '../src/routes/complaint.routes.js'), 'utf8');
+    assert.strictEqual(
+      complaintRouteFile.includes("return res.status(404).json({ error: 'Complaint not found' });"),
+      true,
+      'Complaint route must return 404 when complaint is not found'
+    );
+    assert.strictEqual(
+      complaintRouteFile.includes('ORDER BY created_at DESC LIMIT 1'),
+      false,
+      'Complaint lookup must not fall back to latest complaint'
+    );
+  });
+
 });
+
