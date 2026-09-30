@@ -311,11 +311,118 @@ function resolveGeolocationTier({
   };
 }
 
+/**
+ * Angle-Invariant Same-Issue Image Duplicate Prevention
+ * Rule: The SAME citizen must NEVER be allowed to report the SAME physical issue again within 100 meters,
+ * regardless of angle, crop, rotation, resize, filename, lighting, compression, or status (even resolved/closed/SLA expired).
+ */
+async function checkCitizenAngleInvariantDuplicate({
+  citizenId,
+  latitude,
+  longitude,
+  primaryPhoto,
+  category = null,
+  simulatedVisualMatch = null,
+  existingComplaintsList = null
+}) {
+  if (!citizenId || latitude == null || longitude == null || !primaryPhoto) {
+    return { isDuplicate: false };
+  }
+
+  const { computeImageHash, compareImagesForSamePhysicalIssue, SAME_ISSUE_CONFIDENCE_THRESHOLD } = require('./aiService');
+  const latNum = Number(latitude);
+  const lngNum = Number(longitude);
+
+  let candidates = [];
+  if (Array.isArray(existingComplaintsList)) {
+    candidates = existingComplaintsList.filter(c =>
+      (String(c.citizen_id) === String(citizenId)) &&
+      c.latitude != null && c.longitude != null
+    );
+  } else {
+    // 100m bounding box: ~0.001 deg
+    const latDelta = 0.0015;
+    const lngDelta = 0.0015 / (Math.cos((latNum * Math.PI) / 180) || 1);
+
+    const sql = `
+      SELECT id, complaint_number, citizen_id, category, title, description, priority, status, latitude, longitude,
+             photo_before_url, photo_front_url, primary_image_hash, created_at, sla_deadline
+      FROM complaints
+      WHERE (citizen_id = ? OR CAST(citizen_id AS TEXT) = ?)
+        AND latitude BETWEEN ? AND ?
+        AND longitude BETWEEN ? AND ?
+    `;
+    const res = await query(sql, [
+      citizenId, String(citizenId),
+      latNum - latDelta, latNum + latDelta,
+      lngNum - Math.abs(lngDelta), lngNum + Math.abs(lngDelta)
+    ]);
+    candidates = res.rows || [];
+  }
+
+  // Filter within 100m permanent distance rule
+  const nearby = [];
+  for (const cand of candidates) {
+    const dist = calculateDistanceMeters(latNum, lngNum, Number(cand.latitude), Number(cand.longitude));
+    if (dist <= 100) {
+      nearby.push({ cand, dist });
+    }
+  }
+
+  // Sort nearest first, limit to max 10 candidates
+  nearby.sort((a, b) => a.dist - b.dist);
+  const limited = nearby.slice(0, 10);
+
+  const newHash = computeImageHash(primaryPhoto);
+
+  for (const { cand, dist } of limited) {
+    const candPhoto = cand.photo_front_url || cand.photo_before_url || cand.photo_url;
+
+    // Layer 1: Exact Hash Match
+    const candHash = cand.primary_image_hash || (candPhoto ? computeImageHash(candPhoto) : '');
+    if (newHash && candHash && newHash === candHash) {
+      return {
+        isDuplicate: true,
+        match_type: 'exact',
+        confidence: 100,
+        existing_complaint_id: cand.complaint_number || cand.id,
+        distance_m: Math.round(dist),
+        message: 'You have already reported this issue within 100 metres.'
+      };
+    }
+
+    // Layer 2: Visual / Angle-Invariant Match
+    if (candPhoto) {
+      const visualRes = await compareImagesForSamePhysicalIssue(primaryPhoto, candPhoto, {
+        category,
+        candCategory: cand.category,
+        distanceMeters: dist,
+        simulatedVisualMatch
+      });
+
+      if (visualRes.same_physical_issue && visualRes.confidence >= SAME_ISSUE_CONFIDENCE_THRESHOLD) {
+        return {
+          isDuplicate: true,
+          match_type: 'visual',
+          confidence: visualRes.confidence,
+          existing_complaint_id: cand.complaint_number || cand.id,
+          distance_m: Math.round(dist),
+          reason: visualRes.reason,
+          message: 'You have already reported this issue within 100 metres.'
+        };
+      }
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
 module.exports = {
   calculateDistanceMeters,
   extractExifGps,
   resolveLocation,
   resolveGeolocationTier,
+  checkCitizenAngleInvariantDuplicate,
   checkForDuplicates,
   isValidCoordinate,
   normalizeCategory

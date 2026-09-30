@@ -312,6 +312,186 @@ async function analyzeComplaintPhoto(fileInput) {
   }
 }
 
+const SAME_ISSUE_CONFIDENCE_THRESHOLD = 85;
+
+function computeImageHash(fileInput) {
+  try {
+    let buf = null;
+    if (Buffer.isBuffer(fileInput)) {
+      buf = fileInput;
+    } else if (fileInput && typeof fileInput === 'object' && Buffer.isBuffer(fileInput.buffer)) {
+      buf = fileInput.buffer;
+    } else if (typeof fileInput === 'string') {
+      if (fileInput.startsWith('data:image')) {
+        const base64Data = fileInput.split(',')[1];
+        if (base64Data) buf = Buffer.from(base64Data, 'base64');
+      } else if (fs.existsSync(fileInput)) {
+        buf = fs.readFileSync(fileInput);
+      } else if (fileInput.trim() !== '') {
+        buf = Buffer.from(fileInput.trim());
+      }
+    }
+    if (buf && buf.length > 0) {
+      return crypto.createHash('sha256').update(buf).digest('hex');
+    }
+  } catch (e) {}
+  return '';
+}
+
+async function compareImagesForSamePhysicalIssue(img1, img2, options = {}) {
+  // If test hook or simulated visual match provided in options, use it directly
+  if (options.simulatedVisualMatch) {
+    return {
+      same_physical_issue: Boolean(options.simulatedVisualMatch.same_physical_issue),
+      confidence: Number(options.simulatedVisualMatch.confidence || 0),
+      match_type: 'visual',
+      reason: options.simulatedVisualMatch.reason || 'Simulated angle-invariant visual match'
+    };
+  }
+
+  // Layer 1: Exact Hash Match
+  const hash1 = computeImageHash(img1);
+  const hash2 = computeImageHash(img2);
+  if (hash1 && hash2 && hash1 === hash2) {
+    return {
+      same_physical_issue: true,
+      confidence: 100,
+      match_type: 'exact',
+      reason: 'Exact image binary hash match (SHA-256)'
+    };
+  }
+
+  // Layer 2: Visual / Angle-Invariant Match with Gemini Vision
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
+    return {
+      same_physical_issue: false,
+      confidence: 0,
+      match_type: 'visual',
+      reason: 'AI service unconfigured'
+    };
+  }
+
+  try {
+    const preparePart = (input) => {
+      let buf = null;
+      let mime = 'image/jpeg';
+      if (Buffer.isBuffer(input)) buf = input;
+      else if (input && input.buffer) { buf = input.buffer; if (input.mimetype) mime = input.mimetype; }
+      else if (typeof input === 'string') {
+        if (input.startsWith('data:image')) {
+          const match = input.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) { mime = match[1]; buf = Buffer.from(match[2], 'base64'); }
+        } else if (fs.existsSync(input)) {
+          buf = fs.readFileSync(input);
+          const ext = path.extname(input).toLowerCase();
+          if (ext === '.png') mime = 'image/png';
+          if (ext === '.webp') mime = 'image/webp';
+        }
+      }
+      if (!buf) return null;
+      return {
+        inline_data: {
+          mime_type: mime,
+          data: buf.toString('base64')
+        }
+      };
+    };
+
+    const part1 = preparePart(img1);
+    const part2 = preparePart(img2);
+
+    if (!part1 || !part2) {
+      return {
+        same_physical_issue: false,
+        confidence: 0,
+        match_type: 'visual',
+        reason: 'Unable to read image buffers for visual comparison'
+      };
+    }
+
+    const comparePrompt = `You are NAGARSETU's Civic Defect Duplicate Analyzer.
+Compare Image 1 and Image 2. Both photos were taken by the same citizen within 100 meters.
+Determine whether both photos represent THE SAME PHYSICAL CIVIC DEFECT / ISSUE / OBJECT / SCENE, even if photographed from different angles, viewpoints, distances, rotations, crops, lighting, or compression.
+Ignore camera angle, zoom, crop, rotation, lighting, time of day, and compression.
+Respond ONLY with a valid JSON object matching this exact structure:
+{
+  "same_physical_issue": true or false,
+  "confidence": number between 0 and 100,
+  "reason": "Clear explanation of physical visual evidence"
+}`;
+
+    const model = process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const payload = JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: comparePrompt },
+            { text: "Image 1 (Existing complaint evidence):" },
+            part1,
+            { text: "Image 2 (New complaint photo):" },
+            part2
+          ]
+        }
+      ],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        temperature: 0.1
+      }
+    });
+
+    const parsed = await new Promise((resolve) => {
+      const u = new URL(url);
+      const req = https.request({
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const body = JSON.parse(data);
+            const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+              resolve(JSON.parse(cleaned));
+            } else {
+              resolve({ same_physical_issue: false, confidence: 0, reason: 'Empty AI response' });
+            }
+          } catch (e) {
+            resolve({ same_physical_issue: false, confidence: 0, reason: 'Failed to parse AI response' });
+          }
+        });
+      });
+      req.on('error', () => resolve({ same_physical_issue: false, confidence: 0, reason: 'Network error contacting AI' }));
+      req.setTimeout(10000, () => { req.destroy(); resolve({ same_physical_issue: false, confidence: 0, reason: 'AI request timed out' }); });
+      req.write(payload);
+      req.end();
+    });
+
+    return {
+      same_physical_issue: Boolean(parsed.same_physical_issue),
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : (parsed.same_physical_issue ? 90 : 20),
+      match_type: 'visual',
+      reason: parsed.reason || 'AI visual comparison completed'
+    };
+  } catch (err) {
+    return {
+      same_physical_issue: false,
+      confidence: 0,
+      match_type: 'visual',
+      reason: err.message
+    };
+  }
+}
+
 module.exports = {
-  analyzeComplaintPhoto
+  analyzeComplaintPhoto,
+  computeImageHash,
+  compareImagesForSamePhysicalIssue,
+  SAME_ISSUE_CONFIDENCE_THRESHOLD
 };

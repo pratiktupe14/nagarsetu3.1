@@ -396,6 +396,28 @@ const submitComplaintHandler = async (req, res) => {
       finalDeptCode || finalDeptName
     );
 
+    // --- ANGLE-INVARIANT SAME-ISSUE IMAGE DUPLICATE PREVENTION (100M Permanent Rule) ---
+    const { checkCitizenAngleInvariantDuplicate } = require('../services/locationService');
+    const angleInvariantCheck = await checkCitizenAngleInvariantDuplicate({
+      citizenId,
+      latitude: latNum,
+      longitude: lngNum,
+      primaryPhoto: finalPhotoFront || finalPhotoUrl,
+      category,
+      simulatedVisualMatch: req.body?.simulatedVisualMatch
+    });
+
+    if (angleInvariantCheck.isDuplicate) {
+      return res.status(409).json({
+        error: 'ISSUE_ALREADY_REPORTED_BY_CITIZEN',
+        message: 'You have already reported this issue within 100 metres.',
+        existing_complaint_id: String(angleInvariantCheck.existing_complaint_id),
+        distance_m: angleInvariantCheck.distance_m,
+        match_type: angleInvariantCheck.match_type,
+        confidence: angleInvariantCheck.confidence
+      });
+    }
+
     // --- DUPLICATE DETECTION & SAME CITIZEN REPEAT-COMPLAINT RESTRICTION (500M Radius) ---
     const lat = Number(latitude);
     const lng = Number(longitude);
@@ -490,16 +512,19 @@ const submitComplaintHandler = async (req, res) => {
     const initialRankingScore = riskAssessment.priority_rank;
     const computedPriority = riskAssessment.severity.charAt(0).toUpperCase() + riskAssessment.severity.slice(1).toLowerCase();
 
+    const { computeImageHash } = require('../services/aiService');
+    const primaryImageHash = computeImageHash(finalPhotoFront || finalPhotoUrl);
+
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
-        status, department_id, latitude, longitude, location_source, location_accuracy_m, location_address, duplicate_of_id,
+        status, department_id, latitude, longitude, location_source, location_accuracy_m, primary_image_hash, location_address, duplicate_of_id,
         photo_front_url, photo_left_url, photo_right_url, photo_closeup_url, angle_photos, additional_photos,
         sla_deadline, response_time_hours, support_count, ranking_score, is_potential_duplicate,
         potential_parent_id, duplicate_distance_m,
         safety_score, disruption_score, health_environment_score, defect_severity_score, risk_score, priority_rank
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -515,6 +540,7 @@ const submitComplaintHandler = async (req, res) => {
       lngNum,
       normLocationSource,
       accuracyNum,
+      primaryImageHash,
       location_address || '',
       duplicate_of_id || null,
       finalPhotoFront,

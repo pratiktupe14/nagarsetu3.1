@@ -193,6 +193,7 @@ async function createTablesPostgres() {
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_at TIMESTAMP;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_by TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS location_accuracy_m REAL;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS primary_image_hash TEXT;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
@@ -537,6 +538,7 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'risk_score INTEGER DEFAULT 0');
       safeAddSqliteColumn('complaints', 'priority_rank INTEGER DEFAULT 0');
       safeAddSqliteColumn('complaints', 'location_accuracy_m REAL');
+      safeAddSqliteColumn('complaints', 'primary_image_hash TEXT');
       safeAddSqliteColumn('departments', 'code TEXT');
 
       sqliteDb.run(`

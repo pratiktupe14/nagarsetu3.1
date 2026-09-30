@@ -170,6 +170,11 @@ export const ReportIssuePage: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
+  const [sameIssueDuplicateError, setSameIssueDuplicateError] = useState<{
+    message: string;
+    existingComplaintId?: string;
+    distanceM?: number;
+  } | null>(null);
   const isSubmittingRef = React.useRef<boolean>(false);
   const cachedComplaintsRef = React.useRef<any[] | null>(null);
 
@@ -559,6 +564,7 @@ export const ReportIssuePage: React.FC = () => {
       // Re-enable submission only when submission genuinely fails
       isSubmittingRef.current = false;
       setSubmitting(false);
+      setShowReviewModal(false);
 
       if (isNetworkError(err)) {
         handleSaveDraft();
@@ -568,6 +574,19 @@ export const ReportIssuePage: React.FC = () => {
       } else if (err instanceof HttpError || err.isHttpError || err.status) {
         if (err.status === 429) {
           toast.error(err.message || 'Action rate limit exceeded. Please slow down your requests and try again in a few moments.');
+        } else if (
+          err.status === 409 &&
+          (err.data?.error === 'ISSUE_ALREADY_REPORTED_BY_CITIZEN' ||
+           err.data?.code === 'ISSUE_ALREADY_REPORTED_BY_CITIZEN')
+        ) {
+          const duplicateMsg =
+            'This issue has already been reported by you within 100 metres. You cannot create another complaint for the same issue.';
+          setSameIssueDuplicateError({
+            message: duplicateMsg,
+            existingComplaintId: err.data?.existing_complaint_id,
+            distanceM: err.data?.distance_m
+          });
+          toast.error(duplicateMsg);
         } else {
           const detailStr = err.data?.details && Array.isArray(err.data.details) ? ` (${err.data.details.join(', ')})` : '';
           toast.error(`${err.message || 'Server error processing complaint.'}${detailStr}`);
@@ -620,6 +639,40 @@ export const ReportIssuePage: React.FC = () => {
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center space-x-2 shadow-xs">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>{t('draftSavedSuccess')}</span>
+          </div>
+        )}
+
+        {/* SAME-ISSUE CITIZEN DUPLICATE ALERT */}
+        {sameIssueDuplicateError && (
+          <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-900 shadow-sm space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-amber-900">
+                  Duplicate Issue Reported
+                </h4>
+                <p className="text-sm text-amber-800">
+                  {sameIssueDuplicateError.message}
+                </p>
+                {sameIssueDuplicateError.distanceM !== undefined && (
+                  <p className="text-xs text-amber-700">
+                    Proximity to previous report: {sameIssueDuplicateError.distanceM} metres
+                  </p>
+                )}
+              </div>
+            </div>
+            {sameIssueDuplicateError.existingComplaintId && (
+              <div className="pt-1 flex items-center gap-2">
+                <Link
+                  to={`/citizen/complaints/${sameIssueDuplicateError.existingComplaintId}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Track Existing Complaint #{sameIssueDuplicateError.existingComplaintId}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
