@@ -4470,16 +4470,12 @@ export const DepartmentHeadPortal: React.FC = () => {
                               <td className="p-3.5">
                                 <div className="flex items-center space-x-2.5">
                                   <div className="w-9 h-9 rounded-lg border border-gray-200 bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
-                                    {comp.photo_before_url || comp.photo_front_url ? (
-                                      <img
-                                        src={getValidImageUrl(comp.photo_before_url || comp.photo_front_url)}
-                                        alt="Thumbnail"
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
-                                      />
-                                    ) : (
-                                      <span className="text-[9px] font-mono font-bold text-gray-400">No Image</span>
-                                    )}
+                                    <img
+                                      src={getValidImageUrl(comp.photo_before_url || comp.photo_front_url)}
+                                      alt="Thumbnail"
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                                    />
                                   </div>
                                   <div>
                                     <span className="font-extrabold text-gray-900 block line-clamp-1">{comp.title}</span>
@@ -4879,20 +4875,15 @@ export const DepartmentHeadPortal: React.FC = () => {
                       if (firstUrl) setZoomImageUrl(firstUrl);
                     }}
                   >
-                    {detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url ? (
-                      <>
-                        <img
-                          src={getValidImageUrl(detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url)}
-                          alt="Citizen Evidence"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
-                          {extractComplaintAnglePhotos(detailModalComplaint)[0]?.label || 'Front View'}
-                        </span>
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image Submitted</div>
-                    )}
+                    <img
+                      src={getValidImageUrl(detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url)}
+                      alt="Citizen Evidence"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                    />
+                    <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                      {extractComplaintAnglePhotos(detailModalComplaint)[0]?.label || 'Front View'}
+                    </span>
                   </div>
 
                   {/* All Angle Thumbnails */}

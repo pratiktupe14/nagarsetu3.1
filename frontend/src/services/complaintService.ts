@@ -594,10 +594,13 @@ export function normalizeComplaint(c: any): Complaint {
   }
 
   // Normalise photo URLs so every portal always has a valid, absolute, browser-renderable URL
-  const rawPhoto = c.photo_before_url || c.photo_front_url || c.photo_url || '';
-  const photoBefore = rawPhoto ? getValidImageUrl(rawPhoto) : '';
-  const photoFront = c.photo_front_url ? getValidImageUrl(c.photo_front_url) : photoBefore;
-  const photoAfter = c.photo_after_url ? getValidImageUrl(c.photo_after_url) : '';
+  let rawPhoto = c.photo_before_url || c.photo_front_url || c.photo_url || '';
+  if (!rawPhoto || typeof rawPhoto !== 'string' || rawPhoto.trim() === '' || rawPhoto.startsWith('blob:')) {
+    rawPhoto = DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
+  }
+  const photoBefore = getValidImageUrl(rawPhoto);
+  const photoFront = c.photo_front_url && !c.photo_front_url.startsWith('blob:') ? getValidImageUrl(c.photo_front_url) : photoBefore;
+  const photoAfter = c.photo_after_url && !c.photo_after_url.startsWith('blob:') ? getValidImageUrl(c.photo_after_url) : '';
 
   return {
     ...c,

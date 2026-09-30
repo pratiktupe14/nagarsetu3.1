@@ -54,9 +54,14 @@ function normalizeComplaintPhotoUrls(complaint, req) {
   const host = (req?.get && req.get('host')) || req?.headers?.host || 'localhost:5000';
   const baseUrl = `${protocol}://${host}`;
 
-  const formatUrl = (url) => {
-    if (!url || typeof url !== 'string') return url;
+  const formatUrl = (url, fallbackToDefault = false) => {
+    if (!url || typeof url !== 'string') {
+      return fallbackToDefault ? `${baseUrl}/uploads/civic-default.jpg` : '';
+    }
     const trimmed = url.trim();
+    if (!trimmed || trimmed === '' || trimmed === 'undefined' || trimmed === 'null' || trimmed.startsWith('blob:')) {
+      return fallbackToDefault ? `${baseUrl}/uploads/civic-default.jpg` : '';
+    }
     if (trimmed.startsWith('/uploads/')) {
       return `${baseUrl}${trimmed}`;
     }
@@ -67,12 +72,13 @@ function normalizeComplaintPhotoUrls(complaint, req) {
   };
 
   const c = { ...complaint };
-  if (c.photo_before_url) c.photo_before_url = formatUrl(c.photo_before_url);
-  if (c.photo_front_url) c.photo_front_url = formatUrl(c.photo_front_url);
-  if (c.photo_after_url) c.photo_after_url = formatUrl(c.photo_after_url);
-  if (c.photo_left_url) c.photo_left_url = formatUrl(c.photo_left_url);
-  if (c.photo_right_url) c.photo_right_url = formatUrl(c.photo_right_url);
-  if (c.photo_closeup_url) c.photo_closeup_url = formatUrl(c.photo_closeup_url);
+  const rawPrimary = c.photo_before_url || c.photo_front_url || c.photo_url;
+  c.photo_before_url = formatUrl(rawPrimary, true);
+  c.photo_front_url = formatUrl(c.photo_front_url || rawPrimary, true);
+  if (c.photo_after_url) c.photo_after_url = formatUrl(c.photo_after_url, false);
+  if (c.photo_left_url) c.photo_left_url = formatUrl(c.photo_left_url, false);
+  if (c.photo_right_url) c.photo_right_url = formatUrl(c.photo_right_url, false);
+  if (c.photo_closeup_url) c.photo_closeup_url = formatUrl(c.photo_closeup_url, false);
 
   if (c.angle_photos) {
     try {

@@ -10,7 +10,7 @@ import { getComplaintById, getAllComplaints, getCitizenComplaints, submitComplai
 import { isValidCoordinate } from '../../services/locationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
-import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, ShieldCheck } from 'lucide-react';
+import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers } from 'lucide-react';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 
 export const ComplaintDetailPage: React.FC = () => {
@@ -223,19 +223,17 @@ export const ComplaintDetailPage: React.FC = () => {
                 <span className="text-xs font-bold text-gray-700 block">BEFORE (Reported Condition)</span>
 
                 <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 h-60">
-                  {complaint.photo_before_url || complaint.photo_front_url ? (
-                    <img
-                      src={getValidImageUrl(complaint.photo_before_url || complaint.photo_front_url)}
-                      alt="Before repair"
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-2">
-                      <ShieldCheck className="w-10 h-10 text-gray-300" />
-                      <span className="text-xs font-semibold text-gray-500">No image available</span>
-                    </div>
-                  )}
+                  <img
+                    src={getValidImageUrl(complaint.photo_before_url || complaint.photo_front_url)}
+                    alt="Before repair"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const fallback = getValidImageUrl(DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
+                      if (e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
