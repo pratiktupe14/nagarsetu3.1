@@ -429,8 +429,9 @@ export const ReportIssuePage: React.FC = () => {
         }
       }
 
-      // Determine primary URL (Front View, or first available angle)
-      const primaryUrl = uploadedUrls.front || uploadedUrls.left || uploadedUrls.right || uploadedUrls.closeup || photoPreviewUrl || DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
+      // Determine primary URL (Front View, or first available angle) — NEVER a temporary blob: URL
+      const cleanPreviewFallback = (photoPreviewUrl && !photoPreviewUrl.startsWith('blob:')) ? photoPreviewUrl : '';
+      const primaryUrl = uploadedUrls.front || uploadedUrls.left || uploadedUrls.right || uploadedUrls.closeup || cleanPreviewFallback || DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
 
       const anglePhotos: ComplaintAnglePhoto[] = [
         uploadedUrls.front ? { angle: 'front' as ComplaintAngle, label: 'Front View', url: uploadedUrls.front } : null,

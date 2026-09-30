@@ -674,9 +674,10 @@ export const AdminPortal: React.FC = () => {
               <div>
                 <span className="font-bold text-gray-700 block mb-1">{t('citizenPhotoEvidence')}</span>
                 <img
-                  src={getValidImageUrl(selectedComplaint.photo_before_url)}
+                  src={getValidImageUrl(selectedComplaint.photo_before_url || selectedComplaint.photo_front_url)}
                   alt="Defect"
                   className="w-full h-48 rounded-xl object-cover border border-gray-200 shadow-xs"
+                  onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                 />
               </div>
 

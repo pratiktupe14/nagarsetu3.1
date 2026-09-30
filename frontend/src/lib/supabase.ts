@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getApiUrl } from '../config/apiConfig';
 
 const FALLBACK_SUPABASE_URL = 'https://ozeiymkbxtrqqdoxtmhm.supabase.co';
 const FALLBACK_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96ZWl5bWtieHRycXFkb3h0bWhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyMjk1MzEsImV4cCI6MjEwMjgwNTUzMX0.6nQemY46XsG89kK5f_ONpAvrmI_buXX-VlpgLRY_sqs';
@@ -63,9 +64,9 @@ export const getValidImageUrl = (url?: string | null): string => {
 
   // Relative backend upload paths
   if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
-    const apiBase = (import.meta.env.VITE_API_URL || '').trim();
+    const apiBase = getApiUrl();
     const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    if (apiBase && !apiBase.includes('localhost')) {
+    if (apiBase) {
       return `${apiBase.replace(/\/$/, '')}${cleanPath}`;
     }
     return cleanPath;

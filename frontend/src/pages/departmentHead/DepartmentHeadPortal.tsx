@@ -4470,8 +4470,13 @@ export const DepartmentHeadPortal: React.FC = () => {
                               <td className="p-3.5">
                                 <div className="flex items-center space-x-2.5">
                                   <div className="w-9 h-9 rounded-lg border border-gray-200 bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
-                                    {comp.photo_before_url ? (
-                                      <img src={comp.photo_before_url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    {comp.photo_before_url || comp.photo_front_url ? (
+                                      <img
+                                        src={getValidImageUrl(comp.photo_before_url || comp.photo_front_url)}
+                                        alt="Thumbnail"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                                      />
                                     ) : (
                                       <span className="text-[9px] font-mono font-bold text-gray-400">No Image</span>
                                     )}
@@ -5428,6 +5433,73 @@ export const DepartmentHeadPortal: React.FC = () => {
                   className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-xs"
                 >
                   Confirm Reassignment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* FULLSCREEN PHOTO EVIDENCE VIEWER MODAL */}
+        {zoomImageUrl && (
+          <div
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => { setZoomImageUrl(null); setZoomScale(1); }}
+          >
+            <div
+              className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-4 flex flex-col items-center space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100">
+                <span className="font-outfit font-extrabold text-sm text-gray-900 uppercase tracking-wider flex items-center space-x-2">
+                  <Maximize2 className="w-4 h-4 text-emerald-600" />
+                  <span>High-Resolution Photo Evidence</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setZoomImageUrl(null); setZoomScale(1); }}
+                  className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  title="Close Preview"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-auto max-h-[72vh] max-w-full flex items-center justify-center bg-gray-50 rounded-xl p-2 border border-gray-200">
+                <img
+                  src={getValidImageUrl(zoomImageUrl)}
+                  alt="High Resolution Civic Evidence"
+                  style={{ transform: `scale(${zoomScale})` }}
+                  className="max-h-[68vh] w-auto object-contain transition-transform duration-200 rounded-lg shadow-xs"
+                  onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                />
+              </div>
+
+              <div className="flex items-center space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setZoomScale((s) => Math.max(0.5, s - 0.25))}
+                  className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 min-h-[44px] flex items-center space-x-1 text-xs font-bold"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                  <span>Zoom Out</span>
+                </button>
+                <span className="text-xs font-mono font-bold text-gray-700 px-2">{Math.round(zoomScale * 100)}%</span>
+                <button
+                  type="button"
+                  onClick={() => setZoomScale((s) => Math.min(3, s + 0.25))}
+                  className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 min-h-[44px] flex items-center space-x-1 text-xs font-bold"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                  <span>Zoom In</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoomScale(1)}
+                  className="px-3 py-2 text-xs rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold min-h-[44px]"
+                >
+                  Reset
                 </button>
               </div>
             </div>

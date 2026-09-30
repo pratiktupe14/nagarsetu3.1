@@ -1,5 +1,5 @@
 import { Complaint, ComplaintStatus, PriorityLevel, StaffPerformanceMetrics } from '../types/database.types';
-import { supabase, isSupabaseConfigured, isValidUuid, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isValidUuid, DEFAULT_CIVIC_IMAGE_PLACEHOLDER, getValidImageUrl } from '../lib/supabase';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
@@ -144,7 +144,13 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
     if (res.ok) {
       const data = await res.json();
       if (data?.url || data?.publicUrl) {
-        return data.url || data.publicUrl;
+        const resultUrl = data.url || data.publicUrl;
+        if (typeof resultUrl === 'string' && (resultUrl.startsWith('/uploads/') || resultUrl.startsWith('uploads/'))) {
+          const apiBase = getApiUrl();
+          const cleanPath = resultUrl.startsWith('/') ? resultUrl : `/${resultUrl}`;
+          return apiBase ? `${apiBase.replace(/\/$/, '')}${cleanPath}` : cleanPath;
+        }
+        return resultUrl;
       }
     }
   } catch (backendUploadErr) {
@@ -587,6 +593,12 @@ export function normalizeComplaint(c: any): Complaint {
     lng = undefined;
   }
 
+  // Normalise photo URLs so every portal always has a valid, absolute, browser-renderable URL
+  const rawPhoto = c.photo_before_url || c.photo_front_url || c.photo_url || '';
+  const photoBefore = rawPhoto ? getValidImageUrl(rawPhoto) : '';
+  const photoFront = c.photo_front_url ? getValidImageUrl(c.photo_front_url) : photoBefore;
+  const photoAfter = c.photo_after_url ? getValidImageUrl(c.photo_after_url) : '';
+
   return {
     ...c,
     id: String(c.id || ''),
@@ -601,6 +613,9 @@ export function normalizeComplaint(c: any): Complaint {
     location_address: typeof c.location_address === 'string' ? c.location_address : '',
     department_name: typeof c.department_name === 'string' ? c.department_name : '',
     department_id: c.department_id ? String(c.department_id) : undefined,
+    photo_before_url: photoBefore,
+    photo_front_url: photoFront,
+    photo_after_url: photoAfter,
     latitude: lat as number,
     longitude: lng as number,
     created_at: c.created_at || new Date().toISOString(),

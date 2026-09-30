@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { authRateLimiter, publicRateLimiter, authedRateLimiter, authenticatedRateLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -42,13 +43,27 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static uploads safely (Prevent execution as script/code)
+// Serve static uploads safely with proper CORS & CORP headers
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const serverlessUploadsDir = path.join('/tmp', 'uploads');
+const localUploadsDir = path.join(__dirname, '../uploads');
+
+[serverlessUploadsDir, localUploadsDir].forEach((dir) => {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (e) {}
+});
+
 app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data: *; style-src 'unsafe-inline'");
   res.setHeader('Content-Disposition', 'inline');
   next();
-}, express.static(path.join(__dirname, '../uploads')));
+}, express.static(localUploadsDir), express.static(serverlessUploadsDir));
 
 // Root Welcome & Health Check Endpoints
 app.get('/', (req, res) => {

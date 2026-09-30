@@ -25,11 +25,18 @@ router.post('/upload', optionalAuthenticateToken, uploadSingleImage('photo'), as
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
+    const host = req.get('host');
+    const protocol = req.protocol || 'http';
     const photoUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-photo.jpg');
+    
+    // Normalize relative /uploads/ path to full URL
+    const fullUrl = photoUrl.startsWith('/uploads/') ? `${protocol}://${host}${photoUrl}` : photoUrl;
+
     return res.json({
       success: true,
-      url: photoUrl,
-      publicUrl: photoUrl,
+      url: fullUrl,
+      publicUrl: fullUrl,
+      relativeUrl: photoUrl.startsWith('/uploads/') ? photoUrl : `/uploads/${path.basename(photoUrl)}`,
       filename: req.file.filename || path.basename(photoUrl)
     });
   } catch (err) {
@@ -37,6 +44,59 @@ router.post('/upload', optionalAuthenticateToken, uploadSingleImage('photo'), as
     return res.status(500).json({ error: 'Failed to upload complaint image' });
   }
 });
+
+/**
+ * Normalizes complaint photo URLs so relative /uploads/ paths are returned as fully qualified URLs.
+ */
+function normalizeComplaintPhotoUrls(complaint, req) {
+  if (!complaint || typeof complaint !== 'object') return complaint;
+  const protocol = req?.protocol || 'http';
+  const host = (req?.get && req.get('host')) || req?.headers?.host || 'localhost:5000';
+  const baseUrl = `${protocol}://${host}`;
+
+  const formatUrl = (url) => {
+    if (!url || typeof url !== 'string') return url;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('/uploads/')) {
+      return `${baseUrl}${trimmed}`;
+    }
+    if (trimmed.startsWith('uploads/')) {
+      return `${baseUrl}/${trimmed}`;
+    }
+    return trimmed;
+  };
+
+  const c = { ...complaint };
+  if (c.photo_before_url) c.photo_before_url = formatUrl(c.photo_before_url);
+  if (c.photo_front_url) c.photo_front_url = formatUrl(c.photo_front_url);
+  if (c.photo_after_url) c.photo_after_url = formatUrl(c.photo_after_url);
+  if (c.photo_left_url) c.photo_left_url = formatUrl(c.photo_left_url);
+  if (c.photo_right_url) c.photo_right_url = formatUrl(c.photo_right_url);
+  if (c.photo_closeup_url) c.photo_closeup_url = formatUrl(c.photo_closeup_url);
+
+  if (c.angle_photos) {
+    try {
+      const parsed = typeof c.angle_photos === 'string' ? JSON.parse(c.angle_photos) : c.angle_photos;
+      if (Array.isArray(parsed)) {
+        c.angle_photos = parsed.map(item => ({
+          ...item,
+          url: formatUrl(item?.url)
+        }));
+      }
+    } catch (e) {}
+  }
+
+  if (c.additional_photos) {
+    try {
+      const parsed = typeof c.additional_photos === 'string' ? JSON.parse(c.additional_photos) : c.additional_photos;
+      if (Array.isArray(parsed)) {
+        c.additional_photos = parsed.map(formatUrl);
+      }
+    } catch (e) {}
+  }
+
+  return c;
+}
 
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
 router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
@@ -97,8 +157,8 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
   }
 });
 
-// Step 2: Final Complaint Submission
-router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
+// Step 2: Final Complaint Submission (supports both /submit and /)
+const submitComplaintHandler = async (req, res) => {
   try {
     const {
       complaint_number,
@@ -349,7 +409,7 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
       message: 'Complaint submitted successfully',
       complaint_id: returnedId,
       complaint_number: finalComplaintNumber,
-      complaint: {
+      complaint: normalizeComplaintPhotoUrls({
         id: returnedId,
         complaint_number: finalComplaintNumber,
         citizen_id: citizenId,
@@ -374,13 +434,16 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
         location_address: location_address || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      }
+      }, req)
     });
   } catch (err) {
     console.error('Submit complaint error:', err);
     return res.status(500).json({ error: 'Failed to submit complaint' });
   }
-});
+};
+
+router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
+router.post('/', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
 
 // Get complaint status history timeline
 router.get('/:id/history', authenticateToken, async (req, res) => {
@@ -414,7 +477,7 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
     const result = await query(sql);
     if (result.rows && result.rows.length > 0) {
-      return res.json({ complaints: result.rows });
+      return res.json({ complaints: result.rows.map(c => normalizeComplaintPhotoUrls(c, req)) });
     }
 
     // Supabase fallback if local database has 0 rows (e.g. serverless /tmp container)
@@ -440,14 +503,14 @@ router.get('/', authenticateToken, async (req, res) => {
             ...c,
             department_name: deptMap[c.department_id] || c.department_name || 'Public Works Department (PWD)'
           }));
-          return res.json({ complaints: formatted });
+          return res.json({ complaints: formatted.map(c => normalizeComplaintPhotoUrls(c, req)) });
         }
       }
     } catch (sErr) {
       console.warn('Supabase fallback in GET / warning:', sErr.message);
     }
 
-    return res.json({ complaints: result.rows || [] });
+    return res.json({ complaints: (result.rows || []).map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch all complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -458,7 +521,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/my', authenticateToken, async (req, res) => {
   try {
     let citizenId = req.user.id;
-    if (citizenId === 'c-8788562103' || req.user.mobile === '8788562103' || (req.user.email && req.user.email.includes('8788'))) {
+    if (citizenId === 'c-8788562103' || req.user.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
       citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
     }
 
@@ -472,7 +535,7 @@ router.get('/my', authenticateToken, async (req, res) => {
     `;
     const result = await query(sql, [citizenId, String(citizenId)]);
     if (result.rows && result.rows.length > 0) {
-      return res.json({ complaints: result.rows });
+      return res.json({ complaints: result.rows.map(c => normalizeComplaintPhotoUrls(c, req)) });
     }
 
     // Supabase fallback if local database has 0 rows for this citizen
@@ -491,14 +554,14 @@ router.get('/my', authenticateToken, async (req, res) => {
             ...c,
             department_name: c.departments?.name || c.department_name
           }));
-          return res.json({ complaints: formatted });
+          return res.json({ complaints: formatted.map(c => normalizeComplaintPhotoUrls(c, req)) });
         }
       }
     } catch (sErr) {
       console.warn('Supabase fallback in GET /my warning:', sErr.message);
     }
 
-    return res.json({ complaints: result.rows || [] });
+    return res.json({ complaints: (result.rows || []).map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -616,7 +679,7 @@ router.get('/:id', optionalAuthenticateToken, async (req, res) => {
       complaint.assignment = null;
     }
 
-    return res.json({ complaint });
+    return res.json({ complaint: normalizeComplaintPhotoUrls(complaint, req) });
   } catch (err) {
     console.error('Fetch complaint detail error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaint details' });

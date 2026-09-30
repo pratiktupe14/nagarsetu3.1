@@ -572,7 +572,7 @@ export const AdminComplaintsPage: React.FC = () => {
                     <div className="flex items-center space-x-1">
                       <button
                         type="button"
-                        onClick={() => window.open(selectedComplaint.photo_before_url, '_blank')}
+                        onClick={() => window.open(getValidImageUrl(selectedComplaint.photo_before_url || selectedComplaint.photo_front_url), '_blank')}
                         className="px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] min-h-[44px] flex items-center space-x-1"
                       >
                         <ExternalLink className="w-3 h-3" />
@@ -591,7 +591,7 @@ export const AdminComplaintsPage: React.FC = () => {
 
                   <div className="rounded-xl overflow-hidden border border-gray-200 aspect-4/3 bg-gray-100">
                     <img
-                      src={getValidImageUrl(selectedComplaint.photo_before_url)}
+                      src={getValidImageUrl(selectedComplaint.photo_before_url || selectedComplaint.photo_front_url)}
                       alt="Reported Civic Issue"
                       className="w-full h-full object-cover"
                       onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
@@ -811,7 +811,7 @@ export const AdminComplaintsPage: React.FC = () => {
             >
               ✕
             </button>
-            <img src={getValidImageUrl(selectedComplaint.photo_before_url)} alt="Fullscreen Evidence" className="w-full max-h-[85vh] object-contain rounded-2xl" />
+            <img src={getValidImageUrl(selectedComplaint.photo_before_url || selectedComplaint.photo_front_url)} alt="Fullscreen Evidence" className="w-full max-h-[85vh] object-contain rounded-2xl" />
           </div>
         </div>
       )}

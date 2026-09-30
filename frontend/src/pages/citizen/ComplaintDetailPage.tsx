@@ -223,9 +223,9 @@ export const ComplaintDetailPage: React.FC = () => {
                 <span className="text-xs font-bold text-gray-700 block">BEFORE (Reported Condition)</span>
 
                 <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 h-60">
-                  {complaint.photo_before_url ? (
+                  {complaint.photo_before_url || complaint.photo_front_url ? (
                     <img
-                      src={getValidImageUrl(complaint.photo_before_url)}
+                      src={getValidImageUrl(complaint.photo_before_url || complaint.photo_front_url)}
                       alt="Before repair"
                       className="w-full h-full object-cover"
                       onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
@@ -252,6 +252,46 @@ export const ComplaintDetailPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Multi-Angle Evidence Photos if available */}
+              {(() => {
+                let angles: Array<{ label: string; url: string }> = [];
+                if (complaint.angle_photos) {
+                  try {
+                    const parsed = typeof complaint.angle_photos === 'string' ? JSON.parse(complaint.angle_photos) : complaint.angle_photos;
+                    if (Array.isArray(parsed)) {
+                      angles = parsed.filter(p => p && p.url);
+                    }
+                  } catch (e) {}
+                }
+                if (angles.length === 0) {
+                  if (complaint.photo_left_url) angles.push({ label: 'Left View', url: complaint.photo_left_url });
+                  if (complaint.photo_right_url) angles.push({ label: 'Right View', url: complaint.photo_right_url });
+                  if (complaint.photo_closeup_url) angles.push({ label: 'Close-up Detail', url: complaint.photo_closeup_url });
+                }
+                if (angles.length === 0) return null;
+
+                return (
+                  <div className="col-span-full pt-3 space-y-2">
+                    <span className="text-xs font-bold text-gray-700 block uppercase tracking-wider">Multi-Angle Inspection Evidence ({angles.length} angle{angles.length > 1 ? 's' : ''})</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {angles.map((ang, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50 h-28">
+                            <img
+                              src={getValidImageUrl(ang.url)}
+                              alt={ang.label}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                            />
+                          </div>
+                          <span className="text-[11px] font-mono font-semibold text-gray-600 block truncate">{ang.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
