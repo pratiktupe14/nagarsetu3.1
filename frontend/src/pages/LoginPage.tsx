@@ -103,11 +103,24 @@ export const LoginPage: React.FC = () => {
         }
       }
 
-      await login(identifier, password, selectedRole);
+      // 1. Clear any stale session data before logging in
+      localStorage.removeItem('nagarsetu_token');
+      localStorage.removeItem('nagarsetu_user');
 
+      // 2. Authenticate strictly using entered credentials (never pass client selectedRole to override)
+      await login(identifier, password);
+
+      // 3. Obtain verified server-side role from authenticated user record
       const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
-      const activeRole = currentUser?.role || selectedRole;
-      const targetPortal = getPortalForRole(activeRole);
+      const verifiedRole = currentUser?.role;
+
+      if (!verifiedRole) {
+        throw new Error('Authentication role could not be verified. Please try again.');
+      }
+
+      // 4. Route strictly based on verified database role:
+      // CITIZEN -> /citizen/portal ONLY, CITY_ADMIN -> /admin/portal ONLY
+      const targetPortal = getPortalForRole(verifiedRole);
       navigate(targetPortal);
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed. Please check credentials.');

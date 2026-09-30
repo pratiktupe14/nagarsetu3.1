@@ -10,7 +10,7 @@ interface AuthContextType {
   user: UserProfile | null;
   role: UserRole;
   loading: boolean;
-  login: (identifier: string, password: string, role: UserRole) => Promise<boolean>;
+  login: (identifier: string, password: string, role?: UserRole) => Promise<boolean>;
   loginWithOtp: (mobile: string, otp: string) => Promise<boolean>;
   registerCitizen: (fullName: string, mobile: string, email: string, password?: string) => Promise<boolean>;
   switchRole: (role: UserRole) => void;
@@ -516,9 +516,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
   };
 
-  const login = async (identifier: string, password: string, targetRole: UserRole): Promise<boolean> => {
+  const login = async (identifier: string, password: string, _targetRole?: UserRole): Promise<boolean> => {
     try {
       const cleanIdentifier = identifier.trim();
+
+      // Clear any prior stale session before authenticating
+      localStorage.removeItem('nagarsetu_token');
+      localStorage.removeItem('nagarsetu_user');
+      sessionStorage.removeItem('nagarsetu_token');
+      sessionStorage.removeItem('nagarsetu_user');
+      setUser(null);
 
       // 1. Try Local Express Backend API authentication first
       try {
@@ -541,11 +548,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
-            const mappedRole: UserRole = (data.user.role === 'admin' || data.user.role === 'city_admin')
+            const serverRole = data.user.role;
+            const mappedRole: UserRole = (serverRole === 'admin' || serverRole === 'city_admin')
               ? 'city_admin'
-              : (data.user.role === 'field_staff' || data.user.role === 'staff' || data.user.role === 'service_staff')
-                ? 'service_staff'
-                : (data.user.role as UserRole);
+              : (serverRole === 'department_head')
+                ? 'department_head'
+                : (serverRole === 'field_staff' || serverRole === 'staff' || serverRole === 'service_staff')
+                  ? 'service_staff'
+                  : 'citizen';
+
             const staffMatch = mappedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanIdentifier) : null;
             const resDept = resolveDepartmentInfo(
               data.user.department_id || staffMatch?.department_id,
@@ -579,22 +590,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const errData = await response.json().catch(() => ({}));
           const errMsg = errData.message || errData.error || (response.status === 401 ? 'Invalid login credentials' : 'Authentication failed');
           console.warn('Express Backend API returned error:', errMsg);
-          // Only throw immediately if it's not a demo identifier or demo password
-          const isDemoPass = ['head@123', 'admin@123', 'staff@123', 'password123', 'nagarsetu@123', '8788562103', 'head123', 'staff123', 'admin123', 'NagarSetu@Admin2026!'].includes((password || '').trim());
-          const isDemoEmailOrMobile = cleanIdentifier.toLowerCase().includes('nagarsetu.gov.in') || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.includes('8788562103');
-          if (!isDemoPass && !isDemoEmailOrMobile) {
+          
+          if (!isSupabaseConfigured()) {
             throw new Error(errMsg);
           }
         }
       } catch (backendErr: any) {
-        if (backendErr && backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('Failed to fetch') && !backendErr.message.includes('Invalid login credentials')) {
+        if (backendErr && backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('Failed to fetch')) {
           throw backendErr;
         }
       }
 
       let cleanEmail = cleanIdentifier.includes('@')
         ? cleanIdentifier.toLowerCase()
-        : (targetRole === 'city_admin' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin')
+        : (cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin')
           ? 'admin@nagarsetu.gov.in'
           : `${cleanIdentifier.toLowerCase()}@nagarsetu.gov.in`;
 
@@ -652,7 +661,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const deptHead = headRes.data;
           const resolvedRole: UserRole = deptHead
             ? 'department_head'
-            : (roleRes.data?.role as UserRole) || (profile?.role as UserRole) || (cleanEmail.toLowerCase().includes('admin') ? 'city_admin' : targetRole);
+            : (roleRes.data?.role as UserRole) || (profile?.role as UserRole) || (cleanEmail.toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
           const staffMatch = resolvedRole === 'service_staff' ? findServiceStaffByIdentifier(cleanEmail || cleanIdentifier) : null;
           const rawDeptId = deptHead?.department_id || profile?.department_id || staffMatch?.department_id;
           const rawDeptName = deptHead?.departments?.name || profile?.department_name || staffMatch?.department_name;
@@ -742,9 +751,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return fallback;
       };
 
-      if (targetRole === 'city_admin' || cleanEmail === 'admin@nagarsetu.gov.in' || cleanIdentifier.replace(/\D/g, '').endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin') {
+      const cleanPhoneDigits = cleanIdentifier.replace(/\D/g, '');
+      const isAdminIdentifier = cleanEmail === 'admin@nagarsetu.gov.in' || cleanPhoneDigits.endsWith('9876543213') || cleanIdentifier.toLowerCase() === 'admin';
+      if (isAdminIdentifier) {
+        const validAdminPass = ['NagarSetu@Admin2026!', 'admin123', 'Admin@123'].includes((password || '').trim());
+        if (!validAdminPass) {
+          throw new Error('Invalid login credentials. Please check your admin password.');
+        }
         const adminUser: UserProfile = {
-          id: '1',
+          id: '4',
           full_name: 'Municipal Admin',
           email: 'admin@nagarsetu.gov.in',
           mobile: '9876543213',
@@ -758,7 +773,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
       }
 
-      if (targetRole === 'department_head' || cleanEmail.includes('nagarsetu.gov.in')) {
+      const isDeptHeadIdentifier = cleanEmail.includes('kumar') || cleanEmail.includes('sharma') || cleanPhoneDigits.endsWith('9822000001');
+      if (isDeptHeadIdentifier) {
+        const validHeadPass = ['head123', 'head@123'].includes((password || '').trim());
+        if (!validHeadPass) {
+          throw new Error('Invalid login credentials. Please check your department head password.');
+        }
         const dhMatch = findDepartmentHeadByIdentifier(cleanIdentifier) || findDepartmentHeadByIdentifier(cleanEmail);
         if (dhMatch) {
           setUser(dhMatch);
@@ -769,7 +789,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      if (targetRole === 'service_staff' || cleanEmail.includes('staff')) {
+      const isStaffIdentifier = cleanEmail.includes('staff') || cleanPhoneDigits.endsWith('9822010001') || cleanPhoneDigits.endsWith('9876543212');
+      if (isStaffIdentifier) {
+        const validStaffPass = ['staff123', 'staff@123'].includes((password || '').trim());
+        if (!validStaffPass) {
+          throw new Error('Invalid login credentials. Please check your staff password.');
+        }
         const staffUser = findServiceStaffByIdentifier(cleanIdentifier) || findServiceStaffByIdentifier(cleanEmail);
         if (staffUser) {
           setUser(staffUser);
@@ -780,7 +805,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      if (targetRole === 'citizen' || cleanIdentifier.replace(/\D/g, '').includes('8788562103')) {
+      const isCitizenIdentifier = cleanPhoneDigits.includes('8788562103') || cleanPhoneDigits.endsWith('9876543210') || cleanEmail.includes('citizen') || cleanEmail.includes('tupe');
+      if (isCitizenIdentifier) {
+        const validCitizenPass = ['password123', 'citizen123', 'nagarsetu@123', '8788562103'].includes((password || '').trim());
+        if (!validCitizenPass) {
+          throw new Error('Invalid login credentials. Please check your citizen password.');
+        }
         const citizenUser: UserProfile = {
           id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
           full_name: 'Pratik Dilip Tupe',

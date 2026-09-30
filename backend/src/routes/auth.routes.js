@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
-const { generateToken, authenticateToken } = require('../middleware/auth');
+const { generateToken, authenticateToken, getSupabaseClient } = require('../middleware/auth');
 const validateInput = require('../middleware/validateInput');
 const { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema } = require('../schemas/auth.schemas');
 
@@ -50,16 +50,42 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
     const { mobileOrEmail, password } = req.body;
 
     const cleanIdentifier = String(mobileOrEmail).trim().toLowerCase();
-    const sql = `SELECT * FROM users WHERE mobile = ? OR LOWER(email) = ?`;
-    let resUser = await query(sql, [mobileOrEmail.trim(), cleanIdentifier]);
+    const rawDigits = cleanIdentifier.replace(/\D/g, '');
+    const normMobile = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
 
-    let isMatch = false;
+    const sql = `SELECT * FROM users WHERE mobile = ? OR mobile = ? OR mobile = ? OR LOWER(email) = ?`;
+    let resUser = await query(sql, [mobileOrEmail.trim(), normMobile, `+91 ${normMobile}`, cleanIdentifier]);
+
     let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
 
     if (!user) {
-      if (cleanIdentifier === 'admin@nagarsetu.gov.in' || cleanIdentifier === 'admin' || cleanIdentifier === '9876543213') {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data: supaProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`mobile.eq.${cleanIdentifier},mobile.eq.${normMobile},email.eq.${cleanIdentifier}`)
+            .maybeSingle();
+          if (supaProfile) {
+            user = {
+              id: supaProfile.id,
+              name: supaProfile.full_name || supaProfile.name || 'Citizen User',
+              mobile: supaProfile.mobile || normMobile,
+              email: supaProfile.email || cleanIdentifier,
+              role: supaProfile.role || 'citizen',
+              status: supaProfile.status || 'active',
+              language_pref: supaProfile.language_pref || 'en'
+            };
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!user) {
+      if (cleanIdentifier === 'admin@nagarsetu.gov.in' || cleanIdentifier === 'admin' || normMobile === '9876543213') {
         user = {
-          id: 1,
+          id: 4,
           name: 'Municipal Admin',
           mobile: '9876543213',
           email: 'admin@nagarsetu.gov.in',
@@ -67,8 +93,7 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
           status: 'active',
           language_pref: 'en'
         };
-        isMatch = true;
-      } else if (cleanIdentifier === '8788562103' || cleanIdentifier === 'citizen8788@nagarsetu.gov.in' || cleanIdentifier.includes('8788') || cleanIdentifier.includes('citizen') || cleanIdentifier === '9876543210') {
+      } else if (normMobile === '8788562103' || cleanIdentifier === 'citizen8788@nagarsetu.gov.in' || cleanIdentifier.includes('8788') || cleanIdentifier.includes('citizen') || normMobile === '9876543210') {
         user = {
           id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
           name: 'Pratik Dilip Tupe',
@@ -78,7 +103,28 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
           status: 'active',
           language_pref: 'en'
         };
-        isMatch = true;
+      } else if (cleanIdentifier.includes('rahul.kumar') || normMobile === '9822000001') {
+        user = {
+          id: 13,
+          name: 'Rahul Kumar',
+          mobile: '9822000001',
+          email: 'rahul.kumar@nagarsetu.gov.in',
+          role: 'department_head',
+          department_id: 1,
+          status: 'active',
+          language_pref: 'en'
+        };
+      } else if (cleanIdentifier.includes('staff@nagarsetu.gov.in') || normMobile === '9822010001' || normMobile === '9876543212') {
+        user = {
+          id: 20,
+          name: 'Amit Patil',
+          mobile: '9822010001',
+          email: 'amit.patil@nagarsetu.gov.in',
+          role: 'service_staff',
+          department_id: 1,
+          status: 'active',
+          language_pref: 'en'
+        };
       } else {
         return res.status(401).json({ error: 'Invalid login credentials' });
       }
@@ -88,23 +134,36 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       return res.status(401).json({ error: 'Account is inactive. Please contact City Administration.' });
     }
 
+    let isMatch = false;
     if (user.password_hash) {
       isMatch = await bcrypt.compare(password, user.password_hash);
     }
 
-    // Standard admin/demo fallback credential check
+    // Role-specific demo fallback credential check (strict password matching per role)
     if (!isMatch) {
-      const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
-      const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
-      const devHeadPass = process.env.DEMO_HEAD_PASSWORD || 'head123';
-      const devStaffPass = process.env.DEMO_STAFF_PASSWORD || 'staff123';
-      if (
-        password === devAdminPass || password === devUserPass || password === devHeadPass || password === devStaffPass ||
-        password === 'admin123' || password === 'Admin@123' || password === '8788562103' || password === 'citizen123' || password === 'nagarsetu@123' ||
-        (user.role === 'city_admin' && Boolean(password)) ||
-        (user.role === 'citizen' && Boolean(password))
-      ) {
-        isMatch = true;
+      const userRole = (user.role === 'admin' || user.role === 'city_admin') ? 'city_admin' : user.role;
+      const trimmedPass = (password || '').trim();
+
+      if (userRole === 'city_admin') {
+        const devAdminPass = process.env.DEMO_ADMIN_PASSWORD || 'NagarSetu@Admin2026!';
+        if (trimmedPass === devAdminPass || trimmedPass === 'admin123' || trimmedPass === 'Admin@123') {
+          isMatch = true;
+        }
+      } else if (userRole === 'department_head') {
+        const devHeadPass = process.env.DEMO_HEAD_PASSWORD || 'head123';
+        if (trimmedPass === devHeadPass || trimmedPass === 'head@123') {
+          isMatch = true;
+        }
+      } else if (userRole === 'service_staff') {
+        const devStaffPass = process.env.DEMO_STAFF_PASSWORD || 'staff123';
+        if (trimmedPass === devStaffPass || trimmedPass === 'staff@123') {
+          isMatch = true;
+        }
+      } else if (userRole === 'citizen') {
+        const devUserPass = process.env.DEMO_USER_PASSWORD || 'password123';
+        if (trimmedPass === devUserPass || trimmedPass === 'citizen123' || trimmedPass === 'nagarsetu@123' || trimmedPass === '8788562103') {
+          isMatch = true;
+        }
       }
     }
 
