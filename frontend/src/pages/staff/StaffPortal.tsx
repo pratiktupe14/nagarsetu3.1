@@ -16,7 +16,7 @@ import {
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import { formatSlaRemainingTime, logActivity, fetchComplaintActivityLogs } from '../../services/adminService';
 import { getNotificationsForRole, syncNotificationsFromBackend, markNotificationAsRead } from '../../services/notificationService';
-import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog } from '../../types/database.types';
+import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog, extractComplaintAnglePhotos } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { openGoogleMapsDirections } from '../../utils/navigation';
@@ -1211,15 +1211,46 @@ export const StaffPortal: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <span className="font-bold text-gray-700 block mb-1">BEFORE (Citizen Report - Locked)</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-gray-700 text-xs">BEFORE (Citizen Report - Locked)</span>
+                      {extractComplaintAnglePhotos(selectedTask).length > 1 && (
+                        <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {extractComplaintAnglePhotos(selectedTask).length} Angles
+                        </span>
+                      )}
+                    </div>
                     <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
                       <img
-                        src={getValidImageUrl(selectedTask.photo_before_url)}
+                        src={getValidImageUrl(selectedTask.photo_before_url || extractComplaintAnglePhotos(selectedTask)[0]?.url)}
                         alt="Before"
                         className="w-full h-full object-cover"
                         onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
                       />
+                      <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                        {extractComplaintAnglePhotos(selectedTask)[0]?.label || 'Front View'}
+                      </span>
                     </div>
+
+                    {/* All Angle Thumbnails for Staff */}
+                    {extractComplaintAnglePhotos(selectedTask).length > 1 && (
+                      <div className="grid grid-cols-4 gap-1.5 pt-1.5">
+                        {extractComplaintAnglePhotos(selectedTask).map((photoItem, pIdx) => (
+                          <div
+                            key={pIdx}
+                            className="relative aspect-4/3 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all"
+                            onClick={() => {
+                              window.open(photoItem.url, '_blank');
+                            }}
+                            title={`View ${photoItem.label}`}
+                          >
+                            <img src={getValidImageUrl(photoItem.url)} alt={photoItem.label} className="w-full h-full object-cover" />
+                            <span className="absolute bottom-0.5 inset-x-0 bg-gray-900/80 text-white text-[8px] text-center font-mono truncate px-0.5">
+                              {photoItem.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>

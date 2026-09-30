@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -33,19 +34,57 @@ import {
   AuthError,
   isNetworkError
 } from '../../services/complaintService';
-import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult } from '../../types/database.types';
+import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult, ComplaintAngle, ComplaintAnglePhoto } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
-  ArrowRight, ArrowLeft, RefreshCw, ShieldCheck, WifiOff, FileText, X, Edit3, Save, ThumbsUp, Plus, Image as ImageIcon, Eye
+  ArrowRight, ArrowLeft, RefreshCw, ShieldCheck, WifiOff, FileText, X, Edit3, Save, ThumbsUp, Plus, Image as ImageIcon, Eye, ZoomIn
 } from 'lucide-react';
 
-interface AdditionalPhotoItem {
-  id: string;
-  file?: File;
+interface AngleSlotData {
+  file: File | null;
   previewUrl: string;
-  features: VisualFeatures;
-  similarity: ImageSimilarityResult;
 }
+
+interface AngleConfig {
+  angle: ComplaintAngle;
+  number: number;
+  title: string;
+  badge: string;
+  subtitle: string;
+  recommended?: boolean;
+}
+
+const ANGLE_CONFIGS: AngleConfig[] = [
+  {
+    angle: 'front',
+    number: 1,
+    title: '1. Front View',
+    badge: 'Recommended / Primary',
+    subtitle: 'Primary overview of defect and street context',
+    recommended: true
+  },
+  {
+    angle: 'left',
+    number: 2,
+    title: '2. Left View',
+    badge: 'Perspective & Depth',
+    subtitle: 'Left-side perspective showing depth & footpath'
+  },
+  {
+    angle: 'right',
+    number: 3,
+    title: '3. Right View',
+    badge: 'Traffic & Context',
+    subtitle: 'Right-side perspective showing oncoming lane & surroundings'
+  },
+  {
+    angle: 'closeup',
+    number: 4,
+    title: '4. Close-Up Detail',
+    badge: 'Defect Severity',
+    subtitle: 'Macro shot of crack depth, pothole crater, or defect severity'
+  }
+];
 
 export const ReportIssuePage: React.FC = () => {
   const { user } = useAuth();
@@ -53,16 +92,20 @@ export const ReportIssuePage: React.FC = () => {
   const { toast } = useNotification();
   const navigate = useNavigate();
 
-  // Primary Photo & AI State
+  // 4-Angle Photo Evidence State
+  const [angleSlots, setAngleSlots] = useState<Record<ComplaintAngle, AngleSlotData>>({
+    front: { file: null, previewUrl: '' },
+    left: { file: null, previewUrl: '' },
+    right: { file: null, previewUrl: '' },
+    closeup: { file: null, previewUrl: '' },
+  });
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string>('');
-  const [additionalPhotos, setAdditionalPhotos] = useState<AdditionalPhotoItem[]>([]);
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [analyzingAI, setAnalyzingAI] = useState<boolean>(false);
-  const [analyzingAngle, setAnalyzingAngle] = useState<boolean>(false);
   const [aiResult, setAiResult] = useState<AIVisionResult | null>(null);
   const [aiHealth, setAiHealth] = useState<{ reachable: boolean; configured: boolean; model: string } | null>(null);
   const [primaryFeatures, setPrimaryFeatures] = useState<VisualFeatures | null>(null);
-  const [angleErrorMsg, setAngleErrorMsg] = useState<string | null>(null);
 
   // Form Field States
   const [category, setCategory] = useState<CivicCategory>('Road Damage / Pothole');
@@ -88,6 +131,8 @@ export const ReportIssuePage: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
+  const isSubmittingRef = React.useRef<boolean>(false);
+  const cachedComplaintsRef = React.useRef<any[] | null>(null);
 
   // Initial AI Health & Location Check & Resume Offline Draft if present
   React.useEffect(() => {
@@ -97,7 +142,7 @@ export const ReportIssuePage: React.FC = () => {
     try {
       const drafts = getOfflineDrafts();
       if (drafts && drafts.length > 0) {
-        const latest = drafts[0];
+        const latest = drafts[0] as any;
         if (latest) {
           if (latest.category) setCategory(latest.category as CivicCategory);
           if (latest.title) setTitle(latest.title);
@@ -107,7 +152,23 @@ export const ReportIssuePage: React.FC = () => {
           if (latest.lat != null && !isNaN(Number(latest.lat))) setLat(Number(latest.lat));
           if (latest.lng != null && !isNaN(Number(latest.lng))) setLng(Number(latest.lng));
           if (latest.locationAddress) setLocationAddress(latest.locationAddress);
-          if (latest.photoPreviewUrl) setPhotoPreviewUrl(latest.photoPreviewUrl);
+          if (latest.angleDrafts) {
+            setAngleSlots({
+              front: { file: null, previewUrl: latest.angleDrafts.front || latest.photoPreviewUrl || '' },
+              left: { file: null, previewUrl: latest.angleDrafts.left || '' },
+              right: { file: null, previewUrl: latest.angleDrafts.right || '' },
+              closeup: { file: null, previewUrl: latest.angleDrafts.closeup || '' },
+            });
+            if (latest.angleDrafts.front || latest.photoPreviewUrl) {
+              setPhotoPreviewUrl(latest.angleDrafts.front || latest.photoPreviewUrl);
+            }
+          } else if (latest.photoPreviewUrl) {
+            setPhotoPreviewUrl(latest.photoPreviewUrl);
+            setAngleSlots((prev) => ({
+              ...prev,
+              front: { file: null, previewUrl: latest.photoPreviewUrl }
+            }));
+          }
         }
       }
     } catch (e) {}
@@ -146,7 +207,6 @@ export const ReportIssuePage: React.FC = () => {
         if (addr) setLocationAddress(addr);
         return true;
       } else {
-        // Location permission is disabled or location cannot be accessed
         setShowLocationPromptModal(true);
         return false;
       }
@@ -159,31 +219,66 @@ export const ReportIssuePage: React.FC = () => {
     }
   };
 
-  // Primary Photo Select & AI Vision Trigger
-  const handlePhotoSelect = async (file: File) => {
-    setSelectedPhotoFile(file);
+  // Handle Capture or Upload for Any of the 4 Image Angles
+  const handleAnglePhotoSelect = async (angle: ComplaintAngle, file: File) => {
     const url = URL.createObjectURL(file);
-    setPhotoPreviewUrl(url);
-    setPrimaryFeatures(null);
-    setAiResult(null);
-    setAdditionalPhotos([]);
+    setAngleSlots((prev) => ({
+      ...prev,
+      [angle]: { file, previewUrl: url }
+    }));
 
-    // Extract visual features locally for visual similarity check
-    try {
-      const feats = await extractVisualFeatures(file);
-      setPrimaryFeatures(feats);
-    } catch (e) {
-      console.warn('Local visual feature extraction skipped:', e);
+    if (angle === 'front') {
+      setSelectedPhotoFile(file);
+      setPhotoPreviewUrl(url);
+      setPrimaryFeatures(null);
+      setAiResult(null);
+
+      // Extract visual features locally
+      try {
+        const feats = await extractVisualFeatures(file);
+        setPrimaryFeatures(feats);
+      } catch (e) {
+        console.warn('Local visual feature extraction skipped:', e);
+      }
+
+      // Run AI Vision & Location Resolution on Front View
+      await runAIVisionAndLocation(file, url);
+    } else {
+      // If Front View hasn't been uploaded yet, set this as primary preview fallback
+      if (!angleSlots.front.file && !photoPreviewUrl) {
+        setSelectedPhotoFile(file);
+        setPhotoPreviewUrl(url);
+      }
+      if (primaryFeatures) {
+        try {
+          const angleFeats = await extractVisualFeatures(file);
+          const sim = compareImageSimilarity(primaryFeatures, angleFeats, 0);
+          if (sim.isExactDuplicate) {
+            toast.warning(`Note: The image for ${angle.toUpperCase()} is identical to the Front View.`);
+          }
+        } catch (e) {}
+      }
     }
-
-    // Run AI Vision & Location Resolution
-    await runAIVisionAndLocation(file, url);
   };
+
+  const removeAnglePhoto = (angle: ComplaintAngle) => {
+    setAngleSlots((prev) => ({
+      ...prev,
+      [angle]: { file: null, previewUrl: '' }
+    }));
+    if (angle === 'front') {
+      setSelectedPhotoFile(null);
+      setPhotoPreviewUrl('');
+      setPrimaryFeatures(null);
+      setAiResult(null);
+    }
+  };
+
+  const handlePhotoSelect = (file: File) => handleAnglePhotoSelect('front', file);
 
   // Run AI Vision Analysis & Location Extraction
   const runAIVisionAndLocation = async (file: File, photoUrlStr: string, isRetry: boolean = false) => {
     setAnalyzingAI(true);
-    setAngleErrorMsg(null);
 
     // Extract EXIF location if available and not set by live GPS
     try {
@@ -229,69 +324,13 @@ export const ReportIssuePage: React.FC = () => {
     }
   };
 
-  // Handle Additional Photo Upload / Different Angle Analysis
-  const handleAdditionalPhotoSelect = async (file: File) => {
-    if (additionalPhotos.length >= 4) {
-      toast.warning('Maximum of 5 photos (1 primary + 4 additional angles) allowed per complaint.');
-      return;
-    }
-
-    setAnalyzingAngle(true);
-    setAngleErrorMsg(null);
-
-    try {
-      const angleUrl = URL.createObjectURL(file);
-      const angleFeatures = await extractVisualFeatures(file);
-
-      if (primaryFeatures) {
-        const similarity = compareImageSimilarity(primaryFeatures, angleFeatures, 0);
-
-        if (similarity.isExactDuplicate) {
-          setAngleErrorMsg('Exact duplicate image detected! This exact photo has already been uploaded.');
-          setAnalyzingAngle(false);
-          return;
-        }
-
-        const newPhotoItem: AdditionalPhotoItem = {
-          id: `photo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          file,
-          previewUrl: angleUrl,
-          features: angleFeatures,
-          similarity
-        };
-
-        setAdditionalPhotos((prev) => [...prev, newPhotoItem]);
-      } else {
-        const newPhotoItem: AdditionalPhotoItem = {
-          id: `photo-${Date.now()}`,
-          file,
-          previewUrl: angleUrl,
-          features: angleFeatures,
-          similarity: {
-            isExactDuplicate: false,
-            similarityScore: 0.85,
-            confidenceLevel: 'High',
-            relation: 'same_issue_different_angle',
-            reason: 'Additional visual evidence attached.'
-          }
-        };
-        setAdditionalPhotos((prev) => [...prev, newPhotoItem]);
-      }
-    } catch (err) {
-      console.error('Angle analysis error:', err);
-      setAngleErrorMsg('Failed to process additional angle image.');
-    } finally {
-      setAnalyzingAngle(false);
-    }
-  };
-
-  const removeAdditionalPhoto = (id: string) => {
-    setAdditionalPhotos((prev) => prev.filter((p) => p.id !== id));
-  };
-
   const runDuplicateCheck = async (checkLat: number, checkLng: number) => {
     try {
-      const existing = await getAllComplaints();
+      let existing = cachedComplaintsRef.current;
+      if (!existing || existing.length === 0) {
+        existing = await getAllComplaints();
+        cachedComplaintsRef.current = existing;
+      }
       const dups = findDuplicateComplaints(checkLat, checkLng, existing, 100);
       setNearbyDuplicates(dups);
     } catch {
@@ -301,47 +340,106 @@ export const ReportIssuePage: React.FC = () => {
 
   const handleSaveDraft = () => {
     saveOfflineDraft({
-      category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
-    });
+      category,
+      title,
+      description,
+      priority,
+      department,
+      lat,
+      lng,
+      locationAddress,
+      photoPreviewUrl: angleSlots.front.previewUrl || photoPreviewUrl,
+      angleDrafts: {
+        front: angleSlots.front.previewUrl,
+        left: angleSlots.left.previewUrl,
+        right: angleSlots.right.previewUrl,
+        closeup: angleSlots.closeup.previewUrl,
+      }
+    } as any);
     setDraftSavedToast(true);
     setTimeout(() => setDraftSavedToast(false), 3000);
   };
 
   // Final Complaint Submission
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    // Synchronous immediate guard against double-clicks and concurrent executions
+    if (isSubmittingRef.current || submitting) {
+      return;
+    }
+    isSubmittingRef.current = true;
     setSubmitting(true);
+
     try {
       const complaintNumber = generateComplaintNumber();
 
-      // Convert/upload primary photo file to permanent public URL or Base64 Data URI
-      let finalPhotoBeforeUrl = photoPreviewUrl;
-      if (selectedPhotoFile) {
-        try {
-          finalPhotoBeforeUrl = await uploadComplaintImage(selectedPhotoFile);
-        } catch (uploadErr) {
-          console.warn('Primary image upload fallback triggered:', uploadErr);
+      const hasAnyPhoto = Boolean(
+        angleSlots.front.previewUrl ||
+        angleSlots.left.previewUrl ||
+        angleSlots.right.previewUrl ||
+        angleSlots.closeup.previewUrl ||
+        photoPreviewUrl
+      );
+
+      if (!hasAnyPhoto) {
+        toast.warning('Please capture or upload at least one photo (Front View recommended).');
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+
+      // Upload all available angle files
+      const uploadedUrls: Record<ComplaintAngle, string> = {
+        front: '',
+        left: '',
+        right: '',
+        closeup: ''
+      };
+
+      const angles: ComplaintAngle[] = ['front', 'left', 'right', 'closeup'];
+      for (const ang of angles) {
+        const slot = angleSlots[ang];
+        if (slot.file) {
+          try {
+            uploadedUrls[ang] = await uploadComplaintImage(slot.file);
+          } catch (uploadErr) {
+            console.warn(`Upload failed for ${ang}, falling back to preview:`, uploadErr);
+            uploadedUrls[ang] = slot.previewUrl;
+          }
+        } else if (slot.previewUrl) {
+          uploadedUrls[ang] = slot.previewUrl;
         }
       }
 
-      // Convert/upload additional photo files to permanent URLs
-      const additionalUrls: string[] = [];
-      for (const p of additionalPhotos) {
-        if (p.file) {
-          try {
-            const uploadedUrl = await uploadComplaintImage(p.file);
-            additionalUrls.push(uploadedUrl);
-          } catch (e) {
-            additionalUrls.push(p.previewUrl);
-          }
-        } else {
-          additionalUrls.push(p.previewUrl);
-        }
-      }
+      // Determine primary URL (Front View, or first available angle)
+      const primaryUrl = uploadedUrls.front || uploadedUrls.left || uploadedUrls.right || uploadedUrls.closeup || photoPreviewUrl || DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
+
+      const anglePhotos: ComplaintAnglePhoto[] = [
+        uploadedUrls.front ? { angle: 'front' as ComplaintAngle, label: 'Front View', url: uploadedUrls.front } : null,
+        uploadedUrls.left ? { angle: 'left' as ComplaintAngle, label: 'Left View', url: uploadedUrls.left } : null,
+        uploadedUrls.right ? { angle: 'right' as ComplaintAngle, label: 'Right View', url: uploadedUrls.right } : null,
+        uploadedUrls.closeup ? { angle: 'closeup' as ComplaintAngle, label: 'Close-up Detail', url: uploadedUrls.closeup } : null,
+      ].filter(Boolean) as ComplaintAnglePhoto[];
+
+      const additionalUrls = [
+        uploadedUrls.left,
+        uploadedUrls.right,
+        uploadedUrls.closeup
+      ].filter(Boolean);
 
       const newComplaintData = {
         complaint_number: complaintNumber,
         citizen_id: user?.id || '',
-        photo_before_url: finalPhotoBeforeUrl,
+        photo_before_url: primaryUrl,
+        photo_front_url: uploadedUrls.front || primaryUrl,
+        photo_left_url: uploadedUrls.left || '',
+        photo_right_url: uploadedUrls.right || '',
+        photo_closeup_url: uploadedUrls.closeup || '',
+        angle_photos: anglePhotos,
         additional_photos: additionalUrls,
         ai_vision_metadata: (aiResult && aiResult.confidence > 0) ? {
           category: aiResult.category,
@@ -349,7 +447,7 @@ export const ReportIssuePage: React.FC = () => {
           confidence_level: aiResult.confidence_level,
           detected_objects: aiResult.detected_objects,
           analysis_time_ms: aiResult.analysis_time_ms,
-          additional_angles_count: additionalPhotos.length
+          angles_count: anglePhotos.length
         } : undefined,
         category,
         title: title || `${category} Issue Reported`,
@@ -375,29 +473,29 @@ export const ReportIssuePage: React.FC = () => {
       const created = await createComplaint(newComplaintData);
       clearOfflineDrafts();
       setShowReviewModal(false);
+      // Keep isSubmittingRef.current = true to lock against any duplicate submissions during redirection
       navigate('/citizen/success', { state: { complaint: created } });
     } catch (err: any) {
       console.error('Complaint submission error:', err);
+      // Re-enable submission only when submission genuinely fails
+      isSubmittingRef.current = false;
+      setSubmitting(false);
 
       if (isNetworkError(err)) {
-        // True network failure: fetch threw before receiving an HTTP response, or browser offline
-        saveOfflineDraft({
-          category, title, description, priority, department, lat, lng, locationAddress, photoPreviewUrl
-        });
+        handleSaveDraft();
         toast.info('Network issue detected. Complaint saved to offline drafts on your device.');
       } else if (err instanceof AuthError || err.isAuthError || err.status === 401 || err.status === 403) {
-        // Authentication or authorization error
         toast.error(err.message || 'Authentication required. Please log in again.');
       } else if (err instanceof HttpError || err.isHttpError || err.status) {
-        // HTTP response received (400, 404, 409, 422, 500, 502, 503, etc.)
-        const detailStr = err.data?.details && Array.isArray(err.data.details) ? ` (${err.data.details.join(', ')})` : '';
-        toast.error(`${err.message || 'Server error processing complaint.'}${detailStr}`);
+        if (err.status === 429) {
+          toast.error(err.message || 'Action rate limit exceeded. Please slow down your requests and try again in a few moments.');
+        } else {
+          const detailStr = err.data?.details && Array.isArray(err.data.details) ? ` (${err.data.details.join(', ')})` : '';
+          toast.error(`${err.message || 'Server error processing complaint.'}${detailStr}`);
+        }
       } else {
-        // Other unexpected client-side error
         toast.error(err.message || 'Failed to submit complaint. Please verify your details.');
       }
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -453,127 +551,178 @@ export const ReportIssuePage: React.FC = () => {
           <div className="lg:col-span-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6 lg:sticky lg:top-20">
             
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                {t('photoEvidenceStep')}
-              </h2>
-              {photoPreviewUrl && (
-                <button
-                  onClick={() => {
-                    setPhotoPreviewUrl('');
-                    setSelectedPhotoFile(null);
-                    setPrimaryFeatures(null);
-                    setAiResult(null);
-                    setAdditionalPhotos([]);
-                  }}
-                  className="text-xs text-rose-600 font-bold hover:underline min-h-[44px]"
-                >
-                  {t('removePhoto')}
-                </button>
-              )}
+              <div>
+                <h2 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider flex items-center space-x-2">
+                  <Camera className="w-4 h-4 text-emerald-600" />
+                  <span>Complaint Evidence Photos (4 Angles)</span>
+                </h2>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Capture up to 4 angles for swift municipal verification. Front View is recommended as primary.
+                </p>
+              </div>
+              <span className={`text-[11px] font-mono font-extrabold px-2.5 py-1 rounded-full border ${
+                Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length > 0
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+              }`}>
+                {Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length} / 4 Added
+              </span>
             </div>
 
-            {/* UPLOAD BOX OR LARGE PREVIEW */}
-            {!photoPreviewUrl ? (
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center bg-gray-50/50 space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
-                    <Camera className="w-7 h-7" />
-                  </div>
+            {/* 4-ANGLE EVIDENCE SLOTS GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {ANGLE_CONFIGS.map((cfg) => {
+                const slot = angleSlots[cfg.angle];
+                const isFront = cfg.angle === 'front';
+                const hasImage = Boolean(slot.previewUrl);
 
-                  <div className="space-y-1">
-                    <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('uploadPrimaryPhoto')}</h3>
-                    <p className="text-xs text-gray-500">{t('uploadPhotoSubtitle')}</p>
-                  </div>
+                return (
+                  <div
+                    key={cfg.angle}
+                    className={`rounded-2xl border p-3.5 flex flex-col justify-between transition-all ${
+                      hasImage
+                        ? 'bg-white border-emerald-300 shadow-xs ring-1 ring-emerald-100'
+                        : isFront
+                        ? 'bg-emerald-50/40 border-dashed border-emerald-300'
+                        : 'bg-gray-50/70 border-dashed border-gray-300'
+                    }`}
+                  >
+                    {/* Angle Card Header */}
+                    <div className="flex items-start justify-between gap-1 mb-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5 flex-wrap">
+                          <span className="font-extrabold text-xs text-gray-900 font-outfit">
+                            {cfg.title}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            isFront
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {cfg.badge}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 leading-tight mt-0.5">
+                          {cfg.subtitle}
+                        </p>
+                      </div>
 
-                  {/* Camera Direct Input */}
-                  <label htmlFor="citizen-photo-camera" className="sr-only">Take Photo with Camera</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    id="citizen-photo-camera"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handlePhotoSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  {/* Gallery / Files Standard Input (No Forced Capture) */}
-                  <label htmlFor="citizen-photo-upload" className="sr-only">Upload Issue Photo from Gallery</label>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/jpg"
-                    id="citizen-photo-upload"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handlePhotoSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                    <label
-                      htmlFor="citizen-photo-camera"
-                      className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-sm min-h-[44px] flex items-center justify-center space-x-2"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>{t('takePhotoCamera')}</span>
-                    </label>
-
-                    <label
-                      htmlFor="citizen-photo-upload"
-                      className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 font-extrabold text-xs uppercase tracking-wider cursor-pointer border border-gray-300 shadow-xs min-h-[44px] flex items-center justify-center space-x-2"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>{t('galleryFiles')}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* LARGE PREVIEW IMAGE (ASPECT 4/3) */
-              <div className="space-y-4">
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 aspect-4/3 bg-gray-100">
-                  <img src={photoPreviewUrl} alt="Civic Issue" className="w-full h-full object-cover" />
-                  {analyzingAI && (
-                    <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-2 font-outfit text-xs font-extrabold">
-                      <Sparkles className="w-6 h-6 animate-spin text-emerald-400" />
-                      <span>{t('analyzingPhoto')}</span>
+                      {hasImage && (
+                        <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                          ✓ Saved
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  <label
-                    htmlFor="citizen-photo-upload"
-                    className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs text-center border border-gray-300 cursor-pointer min-h-[44px] flex items-center justify-center space-x-1"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>{t('replacePrimaryPhoto')}</span>
-                  </label>
+                    {/* Angle Slot Body: Preview or Capture Controls */}
+                    {hasImage ? (
+                      <div className="space-y-2 mt-auto">
+                        <div
+                          className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group cursor-pointer"
+                          onClick={() => setZoomImageUrl(slot.previewUrl)}
+                          title="Click to view larger"
+                        >
+                          <img
+                            src={slot.previewUrl}
+                            alt={cfg.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <ZoomIn className="w-5 h-5 drop-shadow" />
+                          </div>
+                          {isFront && analyzingAI && (
+                            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold space-y-1">
+                              <Sparkles className="w-4 h-4 animate-spin text-emerald-400" />
+                              <span>AI Analyzing...</span>
+                            </div>
+                          )}
+                        </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhotoPreviewUrl('');
-                      setSelectedPhotoFile(null);
-                      setPrimaryFeatures(null);
-                      setAiResult(null);
-                      setAdditionalPhotos([]);
-                      setTitle('');
-                      setDescription('');
-                      setIsManuallyEdited(false);
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 min-h-[44px]"
-                  >
-                    {t('removePhoto')}
-                  </button>
-                </div>
-              </div>
-            )}
+                        {/* Action buttons: Retake / Replace / Remove */}
+                        <div className="flex items-center space-x-1.5 pt-1">
+                          <label
+                            htmlFor={`citizen-angle-camera-${cfg.angle}`}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 cursor-pointer min-h-[36px] flex items-center justify-center space-x-1"
+                            title="Retake photo using camera"
+                          >
+                            <Camera className="w-3 h-3 text-emerald-600" />
+                            <span>Retake</span>
+                          </label>
+
+                          <label
+                            htmlFor={`citizen-angle-upload-${cfg.angle}`}
+                            className="py-1.5 px-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 cursor-pointer min-h-[36px] flex items-center justify-center"
+                            title="Replace with file from device"
+                          >
+                            <Upload className="w-3 h-3 text-blue-600" />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => removeAnglePhoto(cfg.angle)}
+                            className="py-1.5 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] border border-rose-200 min-h-[36px] flex items-center justify-center"
+                            title="Remove this photo"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 py-3 mt-auto">
+                        <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center mx-auto border border-gray-200 shadow-2xs">
+                          <Camera className="w-5 h-5 text-gray-500" />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <label
+                            htmlFor={`citizen-angle-camera-${cfg.angle}`}
+                            className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-[11px] text-center cursor-pointer shadow-xs min-h-[44px] flex items-center justify-center space-x-1.5"
+                          >
+                            <Camera className="w-3.5 h-3.5 shrink-0" />
+                            <span>Camera</span>
+                          </label>
+
+                          <label
+                            htmlFor={`citizen-angle-upload-${cfg.angle}`}
+                            className="py-2.5 px-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-800 font-bold text-[11px] text-center border border-gray-300 shadow-2xs cursor-pointer min-h-[44px] flex items-center justify-center space-x-1.5"
+                          >
+                            <Upload className="w-3.5 h-3.5 shrink-0 text-gray-600" />
+                            <span>Upload</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Camera direct input */}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      id={`citizen-angle-camera-${cfg.angle}`}
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleAnglePhotoSelect(cfg.angle, e.target.files[0]);
+                        }
+                      }}
+                    />
+
+                    {/* Standard gallery file input */}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      id={`citizen-angle-upload-${cfg.angle}`}
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleAnglePhotoSelect(cfg.angle, e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
 
             {/* AI ANALYSIS RESULT CARD */}
             {aiResult && (aiResult.confidence === 0 || aiResult.is_available === false) ? (
@@ -593,12 +742,12 @@ export const ReportIssuePage: React.FC = () => {
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-                  {selectedPhotoFile && (
+                  {angleSlots.front.file && (
                     <button
                       type="button"
                       disabled={analyzingAI}
                       onClick={() => {
-                        if (selectedPhotoFile && !analyzingAI) runAIVisionAndLocation(selectedPhotoFile, photoPreviewUrl, true);
+                        if (angleSlots.front.file && !analyzingAI) runAIVisionAndLocation(angleSlots.front.file, angleSlots.front.previewUrl, true);
                       }}
                       className="w-full sm:w-1/2 py-2.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 flex items-center justify-center space-x-1 min-h-[44px] cursor-pointer disabled:opacity-50"
                     >
@@ -668,129 +817,6 @@ export const ReportIssuePage: React.FC = () => {
                       </span>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* ADDITIONAL EVIDENCE / DIFFERENT ANGLE UPLOADS */}
-            {photoPreviewUrl && (
-              <div className="p-4 bg-slate-50 rounded-xl border border-gray-200 space-y-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5">
-                    <ImageIcon className="w-4 h-4 text-emerald-600" />
-                    <span className="font-extrabold text-gray-900 font-outfit">{t('additionalAnglesEvidence')} ({additionalPhotos.length}/4)</span>
-                  </div>
-
-                  {/* Additional Angle Camera Input */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    id="additional-angle-camera"
-                    className="hidden"
-                    disabled={additionalPhotos.length >= 4 || analyzingAngle}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleAdditionalPhotoSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  {/* Additional Angle Gallery/Files Standard Input */}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/jpg"
-                    id="additional-angle-upload"
-                    className="hidden"
-                    disabled={additionalPhotos.length >= 4 || analyzingAngle}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleAdditionalPhotoSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  {additionalPhotos.length < 4 && (
-                    <div className="flex items-center space-x-2">
-                      <label
-                        htmlFor="additional-angle-camera"
-                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] cursor-pointer flex items-center space-x-1 min-h-[36px]"
-                        title="Take photo with camera"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>{t('camera')}</span>
-                      </label>
-
-                      <label
-                        htmlFor="additional-angle-upload"
-                        className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-lg font-bold text-[11px] cursor-pointer flex items-center space-x-1 min-h-[36px]"
-                        title="Choose photo from gallery or files"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>{t('galleryFiles')}</span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {angleErrorMsg && (
-                  <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-medium flex items-center space-x-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                    <span>{angleErrorMsg}</span>
-                  </div>
-                )}
-
-                {analyzingAngle && (
-                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4 animate-spin text-emerald-600" />
-                    <span>{t('comparingNewAngle')}</span>
-                  </div>
-                )}
-
-                {/* ADDITIONAL PHOTOS LIST & SIMILARITY BADGES */}
-                {additionalPhotos.length > 0 ? (
-                  <div className="space-y-2 pt-1">
-                    {additionalPhotos.map((item, idx) => (
-                      <div key={item.id} className="p-2.5 bg-white rounded-lg border border-gray-200 flex items-center justify-between gap-2">
-                        <div className="flex items-center space-x-2.5 min-w-0">
-                          <img src={item.previewUrl} alt={`Angle ${idx + 1}`} className="w-12 h-12 rounded object-cover border border-gray-200 shrink-0" />
-                          <div className="space-y-0.5 min-w-0">
-                            <div className="flex items-center space-x-1.5">
-                              <span className="font-bold text-gray-900 text-xs">Angle #{idx + 1}</span>
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                                  item.similarity.relation === 'same_issue_different_angle'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : item.similarity.relation === 'same_category_different_issue'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}
-                              >
-                                {item.similarity.relation === 'same_issue_different_angle'
-                                  ? '✓ Same Civic Issue'
-                                  : item.similarity.relation === 'same_category_different_issue'
-                                  ? 'ℹ Same Category'
-                                  : '• Distinct View'}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-gray-500 truncate max-w-xs">{item.similarity.reason}</p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeAdditionalPhoto(item.id)}
-                          className="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-gray-500 italic">
-                    {t('additionalAnglesHint')}
-                  </p>
                 )}
               </div>
             )}
@@ -1035,7 +1061,7 @@ export const ReportIssuePage: React.FC = () => {
                 onClick={() => setShowReviewModal(true)}
                 className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px] flex items-center justify-center space-x-2 transition-all"
               >
-                <span>{t('reviewComplaint')} ({additionalPhotos.length + 1} Photos)</span>
+                <span>{t('reviewComplaint')} ({Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length} Photos)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -1159,21 +1185,20 @@ export const ReportIssuePage: React.FC = () => {
               <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px]">✕</button>
             </div>
 
-            {/* Photo Preview Strip */}
-            <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-              {photoPreviewUrl && (
-                <div className="h-28 w-36 shrink-0 rounded-xl overflow-hidden border border-gray-200 relative">
-                  <img src={photoPreviewUrl} alt="Primary Preview" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 bg-gray-900/70 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">Primary</span>
-                </div>
-              )}
-
-              {additionalPhotos.map((photo, idx) => (
-                <div key={photo.id} className="h-28 w-36 shrink-0 rounded-xl overflow-hidden border border-gray-200 relative">
-                  <img src={photo.previewUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 bg-emerald-900/80 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">Angle #{idx + 1}</span>
-                </div>
-              ))}
+            {/* 4-Angle Photo Preview Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-1">
+              {ANGLE_CONFIGS.map((cfg) => {
+                const url = angleSlots[cfg.angle].previewUrl;
+                if (!url) return null;
+                return (
+                  <div key={cfg.angle} className="relative rounded-xl overflow-hidden border border-gray-200 aspect-4/3 bg-gray-100">
+                    <img src={url} alt={cfg.title} className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 left-1 bg-gray-900/80 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">
+                      {cfg.title}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs space-y-2">
@@ -1211,14 +1236,44 @@ export const ReportIssuePage: React.FC = () => {
 
               <button
                 type="button"
+                id="btn-submit-complaint-final"
                 onClick={handleFinalSubmit}
-                disabled={submitting}
-                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase min-h-[44px] flex items-center space-x-1.5"
+                disabled={submitting || isSubmittingRef.current}
+                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase min-h-[44px] flex items-center space-x-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-all"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{submitting ? t('submitting') : t('submitComplaint')}</span>
+                {submitting || isSubmittingRef.current ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>{t('submitting')}</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{t('submitComplaint')}</span>
+                  </>
+                )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULL-SCREEN ZOOM IMAGE PREVIEW MODAL */}
+      {zoomImageUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/80 backdrop-blur-xs"
+          onClick={() => setZoomImageUrl(null)}
+        >
+          <div className="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setZoomImageUrl(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-900/70 text-white hover:bg-gray-900 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img src={zoomImageUrl} alt="Full Angle Preview" className="w-full max-h-[80vh] object-contain rounded-xl" />
           </div>
         </div>
       )}

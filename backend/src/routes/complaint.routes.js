@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require('path');
 const { uploadSingleImage } = require('../middleware/upload');
 const { authenticateToken, optionalAuthenticateToken } = require('../middleware/auth');
+const { complaintSubmitLimiter } = require('../middleware/rateLimiter');
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
@@ -78,11 +79,18 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
 });
 
 // Step 2: Final Complaint Submission
-router.post('/submit', authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
+router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), async (req, res) => {
   try {
     const {
       complaint_number,
       photo_url,
+      photo_before_url,
+      photo_front_url,
+      photo_left_url,
+      photo_right_url,
+      photo_closeup_url,
+      angle_photos,
+      additional_photos,
       category,
       title,
       description,
@@ -127,7 +135,14 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       finalDeptId = parseInt(finalDeptId, 10);
     }
 
-    const finalPhotoUrl = photo_url || '/uploads/civic-default.jpg';
+    const finalPhotoUrl = photo_url || photo_front_url || photo_before_url || '/uploads/civic-default.jpg';
+    const finalPhotoFront = photo_front_url || finalPhotoUrl;
+    const finalPhotoLeft = photo_left_url || null;
+    const finalPhotoRight = photo_right_url || null;
+    const finalPhotoCloseup = photo_closeup_url || null;
+    const finalAnglePhotos = angle_photos ? (typeof angle_photos === 'string' ? angle_photos : JSON.stringify(angle_photos)) : null;
+    const finalAdditionalPhotos = additional_photos ? (typeof additional_photos === 'string' ? additional_photos : JSON.stringify(additional_photos)) : null;
+
     let citizenId = req.user?.id ? String(req.user.id) : 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
     if (citizenId === 'c-8788562103' || req.user?.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
       citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
@@ -136,9 +151,10 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
-        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id
+        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id,
+        photo_front_url, photo_left_url, photo_right_url, photo_closeup_url, angle_photos, additional_photos
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -154,7 +170,13 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
       longitude,
       location_source || 'manual_pin',
       location_address || '',
-      duplicate_of_id || null
+      duplicate_of_id || null,
+      finalPhotoFront,
+      finalPhotoLeft,
+      finalPhotoRight,
+      finalPhotoCloseup,
+      finalAnglePhotos,
+      finalAdditionalPhotos
     ]);
 
     const complaintId = result.rows[0].id;
@@ -191,10 +213,21 @@ router.post('/submit', authenticateToken, validateInput(createComplaintSchema), 
         };
         const supaDeptId = DEPT_UUID_MAP[String(finalDeptId)] || (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(department_id)) ? String(department_id) : '8ed9f760-1314-427c-a515-c2a54d6df6d8');
 
+        let parsedAnglePhotos = null;
+        try { if (finalAnglePhotos) parsedAnglePhotos = JSON.parse(finalAnglePhotos); } catch {}
+        let parsedAdditionalPhotos = null;
+        try { if (finalAdditionalPhotos) parsedAdditionalPhotos = JSON.parse(finalAdditionalPhotos); } catch {}
+
         const { data: supaComp, error: supaErr } = await supabase.from('complaints').insert([{
           complaint_number: finalComplaintNumber,
           citizen_id: citizenId,
           photo_before_url: finalPhotoUrl,
+          photo_front_url: finalPhotoFront,
+          photo_left_url: finalPhotoLeft,
+          photo_right_url: finalPhotoRight,
+          photo_closeup_url: finalPhotoCloseup,
+          angle_photos: parsedAnglePhotos,
+          additional_photos: parsedAdditionalPhotos,
           category,
           title,
           description: description || '',

@@ -24,7 +24,7 @@ import {
   getNotificationsForRole, pushNotification, markNotificationAsRead,
   markAllNotificationsAsRead
 } from '../../services/notificationService';
-import { Complaint, ComplaintStatus, UserProfile, NotificationItem } from '../../types/database.types';
+import { Complaint, ComplaintStatus, UserProfile, NotificationItem, extractComplaintAnglePhotos } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -4865,18 +4865,62 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               {/* CITIZEN PHOTO VS REPAIR PROOF EVIDENCE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Submitted Image</span>
-                  <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer" onClick={() => setZoomImageUrl(detailModalComplaint.photo_before_url)}>
-                    {detailModalComplaint.photo_before_url ? (
-                      <img src={getValidImageUrl(detailModalComplaint.photo_before_url)} alt="Before" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">
+                      Citizen Evidence ({extractComplaintAnglePhotos(detailModalComplaint).length} {extractComplaintAnglePhotos(detailModalComplaint).length === 1 ? 'Angle' : 'Angles'})
+                    </span>
+                    {extractComplaintAnglePhotos(detailModalComplaint).length > 1 && (
+                      <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Multi-Angle
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer group"
+                    onClick={() => {
+                      const firstUrl = detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url;
+                      if (firstUrl) setZoomImageUrl(firstUrl);
+                    }}
+                  >
+                    {detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url ? (
+                      <>
+                        <img
+                          src={getValidImageUrl(detailModalComplaint.photo_before_url || extractComplaintAnglePhotos(detailModalComplaint)[0]?.url)}
+                          alt="Citizen Evidence"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                          {extractComplaintAnglePhotos(detailModalComplaint)[0]?.label || 'Front View'}
+                        </span>
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Image Submitted</div>
                     )}
                   </div>
+
+                  {/* All Angle Thumbnails */}
+                  {extractComplaintAnglePhotos(detailModalComplaint).length > 1 && (
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      {extractComplaintAnglePhotos(detailModalComplaint).map((photoItem, pIdx) => (
+                        <div
+                          key={pIdx}
+                          className="relative aspect-4/3 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all"
+                          onClick={() => setZoomImageUrl(photoItem.url)}
+                          title={`Click to view ${photoItem.label}`}
+                        >
+                          <img src={getValidImageUrl(photoItem.url)} alt={photoItem.label} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-0.5 inset-x-0 bg-gray-900/80 text-white text-[8px] text-center font-mono truncate px-0.5">
+                            {photoItem.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-emerald-700 block">Staff Work Completion Proof</span>
                   <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-emerald-300 bg-emerald-50 cursor-pointer flex items-center justify-center" onClick={() => detailModalComplaint.photo_after_url && setZoomImageUrl(detailModalComplaint.photo_after_url)}>
                     {detailModalComplaint.photo_after_url ? (
@@ -5113,20 +5157,58 @@ export const DepartmentHeadPortal: React.FC = () => {
 
               {/* BEFORE VS AFTER EVIDENCE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">Citizen Issue Photo (Before)</span>
-                  <div
-                    className="aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => reviewModalComplaint.photo_before_url && setZoomImageUrl(reviewModalComplaint.photo_before_url)}
-                  >
-                    <img src={getValidImageUrl(reviewModalComplaint.photo_before_url)} alt="Before" className="w-full h-full object-cover" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold font-mono uppercase text-gray-500 block">
+                      Citizen Issue Evidence ({extractComplaintAnglePhotos(reviewModalComplaint).length} {extractComplaintAnglePhotos(reviewModalComplaint).length === 1 ? 'Angle' : 'Angles'})
+                    </span>
+                    {extractComplaintAnglePhotos(reviewModalComplaint).length > 1 && (
+                      <span className="text-[9px] font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                        Multi-Angle
+                      </span>
+                    )}
                   </div>
+                  <div
+                    className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => {
+                      const firstUrl = reviewModalComplaint.photo_before_url || extractComplaintAnglePhotos(reviewModalComplaint)[0]?.url;
+                      if (firstUrl) setZoomImageUrl(firstUrl);
+                    }}
+                  >
+                    <img
+                      src={getValidImageUrl(reviewModalComplaint.photo_before_url || extractComplaintAnglePhotos(reviewModalComplaint)[0]?.url)}
+                      alt="Before"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+                      {extractComplaintAnglePhotos(reviewModalComplaint)[0]?.label || 'Front View'}
+                    </span>
+                  </div>
+
+                  {/* All Angle Thumbnails */}
+                  {extractComplaintAnglePhotos(reviewModalComplaint).length > 1 && (
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      {extractComplaintAnglePhotos(reviewModalComplaint).map((photoItem, pIdx) => (
+                        <div
+                          key={pIdx}
+                          className="relative aspect-4/3 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
+                          onClick={() => setZoomImageUrl(photoItem.url)}
+                          title={`Click to view ${photoItem.label}`}
+                        >
+                          <img src={getValidImageUrl(photoItem.url)} alt={photoItem.label} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-0.5 inset-x-0 bg-gray-900/80 text-white text-[8px] text-center font-mono truncate px-0.5">
+                            {photoItem.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <span className="text-[10px] font-extrabold font-mono uppercase text-purple-700 block">Repair Evidence Photo (After)</span>
                   <div
-                    className="aspect-4/3 rounded-xl overflow-hidden border border-purple-300 bg-purple-50 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="relative aspect-4/3 rounded-xl overflow-hidden border border-purple-300 bg-purple-50 cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => reviewModalComplaint.photo_after_url && setZoomImageUrl(reviewModalComplaint.photo_after_url)}
                   >
                     {reviewModalComplaint.photo_after_url ? (

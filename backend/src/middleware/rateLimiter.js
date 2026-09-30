@@ -105,6 +105,41 @@ function authRateLimiter(req, res, next) {
   next();
 }
 
+const jwt = require('jsonwebtoken');
+
+/**
+ * Granular client identifier helper for authenticated actions and complaint submissions.
+ * Resolves authenticated user ID / email, bearer token snippet, or IP address.
+ * Ensures users on shared IPs, NAT, or localhost dev environments have isolated buckets.
+ */
+function getAuthedClientKey(req) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+
+  if (req.user && (req.user.id || req.user.email)) {
+    const id = req.user.id || req.user.email;
+    return `user_${id}_${ip}`;
+  }
+
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (authHeader && typeof authHeader === 'string') {
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded && (decoded.id || decoded.email || decoded.sub)) {
+          const userKey = decoded.id || decoded.email || decoded.sub;
+          return `user_${userKey}_${ip}`;
+        }
+      } catch (e) {}
+
+      // Fallback for non-jwt tokens (e.g. demo-token-citizen)
+      return `tok_${token.length > 24 ? token.slice(-24) : token}_${ip}`;
+    }
+  }
+
+  return `ip_${ip}`;
+}
+
 // 2. Public Endpoints Rate Limiter (Health, Geocoding, public maps)
 const publicRateLimiter = rateLimit({
   windowMs: getEnvInt('RATE_LIMIT_PUBLIC_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
@@ -118,9 +153,28 @@ const publicRateLimiter = rateLimit({
 });
 
 // 3. Authenticated User Actions Rate Limiter (Complaints, Admin, Staff, Officer)
+// Applies to mutating actions (POST/PUT/DELETE/PATCH). Skips read queries (GET, HEAD, OPTIONS)
+// so that dashboard viewing, polling, duplicate checks, and maps never deplete action rate limit quotas.
 const authedRateLimiter = rateLimit({
   windowMs: getEnvInt('RATE_LIMIT_AUTHED_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
   max: getEnvInt('RATE_LIMIT_AUTHED_MAX', 300), // 300 requests per 15 minutes
+  keyGenerator: getAuthedClientKey,
+  skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  message: {
+    error: 'Action rate limit exceeded. Please slow down your requests.'
+  }
+});
+
+// 4. Dedicated Complaint Submission Rate Limiter
+// Specifically protects POST /api/complaints/submit against abuse/bots while guaranteeing
+// legitimate citizen complaint submissions always have their own isolated submission allowance.
+const complaintSubmitLimiter = rateLimit({
+  windowMs: getEnvInt('RATE_LIMIT_COMPLAINT_WINDOW_MS', 15 * 60 * 1000), // 15 minutes
+  max: getEnvInt('RATE_LIMIT_COMPLAINT_MAX', 30), // 30 complaint submissions per 15 min per citizen
+  keyGenerator: getAuthedClientKey,
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
@@ -133,5 +187,7 @@ module.exports = {
   authRateLimiter,
   publicRateLimiter,
   authedRateLimiter,
-  authenticatedRateLimiter: authedRateLimiter
+  authenticatedRateLimiter: authedRateLimiter,
+  complaintSubmitLimiter,
+  getAuthedClientKey
 };

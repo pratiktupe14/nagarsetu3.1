@@ -935,7 +935,13 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
 
     const submitPayload = {
       complaint_number: newComplaint.complaint_number,
-      photo_url: newComplaint.photo_before_url || '',
+      photo_url: newComplaint.photo_before_url || newComplaint.photo_front_url || '',
+      photo_front_url: newComplaint.photo_front_url || newComplaint.photo_before_url || '',
+      photo_left_url: newComplaint.photo_left_url || '',
+      photo_right_url: newComplaint.photo_right_url || '',
+      photo_closeup_url: newComplaint.photo_closeup_url || '',
+      angle_photos: (newComplaint as any).angle_photos,
+      additional_photos: (newComplaint as any).additional_photos,
       category: newComplaint.category,
       title: newComplaint.title,
       description: newComplaint.description,

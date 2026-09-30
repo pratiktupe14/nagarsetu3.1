@@ -126,6 +126,12 @@ async function createTablesPostgres() {
     // Safe column migrations for existing Postgres database
     await pgPool.query(`ALTER TABLE complaints DROP CONSTRAINT IF EXISTS complaints_citizen_id_fkey;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ALTER COLUMN citizen_id TYPE TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_front_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_left_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_right_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_closeup_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS angle_photos TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_photos TEXT;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
@@ -422,6 +428,12 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'assigned_by TEXT');
       safeAddSqliteColumn('complaints', 'assigned_by_name TEXT');
       safeAddSqliteColumn('complaints', 'sla_deadline DATETIME');
+      safeAddSqliteColumn('complaints', 'photo_front_url TEXT');
+      safeAddSqliteColumn('complaints', 'photo_left_url TEXT');
+      safeAddSqliteColumn('complaints', 'photo_right_url TEXT');
+      safeAddSqliteColumn('complaints', 'photo_closeup_url TEXT');
+      safeAddSqliteColumn('complaints', 'angle_photos TEXT');
+      safeAddSqliteColumn('complaints', 'additional_photos TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS announcement_reads (

@@ -129,13 +129,115 @@ export interface DepartmentHead {
   total_complaints?: number;
 }
 
+export type ComplaintAngle = 'front' | 'left' | 'right' | 'closeup';
+
+export interface ComplaintAnglePhoto {
+  angle: ComplaintAngle;
+  url: string;
+  label: string;
+  created_at?: string;
+}
+
+export function extractComplaintAnglePhotos(comp: any): ComplaintAnglePhoto[] {
+  if (!comp) return [];
+  const list: ComplaintAnglePhoto[] = [];
+  const seenUrls = new Set<string>();
+
+  // 1. If explicit angle_photos array exists
+  if (Array.isArray(comp.angle_photos)) {
+    for (const item of comp.angle_photos) {
+      if (item && item.url && !seenUrls.has(item.url)) {
+        seenUrls.add(item.url);
+        list.push({
+          angle: item.angle || 'front',
+          url: item.url,
+          label: item.label || getAngleLabel(item.angle)
+        });
+      }
+    }
+  } else if (typeof comp.angle_photos === 'string' && comp.angle_photos.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(comp.angle_photos);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && item.url && !seenUrls.has(item.url)) {
+            seenUrls.add(item.url);
+            list.push({
+              angle: item.angle || 'front',
+              url: item.url,
+              label: item.label || getAngleLabel(item.angle)
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Fall back to dedicated angle columns if not already included
+  const angleMap: Array<{ key: string; angle: ComplaintAngle; label: string }> = [
+    { key: 'photo_front_url', angle: 'front', label: 'Front View' },
+    { key: 'photo_left_url', angle: 'left', label: 'Left View' },
+    { key: 'photo_right_url', angle: 'right', label: 'Right View' },
+    { key: 'photo_closeup_url', angle: 'closeup', label: 'Close-up Detail' }
+  ];
+
+  for (const { key, angle, label } of angleMap) {
+    const url = comp[key];
+    if (url && typeof url === 'string' && !seenUrls.has(url)) {
+      seenUrls.add(url);
+      list.push({ angle, url, label });
+    }
+  }
+
+  // 3. Ensure primary photo_before_url is included as Front View if not yet present
+  if (comp.photo_before_url && !seenUrls.has(comp.photo_before_url)) {
+    seenUrls.add(comp.photo_before_url);
+    list.unshift({ angle: 'front', url: comp.photo_before_url, label: 'Front View' });
+  }
+
+  // 4. Also check additional_photos
+  let addPhotos = comp.additional_photos;
+  if (typeof addPhotos === 'string' && addPhotos.trim().startsWith('[')) {
+    try { addPhotos = JSON.parse(addPhotos); } catch {}
+  }
+  if (Array.isArray(addPhotos)) {
+    addPhotos.forEach((url: string, idx: number) => {
+      if (url && typeof url === 'string' && !seenUrls.has(url)) {
+        seenUrls.add(url);
+        list.push({
+          angle: idx === 0 ? 'left' : idx === 1 ? 'right' : 'closeup',
+          url,
+          label: idx === 0 ? 'Left View' : idx === 1 ? 'Right View' : `Angle #${idx + 2}`
+        });
+      }
+    });
+  }
+
+  return list;
+}
+
+function getAngleLabel(angle?: string): string {
+  switch (angle) {
+    case 'front': return 'Front View';
+    case 'left': return 'Left View';
+    case 'right': return 'Right View';
+    case 'closeup': return 'Close-up Detail';
+    default: return 'Evidence View';
+  }
+}
+
 export interface Complaint {
   id: string;
   complaint_number: string; // e.g. NS-2026-100234
   citizen_id: string;
   photo_before_url: string;
   photo_after_url?: string;
+  photo_front_url?: string;
+  photo_left_url?: string;
+  photo_right_url?: string;
+  photo_closeup_url?: string;
   additional_photos?: string[];
+  angle_photos?: ComplaintAnglePhoto[];
   ai_vision_metadata?: any;
   category: string;
   title: string;
