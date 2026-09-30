@@ -23,51 +23,51 @@ function getCanonicalDepartment(val) {
   // 1. PWD
   if (
     s === '1' || s === 'pwd' || s === 'dept-pwd' || s === 'dept-1' ||
-    s.includes('pwd') || s.includes('public works') || s.includes('8ed9f760')
+    s.includes('pwd') || s.includes('public works') || s.includes('road') || s.includes('pothole') || s.includes('8ed9f760')
   ) {
     return { id: 1, code: 'PWD', name: 'Public Works Department (PWD)', uuid: '8ed9f760-1314-427c-a515-c2a54d6df6d8' };
   }
   // 2. SAN
   if (
     s === '2' || s === 'san' || s === 'dept-san' || s === 'dept-2' ||
-    s.includes('san') || s.includes('waste') || s.includes('9cabc1f2')
+    s.includes('san') || s.includes('waste') || s.includes('garbage') || s.includes('clean') || s.includes('9cabc1f2')
   ) {
     return { id: 2, code: 'SAN', name: 'Sanitation & Waste Management', uuid: '9cabc1f2-fd10-48dd-a5cb-01d05197de22' };
   }
   // 3. WTR
   if (
     s === '3' || s === 'wtr' || s === 'dept-wtr' || s === 'dept-3' ||
-    s.includes('wtr') || s.includes('water') || s.includes('sewerage board') || s.includes('ead370cc')
+    s.includes('wtr') || s.includes('water') || s.includes('pipeline') || s.includes('sewerage board') || s.includes('ead370cc')
   ) {
     return { id: 3, code: 'WTR', name: 'Water Supply & Sewerage Board', uuid: 'ead370cc-459c-44f0-899f-8a97f0928beb' };
   }
-  // 4. DRN
+  // 4. ELE (ID 4 in SQLite DB)
   if (
-    s === '4' || s === 'drn' || s === 'dept-drn' || s === 'dept-4' ||
-    s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('ee73cb82')
+    s === '4' || s === 'ele' || s === 'dept-ele' || s === 'dept-4' || s === 'dept-5' ||
+    s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('streetlight') || s.includes('31842723')
   ) {
-    return { id: 4, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
+    return { id: 4, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
   }
-  // 5. ELE
+  // 5. TRF (ID 5 in SQLite DB)
   if (
-    s === '5' || s === 'ele' || s === 'dept-ele' || s === 'dept-5' ||
-    s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('31842723')
+    s === '5' || s === 'trf' || s === 'dept-trf' || s === 'dept-5' || s === 'dept-6' ||
+    s.includes('trf') || s.includes('traffic') || s.includes('signal') || s.includes('ae5e4d0c')
   ) {
-    return { id: 5, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
+    return { id: 5, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
   }
-  // 6. TRF
+  // 6. MNT (ID 6 in SQLite DB)
   if (
-    s === '6' || s === 'trf' || s === 'dept-trf' || s === 'dept-6' ||
-    s.includes('trf') || s.includes('traffic') || s.includes('ae5e4d0c')
+    s === '6' || s === 'mnt' || s === 'dept-mnt' || s === 'dept-6' || s === 'dept-7' ||
+    s.includes('mnt') || s.includes('maint') || s.includes('facility') || s.includes('park') || s.includes('71542723')
   ) {
-    return { id: 6, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
+    return { id: 6, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
   }
-  // 7. MNT
+  // 7. DRN (ID 7 in SQLite DB)
   if (
-    s === '7' || s === 'mnt' || s === 'dept-mnt' || s === 'dept-7' ||
-    s.includes('mnt') || s.includes('maint') || s.includes('71542723')
+    s === '7' || s === 'drn' || s === 'dept-drn' || s === 'dept-7' ||
+    s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('sewer') || s.includes('gutter') || s.includes('ee73cb82')
   ) {
-    return { id: 7, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
+    return { id: 7, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
   }
   return null;
 }
@@ -78,7 +78,7 @@ const DEPT_HEAD_EMAIL_MAP = {
   'vikram.patil@nagarsetu.gov.in': 'WTR',
   'sanjay.more@nagarsetu.gov.in': 'DRN',
   'aditya.joshi@nagarsetu.gov.in': 'ELE',
-  'kunal.kulkarni@nagarsetu.gov.in': 'ELE',
+  'kunal.kulkarni@nagarsetu.gov.in': 'MNT',
   'rohan.deshmukh@nagarsetu.gov.in': 'TRF'
 };
 
@@ -88,8 +88,11 @@ function staffMatchesDept(staff, targetDept) {
 
   const staffDept =
     getCanonicalDepartment(staff.department_id) ||
-    getCanonicalDepartment(staff.employee_id) ||
-    getCanonicalDepartment(staff.department_name);
+    getCanonicalDepartment(staff.department_code) ||
+    getCanonicalDepartment(staff.department_name) ||
+    getCanonicalDepartment(staff.department) ||
+    getCanonicalDepartment(staff.category) ||
+    getCanonicalDepartment(staff.employee_id);
 
   if (staffDept && staffDept.code === targetDept.code) return true;
   if (String(staff.department_id) === String(targetDept.id)) return true;
@@ -209,8 +212,8 @@ router.get('/complaints', authenticateToken, async (req, res) => {
     const params = [];
 
     if (filterDept) {
-      sql += ` AND (c.department_id = $1 OR c.department_id = $2)`;
-      params.push(filterDept.id, filterDept.uuid);
+      sql += ` AND (c.department_id = $1 OR c.department_id = $2 OR d.code = $3 OR d.name LIKE $4)`;
+      params.push(filterDept.id, filterDept.uuid, filterDept.code, `%${filterDept.name}%`);
     }
 
     sql += ` ORDER BY c.created_at DESC`;

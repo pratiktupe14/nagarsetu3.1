@@ -191,44 +191,51 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
       }
     }
 
-    if (!departmentName) {
+    const DEPT_MAP = {
+      1: { code: 'PWD', name: 'Public Works Department (PWD)' },
+      2: { code: 'SAN', name: 'Sanitation & Solid Waste Management' },
+      3: { code: 'WTR', name: 'Water Supply & Sewerage' },
+      4: { code: 'ELE', name: 'Electrical & Street Lighting' },
+      5: { code: 'TRF', name: 'Traffic & Transport' },
+      6: { code: 'MNT', name: 'Building & Municipal Assets' },
+      7: { code: 'DRN', name: 'Drainage & Sewage Department' }
+    };
+
+    if (!departmentName || !departmentId) {
       if (departmentId === 1 || departmentId === '1' || cleanIdentifier.includes('rahul') || cleanIdentifier.includes('pwd')) {
-        departmentName = 'Public Works Department (PWD)';
         departmentId = 1;
       } else if (departmentId === 2 || departmentId === '2' || cleanIdentifier.includes('amit') || cleanIdentifier.includes('san')) {
-        departmentName = 'Sanitation & Waste Management';
         departmentId = 2;
       } else if (departmentId === 3 || departmentId === '3' || cleanIdentifier.includes('vikram') || cleanIdentifier.includes('wtr')) {
-        departmentName = 'Water Supply & Sewerage Board';
         departmentId = 3;
-      } else if (departmentId === 4 || departmentId === '4' || cleanIdentifier.includes('sanjay') || cleanIdentifier.includes('drn')) {
-        departmentName = 'Drainage & Sewage Department';
+      } else if (departmentId === 4 || departmentId === '4' || cleanIdentifier.includes('aditya') || cleanIdentifier.includes('joshi') || cleanIdentifier.includes('ele')) {
         departmentId = 4;
-      } else if (departmentId === 5 || departmentId === '5' || cleanIdentifier.includes('kulkarni') || cleanIdentifier.includes('ele')) {
-        departmentName = 'Electrical & Street Lighting';
+      } else if (departmentId === 5 || departmentId === '5' || cleanIdentifier.includes('rohan') || cleanIdentifier.includes('trf')) {
         departmentId = 5;
-      } else if (departmentId === 6 || departmentId === '6' || cleanIdentifier.includes('rohan') || cleanIdentifier.includes('trf')) {
-        departmentName = 'Traffic Management Department';
+      } else if (departmentId === 6 || departmentId === '6' || cleanIdentifier.includes('kulkarni') || cleanIdentifier.includes('mnt')) {
         departmentId = 6;
-      } else if (departmentId === 7 || departmentId === '7' || cleanIdentifier.includes('joshi') || cleanIdentifier.includes('mnt')) {
-        departmentName = 'Maintenance Department';
+      } else if (departmentId === 7 || departmentId === '7' || cleanIdentifier.includes('sanjay') || cleanIdentifier.includes('drn')) {
         departmentId = 7;
+      }
+      if (departmentId && DEPT_MAP[departmentId]) {
+        departmentName = DEPT_MAP[departmentId].name;
       }
     }
 
+    const deptInfo = departmentId ? DEPT_MAP[departmentId] : null;
     const userRole = user.role === 'admin' ? 'city_admin' : user.role;
 
     const userObj = {
       id: user.id,
-      name: user.name || user.full_name || 'Rahul Kumar',
-      full_name: user.full_name || user.name || 'Rahul Kumar',
+      name: user.name || user.full_name || 'Staff Member',
+      full_name: user.full_name || user.name || 'Staff Member',
       mobile: user.mobile,
       email: user.email,
       role: userRole,
-      department_id: departmentId || (cleanIdentifier.includes('rahul') || cleanIdentifier.includes('pwd') ? 1 : null),
-      department_name: departmentName,
-      department_code: (departmentId === 1 || departmentId === '1') ? 'PWD' : user.department_code,
-      employee_id: user.employee_id || ((departmentId === 1 || departmentId === '1') ? 'DH-PWD-001' : null),
+      department_id: departmentId,
+      department_name: departmentName || (deptInfo ? deptInfo.name : null),
+      department_code: deptInfo ? deptInfo.code : (user.department_code || null),
+      employee_id: user.employee_id || (deptInfo ? `DH-${deptInfo.code}-001` : null),
       status: user.status || 'active',
       language_pref: user.language_pref
     };
@@ -334,14 +341,69 @@ router.post('/demo-token', (req, res) => {
       language_pref: 'en'
     };
   } else if (role === 'department_head') {
+    const email = (req.body?.email || '').toLowerCase().trim();
+    const deptReq = req.body?.department_id || req.body?.department || req.body?.department_code;
+    let dhId = 1;
+    let dhName = 'Rahul Kumar';
+    let dhEmail = 'rahul.kumar@nagarsetu.gov.in';
+    let deptId = 1;
+    let deptName = 'Public Works Department (PWD)';
+    let deptCode = 'PWD';
+
+    if (email.includes('amit') || email.includes('san') || deptReq === 2 || deptReq === '2' || deptReq === 'SAN') {
+      dhId = 2;
+      dhName = 'Amit Sharma';
+      dhEmail = 'amit.sharma@nagarsetu.gov.in';
+      deptId = 2;
+      deptName = 'Sanitation & Solid Waste Management';
+      deptCode = 'SAN';
+    } else if (email.includes('vikram') || email.includes('wtr') || deptReq === 3 || deptReq === '3' || deptReq === 'WTR') {
+      dhId = 3;
+      dhName = 'Vikram Patil';
+      dhEmail = 'vikram.patil@nagarsetu.gov.in';
+      deptId = 3;
+      deptName = 'Water Supply & Sewerage';
+      deptCode = 'WTR';
+    } else if (email.includes('aditya') || email.includes('joshi') || email.includes('ele') || deptReq === 4 || deptReq === '4' || deptReq === 'ELE') {
+      dhId = 4;
+      dhName = 'Aditya Joshi';
+      dhEmail = 'aditya.joshi@nagarsetu.gov.in';
+      deptId = 4;
+      deptName = 'Electrical & Street Lighting';
+      deptCode = 'ELE';
+    } else if (email.includes('rohan') || email.includes('trf') || deptReq === 5 || deptReq === '5' || deptReq === 'TRF') {
+      dhId = 5;
+      dhName = 'Rohan Deshmukh';
+      dhEmail = 'rohan.deshmukh@nagarsetu.gov.in';
+      deptId = 5;
+      deptName = 'Traffic & Transport';
+      deptCode = 'TRF';
+    } else if (email.includes('kulkarni') || email.includes('mnt') || deptReq === 6 || deptReq === '6' || deptReq === 'MNT') {
+      dhId = 6;
+      dhName = 'Kunal Kulkarni';
+      dhEmail = 'kunal.kulkarni@nagarsetu.gov.in';
+      deptId = 6;
+      deptName = 'Building & Municipal Assets';
+      deptCode = 'MNT';
+    } else if (email.includes('sanjay') || email.includes('drn') || deptReq === 7 || deptReq === '7' || deptReq === 'DRN') {
+      dhId = 7;
+      dhName = 'Sanjay More';
+      dhEmail = 'sanjay.more@nagarsetu.gov.in';
+      deptId = 7;
+      deptName = 'Drainage & Sewage Department';
+      deptCode = 'DRN';
+    }
+
     userObj = {
-      id: 1,
-      name: 'Rahul Kumar',
-      mobile: '+91 9822000001',
-      email: 'rahul.kumar@nagarsetu.gov.in',
+      id: dhId,
+      name: dhName,
+      mobile: '+91 982200000' + dhId,
+      email: dhEmail,
       role: 'department_head',
-      department_id: 1,
-      department_name: 'Public Works Department (PWD)',
+      department_id: deptId,
+      department_name: deptName,
+      department_code: deptCode,
+      employee_id: `DH-${deptCode}-001`,
       language_pref: 'en'
     };
   } else {

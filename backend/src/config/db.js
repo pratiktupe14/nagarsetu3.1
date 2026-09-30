@@ -434,6 +434,7 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'photo_closeup_url TEXT');
       safeAddSqliteColumn('complaints', 'angle_photos TEXT');
       safeAddSqliteColumn('complaints', 'additional_photos TEXT');
+      safeAddSqliteColumn('departments', 'code TEXT');
 
       sqliteDb.run(`
         CREATE TABLE IF NOT EXISTS announcement_reads (
@@ -449,15 +450,24 @@ function createTablesSqlite() {
       // Seed initial default departments if empty
       sqliteDb.get("SELECT COUNT(*) as count FROM departments", (err, row) => {
         if (!err && row && row.count === 0) {
-          const stmt = sqliteDb.prepare("INSERT INTO departments (name, description) VALUES (?, ?)");
-          stmt.run("Public Works Department (PWD)", "Road repairs, potholes, and asphalt infrastructure");
-          stmt.run("Sanitation & Waste Management", "Garbage pickup, trash overflow, and public cleanliness");
-          stmt.run("Water Supply & Sewerage Board", "Pipeline leakages, drainage overflows, and water supply");
-          stmt.run("Drainage & Sewage Department", "Drainage blockage, sewage overflow, open drains, and culverts");
-          stmt.run("Electrical & Street Lighting", "Streetlight repair, electrical poles, and public lighting");
-          stmt.run("Traffic Management Department", "Traffic signal repairs, road signage, and junction issues");
-          stmt.run("Maintenance Department", "General civic facility repairs, building maintenance, and public asset upkeep");
+          const stmt = sqliteDb.prepare("INSERT INTO departments (id, name, description, code) VALUES (?, ?, ?, ?)");
+          stmt.run(1, "Public Works Department (PWD)", "Road repairs, potholes, and asphalt infrastructure", "PWD");
+          stmt.run(2, "Sanitation & Waste Management", "Garbage pickup, trash overflow, and public cleanliness", "SAN");
+          stmt.run(3, "Water Supply & Sewerage Board", "Pipeline leakages, drainage overflows, and water supply", "WTR");
+          stmt.run(4, "Electrical & Street Lighting", "Streetlight repair, electrical poles, and public lighting", "ELE");
+          stmt.run(5, "Traffic Management Department", "Traffic signal repairs, road signage, and junction issues", "TRF");
+          stmt.run(6, "Maintenance Department", "General civic facility repairs, building maintenance, and public asset upkeep", "MNT");
+          stmt.run(7, "Drainage & Sewage Department", "Drainage blockage, sewage overflow, open drains, and culverts", "DRN");
           stmt.finalize();
+        } else {
+          // Ensure codes exist on existing rows
+          sqliteDb.run("UPDATE departments SET code = 'PWD' WHERE id = 1 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'SAN' WHERE id = 2 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'WTR' WHERE id = 3 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'ELE' WHERE id = 4 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'TRF' WHERE id = 5 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'MNT' WHERE id = 6 AND (code IS NULL OR code = '')", () => {});
+          sqliteDb.run("UPDATE departments SET code = 'DRN' WHERE id = 7 AND (code IS NULL OR code = '')", () => {});
         }
         resolve();
       });

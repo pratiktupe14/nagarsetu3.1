@@ -19,6 +19,25 @@ router.use((req, res, next) => {
   next();
 });
 
+// Dedicated photo upload endpoint for complaints (persists to /uploads or Supabase storage)
+router.post('/upload', optionalAuthenticateToken, uploadSingleImage('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const photoUrl = req.file.publicUrl || req.file.supabaseUrl || (req.file.filename ? `/uploads/${req.file.filename}` : '/uploads/temp-photo.jpg');
+    return res.json({
+      success: true,
+      url: photoUrl,
+      publicUrl: photoUrl,
+      filename: req.file.filename || path.basename(photoUrl)
+    });
+  } catch (err) {
+    console.error('Complaint image upload error:', err);
+    return res.status(500).json({ error: 'Failed to upload complaint image' });
+  }
+});
+
 // Step 1: Upload photo, extract location (EXIF / Live GPS / Pin), call AI analyzer
 router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
   try {
@@ -100,40 +119,65 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
       location_source,
       location_address,
       department_id,
+      department_name,
+      department_code,
+      department,
       duplicate_of_id
     } = req.body;
 
     const finalComplaintNumber = complaint_number || `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    // Default department mapping if not provided
-    let finalDeptId = department_id;
-    if (finalDeptId && isNaN(Number(finalDeptId))) {
-      const dRes = await query(`SELECT id FROM departments WHERE code = ? OR name LIKE ? LIMIT 1`, [finalDeptId, `%${finalDeptId}%`]);
-      if (dRes.rows && dRes.rows.length > 0) {
-        finalDeptId = dRes.rows[0].id;
+    // Authoritatively resolve canonical department
+    let resolvedDept = null;
+    const rawDeptInput = department_id || department_code || department_name || department;
+    if (rawDeptInput) {
+      try {
+        const dRes = await query(
+          `SELECT id, name, code FROM departments WHERE id = ? OR code = ? OR name = ? OR name LIKE ? LIMIT 1`,
+          [rawDeptInput, String(rawDeptInput).toUpperCase(), rawDeptInput, `%${rawDeptInput}%`]
+        );
+        if (dRes.rows && dRes.rows.length > 0) {
+          resolvedDept = dRes.rows[0];
+        }
+      } catch (deptLookupErr) {
+        console.warn('Department direct lookup note:', deptLookupErr.message);
       }
     }
-    if (!finalDeptId || isNaN(Number(finalDeptId))) {
+
+    // Infer from category if not resolved
+    if (!resolvedDept && category) {
       let deptCode = 'PWD';
       const catLower = (category || '').toLowerCase();
-      if (catLower.includes('water') || catLower.includes('pipeline')) deptCode = 'WTR';
-      else if (catLower.includes('garbage') || catLower.includes('waste') || catLower.includes('sanitation')) deptCode = 'SAN';
-      else if (catLower.includes('drain') || catLower.includes('sewag') || catLower.includes('sewer')) deptCode = 'DRN';
+      if (catLower.includes('water') || catLower.includes('pipeline') || catLower.includes('leak')) deptCode = 'WTR';
+      else if (catLower.includes('garbage') || catLower.includes('waste') || catLower.includes('sanitat') || catLower.includes('clean')) deptCode = 'SAN';
+      else if (catLower.includes('drain') || catLower.includes('sewag') || catLower.includes('sewer') || catLower.includes('gutter')) deptCode = 'DRN';
       else if (catLower.includes('street') || catLower.includes('electric') || catLower.includes('light')) deptCode = 'ELE';
-      else if (catLower.includes('traffic') || catLower.includes('signal')) deptCode = 'TRF';
-      else if (catLower.includes('infrastructure') || catLower.includes('maintenance') || catLower.includes('other')) deptCode = 'MNT';
-      else if (catLower.includes('pothole') || catLower.includes('road')) deptCode = 'PWD';
+      else if (catLower.includes('traffic') || catLower.includes('signal') || catLower.includes('sign')) deptCode = 'TRF';
+      else if (catLower.includes('maintenance') || catLower.includes('park') || catLower.includes('facility')) deptCode = 'MNT';
+      else if (catLower.includes('pothole') || catLower.includes('road') || catLower.includes('bridge')) deptCode = 'PWD';
 
-      const deptRes = await query(`SELECT id FROM departments WHERE code = ? OR id = ? LIMIT 1`, [deptCode, deptCode]);
-      if (deptRes.rows && deptRes.rows.length > 0) {
-        finalDeptId = deptRes.rows[0].id;
-      } else {
-        const fallbackRes = await query(`SELECT id FROM departments ORDER BY id ASC LIMIT 1`);
-        finalDeptId = fallbackRes.rows?.[0]?.id || 1;
+      try {
+        const deptRes = await query(`SELECT id, name, code FROM departments WHERE code = ? LIMIT 1`, [deptCode]);
+        if (deptRes.rows && deptRes.rows.length > 0) {
+          resolvedDept = deptRes.rows[0];
+        }
+      } catch (deptCodeErr) {
+        console.warn('Department code lookup note:', deptCodeErr.message);
       }
-    } else {
-      finalDeptId = parseInt(finalDeptId, 10);
     }
+
+    if (!resolvedDept) {
+      try {
+        const fallbackRes = await query(`SELECT id, name, code FROM departments ORDER BY id ASC LIMIT 1`);
+        resolvedDept = fallbackRes.rows?.[0] || { id: 1, name: 'Public Works Department', code: 'PWD' };
+      } catch (fallbackErr) {
+        resolvedDept = { id: 1, name: 'Public Works Department', code: 'PWD' };
+      }
+    }
+
+    const finalDeptId = resolvedDept.id;
+    const finalDeptName = resolvedDept.name;
+    const finalDeptCode = resolvedDept.code;
 
     const finalPhotoUrl = photo_url || photo_front_url || photo_before_url || '/uploads/civic-default.jpg';
     const finalPhotoFront = photo_front_url || finalPhotoUrl;
@@ -248,10 +292,45 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
           ai_analyzed_at: req.body.ai_analyzed_at || new Date().toISOString()
         }]).select().maybeSingle();
 
-        if (supaComp?.id) {
+        if (supaErr && supaErr.message && supaErr.message.includes('additional_photos')) {
+          const { data: supaCompRetry, error: supaRetryErr } = await supabase.from('complaints').insert([{
+            complaint_number: finalComplaintNumber,
+            citizen_id: citizenId,
+            photo_before_url: finalPhotoUrl,
+            photo_front_url: finalPhotoFront,
+            photo_left_url: finalPhotoLeft,
+            photo_right_url: finalPhotoRight,
+            photo_closeup_url: finalPhotoCloseup,
+            angle_photos: parsedAnglePhotos,
+            category,
+            title,
+            description: description || '',
+            priority,
+            status: 'Submitted',
+            department_id: supaDeptId,
+            latitude,
+            longitude,
+            location_source: location_source || 'manual_pin',
+            location_address: location_address || '',
+            ai_category: req.body.ai_category || category,
+            ai_specific_issue: req.body.ai_specific_issue || category,
+            ai_confidence: req.body.ai_confidence || 0.85,
+            ai_severity: req.body.ai_severity || priority,
+            ai_urgency: req.body.ai_urgency || priority,
+            ai_evidence: req.body.ai_evidence || description || '',
+            ai_model: req.body.ai_model || 'gemini-3.6-flash',
+            ai_analyzed_at: req.body.ai_analyzed_at || new Date().toISOString()
+          }]).select().maybeSingle();
+
+          if (supaCompRetry?.id) {
+            supaComplaintId = supaCompRetry.id;
+          }
+          if (supaRetryErr) {
+            console.warn('Supabase mirror retry note:', supaRetryErr.message);
+          }
+        } else if (supaComp?.id) {
           supaComplaintId = supaComp.id;
-        }
-        if (supaErr) {
+        } else if (supaErr) {
           console.warn('Supabase mirror insert note:', supaErr.message);
         }
       }
@@ -264,7 +343,7 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
       console.warn('Initial submission notification note:', nErr.message);
     });
 
-    const returnedId = supaComplaintId || finalComplaintNumber;
+    const returnedId = complaintId || supaComplaintId || finalComplaintNumber;
 
     return res.status(201).json({
       message: 'Complaint submitted successfully',
@@ -273,16 +352,28 @@ router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(
       complaint: {
         id: returnedId,
         complaint_number: finalComplaintNumber,
+        citizen_id: citizenId,
+        photo_before_url: finalPhotoUrl,
+        photo_front_url: finalPhotoFront,
+        photo_left_url: finalPhotoLeft,
+        photo_right_url: finalPhotoRight,
+        photo_closeup_url: finalPhotoCloseup,
+        angle_photos: angle_photos || [],
+        additional_photos: additional_photos || [],
         category,
         title,
         description: description || '',
         priority,
         status: 'Submitted',
         department_id: finalDeptId,
+        department_name: finalDeptName,
+        department_code: finalDeptCode,
         latitude,
         longitude,
         location_source: location_source || 'manual_pin',
-        location_address: location_address || ''
+        location_address: location_address || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
     });
   } catch (err) {
@@ -311,7 +402,7 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 // Get all complaints for Admin / Portals
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const isCitizen = req.user.role === 'citizen';
+    const isCitizen = req.user && req.user.role === 'citizen';
     const sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
       ${!isCitizen ? ', u.name as citizen_name, u.mobile as citizen_mobile' : ''}
@@ -376,10 +467,10 @@ router.get('/my', authenticateToken, async (req, res) => {
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.citizen_id = ?
+      WHERE c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?
       ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [citizenId]);
+    const result = await query(sql, [citizenId, String(citizenId)]);
     if (result.rows && result.rows.length > 0) {
       return res.json({ complaints: result.rows });
     }

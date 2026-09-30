@@ -153,67 +153,67 @@ export function resolveDepartmentInfo(
     };
   }
 
-  // 4. Drainage & Sewage Department (DRN) - ID 4
+  // 4. Electrical & Street Lighting (ELE) - SQLite ID 4
   if (
-    dId === '4' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
-    dId === 'ee73cb82-cc47-4333-b7d6-4491353c1354' || dId.includes('ee73cb82') ||
-    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
-    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter') || dCat.includes('drn') ||
-    dCat.includes('emp-drn') || dCat.includes('drn-stf')
-  ) {
-    return {
-      id: actualId || '4',
-      code: 'DRN',
-      name: 'Drainage & Sewage Department',
-      fullName: 'Drainage & Sewage Department (DRN)'
-    };
-  }
-
-  // 5. Electrical & Street Lighting (ELE) - ID 5
-  if (
-    dId === '5' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
+    dId === '4' || dId === 'ele' || dId === 'dept-ele' || dId.includes('ele') ||
     dId === '31842723-23ac-490b-912b-9f6d9afbdfb3' || dId.includes('31842723') ||
     dName.includes('electric') || dName.includes('light') || dName.includes('ele') ||
     dCat.includes('electric') || dCat.includes('light') || dCat.includes('street light') || dCat.includes('ele') ||
     dCat.includes('emp-ele') || dCat.includes('ele-stf')
   ) {
     return {
-      id: actualId || '5',
+      id: actualId || '4',
       code: 'ELE',
       name: 'Electrical & Street Lighting',
       fullName: 'Electrical & Street Lighting (ELE)'
     };
   }
 
-  // 6. Traffic Management Department (TRF) - ID 6
+  // 5. Traffic Management Department (TRF) - SQLite ID 5
   if (
-    dId === '6' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
+    dId === '5' || dId === 'trf' || dId === 'traf' || dId === 'dept-trf' || dId.includes('trf') ||
     dId === 'ae5e4d0c-996f-4d81-9528-d642664c93ae' || dId.includes('ae5e4d0c') ||
     dName.includes('traffic') || dName.includes('trf') ||
     dCat.includes('traffic') || dCat.includes('signal') || dCat.includes('trf') ||
     dCat.includes('emp-trf') || dCat.includes('trf-stf')
   ) {
     return {
-      id: actualId || '6',
+      id: actualId || '5',
       code: 'TRF',
       name: 'Traffic Management Department',
       fullName: 'Traffic Management Department (TRF)'
     };
   }
 
-  // 7. Maintenance Department (MNT) - ID 7
+  // 6. Maintenance Department (MNT) - SQLite ID 6
   if (
-    dId === '7' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
+    dId === '6' || dId === 'mnt' || dId === 'dept-mnt' || dId.includes('mnt') ||
     dId === '71542723-23ac-490b-912b-9f6d9afbdfb7' || dId.includes('71542723') ||
     dName.includes('mainten') || dName.includes('mnt') ||
-    dCat.includes('mainten') || dCat.includes('building') || dCat.includes('mnt') ||
+    dCat.includes('mainten') || dCat.includes('building') || dCat.includes('facility') || dCat.includes('mnt') ||
     dCat.includes('emp-mnt') || dCat.includes('mnt-stf')
   ) {
     return {
-      id: actualId || '7',
+      id: actualId || '6',
       code: 'MNT',
       name: 'Maintenance Department',
       fullName: 'Maintenance Department (MNT)'
+    };
+  }
+
+  // 7. Drainage & Sewage Department (DRN) - SQLite ID 7
+  if (
+    dId === '7' || dId === 'drn' || dId === 'dept-drn' || dId.includes('drn') ||
+    dId === 'ee73cb82-cc47-4333-b7d6-4491353c1354' || dId.includes('ee73cb82') ||
+    dName.includes('drain') || dName.includes('sewage') || dName.includes('drn') ||
+    dCat.includes('drain') || dCat.includes('sewage') || dCat.includes('gutter') || dCat.includes('drn') ||
+    dCat.includes('emp-drn') || dCat.includes('drn-stf')
+  ) {
+    return {
+      id: actualId || '7',
+      code: 'DRN',
+      name: 'Drainage & Sewage Department',
+      fullName: 'Drainage & Sewage Department (DRN)'
     };
   }
 

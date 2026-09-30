@@ -127,8 +127,31 @@ export function saveStoredComplaints(_complaints: Complaint[]) {
   } catch (e) {}
 }
 
-// Upload image to Supabase storage bucket ('issues')
+// Upload image to backend /api/complaints/upload or Supabase storage bucket ('issues')
 export async function uploadComplaintImage(file: File, bucketName: string = 'issues'): Promise<string> {
+  // 1. Try Express backend /api/complaints/upload multipart endpoint
+  try {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+    const res = await fetch(`${getApiUrl()}/api/complaints/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.url || data?.publicUrl) {
+        return data.url || data.publicUrl;
+      }
+    }
+  } catch (backendUploadErr) {
+    console.warn('Backend multipart upload note:', backendUploadErr);
+  }
+
+  // 2. Try Supabase storage if configured
   if (isSupabaseConfigured()) {
     try {
       const fileExt = file.name.split('.').pop() || 'jpg';
@@ -153,12 +176,12 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
     }
   }
 
-  // Optimize & Compress client-side to prevent Vercel 4.5MB serverless request limit violations
+  // 3. Fallback: Optimize & Compress client-side to permanent Base64 Data URL (NEVER a temporary blob: URL)
   return new Promise((resolve) => {
     if (!file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(URL.createObjectURL(file));
+      reader.onloadend = () => resolve((reader.result as string) || DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
+      reader.onerror = () => resolve(DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
       reader.readAsDataURL(file);
       return;
     }
@@ -193,12 +216,12 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
         } catch (canvasErr) {
           console.warn('Canvas image compression note:', canvasErr);
         }
-        resolve(e.target?.result as string);
+        resolve((e.target?.result as string) || DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
       };
-      img.onerror = () => resolve(e.target?.result as string);
-      img.src = e.target?.result as string;
+      img.onerror = () => resolve((e.target?.result as string) || DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
+      img.src = (e.target?.result as string) || '';
     };
-    reader.onerror = () => resolve(URL.createObjectURL(file));
+    reader.onerror = () => resolve(DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
     reader.readAsDataURL(file);
   });
 }
@@ -986,9 +1009,16 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
       localStorage.setItem('nagarsetu_token', token);
     }
 
+    const resolvedDept = resolveDepartmentInfo(
+      newComplaint.department_id,
+      newComplaint.department_name,
+      newComplaint.category
+    );
+
     const submitPayload = {
       complaint_number: newComplaint.complaint_number,
       photo_url: newComplaint.photo_before_url || newComplaint.photo_front_url || '',
+      photo_before_url: newComplaint.photo_before_url || newComplaint.photo_front_url || '',
       photo_front_url: newComplaint.photo_front_url || newComplaint.photo_before_url || '',
       photo_left_url: newComplaint.photo_left_url || '',
       photo_right_url: newComplaint.photo_right_url || '',
@@ -1003,7 +1033,10 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
       longitude: newComplaint.longitude,
       location_source: newComplaint.location_source,
       location_address: newComplaint.location_address,
-      department_id: newComplaint.department_id,
+      department_id: resolvedDept.id || newComplaint.department_id,
+      department_name: resolvedDept.fullName || newComplaint.department_name,
+      department_code: resolvedDept.code,
+      department: resolvedDept.fullName || newComplaint.department_name,
       ai_category: (newComplaint as any).ai_category || newComplaint.category,
       ai_specific_issue: (newComplaint as any).ai_specific_issue,
       ai_confidence: (newComplaint as any).ai_confidence,
@@ -1079,8 +1112,8 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
         if (compInfo.id || bData.complaint_id) newComplaint.id = String(compInfo.id || bData.complaint_id);
         if (compInfo.complaint_number || bData.complaint_number) newComplaint.complaint_number = compInfo.complaint_number || bData.complaint_number;
         if (compInfo.status) newComplaint.status = compInfo.status;
-        if (compInfo.department?.id) newComplaint.department_id = compInfo.department.id;
-        if (compInfo.department?.name) newComplaint.department_name = compInfo.department.name;
+        if (compInfo.department_id || compInfo.department?.id) newComplaint.department_id = String(compInfo.department_id || compInfo.department?.id);
+        if (compInfo.department_name || compInfo.department?.name) newComplaint.department_name = compInfo.department_name || compInfo.department?.name;
       }
     } else {
       const errData = await res.json().catch(() => ({}));

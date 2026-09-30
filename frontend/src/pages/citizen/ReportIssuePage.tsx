@@ -35,6 +35,7 @@ import {
   AuthError,
   isNetworkError
 } from '../../services/complaintService';
+import { resolveDepartmentInfo } from '../../services/departmentService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult, ComplaintAngle, ComplaintAnglePhoto } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
@@ -408,10 +409,22 @@ export const ReportIssuePage: React.FC = () => {
           try {
             uploadedUrls[ang] = await uploadComplaintImage(slot.file);
           } catch (uploadErr) {
-            console.warn(`Upload failed for ${ang}, falling back to preview:`, uploadErr);
-            uploadedUrls[ang] = slot.previewUrl;
+            console.warn(`Upload failed for ${ang}:`, uploadErr);
           }
-        } else if (slot.previewUrl) {
+        }
+        // If upload failed or not available, fallback to permanent base64 data URL (NEVER a temporary blob: URL)
+        if (!uploadedUrls[ang] && slot.file) {
+          try {
+            uploadedUrls[ang] = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve((reader.result as string) || DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
+              reader.onerror = () => resolve(DEFAULT_CIVIC_IMAGE_PLACEHOLDER);
+              reader.readAsDataURL(slot.file!);
+            });
+          } catch {
+            uploadedUrls[ang] = DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
+          }
+        } else if (!uploadedUrls[ang] && slot.previewUrl && !slot.previewUrl.startsWith('blob:')) {
           uploadedUrls[ang] = slot.previewUrl;
         }
       }
@@ -431,6 +444,8 @@ export const ReportIssuePage: React.FC = () => {
         uploadedUrls.right,
         uploadedUrls.closeup
       ].filter(Boolean);
+
+      const resolvedDept = resolveDepartmentInfo(undefined, department, category);
 
       const newComplaintData = {
         complaint_number: complaintNumber,
@@ -455,7 +470,8 @@ export const ReportIssuePage: React.FC = () => {
         description: description || `Civic issue reported via NAGARSETU at ${locationAddress}`,
         priority,
         status: (aiResult && aiResult.confidence < 0.80) ? ('NEEDS_VERIFICATION' as const) : ('Submitted' as const),
-        department_name: department,
+        department_id: resolvedDept.id,
+        department_name: resolvedDept.fullName,
         latitude: lat,
         longitude: lng,
         location_source: locationSource,
