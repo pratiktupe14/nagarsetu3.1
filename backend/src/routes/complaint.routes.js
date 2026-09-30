@@ -7,7 +7,7 @@ const { complaintSubmitLimiter } = require('../middleware/rateLimiter');
 const validateInput = require('../middleware/validateInput');
 const { createComplaintSchema, addFeedbackSchema } = require('../schemas/complaint.schemas');
 const { query } = require('../config/db');
-const { resolveLocation, checkForDuplicates } = require('../services/locationService');
+const { resolveLocation, checkForDuplicates, calculateDistanceMeters, normalizeCategory } = require('../services/locationService');
 const { analyzeComplaintPhoto } = require('../services/aiService');
 const { notifyStatusChange } = require('../services/notificationService');
 
@@ -163,6 +163,94 @@ router.post('/analyze-upload', authenticateToken, uploadSingleImage('photo'), as
   }
 });
 
+// Reusable SLA / Response Time Calculation Helpers
+function getDefaultResponseTimeHours(category, department) {
+  const normCat = String(category || '').trim().toLowerCase();
+  const normDept = String(department || '').trim().toLowerCase();
+
+  // 1. Water Leakage: 24 Hours (Specific rule prioritized)
+  if (
+    normCat.includes('water leak') ||
+    normCat.includes('water') ||
+    normCat.includes('pipeline') ||
+    normDept.includes('water') ||
+    normDept === 'wtr'
+  ) {
+    return 24;
+  }
+
+  // 2. Garbage / Sanitation: 24 Hours
+  if (
+    normCat.includes('garbage') ||
+    normCat.includes('waste') ||
+    normCat.includes('sanitat') ||
+    normCat.includes('trash') ||
+    normCat.includes('clean') ||
+    normDept.includes('sanitat') ||
+    normDept.includes('waste') ||
+    normDept === 'san'
+  ) {
+    return 24;
+  }
+
+  // 3. Drainage: 48 Hours
+  if (
+    normCat.includes('drain') ||
+    normCat.includes('sewer') ||
+    normCat.includes('sewag') ||
+    normCat.includes('gutter') ||
+    normDept.includes('drain') ||
+    normDept.includes('sewag') ||
+    normDept === 'drn'
+  ) {
+    return 48;
+  }
+
+  // 4. Streetlight / Electricity: 48 Hours
+  if (
+    normCat.includes('street light') ||
+    normCat.includes('streetlight') ||
+    normCat.includes('street-light') ||
+    normCat.includes('electric') ||
+    normCat.includes('light') ||
+    normDept.includes('electric') ||
+    normDept.includes('street light') ||
+    normDept.includes('streetlight') ||
+    normDept.includes('light') ||
+    normDept === 'ele'
+  ) {
+    return 48;
+  }
+
+  // 5. PWD / Roads: 15 Days (360 Hours)
+  if (
+    normCat.includes('pothole') ||
+    normCat.includes('road') ||
+    normCat.includes('bridge') ||
+    normCat.includes('pwd') ||
+    normCat.includes('public works') ||
+    normDept.includes('public works') ||
+    normDept.includes('road') ||
+    normDept.includes('pwd') ||
+    normDept === 'pwd'
+  ) {
+    return 15 * 24; // 360 hours
+  }
+
+  // 6. Default for all other departments/categories: 4 Days (96 Hours)
+  return 4 * 24; // 96 hours
+}
+
+function calculateSlaDeadline(createdAt, category, department) {
+  const hours = getDefaultResponseTimeHours(category, department);
+  const baseDate = createdAt ? new Date(createdAt) : new Date();
+  const deadlineDate = new Date(baseDate.getTime() + hours * 60 * 60 * 1000);
+  return {
+    hours,
+    deadline: deadlineDate.toISOString()
+  };
+}
+
 // Step 2: Final Complaint Submission (supports both /submit and /)
 const submitComplaintHandler = async (req, res) => {
   try {
@@ -272,13 +360,104 @@ const submitComplaintHandler = async (req, res) => {
       citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
     }
 
+    // Authoritative server-side SLA deadline calculation (ignores client-supplied deadline/response time)
+    const { hours: slaHours, deadline: slaDeadline } = calculateSlaDeadline(
+      new Date(),
+      category,
+      finalDeptCode || finalDeptName
+    );
+
+    // --- DUPLICATE DETECTION & SAME CITIZEN REPEAT-COMPLAINT RESTRICTION (500M Radius) ---
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const normCat = normalizeCategory(category);
+
+    let sameCitizenActiveMatch = null;
+    let otherCitizenNearbyMatch = null;
+
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      const latDelta = (500 * 1.5) / 111000;
+      const lngDelta = (500 * 1.5) / (111000 * Math.cos((lat * Math.PI) / 180) || 1);
+
+      try {
+        const nearbySql = `
+          SELECT id, complaint_number, citizen_id, category, priority, status, latitude, longitude, sla_deadline, created_at
+          FROM complaints
+          WHERE (status NOT IN ('Resolved', 'Rejected', 'Closed') OR status IS NULL)
+            AND (is_merged IS NULL OR is_merged = false OR is_merged = 0)
+            AND latitude BETWEEN ? AND ?
+            AND longitude BETWEEN ? AND ?
+        `;
+        const nearbyRes = await query(nearbySql, [lat - latDelta, lat + latDelta, lng - Math.abs(lngDelta), lng + Math.abs(lngDelta)]);
+        const openNearby = nearbyRes.rows || [];
+
+        for (const candidate of openNearby) {
+          if (normalizeCategory(candidate.category) !== normCat) continue;
+          const dist = calculateDistanceMeters(lat, lng, Number(candidate.latitude), Number(candidate.longitude));
+          if (dist > 500) continue;
+
+          const isSameCitizen = String(candidate.citizen_id) === String(citizenId);
+          const now = new Date();
+          const slaExp = candidate.sla_deadline ? new Date(candidate.sla_deadline) : new Date(new Date(candidate.created_at || Date.now()).getTime() + 4 * 24 * 60 * 60 * 1000);
+          const isSlaActive = now < slaExp;
+
+          if (isSameCitizen && isSlaActive) {
+            sameCitizenActiveMatch = { candidate, dist, slaExp };
+            break; // Highest priority: block same citizen repeat active report
+          } else if (!isSameCitizen) {
+            if (!otherCitizenNearbyMatch || dist < otherCitizenNearbyMatch.dist) {
+              otherCitizenNearbyMatch = { candidate, dist };
+            }
+          }
+        }
+      } catch (dupCheckErr) {
+        console.warn('Duplicate pre-check note:', dupCheckErr.message);
+      }
+    }
+
+    // STEP 6: If same citizen active duplicate found -> Reject with 409 Conflict
+    if (sameCitizenActiveMatch) {
+      const { candidate, slaExp } = sameCitizenActiveMatch;
+      const remainingMs = Math.max(0, slaExp.getTime() - Date.now());
+      const remainingMins = Math.round(remainingMs / (1000 * 60));
+      const remainingHours = (remainingMs / (1000 * 60 * 60)).toFixed(1);
+      const remainingTimeStr = remainingMins < 60 ? `${remainingMins} minutes` : `${remainingHours} hours`;
+
+      return res.status(409).json({
+        error: 'You already reported this issue within the active response period.',
+        existing_complaint_id: String(candidate.id),
+        complaint_number: candidate.complaint_number || '',
+        sla_deadline: candidate.sla_deadline ? new Date(candidate.sla_deadline).toISOString() : slaExp.toISOString(),
+        remaining_time: remainingTimeStr
+      });
+    }
+
+    // Other citizen duplicate match flag
+    let isPotentialDuplicate = false;
+    let potentialParentId = null;
+    let duplicateDistanceM = null;
+
+    if (otherCitizenNearbyMatch) {
+      isPotentialDuplicate = true;
+      potentialParentId = String(otherCitizenNearbyMatch.candidate.id);
+      duplicateDistanceM = Math.round(otherCitizenNearbyMatch.dist);
+    }
+
+    // Calculate initial severity weight and ranking score
+    const pLower = String(priority || '').trim().toLowerCase();
+    const severityWeight = pLower === 'critical' ? 8 : (pLower === 'high' ? 5 : (pLower === 'medium' ? 2 : 0));
+    const initialSupportCount = 1;
+    const initialRankingScore = initialSupportCount + severityWeight;
+
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
         status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id,
-        photo_front_url, photo_left_url, photo_right_url, photo_closeup_url, angle_photos, additional_photos
+        photo_front_url, photo_left_url, photo_right_url, photo_closeup_url, angle_photos, additional_photos,
+        sla_deadline, response_time_hours, support_count, ranking_score, is_potential_duplicate,
+        potential_parent_id, duplicate_distance_m
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -300,7 +479,14 @@ const submitComplaintHandler = async (req, res) => {
       finalPhotoRight,
       finalPhotoCloseup,
       finalAnglePhotos,
-      finalAdditionalPhotos
+      finalAdditionalPhotos,
+      slaDeadline,
+      slaHours,
+      initialSupportCount,
+      initialRankingScore,
+      isPotentialDuplicate,
+      potentialParentId,
+      duplicateDistanceM
     ]);
 
     const complaintId = result.rows[0].id;
@@ -363,6 +549,8 @@ const submitComplaintHandler = async (req, res) => {
           longitude,
           location_source: location_source || 'manual_pin',
           location_address: location_address || '',
+          sla_deadline: slaDeadline,
+          response_time_hours: slaHours,
           ai_category: req.body.ai_category || category,
           ai_specific_issue: req.body.ai_specific_issue || category,
           ai_confidence: req.body.ai_confidence || 0.85,
@@ -393,6 +581,8 @@ const submitComplaintHandler = async (req, res) => {
             longitude,
             location_source: location_source || 'manual_pin',
             location_address: location_address || '',
+            sla_deadline: slaDeadline,
+            response_time_hours: slaHours,
             ai_category: req.body.ai_category || category,
             ai_specific_issue: req.body.ai_specific_issue || category,
             ai_confidence: req.body.ai_confidence || 0.85,
@@ -454,6 +644,8 @@ const submitComplaintHandler = async (req, res) => {
         longitude,
         location_source: location_source || 'manual_pin',
         location_address: location_address || '',
+        sla_deadline: slaDeadline,
+        response_time_hours: slaHours,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, req)
@@ -464,8 +656,111 @@ const submitComplaintHandler = async (req, res) => {
   }
 };
 
-router.post('/submit', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
-router.post('/', complaintSubmitLimiter, authenticateToken, validateInput(createComplaintSchema), submitComplaintHandler);
+router.post('/submit', authenticateToken, complaintSubmitLimiter, validateInput(createComplaintSchema), submitComplaintHandler);
+router.post('/', authenticateToken, complaintSubmitLimiter, validateInput(createComplaintSchema), submitComplaintHandler);
+
+// Merge duplicate complaint into master complaint (Authorized Overseer / Department Head / City Admin only)
+router.post('/:id/merge', authenticateToken, async (req, res) => {
+  try {
+    const userRole = req.user?.role || 'citizen';
+    if (!['department_head', 'city_admin', 'overseer', 'admin', 'officer'].includes(userRole)) {
+      return res.status(403).json({ error: 'Forbidden: Only authorized overseers/department heads can merge complaints.' });
+    }
+
+    const duplicateId = req.params.id;
+    const { target_complaint_id } = req.body;
+
+    if (!target_complaint_id) {
+      return res.status(400).json({ error: 'target_complaint_id is required' });
+    }
+
+    // Fetch duplicate complaint
+    const dupRes = await query(`SELECT * FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`, [duplicateId, duplicateId, duplicateId]);
+    if (!dupRes.rows || dupRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Duplicate complaint not found' });
+    }
+    const duplicateComp = dupRes.rows[0];
+
+    // Fetch master complaint
+    const masterRes = await query(`SELECT * FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`, [target_complaint_id, target_complaint_id, target_complaint_id]);
+    if (!masterRes.rows || masterRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Target master complaint not found' });
+    }
+    const masterComp = masterRes.rows[0];
+
+    const dist = calculateDistanceMeters(
+      Number(duplicateComp.latitude), Number(duplicateComp.longitude),
+      Number(masterComp.latitude), Number(masterComp.longitude)
+    );
+
+    const nowIso = new Date().toISOString();
+    const userId = String(req.user.id);
+
+    // 1. Mark duplicate complaint as merged
+    await query(
+      `UPDATE complaints 
+       SET is_merged = ?, merged_into_id = ?, merged_at = ?, merged_by = ?, is_potential_duplicate = ?
+       WHERE id = ?`,
+      [true, String(masterComp.id), nowIso, userId, false, duplicateComp.id]
+    );
+
+    // 2. Check if citizen already counted toward master complaint
+    const dupCitizenId = String(duplicateComp.citizen_id);
+    const existingContributorsRes = await query(
+      `SELECT citizen_id FROM complaints WHERE id = ? OR merged_into_id = ? OR CAST(id AS TEXT) = ?`,
+      [masterComp.id, String(masterComp.id), String(masterComp.id)]
+    );
+    const existingCitizenIds = (existingContributorsRes.rows || []).map(r => String(r.citizen_id));
+
+    // Current support count of master
+    let currentSupport = masterComp.support_count || 1;
+    // Count how many times dupCitizenId is in existingCitizenIds before this merge
+    const countPrior = existingCitizenIds.filter(id => id === dupCitizenId).length;
+
+    let newSupport = currentSupport;
+    if (countPrior <= 1) {
+      // First time this citizen is being merged into master
+      newSupport = currentSupport + 1;
+    }
+
+    // 3. Recalculate ranking score
+    const p = String(masterComp.priority || '').toLowerCase();
+    const severityWeight = p === 'critical' ? 8 : (p === 'high' ? 5 : (p === 'medium' ? 2 : 0));
+    const isOverdue = masterComp.sla_deadline && new Date() > new Date(masterComp.sla_deadline);
+    const overdueWeight = isOverdue ? 4 : 0;
+    const newRankingScore = newSupport + severityWeight + overdueWeight;
+
+    await query(
+      `UPDATE complaints SET support_count = ?, ranking_score = ? WHERE id = ?`,
+      [newSupport, newRankingScore, masterComp.id]
+    );
+
+    // 4. History log
+    try {
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [
+          duplicateComp.id,
+          'Merged',
+          `Complaint ${duplicateComp.complaint_number || duplicateComp.id} merged into ${masterComp.complaint_number || masterComp.id}. Distance: ${Math.round(dist)} m. Reason: Same issue within 500 m`,
+          'Overseer Review',
+          String(req.user.name || req.user.email || 'Authorized Staff')
+        ]
+      );
+    } catch (hErr) {}
+
+    return res.json({
+      success: true,
+      message: `Merged complaint ${duplicateComp.complaint_number || duplicateComp.id} into ${masterComp.complaint_number || masterComp.id}`,
+      master_complaint_id: masterComp.id,
+      support_count: newSupport,
+      ranking_score: newRankingScore
+    });
+  } catch (err) {
+    console.error('Merge complaint error:', err);
+    return res.status(500).json({ error: 'Failed to merge complaints' });
+  }
+});
 
 // Get complaint status history timeline with role-aware authorization
 router.get('/:id/history', authenticateToken, async (req, res) => {
@@ -525,6 +820,63 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper to safely merge authorized records from both PostgreSQL and Supabase
+function mergeComplaintRows(primaryList = [], secondaryList = []) {
+  const mergedMap = new Map();
+  const getRecordKey = (c) => c.complaint_number || String(c.id);
+
+  const mergeTwo = (newer, older) => {
+    const result = { ...newer };
+    const fieldsToFill = [
+      'latitude',
+      'longitude',
+      'department_id',
+      'department_name',
+      'category',
+      'priority',
+      'status',
+      'photo_url',
+      'image_url',
+      'assigned_staff_id',
+      'assigned_staff_name',
+      'sla_deadline',
+      'location_address',
+      'description',
+      'title',
+      'citizen_id',
+      'citizen_name',
+      'citizen_mobile'
+    ];
+    for (const f of fieldsToFill) {
+      if ((result[f] === null || result[f] === undefined || result[f] === '') && older[f] !== null && older[f] !== undefined && older[f] !== '') {
+        result[f] = older[f];
+      }
+    }
+    return result;
+  };
+
+  for (const c of [...primaryList, ...secondaryList]) {
+    if (!c) continue;
+    const key = getRecordKey(c);
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, c);
+    } else {
+      const existing = mergedMap.get(key);
+      const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+      const newTime = new Date(c.updated_at || c.created_at || 0).getTime();
+      if (newTime >= existingTime) {
+        mergedMap.set(key, mergeTwo(c, existing));
+      } else {
+        mergedMap.set(key, mergeTwo(existing, c));
+      }
+    }
+  }
+
+  return Array.from(mergedMap.values()).sort((a, b) => {
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+}
+
 // Get all complaints for Admin / Portals (Citizens only list their own complaints)
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -550,49 +902,49 @@ router.get('/', authenticateToken, async (req, res) => {
     }
     sql += ` ORDER BY c.created_at DESC`;
     const result = await query(sql, params);
-    if (result.rows && result.rows.length > 0) {
-      return res.json({ complaints: result.rows.map(c => normalizeComplaintPhotoUrls(c, req)) });
-    }
+    const pgRows = result.rows || [];
 
-    // Supabase fallback if local database has 0 rows (e.g. serverless /tmp container)
-    try {
-      const { getSupabaseClient } = require('../middleware/auth');
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        let supaQuery = supabase
-          .from('complaints')
-          .select('*')
-          .order('created_at', { ascending: false });
+    let supaRows = [];
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const { getSupabaseClient } = require('../middleware/auth');
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          let supaQuery = supabase
+            .from('complaints')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        if (isCitizen) {
-          supaQuery = supaQuery.eq('citizen_id', req.user.id);
-        } else if (isDeptHead && req.user?.department_id) {
-          supaQuery = supaQuery.eq('department_id', req.user.department_id);
+          if (isCitizen) {
+            supaQuery = supaQuery.eq('citizen_id', req.user.id);
+          } else if (isDeptHead && req.user?.department_id) {
+            supaQuery = supaQuery.eq('department_id', req.user.department_id);
+          }
+
+          const { data, error } = await supaQuery;
+
+          if (!error && Array.isArray(data) && data.length > 0) {
+            let deptMap = {};
+            try {
+              const { data: depts } = await supabase.from('departments').select('id, name');
+              if (depts) {
+                depts.forEach((d) => { deptMap[d.id] = d.name; });
+              }
+            } catch (e) {}
+
+            supaRows = data.map((c) => ({
+              ...c,
+              department_name: deptMap[c.department_id] || c.department_name || 'Public Works Department (PWD)'
+            }));
+          }
         }
-
-        const { data, error } = await supaQuery;
-
-        if (!error && Array.isArray(data) && data.length > 0) {
-          let deptMap = {};
-          try {
-            const { data: depts } = await supabase.from('departments').select('id, name');
-            if (depts) {
-              depts.forEach((d) => { deptMap[d.id] = d.name; });
-            }
-          } catch (e) {}
-
-          const formatted = data.map((c) => ({
-            ...c,
-            department_name: deptMap[c.department_id] || c.department_name || 'Public Works Department (PWD)'
-          }));
-          return res.json({ complaints: formatted.map(c => normalizeComplaintPhotoUrls(c, req)) });
-        }
+      } catch (sErr) {
+        console.warn('Supabase fetch in GET / warning:', sErr.message);
       }
-    } catch (sErr) {
-      console.warn('Supabase fallback in GET / warning:', sErr.message);
     }
 
-    return res.json({ complaints: (result.rows || []).map(c => normalizeComplaintPhotoUrls(c, req)) });
+    const merged = mergeComplaintRows(pgRows, supaRows);
+    return res.json({ complaints: merged.map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch all complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -616,34 +968,34 @@ router.get('/my', authenticateToken, async (req, res) => {
       ORDER BY c.created_at DESC
     `;
     const result = await query(sql, [citizenId, String(citizenId)]);
-    if (result.rows && result.rows.length > 0) {
-      return res.json({ complaints: result.rows.map(c => normalizeComplaintPhotoUrls(c, req)) });
-    }
+    const pgRows = result.rows || [];
 
-    // Supabase fallback if local database has 0 rows for this citizen
-    try {
-      const { getSupabaseClient } = require('../middleware/auth');
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('complaints')
-          .select('*, departments(name)')
-          .eq('citizen_id', citizenId)
-          .order('created_at', { ascending: false });
+    let supaRows = [];
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const { getSupabaseClient } = require('../middleware/auth');
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          const { data, error } = await supabase
+            .from('complaints')
+            .select('*, departments(name)')
+            .eq('citizen_id', citizenId)
+            .order('created_at', { ascending: false });
 
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const formatted = data.map((c) => ({
-            ...c,
-            department_name: c.departments?.name || c.department_name
-          }));
-          return res.json({ complaints: formatted.map(c => normalizeComplaintPhotoUrls(c, req)) });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            supaRows = data.map((c) => ({
+              ...c,
+              department_name: c.departments?.name || c.department_name
+            }));
+          }
         }
+      } catch (sErr) {
+        console.warn('Supabase fetch in GET /my warning:', sErr.message);
       }
-    } catch (sErr) {
-      console.warn('Supabase fallback in GET /my warning:', sErr.message);
     }
 
-    return res.json({ complaints: (result.rows || []).map(c => normalizeComplaintPhotoUrls(c, req)) });
+    const merged = mergeComplaintRows(pgRows, supaRows);
+    return res.json({ complaints: merged.map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -809,5 +1161,8 @@ router.post('/:id/feedback', authenticateToken, validateInput(addFeedbackSchema)
     return res.status(500).json({ error: 'Failed to submit feedback' });
   }
 });
+
+router.getDefaultResponseTimeHours = getDefaultResponseTimeHours;
+router.calculateSlaDeadline = calculateSlaDeadline;
 
 module.exports = router;

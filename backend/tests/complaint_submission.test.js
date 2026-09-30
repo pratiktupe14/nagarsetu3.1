@@ -233,4 +233,92 @@ describe('Citizen Complaint Submission Flow with Demo & JWT Auth', () => {
 
     assert.ok(rateLimited, 'Genuine excessive complaint flooding must trigger rate limit (429)');
   });
+
+  test('8. Server-side authoritative SLA deadline calculation per business rules', async () => {
+    const { getDefaultResponseTimeHours, calculateSlaDeadline } = require('../src/routes/complaint.routes');
+
+    // Rule tests:
+    // PWD -> 15 days (360 hours)
+    assert.strictEqual(getDefaultResponseTimeHours('Pothole & Road Damage', 'PWD'), 360);
+    assert.strictEqual(getDefaultResponseTimeHours('Road maintenance', 'Public Works Department'), 360);
+
+    // Streetlight -> 48 hours
+    assert.strictEqual(getDefaultResponseTimeHours('Streetlight Failure', 'ELE'), 48);
+    assert.strictEqual(getDefaultResponseTimeHours('Street light not working', 'Electrical'), 48);
+
+    // Water Leakage -> 24 hours
+    assert.strictEqual(getDefaultResponseTimeHours('Water Leakage', 'Water Supply'), 24);
+    assert.strictEqual(getDefaultResponseTimeHours('Pipeline burst with water leak', 'WTR'), 24);
+
+    // Garbage -> 24 hours
+    assert.strictEqual(getDefaultResponseTimeHours('Garbage & Waste Pile', 'Sanitation'), 24);
+    assert.strictEqual(getDefaultResponseTimeHours('Solid waste dumping', 'SAN'), 24);
+
+    // Drainage -> 48 hours
+    assert.strictEqual(getDefaultResponseTimeHours('Drainage Overflow', 'Drainage'), 48);
+    assert.strictEqual(getDefaultResponseTimeHours('Gutter blockage', 'DRN'), 48);
+
+    // Remaining / unknown department -> 4 days (96 hours)
+    assert.strictEqual(getDefaultResponseTimeHours('Park maintenance', 'Gardens'), 96);
+    assert.strictEqual(getDefaultResponseTimeHours('General civic inquiry', 'Administration'), 96);
+
+    // Deterministic fixed timestamp test
+    const fixedTime = '2026-10-01T10:00:00.000Z';
+    const pwdSla = calculateSlaDeadline(fixedTime, 'Roads', 'PWD');
+    assert.strictEqual(pwdSla.hours, 360);
+    assert.strictEqual(pwdSla.deadline, '2026-10-16T10:00:00.000Z');
+
+    const streetSla = calculateSlaDeadline(fixedTime, 'Street light', 'ELE');
+    assert.strictEqual(streetSla.hours, 48);
+    assert.strictEqual(streetSla.deadline, '2026-10-03T10:00:00.000Z');
+
+    const waterSla = calculateSlaDeadline(fixedTime, 'Water Leakage', 'WTR');
+    assert.strictEqual(waterSla.hours, 24);
+    assert.strictEqual(waterSla.deadline, '2026-10-02T10:00:00.000Z');
+
+    const garbageSla = calculateSlaDeadline(fixedTime, 'Garbage dumping', 'SAN');
+    assert.strictEqual(garbageSla.hours, 24);
+    assert.strictEqual(garbageSla.deadline, '2026-10-02T10:00:00.000Z');
+
+    const drainageSla = calculateSlaDeadline(fixedTime, 'Drain blockage', 'DRN');
+    assert.strictEqual(drainageSla.hours, 48);
+    assert.strictEqual(drainageSla.deadline, '2026-10-03T10:00:00.000Z');
+
+    const otherSla = calculateSlaDeadline(fixedTime, 'Civic tree trimming', 'Horticulture');
+    assert.strictEqual(otherSla.hours, 96);
+    assert.strictEqual(otherSla.deadline, '2026-10-05T10:00:00.000Z');
+
+    // Verify submission ignores client-supplied sla_deadline
+    const { generateToken } = require('../src/middleware/auth');
+    const slaCitizenToken = generateToken({
+      id: `sla-user-${Date.now()}`,
+      name: 'SLA Tester',
+      email: `sla-${Date.now()}@test.com`,
+      role: 'citizen'
+    });
+    const clientFakeDeadline = '2099-01-01T00:00:00.000Z';
+    const res = await fetch(`${baseUrl}/api/complaints/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${slaCitizenToken}`
+      },
+      body: JSON.stringify({
+        complaint_number: `NS-SLA-${Date.now()}`,
+        photo_url: '/uploads/test-water.jpg',
+        category: 'Water Leakage',
+        title: 'Water pipe leak near central square',
+        department_id: 3,
+        latitude: 19.9975,
+        longitude: 73.7898,
+        sla_deadline: clientFakeDeadline,
+        response_time_hours: 9999
+      })
+    });
+    const data = await res.json();
+    assert.strictEqual(res.status, 201);
+    assert.ok(data.complaint);
+    assert.strictEqual(data.complaint.response_time_hours, 24, 'Must enforce server-side 24h for Water Leakage');
+    assert.notStrictEqual(data.complaint.sla_deadline, clientFakeDeadline, 'Must ignore client-supplied sla_deadline');
+  });
 });

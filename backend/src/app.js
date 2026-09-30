@@ -57,7 +57,10 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    if (isDev && (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin))) {
+    if (isDev && (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) || /^http:\/\/\[::1\]:\d+$/.test(origin) || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('[::1]'))) {
+      return callback(null, true);
+    }
+    if (isDev) {
       return callback(null, true);
     }
     return callback(new Error(`CORS Error: Origin '${origin}' is not authorized.`));

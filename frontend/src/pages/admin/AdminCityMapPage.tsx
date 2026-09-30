@@ -110,9 +110,8 @@ export const AdminCityMapPage: React.FC = () => {
     (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
     (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
   );
-  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
-    hasGoogleMapsKey ? 'google' : 'leaflet'
-  );
+  // Default consistently to full-featured Leaflet renderer across environments for complete feature parity
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>('leaflet');
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,15 +132,30 @@ export const AdminCityMapPage: React.FC = () => {
     try {
       const [list, _staffRes, depts] = await Promise.all([
         getAllComplaints(),
-        fetchDepartmentStaffApi().catch(() => null),
-        getDepartments().catch(() => [])
+        fetchDepartmentStaffApi().catch((err) => {
+          console.warn('AdminCityMap fetchDepartmentStaffApi failure:', err);
+          return null;
+        }),
+        getDepartments().catch((err) => {
+          console.warn('AdminCityMap getDepartments failure:', err);
+          return [];
+        })
       ]);
       setComplaints(list);
-      setStaffRecords(getAllServiceStaffRecords());
+      if (_staffRes && Array.isArray(_staffRes.staff) && _staffRes.staff.length > 0) {
+        setStaffRecords(getAllServiceStaffRecords());
+      } else {
+        setStaffRecords(getAllServiceStaffRecords());
+      }
       setDepartments(depts);
 
       // Auto-recenter to first valid complaint coordinate if available
-      const validCoordComp = list.find((c) => !!c.latitude && !!c.longitude && !isNaN(Number(c.latitude)));
+      const validCoordComp = list.find((c) => {
+        if (c.latitude === null || c.latitude === undefined || c.longitude === null || c.longitude === undefined || String(c.latitude).trim() === '' || String(c.longitude).trim() === '') return false;
+        const lat = Number(c.latitude);
+        const lng = Number(c.longitude);
+        return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      });
       if (validCoordComp) {
         setMapCenter([Number(validCoordComp.latitude), Number(validCoordComp.longitude)]);
       }
@@ -186,8 +200,13 @@ export const AdminCityMapPage: React.FC = () => {
   const filteredComplaints = useMemo(() => {
     const now = new Date();
     return complaints.filter((c) => {
-      // Must have valid location
-      if (!c.latitude || !c.longitude || isNaN(Number(c.latitude)) || isNaN(Number(c.longitude))) {
+      // Must have valid coordinates (-90 to 90, -180 to 180, valid 0, no NaN/null/undefined)
+      if (c.latitude === null || c.latitude === undefined || c.longitude === null || c.longitude === undefined || String(c.latitude).trim() === '' || String(c.longitude).trim() === '') {
+        return false;
+      }
+      const lat = Number(c.latitude);
+      const lng = Number(c.longitude);
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         return false;
       }
 

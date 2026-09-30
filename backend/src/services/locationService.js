@@ -114,7 +114,13 @@ function isValidCoordinate(lat, lng) {
 
 function normalizeCategory(cat) {
   if (!cat || typeof cat !== 'string') return '';
-  return cat.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const raw = cat.trim().toLowerCase();
+  if (raw.includes('street light') || raw.includes('streetlight') || raw.includes('electric') || raw.includes('light')) return 'streetlight';
+  if (raw.includes('water') || raw.includes('leak') || raw.includes('pipeline')) return 'water';
+  if (raw.includes('garbage') || raw.includes('waste') || raw.includes('trash') || raw.includes('sanitat')) return 'garbage';
+  if (raw.includes('pothole') || raw.includes('road') || raw.includes('pwd')) return 'pothole';
+  if (raw.includes('drain') || raw.includes('sewag') || raw.includes('sewer') || raw.includes('gutter')) return 'drainage';
+  return raw.replace(/[^a-z0-9]/g, '');
 }
 
 // Find potential duplicate open complaints within radius (e.g. 100 meters)

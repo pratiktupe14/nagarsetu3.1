@@ -457,10 +457,12 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   let responseStatus = 0;
   const startTime = new Date().toISOString();
 
-  // 1. Try Express Backend API first with no-cache headers and scope=all (with 2000ms timeout)
+  // 1. Try Express Backend API first with no-cache headers and scope=all (with resilient production timeout)
   try {
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const apiTimeoutMs = isLocalhost ? 6000 : 15000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), apiTimeoutMs);
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
     const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {
@@ -480,19 +482,27 @@ export async function getAllComplaints(): Promise<Complaint[]> {
             department_name: c.department_name || resolveDepartmentInfo(c.department_id, undefined, c.category)?.fullName || 'Public Works Department (PWD)'
           }));
       }
+    } else {
+      console.warn(`Express backend returned HTTP ${res.status} for complaints`);
     }
-  } catch (err) {
-    console.warn('Express backend getAllComplaints fallback:', err);
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.warn('Express backend getAllComplaints timed out after configured deadline.');
+    } else {
+      console.warn('Express backend getAllComplaints note:', err?.message || err);
+    }
   }
 
   // 2. Fallback to or merge Supabase if Express API was unreachable or returned 0 complaints
   if ((responseStatus !== 200 || list.length === 0) && isSupabaseConfigured()) {
     try {
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const supaTimeoutMs = isLocalhost ? 6000 : 15000;
       const supaPromise = supabase
         .from('complaints')
         .select('*')
         .order('updated_at', { ascending: false });
-      const supaTimeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Supabase timeout') }), 2000));
+      const supaTimeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Supabase timeout') }), supaTimeoutMs));
       const { data, error } = await Promise.race([supaPromise, supaTimeoutPromise]);
 
       if (!error && data && data.length > 0) {

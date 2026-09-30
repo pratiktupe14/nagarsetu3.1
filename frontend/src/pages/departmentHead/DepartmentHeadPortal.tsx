@@ -78,9 +78,14 @@ const createCustomMapMarkerIcon = (priority: string) => {
 // Leaflet Map Fly-To Helper Controller
 function DeptMapFlyToController({ center, zoom }: { center: [number, number] | null; zoom: number }) {
   const map = useMap();
+  const prevRef = React.useRef<string>('');
   useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom, { animate: true, duration: 1.2 });
+    if (center && center[0] != null && center[1] != null && !isNaN(center[0]) && !isNaN(center[1])) {
+      const key = `${Number(center[0]).toFixed(4)}_${Number(center[1]).toFixed(4)}_${zoom}`;
+      if (prevRef.current !== key) {
+        prevRef.current = key;
+        map.flyTo(center, zoom, { animate: true, duration: 1.2 });
+      }
     }
   }, [center, zoom, map]);
   return null;
@@ -284,9 +289,7 @@ export const DepartmentHeadPortal: React.FC = () => {
     (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) ||
     (import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY as string)
   );
-  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>(
-    hasGoogleMapsKey ? 'google' : 'leaflet'
-  );
+  const [mapEngine, setMapEngine] = useState<'google' | 'leaflet'>('leaflet');
 
   // Extract staff ID if viewing single staff member
   const staffIdFromPath = isStaffDetailView ? currentPath.split('/department-head/staff/')[1] : null;
@@ -347,10 +350,31 @@ export const DepartmentHeadPortal: React.FC = () => {
     return normShort.includes('pwd') || normShort.includes('public works') || normDeptId.includes('pwd') || normDeptFull.includes('public works');
   }, [deptInfo, headDeptId, headDepartmentFull]);
 
+  // Stable primitives and identity refs for loadData to prevent refetch loops
+  const userId = user?.id;
+  const userEmail = user?.email;
+  const userDeptId = user?.department_id;
+  const userDeptName = user?.department_name;
+  const userDeptCode = user?.department_code;
+
+  const activeHeadRecordRef = React.useRef<any>(null);
+  const headDeptIdRef = React.useRef<string | number>(headDeptId);
+  headDeptIdRef.current = headDeptId;
+  const headDepartmentFullRef = React.useRef<string>(headDepartmentFull);
+  headDepartmentFullRef.current = headDepartmentFull;
+  const headIdRef = React.useRef<string>(headId);
+  headIdRef.current = headId;
+  const resolvedDeptIdRef = React.useRef<string | number>(resolvedDept.id);
+  resolvedDeptIdRef.current = resolvedDept.id;
+  const resolvedDeptFullRef = React.useRef<string>(resolvedDept.fullName);
+  resolvedDeptFullRef.current = resolvedDept.fullName;
+
   // Data States
   const [departmentComplaints, setDepartmentComplaints] = useState<Complaint[]>([]);
   const [departmentStaff, setDepartmentStaff] = useState<ServiceStaffMemberRecord[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const initialLoadingRef = React.useRef(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -456,22 +480,24 @@ export const DepartmentHeadPortal: React.FC = () => {
 
   // Load Department Data (Complaints, Staff, Notifications strictly by department from Supabase)
   const loadData = useCallback(async (opts?: boolean | React.MouseEvent) => {
-    const isInitial = typeof opts === 'boolean' ? opts : true;
-    if (isInitial) setLoading(true);
+    const isInitial = typeof opts === 'boolean' ? opts : false;
+    if (isInitial && initialLoadingRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      let activeDeptId = headDeptId || user?.department_id || resolvedDept.id || '1';
-      let activeDeptFull = headDepartmentFull || user?.department_name || resolvedDept.fullName || 'Public Works Department (PWD)';
-      let activeHeadId = headId || user?.id || '';
+      let activeDeptId = String(headDeptIdRef.current || userDeptId || resolvedDeptIdRef.current || '1');
+      let activeDeptFull = headDepartmentFullRef.current || userDeptName || resolvedDeptFullRef.current || 'Public Works Department (PWD)';
+      let activeHeadId = headIdRef.current || userId || '';
 
-      if (isSupabaseConfigured() && user?.email) {
+      if (isSupabaseConfigured() && userEmail) {
         try {
           const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || '');
-          const cleanEmail = (user.email || '').toLowerCase();
+          const cleanEmail = (userEmail || '').toLowerCase();
 
           let dhQuery = supabase.from('department_heads').select('*, departments(*)');
-          if (isUuid(user.id)) {
-            dhQuery = dhQuery.or(`user_id.eq.${user.id},email.eq.${cleanEmail}`);
+          if (userId && isUuid(userId)) {
+            dhQuery = dhQuery.or(`user_id.eq.${userId},email.eq.${cleanEmail}`);
           } else {
             dhQuery = dhQuery.eq('email', cleanEmail);
           }
@@ -479,15 +505,18 @@ export const DepartmentHeadPortal: React.FC = () => {
           const { data: dhRow } = await dhQuery.eq('status', 'active').maybeSingle();
 
           if (dhRow) {
-            setActiveHeadRecord(dhRow);
+            if (activeHeadRecordRef.current?.id !== dhRow.id || activeHeadRecordRef.current?.status !== dhRow.status) {
+              activeHeadRecordRef.current = dhRow;
+              setActiveHeadRecord(dhRow);
+            }
             setIsHeadActive(true);
-            activeDeptId = dhRow.department_id || activeDeptId;
+            activeDeptId = String(dhRow.department_id || activeDeptId);
             activeDeptFull = dhRow.departments?.name || activeDeptFull;
             activeHeadId = dhRow.user_id || activeHeadId;
           } else {
             let anyQuery = supabase.from('department_heads').select('*');
-            if (isUuid(user.id)) {
-              anyQuery = anyQuery.or(`user_id.eq.${user.id},email.eq.${cleanEmail}`);
+            if (userId && isUuid(userId)) {
+              anyQuery = anyQuery.or(`user_id.eq.${userId},email.eq.${cleanEmail}`);
             } else {
               anyQuery = anyQuery.eq('email', cleanEmail);
             }
@@ -538,13 +567,17 @@ export const DepartmentHeadPortal: React.FC = () => {
 
     } catch (err) {
       console.error('Error loading Department Head data:', err);
-      if (!headDeptId && !headDepartmentFull && !resolvedDept.fullName) {
+      if (!headDeptIdRef.current && !headDepartmentFullRef.current && !resolvedDeptFullRef.current) {
         setError('Department assignment could not be resolved. Please contact City Administration.');
       }
     } finally {
-      if (isInitial) setLoading(false);
+      if (initialLoadingRef.current) {
+        initialLoadingRef.current = false;
+        setInitialLoading(false);
+      }
+      setLoading(false);
     }
-  }, [headDeptId, headDepartmentFull, headId, staffIdFromPath, user, resolvedDept]);
+  }, [userId, userEmail, userDeptId, userDeptName, userDeptCode, staffIdFromPath]);
 
   useEffect(() => {
     loadData(true);
@@ -568,7 +601,11 @@ export const DepartmentHeadPortal: React.FC = () => {
     };
   }, [loadData]);
 
-  const now = new Date();
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Notification Metrics & Filtering (Real Supabase Data)
   const notifMetrics = useMemo(() => {
@@ -2168,102 +2205,112 @@ export const DepartmentHeadPortal: React.FC = () => {
                     </div>
 
                     <div className="h-[520px] rounded-xl overflow-hidden border border-gray-300 relative shadow-inner">
-                      {loading ? (
+                      {initialLoading ? (
                         <div className="w-full h-full bg-slate-100 flex items-center justify-center space-x-2 text-gray-600 font-outfit text-sm">
                           <RefreshCw className="w-5 h-5 animate-spin text-emerald-600" />
-                          <span>Loading department locations...</span>
+                          <span>Loading department map...</span>
                         </div>
-                      ) : mappedComplaints.length === 0 ? (
-                        <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-2">
-                          <MapPin className="w-10 h-10 text-gray-400" />
-                          <h4 className="font-extrabold text-gray-800 text-base font-outfit">No Mapped Complaints</h4>
-                          <p className="text-xs text-gray-500 max-w-sm">Complaints with available location data in {deptInfo.fullName} will appear on this interactive map.</p>
-                        </div>
-                      ) : mapEngine === 'google' && hasGoogleMapsKey ? (
-                        <NagarSetuMap
-                          complaints={mappedComplaints.map((c) => ({
-                            id: c.id,
-                            complaintNumber: c.complaint_number,
-                            category: c.category,
-                            title: c.title,
-                            description: c.description,
-                            priority: c.priority,
-                            status: c.status,
-                            latitude: parseFloat(c.latitude as any),
-                            longitude: parseFloat(c.longitude as any),
-                            department_name: c.department_name || deptInfo.fullName,
-                            location_address: c.location_address
-                          }))}
-                          center={mapCenter ? { lat: mapCenter[0], lng: mapCenter[1] } : undefined}
-                          zoom={mapZoom}
-                          height="100%"
-                          onComplaintSelect={(mc) => {
-                            const matched = mappedComplaints.find((c) => c.id === mc.id);
-                            if (matched) setDetailModalComplaint(matched);
-                          }}
-                        />
                       ) : (
-                        <MapContainer
-                          center={mapCenter || [20.0059, 73.7898]}
-                          zoom={mapZoom}
-                          scrollWheelZoom={true}
-                          style={{ height: '100%', width: '100%' }}
-                        >
-                          <DeptMapFlyToController center={mapCenter} zoom={mapZoom} />
-                          <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          />
+                        <div className="relative w-full h-full">
+                          {loading && (
+                            <div className="absolute top-3 right-3 z-[1000] bg-white/95 backdrop-blur-xs px-2.5 py-1 rounded-md border border-gray-200 shadow-xs flex items-center space-x-1.5 text-[11px] font-bold text-gray-700 pointer-events-none">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                              <span>Updating...</span>
+                            </div>
+                          )}
+                          {mappedComplaints.length === 0 ? (
+                            <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-2">
+                              <MapPin className="w-10 h-10 text-gray-400" />
+                              <h4 className="font-extrabold text-gray-800 text-base font-outfit">No Mapped Complaints</h4>
+                              <p className="text-xs text-gray-500 max-w-sm">Complaints with available location data in {deptInfo.fullName} will appear on this interactive map.</p>
+                            </div>
+                          ) : mapEngine === 'google' && hasGoogleMapsKey ? (
+                            <NagarSetuMap
+                              complaints={mappedComplaints.map((c) => ({
+                                id: c.id,
+                                complaintNumber: c.complaint_number,
+                                category: c.category,
+                                title: c.title,
+                                description: c.description,
+                                priority: c.priority,
+                                status: c.status,
+                                latitude: parseFloat(c.latitude as any),
+                                longitude: parseFloat(c.longitude as any),
+                                department_name: c.department_name || deptInfo.fullName,
+                                location_address: c.location_address
+                              }))}
+                              center={mapCenter ? { lat: mapCenter[0], lng: mapCenter[1] } : undefined}
+                              zoom={mapZoom}
+                              height="100%"
+                              onComplaintSelect={(mc) => {
+                                const matched = mappedComplaints.find((c) => c.id === mc.id);
+                                if (matched) setDetailModalComplaint(matched);
+                              }}
+                            />
+                          ) : (
+                            <MapContainer
+                              center={mapCenter || [20.0059, 73.7898]}
+                              zoom={mapZoom}
+                              scrollWheelZoom={true}
+                              style={{ height: '100%', width: '100%' }}
+                            >
+                              <DeptMapFlyToController center={mapCenter} zoom={mapZoom} />
+                              <TileLayer
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              />
 
-                          {mappedComplaints.map((c) => {
-                            const lat = parseFloat(c.latitude as any);
-                            const lng = parseFloat(c.longitude as any);
-                            const isOver = c.sla_deadline && new Date(c.sla_deadline) < now && c.status !== 'Resolved';
+                              {mappedComplaints.map((c) => {
+                                const lat = parseFloat(c.latitude as any);
+                                const lng = parseFloat(c.longitude as any);
+                                const isOver = c.sla_deadline && new Date(c.sla_deadline) < now && c.status !== 'Resolved';
 
-                            return (
-                              <Marker
-                                key={c.id}
-                                position={[lat, lng]}
-                                icon={createCustomMapMarkerIcon(c.priority)}
-                              >
-                                <Popup>
-                                  <div className="p-1 space-y-2 text-xs max-w-[220px]">
-                                    <div className="flex items-center justify-between border-b border-gray-100 pb-1">
-                                      <span className="font-mono font-extrabold text-emerald-800">{c.complaint_number}</span>
-                                      <PriorityBadge priority={c.priority} />
-                                    </div>
-
-                                    <h5 className="font-extrabold text-gray-900 line-clamp-1">{c.title}</h5>
-                                    <p className="text-[11px] text-gray-600 line-clamp-1">📍 {c.location_address || 'Nashik'}</p>
-
-                                    <div className="bg-slate-50 p-2 rounded border border-gray-200 space-y-1 text-[10px]">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 font-bold">Assigned:</span>
-                                        <span className="font-bold text-gray-800">{c.assigned_staff_name || 'Unassigned'}</span>
-                                      </div>
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 font-bold">Status:</span>
-                                        <StatusBadge status={c.status} />
-                                      </div>
-                                      {isOver && (
-                                        <div className="text-rose-600 font-mono font-extrabold text-[10px]">
-                                          ⚠ SLA BREACHED
+                                return (
+                                  <Marker
+                                    key={c.id}
+                                    position={[lat, lng]}
+                                    icon={createCustomMapMarkerIcon(c.priority)}
+                                  >
+                                    <Popup>
+                                      <div className="p-1 space-y-2 text-xs max-w-[220px]">
+                                        <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                                          <span className="font-mono font-extrabold text-emerald-800">{c.complaint_number}</span>
+                                          <PriorityBadge priority={c.priority} />
                                         </div>
-                                      )}
-                                    </div>
 
-                                    <button
-                                      onClick={() => setDetailModalComplaint(c)}
-                                      className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded text-[11px] transition-colors shadow-2xs"
-                                    >
-                                      View Details →
-                                    </button>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            );
-                          })}
-                        </MapContainer>
+                                        <h5 className="font-extrabold text-gray-900 line-clamp-1">{c.title}</h5>
+                                        <p className="text-[11px] text-gray-600 line-clamp-1">📍 {c.location_address || 'Nashik'}</p>
+
+                                        <div className="bg-slate-50 p-2 rounded border border-gray-200 space-y-1 text-[10px]">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-gray-500 font-bold">Assigned:</span>
+                                            <span className="font-bold text-gray-800">{c.assigned_staff_name || 'Unassigned'}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-gray-500 font-bold">Status:</span>
+                                            <StatusBadge status={c.status} />
+                                          </div>
+                                          {isOver && (
+                                            <div className="text-rose-600 font-mono font-extrabold text-[10px]">
+                                              ⚠ SLA BREACHED
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <button
+                                          onClick={() => setDetailModalComplaint(c)}
+                                          className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded text-[11px] transition-colors shadow-2xs"
+                                        >
+                                          View Details →
+                                        </button>
+                                      </div>
+                                    </Popup>
+                                  </Marker>
+                                );
+                              })}
+                            </MapContainer>
+                          )}
+                        </div>
                       )}
                     </div>
 

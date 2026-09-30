@@ -614,23 +614,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 1. Try Local Express Backend API authentication first
       try {
-        let response: Response;
-        try {
-          response = await fetch(`${getApiUrl()}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
-          });
-        } catch (fetchErr: any) {
-          console.warn(`Backend API login connection note (${getApiUrl()}):`, fetchErr.message);
+        let response: Response | null = null;
+        const candidateEndpoints = [
+          `${getApiUrl()}/api/auth/login`,
+          '/api/auth/login',
+          'http://localhost:5000/api/auth/login'
+        ];
+        const uniqueEndpoints = Array.from(new Set(candidateEndpoints.filter(Boolean)));
 
-          if (!isSupabaseConfigured()) {
-            throw new Error(`Unable to connect to NagarSetu backend server (${getApiUrl()}). Please make sure your backend API server is running.`);
+        for (const endpoint of uniqueEndpoints) {
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mobileOrEmail: cleanIdentifier, password })
+            });
+            response = res;
+            if (res.ok || res.status === 401 || res.status === 400) {
+              break;
+            }
+          } catch (fetchErr: any) {
+            console.warn(`Backend API login connection attempt note (${endpoint}):`, fetchErr.message);
           }
-          throw fetchErr;
         }
 
-        if (response.ok) {
+        if (!response) {
+          if (!isSupabaseConfigured()) {
+            throw new Error(`Unable to connect to NagarSetu backend server. Please make sure your backend API server is running.`);
+          }
+        }
+
+        if (response && response.ok) {
           const data = await response.json();
           if (data.token && data.user) {
             const serverRole = data.user.role;
@@ -834,6 +848,60 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (e) {
           console.warn('Supabase department_heads lookup note:', e);
+        }
+      }
+
+      // Query service staff record matching cleanEmail / cleanIdentifier when staff password is used
+      if (password === 'staff@123') {
+        const staffMatch = findServiceStaffByIdentifier(cleanIdentifier);
+        if (staffMatch) {
+          setUser(staffMatch);
+          const tok = 'demo-token-service-staff';
+          sessionStorage.setItem('nagarsetu_token', tok);
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(staffMatch));
+          localStorage.setItem('nagarsetu_token', tok);
+          localStorage.setItem('nagarsetu_user', JSON.stringify(staffMatch));
+          localStorage.setItem('nagarsetu_token_service_staff', tok);
+          localStorage.setItem('nagarsetu_user_service_staff', JSON.stringify(staffMatch));
+          return true;
+        }
+
+        if (isSupabaseConfigured()) {
+          try {
+            const { data: staffProf } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('email', cleanEmail)
+              .eq('role', 'service_staff')
+              .maybeSingle();
+
+            if (staffProf) {
+              const resDept = resolveDepartmentInfo(staffProf.department_id, staffProf.department_name, cleanEmail);
+              const staffUser: UserProfile = {
+                id: staffProf.id,
+                full_name: staffProf.full_name || staffProf.name || 'Field Staff',
+                email: cleanEmail,
+                mobile: staffProf.mobile || '',
+                role: 'service_staff',
+                department_id: staffProf.department_id || resDept.id,
+                department_name: staffProf.department_name || resDept.fullName || resDept.name,
+                department_code: resDept.code,
+                employee_id: staffProf.employee_id,
+                language_pref: staffProf.language_pref || 'en'
+              };
+              setUser(staffUser);
+              const tok = 'demo-token-service-staff';
+              sessionStorage.setItem('nagarsetu_token', tok);
+              sessionStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+              localStorage.setItem('nagarsetu_token', tok);
+              localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+              localStorage.setItem('nagarsetu_token_service_staff', tok);
+              localStorage.setItem('nagarsetu_user_service_staff', JSON.stringify(staffUser));
+              return true;
+            }
+          } catch (e) {
+            console.warn('Supabase service_staff profile lookup note:', e);
+          }
         }
       }
 

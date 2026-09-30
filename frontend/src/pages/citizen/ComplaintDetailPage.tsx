@@ -10,8 +10,29 @@ import { getComplaintById, getAllComplaints, getCitizenComplaints, submitComplai
 import { isValidCoordinate } from '../../services/locationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
-import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers } from 'lucide-react';
+import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, Clock } from 'lucide-react';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+
+function formatResponseTimeLabel(hours?: number, deadline?: string, createdAt?: string): string {
+  if (hours) {
+    if (hours === 360) return '15 Days';
+    if (hours === 96) return '4 Days';
+    if (hours === 48) return '48 Hours';
+    if (hours === 24) return '24 Hours';
+    if (hours >= 24 && hours % 24 === 0) return `${hours / 24} Days`;
+    return `${hours} Hours`;
+  }
+  if (deadline && createdAt) {
+    const diffHours = Math.round((new Date(deadline).getTime() - new Date(createdAt).getTime()) / (1000 * 60 * 60));
+    if (diffHours >= 350 && diffHours <= 370) return '15 Days';
+    if (diffHours >= 90 && diffHours <= 100) return '4 Days';
+    if (diffHours >= 45 && diffHours <= 50) return '48 Hours';
+    if (diffHours >= 20 && diffHours <= 26) return '24 Hours';
+    if (diffHours >= 24 && diffHours % 24 === 0) return `${Math.round(diffHours / 24)} Days`;
+    if (diffHours > 0) return `${diffHours} Hours`;
+  }
+  return '4 Days';
+}
 
 export const ComplaintDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -311,6 +332,29 @@ export const ComplaintDetailPage: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-1">
               <span className="text-gray-500 font-medium block">Assigned Field Staff Officer</span>
               <span className="font-extrabold text-gray-900 text-sm font-outfit block">{complaint.assigned_staff_name || 'Awaiting Officer Dispatch'}</span>
+            </div>
+          </div>
+
+          {/* RESPONSE TIME & SLA DEADLINE INFO */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100 text-xs">
+            <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-1">
+              <span className="text-gray-500 font-medium flex items-center space-x-1">
+                <Clock className="w-3.5 h-3.5 text-gray-500" />
+                <span>Response Time</span>
+              </span>
+              <span className="font-extrabold text-gray-900 text-sm font-outfit block">
+                {formatResponseTimeLabel(complaint.response_time_hours, complaint.sla_deadline, complaint.created_at)}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-gray-200 space-y-1">
+              <span className="text-gray-500 font-medium flex items-center space-x-1">
+                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Response Deadline</span>
+              </span>
+              <span className="font-extrabold text-emerald-800 text-sm font-outfit block">
+                {complaint.sla_deadline ? new Date(complaint.sla_deadline).toLocaleString() : 'Standard SLA Queue'}
+              </span>
             </div>
           </div>
 

@@ -181,6 +181,17 @@ async function createTablesPostgres() {
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_closeup_url TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS angle_photos TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_photos TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS sla_deadline TIMESTAMP;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS response_time_hours INTEGER;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS support_count INTEGER DEFAULT 1;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS ranking_score INTEGER DEFAULT 1;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS is_potential_duplicate BOOLEAN DEFAULT false;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS potential_parent_id TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS duplicate_distance_m NUMERIC;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS is_merged BOOLEAN DEFAULT false;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_into_id TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_at TIMESTAMP;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_by TEXT;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
@@ -397,6 +408,7 @@ function createTablesSqlite() {
           latitude REAL NOT NULL,
           longitude REAL NOT NULL,
           location_source TEXT NOT NULL,
+          location_address TEXT,
           duplicate_of_id INTEGER,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -499,12 +511,22 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'assigned_by TEXT');
       safeAddSqliteColumn('complaints', 'assigned_by_name TEXT');
       safeAddSqliteColumn('complaints', 'sla_deadline DATETIME');
+      safeAddSqliteColumn('complaints', 'response_time_hours INTEGER');
       safeAddSqliteColumn('complaints', 'photo_front_url TEXT');
       safeAddSqliteColumn('complaints', 'photo_left_url TEXT');
       safeAddSqliteColumn('complaints', 'photo_right_url TEXT');
       safeAddSqliteColumn('complaints', 'photo_closeup_url TEXT');
       safeAddSqliteColumn('complaints', 'angle_photos TEXT');
       safeAddSqliteColumn('complaints', 'additional_photos TEXT');
+      safeAddSqliteColumn('complaints', 'support_count INTEGER DEFAULT 1');
+      safeAddSqliteColumn('complaints', 'ranking_score INTEGER DEFAULT 1');
+      safeAddSqliteColumn('complaints', 'is_potential_duplicate INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'potential_parent_id TEXT');
+      safeAddSqliteColumn('complaints', 'duplicate_distance_m REAL');
+      safeAddSqliteColumn('complaints', 'is_merged INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'merged_into_id TEXT');
+      safeAddSqliteColumn('complaints', 'merged_at DATETIME');
+      safeAddSqliteColumn('complaints', 'merged_by TEXT');
       safeAddSqliteColumn('departments', 'code TEXT');
 
       sqliteDb.run(`

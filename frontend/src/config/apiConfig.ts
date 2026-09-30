@@ -3,19 +3,24 @@
  * Resolves API URL dynamically in both Development (localhost) and Vercel Production.
  */
 export const getApiUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.trim() !== '') {
-    return envUrl.trim().replace(/\/$/, '');
-  }
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
-    }
-    // Unified NagarSetu deployment uses same-origin relative URLs for /api:
-    if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('netlify.app')) {
+  const isBrowser = typeof window !== 'undefined';
+  const isLocalhost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+
+  // In production browser environments, ignore any localhost URL and use same-origin relative /api
+  if (isBrowser && !isLocalhost) {
+    if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
       return '';
     }
-    return '';
+    return envUrl;
+  }
+
+  // Local development
+  if (envUrl) {
+    return envUrl;
+  }
+  if (isLocalhost) {
+    return 'http://localhost:5000';
   }
   return '';
 };

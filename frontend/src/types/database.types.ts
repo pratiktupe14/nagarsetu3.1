@@ -261,6 +261,7 @@ export interface Complaint {
   department_head_name?: string;
   rework_reason?: string;
   sla_deadline?: string;
+  response_time_hours?: number;
   photo_before_work_url?: string;
   work_performed?: string;
   materials_used?: string;
