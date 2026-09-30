@@ -43,7 +43,7 @@ export const ComplaintDetailPage: React.FC = () => {
       if (!data) {
         // Fallback: check citizen's complaints list
         try {
-          const userStr = localStorage.getItem('nagarsetu_user');
+          const userStr = sessionStorage.getItem('nagarsetu_user') || localStorage.getItem('nagarsetu_user');
           const userObj = userStr ? JSON.parse(userStr) : null;
           const myComplaints = await getCitizenComplaints(userObj?.id || '');
           if (myComplaints && myComplaints.length > 0) {

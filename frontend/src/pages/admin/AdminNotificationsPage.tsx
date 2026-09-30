@@ -159,7 +159,7 @@ export const AdminNotificationsPage: React.FC = () => {
     if (n.complaint_id) {
       navigate(`/citizen/complaint/${n.complaint_id}`);
     } else {
-      navigate('/admin/portal');
+      navigate('/admin/dashboard');
     }
   };
 

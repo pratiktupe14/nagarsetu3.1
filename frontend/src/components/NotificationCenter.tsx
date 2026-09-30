@@ -82,7 +82,7 @@ export const NotificationCenter: React.FC = () => {
 
     const roleStr = String(role);
     if (roleStr === 'city_admin' || roleStr === 'admin') {
-      navigate('/admin/portal');
+      navigate('/admin/dashboard');
     } else if (roleStr === 'department_head') {
       navigate(`/department-head/complaints?id=${complaintId}`);
     } else if (roleStr === 'service_staff' || roleStr === 'staff') {

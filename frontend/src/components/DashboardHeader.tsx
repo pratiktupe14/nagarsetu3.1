@@ -26,7 +26,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const handleRoleSwitch = async (targetRole: UserRole) => {
     await switchRole(targetRole);
     if (targetRole === 'citizen') navigate('/citizen/portal');
-    if (targetRole === 'city_admin') navigate('/admin/portal');
+    if (targetRole === 'city_admin') navigate('/admin/dashboard');
+    if (targetRole === 'department_head') navigate('/department/portal');
     if (targetRole === 'service_staff') navigate('/staff/portal');
   };
 

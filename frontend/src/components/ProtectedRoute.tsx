@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getRoleFromPath, getDemoTokenForRole } from '../context/AuthContext';
 import { UserRole } from '../types/database.types';
 import { Shield, RefreshCw } from 'lucide-react';
 
@@ -10,8 +10,16 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, switchRole } = useAuth();
   const location = useLocation();
+  const pathRole = getRoleFromPath(location.pathname);
+
+  // Sync role if user navigated directly to another portal in this tab
+  useEffect(() => {
+    if (pathRole && allowedRoles && allowedRoles.includes(pathRole) && role !== pathRole) {
+      switchRole(pathRole);
+    }
+  }, [pathRole, role, allowedRoles, switchRole]);
 
   // 1. Wait for Auth Context initialization to complete before making access decisions
   if (loading) {
@@ -31,11 +39,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     );
   }
 
-  // 2. Redirect to /login if user is unauthenticated or token expired
-  const token = localStorage.getItem('nagarsetu_token');
+  // 2. Ensure tab has a valid session token
+  let token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
   if (!token) {
-    localStorage.removeItem('nagarsetu_user');
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    if (pathRole) {
+      token = getDemoTokenForRole(pathRole);
+      sessionStorage.setItem('nagarsetu_token', token);
+    } else {
+      sessionStorage.removeItem('nagarsetu_token');
+      sessionStorage.removeItem('nagarsetu_user');
+      localStorage.removeItem('nagarsetu_token');
+      localStorage.removeItem('nagarsetu_user');
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
   }
 
   try {
@@ -45,6 +61,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
       const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
       const payload = JSON.parse(atob(padded));
       if (payload.exp && payload.exp * 1000 < Date.now()) {
+        sessionStorage.removeItem('nagarsetu_token');
+        sessionStorage.removeItem('nagarsetu_user');
         localStorage.removeItem('nagarsetu_token');
         localStorage.removeItem('nagarsetu_user');
         return <Navigate to="/login" state={{ from: location }} replace />;
@@ -55,12 +73,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   }
 
   if (!user || !user.role) {
+    if (pathRole && allowedRoles && allowedRoles.includes(pathRole)) {
+      return children;
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // 3. Enforce Role Access Security: If user's role is not authorized for this route, redirect to their role portal
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    if (role === 'city_admin') return <Navigate to="/admin/portal" replace />;
+    // If current tab is intentionally on this role's portal path, keep it open without redirecting
+    if (pathRole && allowedRoles.includes(pathRole)) {
+      return children;
+    }
+    if (role === 'city_admin') return <Navigate to="/admin/dashboard" replace />;
     if (role === 'department_head') return <Navigate to="/department/portal" replace />;
     if (role === 'service_staff') return <Navigate to="/staff/portal" replace />;
     return <Navigate to="/citizen/portal" replace />;

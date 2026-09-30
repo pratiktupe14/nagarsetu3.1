@@ -221,39 +221,111 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
 
 export const DEMO_USERS = DEFAULT_ROLE_USERS;
 
+export function getRoleFromPath(pathname: string): UserRole | null {
+  if (!pathname) return null;
+  if (pathname.startsWith('/admin')) return 'city_admin';
+  if (pathname.startsWith('/department') || pathname.startsWith('/department-head')) return 'department_head';
+  if (pathname.startsWith('/staff')) return 'service_staff';
+  if (pathname.startsWith('/citizen')) return 'citizen';
+  return null;
+}
+
+export function getDemoTokenForRole(role: UserRole): string {
+  if (role === 'city_admin') return 'demo-token-city-admin';
+  if (role === 'department_head') return 'demo-token-dept-head';
+  if (role === 'service_staff') return 'demo-token-service-staff';
+  return 'demo-token-citizen';
+}
+
 export function getPortalForRole(role: UserRole): string {
-  if (role === 'city_admin') return '/admin/portal';
+  if (role === 'city_admin') return '/admin/dashboard';
   if (role === 'department_head') return '/department/portal';
   if (role === 'service_staff') return '/staff/portal';
   return '/citizen/portal';
 }
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const cached = localStorage.getItem('nagarsetu_user');
-    if (cached) {
+function resolveInitialUser(): UserProfile | null {
+  if (typeof window === 'undefined') return null;
+
+  const currentPath = window.location.pathname;
+  const pathRole = getRoleFromPath(currentPath);
+
+  // 1. Check tab's sessionStorage first
+  const sessionUserRaw = sessionStorage.getItem('nagarsetu_user');
+  if (sessionUserRaw) {
+    try {
+      const parsed = JSON.parse(sessionUserRaw);
+      if (parsed && parsed.role && parsed.id) {
+        if (!pathRole || parsed.role === pathRole) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. If visiting a role-specific portal (or sessionStorage was empty / mismatched):
+  if (pathRole) {
+    const roleSavedRaw = localStorage.getItem(`nagarsetu_user_${pathRole}`);
+    if (roleSavedRaw) {
       try {
-        const parsed = JSON.parse(cached);
-        if (parsed && parsed.role && parsed.id) {
-          if (parsed.role === 'citizen' && (parsed.id === 'c-8788562103' || parsed.mobile === '8788562103' || (parsed.email && parsed.email.includes('8788')))) {
-            parsed.id = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-            localStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
-          }
-          if (parsed.role === 'service_staff' && (!parsed.department_id || !parsed.department_name)) {
-            const resolved = findServiceStaffByIdentifier(parsed.email || parsed.employee_id || parsed.id || '');
-            if (resolved) {
-              localStorage.setItem('nagarsetu_user', JSON.stringify(resolved));
-              return resolved;
-            }
+        const parsed = JSON.parse(roleSavedRaw);
+        if (parsed && parsed.role === pathRole) {
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+          const savedToken = localStorage.getItem(`nagarsetu_token_${pathRole}`);
+          if (savedToken) {
+            sessionStorage.setItem('nagarsetu_token', savedToken);
+          } else {
+            sessionStorage.setItem('nagarsetu_token', getDemoTokenForRole(pathRole));
           }
           return parsed;
         }
       } catch (e) {}
     }
-    return null;
+
+    const generalUserRaw = localStorage.getItem('nagarsetu_user');
+    if (generalUserRaw) {
+      try {
+        const parsed = JSON.parse(generalUserRaw);
+        if (parsed && parsed.role === pathRole) {
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+          const genToken = localStorage.getItem('nagarsetu_token') || getDemoTokenForRole(pathRole);
+          sessionStorage.setItem('nagarsetu_token', genToken);
+          return parsed;
+        }
+      } catch (e) {}
+    }
+
+    const defaultUser = DEFAULT_ROLE_USERS[pathRole];
+    if (defaultUser) {
+      sessionStorage.setItem('nagarsetu_user', JSON.stringify(defaultUser));
+      sessionStorage.setItem('nagarsetu_token', getDemoTokenForRole(pathRole));
+      return defaultUser;
+    }
+  }
+
+  // 3. For public / non-role pages, check general localStorage
+  const generalUserRaw = localStorage.getItem('nagarsetu_user');
+  if (generalUserRaw) {
+    try {
+      const parsed = JSON.parse(generalUserRaw);
+      if (parsed && parsed.role && parsed.id) {
+        sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+        return parsed;
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    return resolveInitialUser();
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    return !resolveInitialUser();
+  });
 
   // Sync Supabase Auth state changes safely
   useEffect(() => {
@@ -266,7 +338,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     async function checkCurrentSession() {
       // 1. Authoritative Backend Database Session Check
-      const storedToken = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+      const storedToken = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
       if (storedToken) {
         try {
           const res = await fetch(`${getApiUrl()}/api/auth/me`, {
@@ -294,17 +366,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 language_pref: u.language_pref || 'en'
               };
               setUser(authenticatedUser);
+              sessionStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+              sessionStorage.setItem('nagarsetu_token', storedToken);
               localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+              localStorage.setItem(`nagarsetu_user_${authenticatedUser.role}`, JSON.stringify(authenticatedUser));
+              localStorage.setItem(`nagarsetu_token_${authenticatedUser.role}`, storedToken);
               if (isMounted) setLoading(false);
               clearTimeout(safetyTimer);
               return;
             }
           } else if (res.status === 401 || res.status === 403 || res.status === 404) {
             if (!isSupabaseConfigured()) {
-              localStorage.removeItem('nagarsetu_token');
-              localStorage.removeItem('nagarsetu_user');
               sessionStorage.removeItem('nagarsetu_token');
               sessionStorage.removeItem('nagarsetu_user');
+              localStorage.removeItem('nagarsetu_token');
+              localStorage.removeItem('nagarsetu_user');
               if (isMounted) setUser(null);
             }
           }
@@ -389,9 +465,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return fetchedUser;
             });
             if (session.access_token) {
+              sessionStorage.setItem('nagarsetu_token', session.access_token);
               localStorage.setItem('nagarsetu_token', session.access_token);
+              localStorage.setItem(`nagarsetu_token_${fetchedUser.role}`, session.access_token);
             }
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
             localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
+            localStorage.setItem(`nagarsetu_user_${fetchedUser.role}`, JSON.stringify(fetchedUser));
           }
         }
       } catch (err) {
@@ -472,9 +552,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return updatedUser;
           });
           if (session?.access_token) {
+            sessionStorage.setItem('nagarsetu_token', session.access_token);
             localStorage.setItem('nagarsetu_token', session.access_token);
+            localStorage.setItem(`nagarsetu_token_${updatedUser.role}`, session.access_token);
           }
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
           localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+          localStorage.setItem(`nagarsetu_user_${updatedUser.role}`, JSON.stringify(updatedUser));
         }
       });
       authSubscription = res?.data?.subscription;
@@ -482,17 +566,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('onAuthStateChange setup note:', e);
     }
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'nagarsetu_token' || e.key === 'nagarsetu_user') {
-        checkCurrentSession();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
-      window.removeEventListener('storage', handleStorageChange);
       if (authSubscription && typeof authSubscription.unsubscribe === 'function') {
         try {
           authSubscription.unsubscribe();
@@ -503,6 +579,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const switchRole = async (newRole: UserRole) => {
     let roleUser = DEFAULT_ROLE_USERS[newRole] || DEFAULT_ROLE_USERS.citizen;
+    const roleSavedRaw = localStorage.getItem(`nagarsetu_user_${newRole}`);
+    if (roleSavedRaw) {
+      try {
+        const parsed = JSON.parse(roleSavedRaw);
+        if (parsed && parsed.role === newRole) roleUser = parsed;
+      } catch (e) {}
+    }
     if (newRole === 'service_staff' && user && user.email) {
       const resolved = findServiceStaffByIdentifier(user.email);
       if (resolved) roleUser = resolved;
@@ -513,7 +596,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setUser(roleUser);
-    localStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
+    sessionStorage.setItem('nagarsetu_user', JSON.stringify(roleUser));
+    const token = localStorage.getItem(`nagarsetu_token_${newRole}`) || getDemoTokenForRole(newRole);
+    sessionStorage.setItem('nagarsetu_token', token);
   };
 
   const login = async (identifier: string, password: string, _targetRole?: UserRole): Promise<boolean> => {
@@ -582,8 +667,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               must_change_password: Boolean(data.user.must_change_password)
             };
             setUser(authenticatedUser);
+            sessionStorage.setItem('nagarsetu_token', data.token);
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
             localStorage.setItem('nagarsetu_token', data.token);
             localStorage.setItem('nagarsetu_user', JSON.stringify(authenticatedUser));
+            localStorage.setItem(`nagarsetu_token_${authenticatedUser.role}`, data.token);
+            localStorage.setItem(`nagarsetu_user_${authenticatedUser.role}`, JSON.stringify(authenticatedUser));
             return true;
           }
         } else {
@@ -686,9 +775,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
           setUser(fetchedUser);
           if (data.session?.access_token) {
+            sessionStorage.setItem('nagarsetu_token', data.session.access_token);
             localStorage.setItem('nagarsetu_token', data.session.access_token);
+            localStorage.setItem(`nagarsetu_token_${resolvedRole}`, data.session.access_token);
           }
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
           localStorage.setItem('nagarsetu_user', JSON.stringify(fetchedUser));
+          localStorage.setItem(`nagarsetu_user_${resolvedRole}`, JSON.stringify(fetchedUser));
           return true;
         }
 
@@ -726,8 +819,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               language_pref: 'en'
             };
             setUser(dhUser);
-            localStorage.setItem('nagarsetu_token', 'demo-token-dept-head');
+            const tok = 'demo-token-dept-head';
+            sessionStorage.setItem('nagarsetu_token', tok);
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+            localStorage.setItem('nagarsetu_token', tok);
             localStorage.setItem('nagarsetu_user', JSON.stringify(dhUser));
+            localStorage.setItem('nagarsetu_token_department_head', tok);
+            localStorage.setItem('nagarsetu_user_department_head', JSON.stringify(dhUser));
             return true;
           }
         } catch (e) {
@@ -768,8 +866,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         setUser(adminUser);
         const tok = await fetchDemoToken('city_admin', 'demo-token-city-admin');
+        sessionStorage.setItem('nagarsetu_token', tok);
+        sessionStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
         localStorage.setItem('nagarsetu_token', tok);
         localStorage.setItem('nagarsetu_user', JSON.stringify(adminUser));
+        localStorage.setItem('nagarsetu_token_city_admin', tok);
+        localStorage.setItem('nagarsetu_user_city_admin', JSON.stringify(adminUser));
         return true;
       }
 
@@ -783,8 +885,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (dhMatch) {
           setUser(dhMatch);
           const tok = await fetchDemoToken('department_head', 'demo-token-dept-head');
+          sessionStorage.setItem('nagarsetu_token', tok);
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
           localStorage.setItem('nagarsetu_token', tok);
           localStorage.setItem('nagarsetu_user', JSON.stringify(dhMatch));
+          localStorage.setItem('nagarsetu_token_department_head', tok);
+          localStorage.setItem('nagarsetu_user_department_head', JSON.stringify(dhMatch));
           return true;
         }
       }
@@ -799,8 +905,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (staffUser) {
           setUser(staffUser);
           const tok = await fetchDemoToken('service_staff', 'demo-token-service-staff');
+          sessionStorage.setItem('nagarsetu_token', tok);
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
           localStorage.setItem('nagarsetu_token', tok);
           localStorage.setItem('nagarsetu_user', JSON.stringify(staffUser));
+          localStorage.setItem('nagarsetu_token_service_staff', tok);
+          localStorage.setItem('nagarsetu_user_service_staff', JSON.stringify(staffUser));
           return true;
         }
       }
@@ -821,8 +931,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         setUser(citizenUser);
         const tok = await fetchDemoToken('citizen', 'demo-token-citizen');
+        sessionStorage.setItem('nagarsetu_token', tok);
+        sessionStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
         localStorage.setItem('nagarsetu_token', tok);
         localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
+        localStorage.setItem('nagarsetu_token_citizen', tok);
+        localStorage.setItem('nagarsetu_user_citizen', JSON.stringify(citizenUser));
         return true;
       }
 
@@ -851,8 +965,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           language_pref: data.user.language_pref || 'en'
         };
         setUser(citizenUser);
+        sessionStorage.setItem('nagarsetu_token', data.token);
+        sessionStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
         localStorage.setItem('nagarsetu_token', data.token);
         localStorage.setItem('nagarsetu_user', JSON.stringify(citizenUser));
+        localStorage.setItem('nagarsetu_token_citizen', data.token);
+        localStorage.setItem('nagarsetu_user_citizen', JSON.stringify(citizenUser));
         return true;
       }
       throw new Error(data.error || 'Invalid OTP code');
@@ -904,8 +1022,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               language_pref: data.user.language_pref || 'en'
             };
             setUser(registeredUser);
+            sessionStorage.setItem('nagarsetu_token', data.token);
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));
             localStorage.setItem('nagarsetu_token', data.token);
             localStorage.setItem('nagarsetu_user', JSON.stringify(registeredUser));
+            localStorage.setItem('nagarsetu_token_citizen', data.token);
+            localStorage.setItem('nagarsetu_user_citizen', JSON.stringify(registeredUser));
             return true;
           }
         } else {
@@ -1015,7 +1137,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setUser(updatedUser);
+      sessionStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
       localStorage.setItem('nagarsetu_user', JSON.stringify(updatedUser));
+      localStorage.setItem(`nagarsetu_user_${updatedUser.role}`, JSON.stringify(updatedUser));
 
       if (isSupabaseConfigured() && user?.id) {
         try {
@@ -1129,7 +1253,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
-        role: user ? user.role : 'citizen',
+        role: user ? user.role : ((typeof window !== 'undefined' ? getRoleFromPath(window.location.pathname) : null) || 'citizen'),
         loading,
         login,
         loginWithOtp,

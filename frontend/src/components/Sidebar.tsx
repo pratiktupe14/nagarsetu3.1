@@ -252,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: t('overviewMenu'),
       items: [
-        { label: t('dashboard'), path: '/admin/portal', icon: Home }
+        { label: t('dashboard'), path: '/admin/dashboard', icon: Home }
       ]
     },
     {
@@ -522,6 +522,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   if (
                     item.path !== '/citizen/portal' &&
+                    item.path !== '/admin/dashboard' &&
                     item.path !== '/admin/portal' &&
                     item.path !== '/staff/portal' &&
                     item.path !== '/staff/tasks' &&

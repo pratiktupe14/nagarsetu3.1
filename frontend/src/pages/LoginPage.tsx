@@ -93,8 +93,12 @@ export const LoginPage: React.FC = () => {
           throw new Error(data.error || 'Invalid OTP code');
         }
         if (data.token && data.user) {
+          sessionStorage.setItem('nagarsetu_token', data.token);
+          sessionStorage.setItem('nagarsetu_user', JSON.stringify(data.user));
           localStorage.setItem('nagarsetu_token', data.token);
           localStorage.setItem('nagarsetu_user', JSON.stringify(data.user));
+          localStorage.setItem('nagarsetu_token_citizen', data.token);
+          localStorage.setItem('nagarsetu_user_citizen', JSON.stringify(data.user));
           navigate('/citizen/portal');
           return;
         } else if (data.needsRegistration) {
@@ -103,7 +107,9 @@ export const LoginPage: React.FC = () => {
         }
       }
 
-      // 1. Clear any stale session data before logging in
+      // 1. Clear any stale session data in this tab before logging in
+      sessionStorage.removeItem('nagarsetu_token');
+      sessionStorage.removeItem('nagarsetu_user');
       localStorage.removeItem('nagarsetu_token');
       localStorage.removeItem('nagarsetu_user');
 
@@ -111,7 +117,7 @@ export const LoginPage: React.FC = () => {
       await login(identifier, password);
 
       // 3. Obtain verified server-side role from authenticated user record
-      const currentUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
+      const currentUser = JSON.parse(sessionStorage.getItem('nagarsetu_user') || localStorage.getItem('nagarsetu_user') || '{}');
       const verifiedRole = currentUser?.role;
 
       if (!verifiedRole) {
@@ -119,7 +125,7 @@ export const LoginPage: React.FC = () => {
       }
 
       // 4. Route strictly based on verified database role:
-      // CITIZEN -> /citizen/portal ONLY, CITY_ADMIN -> /admin/portal ONLY
+      // CITIZEN -> /citizen/portal, CITY_ADMIN -> /admin/dashboard
       const targetPortal = getPortalForRole(verifiedRole);
       navigate(targetPortal);
     } catch (err: any) {

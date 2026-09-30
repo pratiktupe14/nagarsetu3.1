@@ -30,7 +30,7 @@ export const getAiServiceUrl = (): string => {
 };
 
 export const getNoCacheHeaders = (additionalHeaders: Record<string, string> = {}): Record<string, string> => {
-  const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token') || '';
+  const token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token') || '';
   return {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',

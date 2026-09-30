@@ -230,7 +230,7 @@ export function saveOrUpdateMunicipalDepartment(dept: Omit<MunicipalDepartmentRe
 export async function saveMunicipalDepartmentApi(
   dept: Omit<MunicipalDepartmentRecord, 'id' | 'created_at'> & { id?: string }
 ): Promise<MunicipalDepartmentRecord> {
-  const token = localStorage.getItem('nagarsetu_token');
+  const token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -280,7 +280,7 @@ export async function saveMunicipalDepartmentApi(
 }
 
 export async function deleteMunicipalDepartmentApi(id: string): Promise<void> {
-  const token = localStorage.getItem('nagarsetu_token');
+  const token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
   const headers = {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };

@@ -126,7 +126,7 @@ export const TrackComplaintPage: React.FC = () => {
     if (!targetComp) return;
     const lookupKey = targetComp.complaint_number || targetComp.id;
     try {
-      const token = localStorage.getItem('nagarsetu_token');
+      const token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
       const response = await fetch(`${getApiUrl()}/api/complaints/${encodeURIComponent(lookupKey)}/history`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });

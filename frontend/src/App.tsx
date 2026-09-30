@@ -362,7 +362,6 @@ export default function App() {
 
             {/* Citizen Protected Portal Aliases */}
             {[
-              '/citizen/portal',
               '/citizen/dashboard'
             ].map((path) => (
               <Route
@@ -378,8 +377,8 @@ export default function App() {
 
             {/* City Admin Protected Portal Aliases */}
             {[
-              '/admin/portal',
-              '/admin/dashboard'
+              '/admin/dashboard',
+              '/admin/portal'
             ].map((path) => (
               <Route
                 key={path}

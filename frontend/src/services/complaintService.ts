@@ -556,7 +556,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
           targetCitizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
         } else {
           try {
-            const storedUser = JSON.parse(localStorage.getItem('nagarsetu_user') || '{}');
+            const storedUser = JSON.parse(sessionStorage.getItem('nagarsetu_user') || localStorage.getItem('nagarsetu_user') || '{}');
             if (storedUser.id && isValidUuid(storedUser.id)) {
               targetCitizenId = storedUser.id;
             } else {
@@ -707,7 +707,7 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
         query = supabase.from('complaints').select('*').eq('complaint_number', idOrNumber).maybeSingle();
       } else if (idOrNumber === '1' || !isNaN(Number(idOrNumber))) {
         // Numeric / ID 1 fallback: find most recent complaint for user or globally
-        const userStr = localStorage.getItem('nagarsetu_user');
+        const userStr = sessionStorage.getItem('nagarsetu_user') || localStorage.getItem('nagarsetu_user');
         let citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
         if (userStr) {
           try {
@@ -828,14 +828,15 @@ export async function createComplaint(payload: Omit<Complaint, 'id' | 'created_a
       }
     }
 
-    // Fallback: If no token but user profile exists in localStorage, assign demo-token-citizen
+    // Fallback: If no token but user profile exists in storage, assign demo-token-citizen
     if (!token) {
-      const userCached = localStorage.getItem('nagarsetu_user');
+      const userCached = sessionStorage.getItem('nagarsetu_user') || localStorage.getItem('nagarsetu_user');
       if (userCached) {
         try {
           const parsed = JSON.parse(userCached);
           if (parsed?.role === 'citizen') {
             token = 'demo-token-citizen';
+            sessionStorage.setItem('nagarsetu_token', token);
             localStorage.setItem('nagarsetu_token', token);
           }
         } catch (e) {}

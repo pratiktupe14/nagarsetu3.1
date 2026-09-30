@@ -587,7 +587,7 @@ export async function getDepartmentHeads(): Promise<DepartmentLeadershipSummary[
   // Also attempt to fetch staff from Express API
   let apiStaffRecords: any[] = [];
   try {
-    const token = localStorage.getItem('nagarsetu_token');
+    const token = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     const apiStaffRes = await fetch(`${getApiUrl()}/api/department/staff`, { headers });
     if (apiStaffRes.ok) {

@@ -25,8 +25,8 @@ export const Navbar: React.FC = () => {
   const handleRoleSwitch = async (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
     await switchRole(targetRole);
     if (targetRole === 'citizen') navigate('/citizen/portal');
-    if (targetRole === 'city_admin') navigate('/admin/portal');
-    if (targetRole === 'department_head') navigate('/department-head/portal');
+    if (targetRole === 'city_admin') navigate('/admin/dashboard');
+    if (targetRole === 'department_head') navigate('/department/portal');
     if (targetRole === 'service_staff') navigate('/staff/portal');
   };
 
@@ -74,9 +74,9 @@ export const Navbar: React.FC = () => {
 
               {activeRole === 'city_admin' && (
                 <Link
-                  to="/admin/portal"
+                  to="/admin/dashboard"
                   className={`transition-colors ${
-                    location.pathname === '/admin/portal'
+                    location.pathname === '/admin/dashboard' || location.pathname === '/admin/portal'
                       ? 'text-emerald-700 font-extrabold'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
