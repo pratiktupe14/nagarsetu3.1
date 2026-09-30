@@ -75,7 +75,7 @@ const MARKER_COLORS: Record<string, string> = {
   'Resolution Submitted': '#7c3aed',
   Resolved: '#059669',
   Reopened: '#ea580c',
-  Critical: '#e11d48'
+  Critical: '#dc2626'
 };
 
 const DENSITY_COLORS: Record<string, { fill: string; border: string; radius: number }> = {

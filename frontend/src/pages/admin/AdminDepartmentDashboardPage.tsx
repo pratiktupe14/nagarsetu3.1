@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
-import { PriorityBadge } from '../../components/PriorityBadge';
+import { PriorityBadge, getPriorityConfig } from '../../components/PriorityBadge';
 import { getAllComplaints } from '../../services/complaintService';
 import {
   fetchDepartmentStaffApi,
@@ -40,19 +40,9 @@ L.Icon.Default.mergeOptions({
 
 // Custom DivIcon generator for priority-based map markers
 const createCustomMapMarkerIcon = (priority: string) => {
-  let bgColor = '#059669'; // Emerald Low
-  let pulseColor = '#10b981';
-
-  if (priority === 'Critical') {
-    bgColor = '#e11d48'; // Rose Critical
-    pulseColor = '#f43f5e';
-  } else if (priority === 'High') {
-    bgColor = '#ea580c'; // Orange High
-    pulseColor = '#fb923c';
-  } else if (priority === 'Medium') {
-    bgColor = '#d97706'; // Amber Medium
-    pulseColor = '#f59e0b';
-  }
+  const pConfig = getPriorityConfig(priority);
+  const bgColor = pConfig.hex;
+  const pulseColor = pConfig.pulseHex;
 
   const svgHtml = `
     <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">

@@ -380,9 +380,9 @@ export const StaffOverdueTasksPage: React.FC = () => {
             <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block font-outfit">Critical</span>
             <span className="text-xl font-extrabold text-rose-800 font-mono block">{metrics.criticalCount}</span>
           </div>
-          <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
-            <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
-            <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
+          <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-center">
+            <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block font-outfit">High Priority</span>
+            <span className="text-xl font-extrabold text-orange-900 font-mono block">{metrics.highCount}</span>
           </div>
           <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-center">
             <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block font-outfit">SLA Breached</span>

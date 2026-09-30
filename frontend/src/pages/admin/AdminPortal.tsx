@@ -692,7 +692,10 @@ export const AdminPortal: React.FC = () => {
                     </span>
                   </div>
                   <p className="font-semibold text-gray-900">{t('aiDetectedCategory')} {translateCategory(selectedComplaint.category)} (94% Confidence)</p>
-                  <p className="text-[11px] text-amber-800">{t('recommendedPriority')}: {translatePriority(selectedComplaint.priority)}</p>
+                  <div className="flex items-center space-x-1.5 text-[11px] text-gray-700 pt-0.5">
+                    <span className="font-semibold">{t('recommendedPriority')}:</span>
+                    <PriorityBadge priority={selectedComplaint.priority} />
+                  </div>
                 </div>
 
                 <div>

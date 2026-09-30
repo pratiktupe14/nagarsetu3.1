@@ -361,12 +361,12 @@ export const StaffNewTasksPage: React.FC = () => {
             onClick={() => setMetricFilter('High')}
             className={`p-3.5 rounded-xl border text-center transition-all min-h-[72px] ${
               metricFilter === 'High'
-                ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-500/20 shadow-xs'
-                : 'bg-purple-50 border-purple-200 hover:bg-purple-100/60'
+                ? 'bg-orange-100 border-orange-400 ring-2 ring-orange-500/20 shadow-xs'
+                : 'bg-orange-50 border-orange-200 hover:bg-orange-100/60'
             }`}
           >
-            <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider block font-outfit">High Priority</span>
-            <span className="text-xl font-extrabold text-purple-950 font-mono block">{newMetrics.highCount}</span>
+            <span className="text-[10px] font-bold text-orange-800 uppercase tracking-wider block font-outfit">High Priority</span>
+            <span className="text-xl font-extrabold text-orange-950 font-mono block">{newMetrics.highCount}</span>
           </button>
 
           <button

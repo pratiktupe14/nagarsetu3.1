@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getDepartments } from '../../services/departmentService';
 import { DashboardLayout } from '../../components/DashboardLayout';
+import { PriorityBadge } from '../../components/PriorityBadge';
 import {
   getDepartmentHeadAnnouncements,
   getAdminAnnouncements,
@@ -387,15 +388,7 @@ export const AnnouncementsWorkspacePage: React.FC = () => {
                   <div className="space-y-2.5">
                     {/* CARD HEADER BADGES */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-                        ann.priority === 'Critical'
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                          : ann.priority === 'High'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      }`}>
-                        {ann.priority} Priority
-                      </span>
+                      <PriorityBadge priority={ann.priority} />
 
                       <div className="flex items-center space-x-1">
                         {isUnread && (

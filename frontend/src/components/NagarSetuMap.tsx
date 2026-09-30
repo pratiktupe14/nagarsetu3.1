@@ -31,7 +31,7 @@ export const DEFAULT_NAGARSETU_CENTER: LatLng = { lat: 20.0059, lng: 73.7898 };
 
 function getStatusPinColors(status?: string, priority?: string): { background: string; borderColor: string; glyphColor: string } {
   if (priority === 'Critical') {
-    return { background: '#e11d48', borderColor: '#881337', glyphColor: '#ffffff' };
+    return { background: '#dc2626', borderColor: '#991b1b', glyphColor: '#ffffff' };
   }
   switch (status) {
     case 'Resolved':

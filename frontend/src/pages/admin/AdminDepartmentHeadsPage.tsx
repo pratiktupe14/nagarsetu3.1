@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '../../components/DashboardLayout';
+import { PriorityBadge } from '../../components/PriorityBadge';
 import {
   getDepartmentHeads,
   createDepartmentHead,
@@ -1537,13 +1538,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                            comp.priority === 'Critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                            comp.priority === 'High' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
-                            'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}>
-                            {comp.priority || 'Normal'} Priority
-                          </span>
+                          <PriorityBadge priority={comp.priority} />
 
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                             comp.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
@@ -1630,13 +1625,7 @@ export const AdminDepartmentHeadsPage: React.FC = () => {
 
               {/* BADGES & PRIORITY */}
               <div className="flex items-center space-x-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                  viewComplaintDetailModal.priority === 'Critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                  viewComplaintDetailModal.priority === 'High' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
-                  'bg-amber-100 text-amber-800 border border-amber-200'
-                }`}>
-                  {viewComplaintDetailModal.priority || 'Normal'} Priority
-                </span>
+                <PriorityBadge priority={viewComplaintDetailModal.priority} />
 
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                   viewComplaintDetailModal.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :

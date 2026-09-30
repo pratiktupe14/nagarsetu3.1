@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
+import { PriorityBadge } from '../../components/PriorityBadge';
 import {
   resolveIssueLocation,
   findDuplicateComplaints,
@@ -1204,7 +1205,7 @@ export const ReportIssuePage: React.FC = () => {
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-emerald-800 font-outfit">{t('category')}: {translateCategory(category)}</span>
-                <span className="font-extrabold text-gray-900">{t('priority')}: {translatePriority(priority)}</span>
+                <PriorityBadge priority={priority} />
               </div>
 
               <div>

@@ -38,7 +38,7 @@ const userLocationIcon = createDotIcon('#059669', true);
 const blueIcon = createDotIcon('#2563eb');
 const amberIcon = createDotIcon('#d97706');
 const greenIcon = createDotIcon('#10b981');
-const roseIcon = createDotIcon('#e11d48');
+const roseIcon = createDotIcon('#dc2626');
 const orangeIcon = createDotIcon('#f97316');
 
 function getComplaintMarkerIcon(complaint: Complaint) {

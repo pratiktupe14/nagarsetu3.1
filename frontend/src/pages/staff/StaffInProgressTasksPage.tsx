@@ -385,9 +385,9 @@ export const StaffInProgressTasksPage: React.FC = () => {
             <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block font-outfit">Total In Progress</span>
             <span className="text-xl font-extrabold text-amber-900 font-mono block">{metrics.totalActive}</span>
           </div>
-          <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-xl text-center">
-            <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block font-outfit">High Priority</span>
-            <span className="text-xl font-extrabold text-purple-900 font-mono block">{metrics.highCount}</span>
+          <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-center">
+            <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block font-outfit">High Priority</span>
+            <span className="text-xl font-extrabold text-orange-900 font-mono block">{metrics.highCount}</span>
           </div>
           <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
             <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block font-outfit">Due Today</span>

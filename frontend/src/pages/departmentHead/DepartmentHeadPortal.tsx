@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
-import { PriorityBadge } from '../../components/PriorityBadge';
+import { PriorityBadge, getPriorityConfig } from '../../components/PriorityBadge';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { DepartmentHeadAnnouncements } from '../../components/DepartmentHeadAnnouncements';
 import {
@@ -53,19 +53,9 @@ L.Icon.Default.mergeOptions({
 
 // Custom DivIcon generator for priority-based map markers
 const createCustomMapMarkerIcon = (priority: string) => {
-  let bgColor = '#059669'; // Emerald Low
-  let pulseColor = '#10b981';
-
-  if (priority === 'Critical') {
-    bgColor = '#e11d48'; // Rose Critical
-    pulseColor = '#f43f5e';
-  } else if (priority === 'High') {
-    bgColor = '#ea580c'; // Orange High
-    pulseColor = '#fb923c';
-  } else if (priority === 'Medium') {
-    bgColor = '#d97706'; // Amber Medium
-    pulseColor = '#f59e0b';
-  }
+  const pConfig = getPriorityConfig(priority);
+  const bgColor = pConfig.hex;
+  const pulseColor = pConfig.pulseHex;
 
   const svgHtml = `
     <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">

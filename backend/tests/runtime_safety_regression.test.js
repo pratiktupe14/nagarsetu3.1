@@ -112,4 +112,25 @@ describe('Citizen Portal Runtime Safety Regression Suite', () => {
     assert.ok(myComplaintsContent.includes("typeof c.category === 'string' ? c.category.toLowerCase() : ''"), 'MyComplaintsPage must safe guard category');
     assert.ok(myComplaintsContent.includes("isValidCoordinate(c.latitude, c.longitude)"), 'MyComplaintsPage must check isValidCoordinate before distance calculation');
   });
+
+  test('7. Universal Priority Color System enforces consistent semantic colors and safe normalization', () => {
+    const priorityBadgePath = path.join(__dirname, '../../frontend/src/components/PriorityBadge.tsx');
+    assert.ok(fs.existsSync(priorityBadgePath), 'PriorityBadge.tsx must exist');
+    const badgeContent = fs.readFileSync(priorityBadgePath, 'utf8');
+
+    // Semantic color mappings
+    assert.ok(badgeContent.includes("Critical: {"), 'Critical configuration must be defined');
+    assert.ok(badgeContent.includes("bg-red-50") && badgeContent.includes("text-red-900"), 'Critical must use Red');
+    assert.ok(badgeContent.includes("High: {"), 'High configuration must be defined');
+    assert.ok(badgeContent.includes("bg-orange-50") && badgeContent.includes("text-orange-900"), 'High must use Orange');
+    assert.ok(badgeContent.includes("Medium: {"), 'Medium configuration must be defined');
+    assert.ok(badgeContent.includes("bg-yellow-50") && badgeContent.includes("text-yellow-900"), 'Medium must use Yellow');
+    assert.ok(badgeContent.includes("Low: {"), 'Low configuration must be defined');
+    assert.ok(badgeContent.includes("bg-emerald-50") && badgeContent.includes("text-emerald-800"), 'Low must use Green/Emerald');
+
+    // Safe normalization
+    assert.ok(badgeContent.includes("export function normalizePriority"), 'Must export normalizePriority');
+    assert.ok(badgeContent.includes("export function getPriorityConfig"), 'Must export getPriorityConfig');
+    assert.ok(badgeContent.includes("if (typeof priority !== 'string') return 'Medium';"), 'Must safely default non-strings to Medium');
+  });
 });
