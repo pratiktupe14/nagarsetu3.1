@@ -685,6 +685,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } catch (backendErr: any) {
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal && (backendErr?.message?.includes('fetch') || backendErr?.message?.includes('Failed to fetch') || backendErr?.message?.includes('NetworkError'))) {
+          throw new Error(`Cannot connect to NagarSetu backend server (${getApiUrl()}). Please make sure your backend is running.`);
+        }
         if (backendErr && backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('Failed to fetch')) {
           throw backendErr;
         }
