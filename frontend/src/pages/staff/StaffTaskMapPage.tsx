@@ -983,13 +983,12 @@ export const StaffTaskMapPage: React.FC = () => {
 
                   <div>
                     <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
-                    {detailModalTask.photo_after_url || photoAfterPreview ? (
+                    {photoAfterPreview || detailModalTask.photo_after_url ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
                         <img
-                          src={getValidImageUrl(detailModalTask.photo_after_url || photoAfterPreview)}
+                          src={getValidImageUrl(photoAfterPreview || detailModalTask.photo_after_url)}
                           alt="Proof"
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                          className="w-full h-full object-cover font-mono text-xs text-gray-500"
                         />
                         {detailModalTask.status !== 'Resolved' && (
                           <button

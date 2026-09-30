@@ -64,11 +64,15 @@ async function seedServiceStaff() {
   // Build dynamic department mapping
   const deptsRes = await query(`SELECT id, name FROM departments`);
   const deptMap = {};
-  for (const def of SERVICE_STAFF_DEFINITIONS) {
-    const dMatch = deptsRes.rows.find(d => d.name.toLowerCase().includes(def.search.toLowerCase()));
-    if (dMatch) {
-      deptMap[def.deptCode] = dMatch.id;
-    }
+  for (const d of (deptsRes.rows || [])) {
+    const n = (d.name || '').toLowerCase();
+    if (n.includes('public works') || n.includes('pwd')) deptMap['PWD'] = d.id;
+    else if (n.includes('sanitat') || n.includes('waste')) deptMap['SAN'] = d.id;
+    else if (n.includes('water')) deptMap['WTR'] = d.id;
+    else if (n.includes('drain') || n.includes('sewag')) deptMap['DRN'] = d.id;
+    else if (n.includes('electr') || n.includes('light')) deptMap['ELE'] = d.id;
+    else if (n.includes('traffic')) deptMap['TRF'] = d.id;
+    else if (n.includes('maint')) deptMap['MNT'] = d.id;
   }
 
   const salt = await bcrypt.genSalt(10);

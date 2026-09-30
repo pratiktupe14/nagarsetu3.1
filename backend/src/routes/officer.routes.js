@@ -71,7 +71,7 @@ router.get('/dashboard', validateInput(officerDashboardSchema), async (req, res)
 // Get available field staff for assignment (Only Active staff of user's department)
 router.get('/staff-list', async (req, res) => {
   try {
-    let sql = `SELECT id, name, mobile, email, employee_id, designation FROM users WHERE (role = 'service_staff' OR role = 'staff') AND LOWER(COALESCE(status, 'active')) = 'active'`;
+    let sql = `SELECT id, name, mobile, email, employee_id, department_id, designation FROM users WHERE (role = 'service_staff' OR role = 'staff') AND LOWER(COALESCE(status, 'active')) = 'active'`;
     const params = [];
 
     if (req.user.role === 'department_head') {

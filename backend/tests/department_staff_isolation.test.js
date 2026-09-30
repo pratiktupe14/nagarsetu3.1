@@ -32,6 +32,16 @@ describe('Department Head Staff Isolation & Security Suite', () => {
     department_name: 'Sanitation & Solid Waste Management'
   });
 
+  const wtrHeadToken = generateToken({
+    id: 13,
+    name: 'Vikram Patil',
+    email: 'vikram.patil@nagarsetu.gov.in',
+    role: 'department_head',
+    department_id: 3,
+    department_code: 'WTR',
+    department_name: 'Water Supply & Sewerage Board'
+  });
+
   const cityAdminToken = generateToken({
     id: 1,
     name: 'City Admin',
@@ -129,6 +139,23 @@ describe('Department Head Staff Isolation & Security Suite', () => {
     for (const staff of data.staff) {
       const isSan = staff.employee_id.startsWith('SAN-STF') || String(staff.department_id) === '2';
       assert.ok(isSan, `Staff ${staff.name} (${staff.employee_id}) must belong to Sanitation`);
+      assert.ok(!staff.employee_id.startsWith('PWD-STF'), `PWD staff must not be present`);
+    }
+  });
+
+  test('3b. Department Head (Water WTR) receives ONLY Water staff and NO PWD staff', async () => {
+    const res = await fetch(`${baseUrl}/api/department/staff`, {
+      headers: { Authorization: `Bearer ${wtrHeadToken}` }
+    });
+
+    assert.strictEqual(res.status, 200, 'Should return HTTP 200');
+    const data = await res.json();
+    assert.ok(Array.isArray(data.staff), 'Should return staff array');
+    assert.strictEqual(data.staff.length, 5, 'Water department should have exactly 5 staff members');
+
+    for (const staff of data.staff) {
+      const isWtr = staff.employee_id.startsWith('WTR-STF') || String(staff.department_id) === '3';
+      assert.ok(isWtr, `Staff ${staff.name} (${staff.employee_id}) must belong to Water WTR`);
       assert.ok(!staff.employee_id.startsWith('PWD-STF'), `PWD staff must not be present`);
     }
   });

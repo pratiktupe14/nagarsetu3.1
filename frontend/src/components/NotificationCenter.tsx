@@ -12,6 +12,7 @@ import {
   Bell, Check, CheckCheck, Clock, ShieldCheck, AlertTriangle, FileText,
   Wrench, CheckCircle2, RotateCcw, Zap, ExternalLink
 } from 'lucide-react';
+import { formatPortalTime } from '../utils/dateUtils';
 
 const NOTIFICATION_ICONS: Record<NotificationType, { icon: React.ReactNode; color: string }> = {
   submitted: { icon: <FileText className="w-4 h-4 text-blue-600" />, color: 'bg-blue-50 border-blue-200' },
@@ -205,7 +206,7 @@ export const NotificationCenter: React.FC = () => {
                       <p className="text-gray-600 leading-snug text-[11px] line-clamp-2">{n.message}</p>
 
                       <div className="flex items-center justify-between pt-1 text-[10px] text-gray-400 font-mono">
-                        <span>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{formatPortalTime(n.created_at)}</span>
 
                         {!n.is_read && (
                           <button

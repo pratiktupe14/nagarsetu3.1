@@ -46,12 +46,12 @@ export const getValidImageUrl = (url?: string | null): string => {
 
   if (!url || typeof url !== 'string') return getDefault();
   const trimmed = url.trim();
-  if (!trimmed || trimmed === '' || trimmed === 'undefined' || trimmed === 'null' || trimmed.startsWith('blob:')) {
+  if (!trimmed || trimmed === '' || trimmed === 'undefined' || trimmed === 'null') {
     return getDefault();
   }
   
-  // Full HTTP/HTTPS URLs or Base64 Data URIs
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/')) {
+  // Full HTTP/HTTPS URLs, Base64 Data URIs, or local blob URLs (from URL.createObjectURL)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
     return trimmed;
   }
   

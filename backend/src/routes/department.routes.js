@@ -41,34 +41,41 @@ function getCanonicalDepartment(val) {
   ) {
     return { id: 3, code: 'WTR', name: 'Water Supply & Sewerage Board', uuid: 'ead370cc-459c-44f0-899f-8a97f0928beb' };
   }
-  // 4. ELE (ID 4 in SQLite DB)
+  // 4. DRN
   if (
-    s === '4' || s === 'ele' || s === 'dept-ele' || s === 'dept-4' || s === 'dept-5' ||
-    s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('streetlight') || s.includes('31842723')
-  ) {
-    return { id: 4, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
-  }
-  // 5. TRF (ID 5 in SQLite DB)
-  if (
-    s === '5' || s === 'trf' || s === 'dept-trf' || s === 'dept-5' || s === 'dept-6' ||
-    s.includes('trf') || s.includes('traffic') || s.includes('signal') || s.includes('ae5e4d0c')
-  ) {
-    return { id: 5, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
-  }
-  // 6. MNT (ID 6 in SQLite DB)
-  if (
-    s === '6' || s === 'mnt' || s === 'dept-mnt' || s === 'dept-6' || s === 'dept-7' ||
-    s.includes('mnt') || s.includes('maint') || s.includes('facility') || s.includes('park') || s.includes('71542723')
-  ) {
-    return { id: 6, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
-  }
-  // 7. DRN (ID 7 in SQLite DB)
-  if (
-    s === '7' || s === 'drn' || s === 'dept-drn' || s === 'dept-7' ||
+    s === 'drn' || s === 'dept-drn' ||
     s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('sewer') || s.includes('gutter') || s.includes('ee73cb82')
   ) {
-    return { id: 7, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
+    return { id: 4, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
   }
+  // 5. ELE
+  if (
+    s === 'ele' || s === 'dept-ele' ||
+    s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('streetlight') || s.includes('31842723')
+  ) {
+    return { id: 5, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
+  }
+  // 6. TRF
+  if (
+    s === 'trf' || s === 'tra' || s === 'dept-trf' || s === 'dept-tra' ||
+    s.includes('trf') || s.includes('tra') || s.includes('traffic') || s.includes('signal') || s.includes('ae5e4d0c')
+  ) {
+    return { id: 6, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
+  }
+  // 7. MNT
+  if (
+    s === 'mnt' || s === 'dept-mnt' ||
+    s.includes('mnt') || s.includes('maint') || s.includes('facility') || s.includes('park') || s.includes('71542723')
+  ) {
+    return { id: 7, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
+  }
+
+  // Handle direct numeric IDs
+  if (s === '4') return { id: 4, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
+  if (s === '5') return { id: 5, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
+  if (s === '6') return { id: 6, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
+  if (s === '7') return { id: 7, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
+
   return null;
 }
 
@@ -87,17 +94,15 @@ function staffMatchesDept(staff, targetDept) {
   if (!staff) return false;
 
   const staffDept =
-    getCanonicalDepartment(staff.department_id) ||
+    getCanonicalDepartment(staff.employee_id) ||
     getCanonicalDepartment(staff.department_code) ||
     getCanonicalDepartment(staff.department_name) ||
-    getCanonicalDepartment(staff.department) ||
-    getCanonicalDepartment(staff.category) ||
-    getCanonicalDepartment(staff.employee_id);
+    getCanonicalDepartment(staff.department_id) ||
+    getCanonicalDepartment(staff.department);
 
   if (staffDept && staffDept.code === targetDept.code) return true;
   if (String(staff.department_id) === String(targetDept.id)) return true;
   if (String(staff.department_id) === String(targetDept.uuid)) return true;
-  if (staff.employee_id && String(staff.employee_id).toUpperCase().startsWith(targetDept.code)) return true;
   return false;
 }
 

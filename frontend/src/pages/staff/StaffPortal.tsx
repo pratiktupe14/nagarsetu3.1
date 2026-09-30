@@ -1255,13 +1255,12 @@ export const StaffPortal: React.FC = () => {
 
                   <div>
                     <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
-                    {selectedTask.photo_after_url || photoAfterPreview ? (
+                    {photoAfterPreview || selectedTask.photo_after_url ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
                         <img
-                          src={getValidImageUrl(selectedTask.photo_after_url || photoAfterPreview)}
+                          src={getValidImageUrl(photoAfterPreview || selectedTask.photo_after_url)}
                           alt="Proof"
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
+                          className="w-full h-full object-cover font-mono text-xs text-gray-500"
                         />
                         {selectedTask.status !== 'Resolved' && (
                           <button

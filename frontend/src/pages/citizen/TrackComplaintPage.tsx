@@ -16,6 +16,7 @@ import {
   Clock, Search, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Zap,
   Building2, UserCheck, FileText, Activity, ShieldCheck, Check, Sparkles, MapPin, ChevronRight, User
 } from 'lucide-react';
+import { formatPortalDate, formatPortalDateTime, formatPortalTime } from '../../utils/dateUtils';
 
 interface TimelineStep {
   key: string;
@@ -401,14 +402,14 @@ export const TrackComplaintPage: React.FC = () => {
                   <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Reported On</span>
                     <span className="font-mono text-[10px] text-gray-700 block">
-                      {new Date(activeComplaint.created_at).toLocaleDateString()}
+                      {formatPortalDate(activeComplaint.created_at)}
                     </span>
                   </div>
 
                   <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Last Updated</span>
                     <span className="font-mono text-[10px] text-gray-700 block">
-                      {new Date(activeComplaint.updated_at).toLocaleTimeString()}
+                      {formatPortalDateTime(activeComplaint.updated_at || activeComplaint.created_at)}
                     </span>
                   </div>
                 </div>
@@ -516,7 +517,7 @@ export const TrackComplaintPage: React.FC = () => {
                       <div key={log.id || index} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-bold text-gray-900">{log.updated_by || 'Officer'}</span>
-                          <span className="font-mono text-[10px] text-gray-400">{new Date(log.created_at).toLocaleTimeString()}</span>
+                          <span className="font-mono text-[10px] text-gray-400">{formatPortalTime(log.created_at)}</span>
                         </div>
                         {log.remark && (
                           <p className="text-[11px] text-gray-700 italic bg-white p-2 rounded-lg border border-gray-100">

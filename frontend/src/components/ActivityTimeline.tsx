@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchComplaintActivityLogs } from '../services/adminService';
 import { ComplaintActivityLog } from '../types/database.types';
 import { Clock } from 'lucide-react';
+import { formatPortalDateTime } from '../utils/dateUtils';
 
 export const ActivityTimeline: React.FC<{ complaintId: string }> = ({ complaintId }) => {
   const [logs, setLogs] = useState<ComplaintActivityLog[]>([]);
@@ -47,7 +48,7 @@ export const ActivityTimeline: React.FC<{ complaintId: string }> = ({ complaintI
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-gray-900">{log.action}</span>
                   <span className="text-[10px] text-gray-400 font-mono">
-                    {new Date(log.created_at).toLocaleString()}
+                    {formatPortalDateTime(log.created_at, true)}
                   </span>
                 </div>
                 

@@ -17,6 +17,7 @@ import {
   PlusCircle, Search, Filter, Clock, ArrowRight, ShieldCheck, FileText,
   AlertTriangle, CheckCircle2, RotateCcw, Star, Calendar, Building2, MapPin, RefreshCw, Navigation, Compass
 } from 'lucide-react';
+import { formatPortalDate, formatPortalDateTime, formatPortalTime } from '../../utils/dateUtils';
 
 const STAGES = [
   'Submitted',
@@ -567,7 +568,7 @@ export const MyComplaintsPage: React.FC = () => {
                           <Calendar className="w-3.5 h-3.5 text-gray-400" />
                           <span>Submitted:</span>
                         </span>
-                        <span className="font-mono text-[11px] font-bold text-gray-800">{new Date(c.created_at).toLocaleDateString()}</span>
+                        <span className="font-mono text-[11px] font-bold text-gray-800">{formatPortalDate(c.created_at)}</span>
                       </div>
                     </div>
 
@@ -628,7 +629,7 @@ export const MyComplaintsPage: React.FC = () => {
                             <span>✓ Resolved</span>
                           </span>
                           <span className="font-mono text-[10px] text-emerald-800">
-                            {new Date(c.updated_at || c.created_at).toLocaleDateString()}
+                            {formatPortalDateTime(c.updated_at || c.created_at)}
                           </span>
                         </div>
 

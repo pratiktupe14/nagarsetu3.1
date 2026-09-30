@@ -12,6 +12,7 @@ import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, Clock } from 'lucide-react';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+import { formatPortalDateTime, formatPortalDate, formatPortalTime } from '../../utils/dateUtils';
 
 function formatResponseTimeLabel(hours?: number, deadline?: string, createdAt?: string): string {
   if (hours) {
@@ -212,7 +213,7 @@ export const ComplaintDetailPage: React.FC = () => {
             </div>
 
             <div className="text-right text-xs text-gray-500 font-mono">
-              <span>Submitted: {new Date(complaint.created_at).toLocaleString()}</span>
+              <span>Submitted: {formatPortalDateTime(complaint.created_at)}</span>
             </div>
           </div>
 

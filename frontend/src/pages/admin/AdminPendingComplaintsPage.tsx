@@ -18,6 +18,7 @@ import {
   Search, Download, ArrowUpDown, RefreshCw, AlertTriangle,
   Building2, Users, MapPin, Sparkles, Maximize2, ExternalLink, ShieldCheck, Clock
 } from 'lucide-react';
+import { formatPortalDate, formatPortalDateTime, formatPortalTime } from '../../utils/dateUtils';
 
 const DEPARTMENT_OPTIONS = [
   'Roads & Public Works',
@@ -432,7 +433,7 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                           {c.department_name || 'Public Works'}
                         </td>
                         <td className="p-3.5 text-gray-500 font-mono whitespace-nowrap">
-                          {new Date(c.created_at).toLocaleDateString()}
+                          {formatPortalDate(c.created_at)}
                         </td>
                         <td className={`p-3.5 font-mono text-[11px] font-bold whitespace-nowrap ${slaInfo.isOverdue ? 'text-rose-700' : hoursLeft <= 6 ? 'text-amber-800' : 'text-gray-600'}`}>
                           {slaInfo.text}
@@ -642,7 +643,7 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                     <div><span className="text-gray-500 block">Category:</span> <strong>{selectedComplaint.category}</strong></div>
                     <div><span className="text-gray-500 block">Priority:</span> <strong>{selectedComplaint.priority}</strong></div>
                     <div><span className="text-gray-500 block">Department:</span> <strong>{selectedComplaint.department_name || 'Public Works'}</strong></div>
-                    <div><span className="text-gray-500 block">Reported Date:</span> <strong>{new Date(selectedComplaint.created_at).toLocaleString()}</strong></div>
+                    <div><span className="text-gray-500 block">Reported Date:</span> <strong>{formatPortalDateTime(selectedComplaint.created_at)}</strong></div>
                   </div>
                 </div>
 
