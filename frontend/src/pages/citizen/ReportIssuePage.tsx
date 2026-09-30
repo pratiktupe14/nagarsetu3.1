@@ -84,6 +84,7 @@ export const ReportIssuePage: React.FC = () => {
   // Duplicate Check & UI Modal States
   const [nearbyDuplicates, setNearbyDuplicates] = useState<Array<{ complaint: any; distanceMeters: number }>>([]);
   const [showLocationPickerModal, setShowLocationPickerModal] = useState<boolean>(false);
+  const [showLocationPromptModal, setShowLocationPromptModal] = useState<boolean>(false);
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [draftSavedToast, setDraftSavedToast] = useState<boolean>(false);
@@ -91,7 +92,7 @@ export const ReportIssuePage: React.FC = () => {
   // Initial AI Health & Location Check & Resume Offline Draft if present
   React.useEffect(() => {
     checkAiHealth().then(setAiHealth).catch(() => setAiHealth({ reachable: false, configured: false, model: 'Offline' }));
-    requestFreshLocation();
+    requestFreshLocation(false);
 
     try {
       const drafts = getOfflineDrafts();
@@ -112,9 +113,24 @@ export const ReportIssuePage: React.FC = () => {
     } catch (e) {}
   }, []);
 
-  // Request Fresh Live GPS Location
-  const requestFreshLocation = async () => {
+  // Request Fresh Live GPS Location & Check whether browser/device location is enabled
+  const requestFreshLocation = async (isUserAction: boolean = false) => {
     setDetectingLocation(true);
+
+    // Fast-path permission check via navigator.permissions if supported
+    if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
+      try {
+        const permStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        if (permStatus.state === 'denied') {
+          setDetectingLocation(false);
+          setShowLocationPromptModal(true);
+          return false;
+        }
+      } catch {
+        // Fall back directly to requestFreshGpsLocation
+      }
+    }
+
     try {
       const gps = await requestFreshGpsLocation();
       if (gps && gps.latitude && gps.longitude) {
@@ -123,13 +139,21 @@ export const ReportIssuePage: React.FC = () => {
         setLocationAccuracy(gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10);
         setLocationSource('live_gps');
         setLocationStatusText(`Verified Live GPS Location (±${gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10}m accuracy)`);
+        setShowLocationPromptModal(false);
         runDuplicateCheck(gps.latitude, gps.longitude);
 
         const addr = await reverseGeocodeCoordinates(gps.latitude, gps.longitude);
         if (addr) setLocationAddress(addr);
+        return true;
+      } else {
+        // Location permission is disabled or location cannot be accessed
+        setShowLocationPromptModal(true);
+        return false;
       }
     } catch (e) {
-      console.warn('GPS detection failed, fallback to Nashik Center pin');
+      console.warn('GPS detection failed:', e);
+      setShowLocationPromptModal(true);
+      return false;
     } finally {
       setDetectingLocation(false);
     }
@@ -781,7 +805,7 @@ export const ReportIssuePage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={requestFreshLocation}
+                  onClick={() => requestFreshLocation(true)}
                   disabled={detectingLocation}
                   className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs border border-emerald-200 flex items-center space-x-1 min-h-[36px] cursor-pointer"
                 >
@@ -1021,6 +1045,65 @@ export const ReportIssuePage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* TURN ON YOUR LOCATION POPUP MODAL */}
+      {showLocationPromptModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="turn-on-location-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs font-sans"
+        >
+          <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-7 border border-gray-200 shadow-2xl space-y-5 text-center my-auto animate-in fade-in zoom-in-95 duration-200">
+            {/* Location Icon Badge */}
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+              <MapPin className="w-8 h-8" />
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-2">
+              <h3 id="turn-on-location-title" className="text-xl font-extrabold text-gray-900 font-outfit">
+                Turn On Your Location
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Please turn on your device location to report a complaint. Location is required to accurately identify the complaint location.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                id="btn-turn-on-location"
+                onClick={() => requestFreshLocation(true)}
+                disabled={detectingLocation}
+                className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs uppercase tracking-wider shadow-md hover:shadow-lg flex items-center justify-center space-x-2 min-h-[48px] cursor-pointer transition-all disabled:opacity-60"
+              >
+                {detectingLocation ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white mr-1.5" />
+                    <span>Detecting Location...</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4 mr-1.5" />
+                    <span>Turn On Location</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                id="btn-cancel-location"
+                onClick={() => setShowLocationPromptModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xs uppercase tracking-wider min-h-[44px] cursor-pointer transition-all"
+              >
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT LOCATION MAP PICKER MODAL */}
       {showLocationPickerModal && (
