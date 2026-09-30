@@ -27,8 +27,8 @@ describe('API URL Resolver Configuration Contract', () => {
   });
 
   test('.env and .env.production must not point to stale backend-zeta-two-60 URL', () => {
-    const prodEnv = fs.readFileSync(envProdPath, 'utf8');
-    const localEnv = fs.readFileSync(envPath, 'utf8');
+    const prodEnv = fs.existsSync(envProdPath) ? fs.readFileSync(envProdPath, 'utf8') : '';
+    const localEnv = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
     assert.strictEqual(
       prodEnv.includes('backend-zeta-two-60.vercel.app'),
       false,

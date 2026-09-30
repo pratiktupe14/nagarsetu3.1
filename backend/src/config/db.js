@@ -450,7 +450,7 @@ function createTablesSqlite() {
       // Seed initial default departments if empty
       sqliteDb.get("SELECT COUNT(*) as count FROM departments", (err, row) => {
         if (!err && row && row.count === 0) {
-          const stmt = sqliteDb.prepare("INSERT INTO departments (id, name, description, code) VALUES (?, ?, ?, ?)");
+          const stmt = sqliteDb.prepare("INSERT OR IGNORE INTO departments (id, name, description, code) VALUES (?, ?, ?, ?)");
           stmt.run(1, "Public Works Department (PWD)", "Road repairs, potholes, and asphalt infrastructure", "PWD");
           stmt.run(2, "Sanitation & Waste Management", "Garbage pickup, trash overflow, and public cleanliness", "SAN");
           stmt.run(3, "Water Supply & Sewerage Board", "Pipeline leakages, drainage overflows, and water supply", "WTR");
