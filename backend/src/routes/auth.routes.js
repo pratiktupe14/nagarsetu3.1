@@ -327,13 +327,23 @@ router.post('/demo-token', (req, res) => {
       deptCode = 'DRN';
     }
 
+    const DEPT_UUID_MAP = {
+      PWD: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
+      SAN: '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
+      WTR: 'ead370cc-459c-44f0-899f-8a97f0928beb',
+      ELE: '31842723-23ac-490b-912b-9f6d9afbdfb3',
+      TRF: 'ae5e4d0c-996f-4d81-9528-d642664c93ae',
+      MNT: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
+      DRN: 'ee73cb82-cc47-4333-b7d6-4491353c1354'
+    };
+
     userObj = {
       id: dhId,
       name: dhName,
       mobile: '+91 982200000' + dhId,
       email: dhEmail,
       role: 'department_head',
-      department_id: deptId,
+      department_id: DEPT_UUID_MAP[deptCode] || deptId,
       department_name: deptName,
       department_code: deptCode,
       employee_id: `DH-${deptCode}-001`,
@@ -346,7 +356,7 @@ router.post('/demo-token', (req, res) => {
       mobile: '9822010001',
       email: 'amit.patil@nagarsetu.gov.in',
       role: 'service_staff',
-      department_id: 1,
+      department_id: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
       department_name: 'Public Works Department (PWD)',
       language_pref: 'en'
     };

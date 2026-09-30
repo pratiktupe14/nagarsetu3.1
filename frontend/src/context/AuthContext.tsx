@@ -201,7 +201,7 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
     mobile: '+91 98220 10001',
     email: 'staff@nagarsetu.gov.in',
     role: 'service_staff',
-    department_id: '1',
+    department_id: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
     department_name: 'Public Works Department (PWD)',
     employee_id: 'PWD-STF-001',
     language_pref: 'en'
@@ -213,7 +213,7 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
     email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
     department_name: 'Public Works Department (PWD)',
-    department_id: '1',
+    department_id: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
     department_code: 'PWD',
     employee_id: 'DH-PWD-001',
     language_pref: 'en'

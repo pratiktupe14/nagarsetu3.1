@@ -99,7 +99,7 @@ const DEMO_USER_TOKENS = {
     mobile: '+91 9822000001',
     email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
-    department_id: 1,
+    department_id: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
     department_name: 'Public Works Department (PWD)',
     department_code: 'PWD',
     language_pref: 'en'
@@ -110,7 +110,7 @@ const DEMO_USER_TOKENS = {
     mobile: '9822010001',
     email: 'amit.patil@nagarsetu.gov.in',
     role: 'service_staff',
-    department_id: 1,
+    department_id: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
     department_name: 'Public Works Department (PWD)',
     language_pref: 'en'
   },

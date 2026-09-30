@@ -482,7 +482,7 @@ CREATE POLICY "Complaints select policy" ON public.complaints
   USING (
     citizen_id = auth.uid()
     OR assigned_staff_id = auth.uid()
-    OR current_user_role() = 'city_admin'
+    OR current_user_role() IN ('city_admin', 'admin')
     OR (current_user_role() = 'department_head' AND department_id = current_user_department())
   );
 
@@ -497,12 +497,12 @@ CREATE POLICY "Complaints insert policy" ON public.complaints
 CREATE POLICY "Complaints update policy" ON public.complaints
   FOR UPDATE TO authenticated
   USING (
-    current_user_role() = 'city_admin'
+    current_user_role() IN ('city_admin', 'admin')
     OR (current_user_role() = 'department_head' AND department_id = current_user_department())
     OR (current_user_role() = 'service_staff' AND assigned_staff_id = auth.uid())
   )
   WITH CHECK (
-    current_user_role() = 'city_admin'
+    current_user_role() IN ('city_admin', 'admin')
     OR (current_user_role() = 'department_head' AND department_id = current_user_department())
     OR (current_user_role() = 'service_staff' AND assigned_staff_id = auth.uid())
   );

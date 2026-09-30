@@ -461,9 +461,11 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
     const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {
       signal: controller.signal,
-      headers: getNoCacheHeaders()
+      headers
     });
     clearTimeout(timeoutId);
     responseStatus = res.status;

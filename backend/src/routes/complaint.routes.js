@@ -241,10 +241,23 @@ const submitComplaintHandler = async (req, res) => {
         resolvedDept = { id: 1, name: 'Public Works Department', code: 'PWD' };
       }
     }
+    const CANONICAL_DEPT_UUIDS = {
+      PWD: '8ed9f760-1314-427c-a515-c2a54d6df6d8',
+      SAN: '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
+      WTR: 'ead370cc-459c-44f0-899f-8a97f0928beb',
+      DRN: 'ee73cb82-cc47-4333-b7d6-4491353c1354',
+      ELE: '31842723-23ac-490b-912b-9f6d9afbdfb3',
+      TRF: 'ae5e4d0c-996f-4d81-9528-d642664c93ae',
+      MNT: '8ed9f760-1314-427c-a515-c2a54d6df6d8'
+    };
 
-    const finalDeptId = resolvedDept.id;
-    const finalDeptName = resolvedDept.name;
-    const finalDeptCode = resolvedDept.code;
+    const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    const finalDeptCode = resolvedDept?.code || deptCode || 'PWD';
+    const finalDeptName = resolvedDept?.name || 'Public Works Department (PWD)';
+    const finalDeptId = isUuid(resolvedDept?.id)
+      ? resolvedDept.id
+      : (CANONICAL_DEPT_UUIDS[finalDeptCode] || '8ed9f760-1314-427c-a515-c2a54d6df6d8');
 
     const finalPhotoUrl = photo_url || photo_front_url || photo_before_url || '/uploads/civic-default.jpg';
     const finalPhotoFront = photo_front_url || finalPhotoUrl;
@@ -513,12 +526,15 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 // Get all complaints for Admin / Portals (Citizens only list their own complaints)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const isCitizen = req.user && req.user.role === 'citizen';
+    const userRole = req.user?.role || 'citizen';
+    const isCitizen = userRole === 'citizen';
+    const isDeptHead = userRole === 'department_head';
+
     let sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
       ${!isCitizen ? ', u.name as citizen_name, u.mobile as citizen_mobile' : ''}
       FROM complaints c
-      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN departments d ON (CAST(c.department_id AS TEXT) = CAST(d.id AS TEXT) OR c.department_id = d.code)
       LEFT JOIN feedback f ON f.complaint_id = c.id
       ${!isCitizen ? 'LEFT JOIN users u ON c.citizen_id = u.id' : ''}
     `;
@@ -526,6 +542,9 @@ router.get('/', authenticateToken, async (req, res) => {
     if (isCitizen) {
       sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
       params.push(req.user.id, String(req.user.id));
+    } else if (isDeptHead && req.user?.department_id) {
+      sql += ` WHERE (c.department_id = ? OR CAST(c.department_id AS TEXT) = ? OR d.id = ? OR CAST(d.id AS TEXT) = ?)`;
+      params.push(req.user.department_id, String(req.user.department_id), req.user.department_id, String(req.user.department_id));
     }
     sql += ` ORDER BY c.created_at DESC`;
     const result = await query(sql, params);
@@ -545,6 +564,8 @@ router.get('/', authenticateToken, async (req, res) => {
 
         if (isCitizen) {
           supaQuery = supaQuery.eq('citizen_id', req.user.id);
+        } else if (isDeptHead && req.user?.department_id) {
+          supaQuery = supaQuery.eq('department_id', req.user.department_id);
         }
 
         const { data, error } = await supaQuery;
