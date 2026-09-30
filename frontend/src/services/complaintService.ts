@@ -226,16 +226,27 @@ export async function getAllComplaints(): Promise<Complaint[]> {
     console.warn('Express backend getAllComplaints fallback:', err);
   }
 
-  // 2. Try Supabase ONLY if Express Backend API was unreachable (responseStatus !== 200)
-  if (responseStatus !== 200 && isSupabaseConfigured()) {
+  // 2. Fallback to or merge Supabase if Express API was unreachable or returned 0 complaints
+  if ((responseStatus !== 200 || list.length === 0) && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('complaints')
         .select('*')
         .order('updated_at', { ascending: false });
 
-      if (!error && data) {
-        list = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+      if (!error && data && data.length > 0) {
+        const supaList = (data as Complaint[]).filter((c) => !isDemoComplaint(c));
+        if (list.length === 0) {
+          list = supaList;
+        } else {
+          const existingIds = new Set(list.map((c) => String(c.id)));
+          const existingNums = new Set(list.map((c) => c.complaint_number));
+          for (const sc of supaList) {
+            if (!existingIds.has(String(sc.id)) && !existingNums.has(sc.complaint_number)) {
+              list.push(sc);
+            }
+          }
+        }
         responseStatus = 200;
       }
     } catch (err) {

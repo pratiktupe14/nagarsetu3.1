@@ -11,7 +11,8 @@ import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { getAllComplaints, reviewResolutionAdmin } from '../../services/complaintService';
 import {
   calculateAdminKPIStats, formatSlaRemainingTime, verifyAndApproveComplaint,
-  changeDepartmentRouting, assignStaffToTask, getDepartmentStaffRoster
+  changeDepartmentRouting, assignStaffToTask, getDepartmentStaffRoster,
+  fetchDepartmentStaffApi
 } from '../../services/adminService';
 import {
   calculateAnalyticsSummary, calculateDepartmentPerformance, calculateStaffPerformanceTable,
@@ -40,6 +41,7 @@ export const AdminPortal: React.FC = () => {
   const { t, lang, changeLanguage, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
   const { toast } = useNotification();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [staffList, setStaffList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Sub-Tabs: 'Triage Queue' | 'Resolution Reviews' | 'Map Center' | 'Analytics & Insights'
@@ -65,8 +67,14 @@ export const AdminPortal: React.FC = () => {
   const loadComplaints = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await getAllComplaints();
+      const [list, staffRes] = await Promise.all([
+        getAllComplaints(),
+        fetchDepartmentStaffApi().catch(() => ({ staff: [], summary: {} as any }))
+      ]);
       setComplaints(list);
+      if (staffRes && Array.isArray(staffRes.staff) && staffRes.staff.length > 0) {
+        setStaffList(staffRes.staff);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -87,7 +95,7 @@ export const AdminPortal: React.FC = () => {
     setEditCategory(c.category || 'Pothole');
     setEditPriority(c.priority);
     setEditDepartment(c.department_name || 'Public Works Department (PWD)');
-    const roster = getDepartmentStaffRoster(c.department_name);
+    const roster = getDepartmentStaffRoster(c.department_name, complaints, staffList.length > 0 ? staffList : undefined);
     if (roster.length > 0) {
       setSelectedStaffId(roster[0].id);
     }
@@ -120,7 +128,7 @@ export const AdminPortal: React.FC = () => {
       toast.warning('Please select a department staff member to assign.');
       return;
     }
-    const roster = getDepartmentStaffRoster(editDepartment);
+    const roster = getDepartmentStaffRoster(editDepartment, complaints, staffList.length > 0 ? staffList : undefined);
     const staff = roster.find((s) => s.id === selectedStaffId) || roster[0];
 
     setSubmittingAction(true);
@@ -158,7 +166,7 @@ export const AdminPortal: React.FC = () => {
   const kpiStats: AdminKPIStats = calculateAdminKPIStats(complaints);
   const analyticsSummary: AnalyticsSummary = calculateAnalyticsSummary(complaints);
   const deptPerformance: DepartmentPerformance[] = calculateDepartmentPerformance(complaints);
-  const staffTable: StaffPerformanceRow[] = calculateStaffPerformanceTable(complaints);
+  const staffTable: StaffPerformanceRow[] = calculateStaffPerformanceTable(complaints, staffList.length > 0 ? staffList : undefined);
   const resolutionReviewsList = complaints.filter((c) => c.status === 'Resolution Submitted');
 
   const filteredComplaints = complaints.filter((c) => {
@@ -177,7 +185,7 @@ export const AdminPortal: React.FC = () => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const currentDepartmentStaffRoster = getDepartmentStaffRoster(editDepartment);
+  const currentDepartmentStaffRoster = getDepartmentStaffRoster(editDepartment, complaints, staffList.length > 0 ? staffList : undefined);
 
   return (
     <DashboardLayout title={t('adminCommandCenter')}>

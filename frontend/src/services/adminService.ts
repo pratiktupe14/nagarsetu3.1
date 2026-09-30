@@ -605,7 +605,152 @@ export interface ServiceStaffMemberRecord {
 
 export const DEMO_SERVICE_STAFF_RECORDS: ServiceStaffMemberRecord[] = [];
 
-const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [];
+const DEFAULT_SERVICE_STAFF: ServiceStaffMemberRecord[] = [
+  {
+    id: '101',
+    name: 'Amit Patil',
+    employee_id: 'PWD-STF-001',
+    department_name: 'Public Works Department (PWD)',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10001',
+    email: 'amit.patil@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '102',
+    name: 'Sagar Jadhav',
+    employee_id: 'PWD-STF-002',
+    department_name: 'Public Works Department (PWD)',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10002',
+    email: 'sagar.jadhav@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '106',
+    name: 'Prashant Mane',
+    employee_id: 'SAN-STF-001',
+    department_name: 'Sanitation & Waste Management',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10006',
+    email: 'prashant.mane@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '107',
+    name: 'Ganesh Chavan',
+    employee_id: 'SAN-STF-002',
+    department_name: 'Sanitation & Waste Management',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10007',
+    email: 'ganesh.chavan@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '111',
+    name: 'Kiran Patil',
+    employee_id: 'WTR-STF-001',
+    department_name: 'Water Supply & Sewerage Board',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10011',
+    email: 'kiran.patil@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '116',
+    name: 'Sunil Patil',
+    employee_id: 'DRN-STF-001',
+    department_name: 'Drainage & Sewage Department',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10016',
+    email: 'sunil.patil@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '121',
+    name: 'Rahul Joshi',
+    employee_id: 'ELE-STF-001',
+    department_name: 'Electrical & Lighting Dept',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10021',
+    email: 'rahul.joshi@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '126',
+    name: 'Rohan Patil',
+    employee_id: 'TRF-STF-001',
+    department_name: 'Traffic Management Dept',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10026',
+    email: 'rohan.patil@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  },
+  {
+    id: '131',
+    name: 'Kunal Patil',
+    employee_id: 'MNT-STF-001',
+    department_name: 'Maintenance Department',
+    role: 'Field Service Staff',
+    status: 'Available',
+    contact_number: '+91 98220 10031',
+    email: 'kunal.patil@nagarsetu.gov.in',
+    ward_area: 'Nashik City',
+    joined_date: new Date(Date.now() - 86400000 * 30).toISOString(),
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    active_tasks: 0,
+    completed_tasks: 0,
+    overdue_tasks: 0
+  }
+];
 
 // In-memory runtime cache for service staff records (PostgreSQL is authoritative source)
 let memoryStaffRecords: ServiceStaffMemberRecord[] = [];
@@ -642,7 +787,7 @@ export function getAllServiceStaffRecords(): ServiceStaffMemberRecord[] {
       .catch((err) => console.warn('Background staff fetch error:', err))
       .finally(() => { isFetchingStaff = false; });
   }
-  return memoryStaffRecords;
+  return memoryStaffRecords.length > 0 ? memoryStaffRecords : DEFAULT_SERVICE_STAFF;
 }
 
 export function setMemoryServiceStaffRecords(staff: ServiceStaffMemberRecord[]) {
@@ -809,8 +954,14 @@ export function saveOrUpdateServiceStaffRecord(staff: Omit<ServiceStaffMemberRec
   return newStaff;
 }
 
-export function getDepartmentStaffRoster(departmentName?: string, complaints: Complaint[] = []): DepartmentStaffMember[] {
-  const allStaff = getAllServiceStaffRecords();
+export function getDepartmentStaffRoster(
+  departmentName?: string,
+  complaints: Complaint[] = [],
+  customStaffList?: any[]
+): DepartmentStaffMember[] {
+  const allStaff = (customStaffList && customStaffList.length > 0)
+    ? customStaffList
+    : getAllServiceStaffRecords();
   const roster: DepartmentStaffMember[] = allStaff.map((s) => {
     const activeTasks = complaints.filter(
       (c) => (c.assigned_staff_id === s.id || c.assigned_staff_id === s.employee_id || (c.assigned_staff_email && c.assigned_staff_email.toLowerCase() === (s.email || '').toLowerCase()) || c.assigned_staff_name === s.name) && c.status !== 'Resolved' && c.status !== 'Rejected'

@@ -576,15 +576,27 @@ async function query(sql, params = []) {
       return runMemQuery(sql, params);
     }
     return new Promise((resolve, reject) => {
-      let sqliteSql = sql.replace(/\$\d+/g, '?');
+      let finalParams = params;
+      let sqliteSql = sql;
+      if (Array.isArray(params) && params.length > 0 && /\$\d+/.test(sql)) {
+        const sqliteParams = [];
+        sqliteSql = sql.replace(/\$(\d+)/g, (_, num) => {
+          const index = parseInt(num, 10) - 1;
+          sqliteParams.push(params[index]);
+          return '?';
+        });
+        finalParams = sqliteParams;
+      } else {
+        sqliteSql = sql.replace(/\$\d+/g, '?');
+      }
       const isSelect = sqliteSql.trim().toUpperCase().startsWith('SELECT');
       if (isSelect) {
-        sqliteDb.all(sqliteSql, params, (err, rows) => {
+        sqliteDb.all(sqliteSql, finalParams, (err, rows) => {
           if (err) return reject(err);
           resolve({ rows });
         });
       } else {
-        sqliteDb.run(sqliteSql, params, function (err) {
+        sqliteDb.run(sqliteSql, finalParams, function (err) {
           if (err) return reject(err);
           resolve({ rows: [{ id: this.lastID }], rowCount: this.changes });
         });
