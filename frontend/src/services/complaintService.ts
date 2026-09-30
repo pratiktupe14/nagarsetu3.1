@@ -451,11 +451,15 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   let responseStatus = 0;
   const startTime = new Date().toISOString();
 
-  // 1. Try Express Backend API first with no-cache headers and scope=all
+  // 1. Try Express Backend API first with no-cache headers and scope=all (with 2000ms timeout)
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${getApiUrl()}/api/complaints?scope=all`, {
+      signal: controller.signal,
       headers: getNoCacheHeaders()
     });
+    clearTimeout(timeoutId);
     responseStatus = res.status;
     if (res.ok) {
       const data = await res.json();
@@ -476,10 +480,12 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   // 2. Fallback to or merge Supabase if Express API was unreachable or returned 0 complaints
   if ((responseStatus !== 200 || list.length === 0) && isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase
+      const supaPromise = supabase
         .from('complaints')
         .select('*')
         .order('updated_at', { ascending: false });
+      const supaTimeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Supabase timeout') }), 2000));
+      const { data, error } = await Promise.race([supaPromise, supaTimeoutPromise]);
 
       if (!error && data && data.length > 0) {
         const supaList = (data as Complaint[])
@@ -517,16 +523,13 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   if (responseStatus === 200) {
     let finalComplaints = list.filter((c) => !isDemoComplaint(c));
 
-    // Audit and repair locations with a non-blocking timeout so dashboard loads instantly
-    try {
-      const repairPromise = auditAndRepairComplaintLocations(finalComplaints);
-      const timeoutPromise = new Promise<{ repairedComplaints: Complaint[] }>((resolve) =>
-        setTimeout(() => resolve({ repairedComplaints: finalComplaints }), 1200)
-      );
-      const { repairedComplaints } = await Promise.race([repairPromise, timeoutPromise]);
-      finalComplaints = repairedComplaints.filter((c) => !isDemoComplaint(c));
-    } catch (e) {
-      console.warn('Location audit skipped or timed out:', e);
+    // Run location audit & Nominatim repair in background so complaint loading is never delayed
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        try {
+          auditAndRepairComplaintLocations(finalComplaints).catch(() => {});
+        } catch (e) {}
+      }, 50);
     }
 
     if (finalComplaints.length === 0) {

@@ -340,17 +340,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let isMounted = true;
 
-    // Safety timeout guard: Force loading to false after 3.5s so app NEVER locks on loading screen
+    // Fast safety timeout guard: Force loading to false after 1200ms so app NEVER locks on loading screen
     const safetyTimer = setTimeout(() => {
       if (isMounted) setLoading(false);
-    }, 3500);
+    }, 1200);
 
     async function checkCurrentSession() {
       // 1. Authoritative Backend Database Session Check
       const storedToken = sessionStorage.getItem('nagarsetu_token') || localStorage.getItem('nagarsetu_token');
       if (storedToken) {
         try {
+          const authController = new AbortController();
+          const authTimeout = setTimeout(() => authController.abort(), 1500);
           const res = await fetch(`${getApiUrl()}/api/auth/me`, {
+            signal: authController.signal,
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache',
@@ -358,6 +361,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               'Authorization': `Bearer ${storedToken}`
             }
           });
+          clearTimeout(authTimeout);
           if (res.ok) {
             const data = await res.json();
             if (data && data.user && isMounted) {
@@ -405,7 +409,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       try {
-        const { data } = await supabase.auth.getSession();
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeoutPromise = new Promise<any>((resolve) => setTimeout(() => resolve({ data: null }), 1500));
+        const { data } = await Promise.race([sessionPromise, sessionTimeoutPromise]);
         const session = data?.session;
         if (session && session.user) {
           const authUser = session.user;

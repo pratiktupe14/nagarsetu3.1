@@ -1,0 +1,41 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Test Backend & Build Frontend (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm install
+
+      - name: Run Backend Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          DB_TYPE: sqlite
+          JWT_SECRET: ci_test_jwt_secret_key_nagarsetu_2026
+
+      - name: Build Frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ''

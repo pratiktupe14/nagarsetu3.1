@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -6,50 +6,72 @@ import { NotificationProvider } from './context/NotificationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+// Public Landing Page (Eagerly loaded for instant First Contentful Paint)
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
 
-import { CitizenPortal } from './pages/citizen/CitizenPortal';
-import { MyComplaintsPage } from './pages/citizen/MyComplaintsPage';
-import { NearbyIssuesPage } from './pages/citizen/NearbyIssuesPage';
-import { ReportIssuePage } from './pages/citizen/ReportIssuePage';
-import { SubmissionSuccessPage } from './pages/citizen/SubmissionSuccessPage';
-import { ComplaintDetailPage } from './pages/citizen/ComplaintDetailPage';
-import { CitizenProfilePage } from './pages/citizen/CitizenProfilePage';
-import { CitizenSettingsPage } from './pages/citizen/CitizenSettingsPage';
-import { CitizenNotificationsPage } from './pages/citizen/CitizenNotificationsPage';
-import { AnnouncementDetailPage } from './pages/citizen/AnnouncementDetailPage';
-import { CitizenWorkPage } from './pages/citizen/CitizenWorkPage';
-import { MaintenanceDetailPage } from './pages/citizen/MaintenanceDetailPage';
-import { TrackComplaintPage } from './pages/citizen/TrackComplaintPage';
+// Lazy-loaded Public Pages
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
 
-import { AdminPortal } from './pages/admin/AdminPortal';
-import { AdminComplaintsPage } from './pages/admin/AdminComplaintsPage';
-import { AdminNewComplaintsPage } from './pages/admin/AdminNewComplaintsPage';
-import { AdminPendingComplaintsPage } from './pages/admin/AdminPendingComplaintsPage';
-import { AdminInProgressComplaintsPage } from './pages/admin/AdminInProgressComplaintsPage';
-import { AdminResolvedComplaintsPage } from './pages/admin/AdminResolvedComplaintsPage';
-import { AdminOverdueComplaintsPage } from './pages/admin/AdminOverdueComplaintsPage';
-import { AdminDepartmentsPage } from './pages/admin/AdminDepartmentsPage';
-import { AdminDepartmentHeadsPage } from './pages/admin/AdminDepartmentHeadsPage';
-import { AdminDepartmentDashboardPage } from './pages/admin/AdminDepartmentDashboardPage';
-import { AdminCityMapPage } from './pages/admin/AdminCityMapPage';
-import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
-import { AdminReportsPage } from './pages/admin/AdminReportsPage';
-import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
-import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
-import { StaffPortal } from './pages/staff/StaffPortal';
-import { StaffNewTasksPage } from './pages/staff/StaffNewTasksPage';
-import { StaffInProgressTasksPage } from './pages/staff/StaffInProgressTasksPage';
-import { StaffOverdueTasksPage } from './pages/staff/StaffOverdueTasksPage';
-import { StaffCompletedTasksPage } from './pages/staff/StaffCompletedTasksPage';
-import { StaffTaskMapPage } from './pages/staff/StaffTaskMapPage';
-import { StaffNotificationsPage } from './pages/staff/StaffNotificationsPage';
-import { StaffSettingsPage } from './pages/staff/StaffSettingsPage';
-import { DepartmentHeadPortal } from './pages/departmentHead/DepartmentHeadPortal';
-import { AnnouncementsWorkspacePage } from './pages/announcements/AnnouncementsWorkspacePage';
-import { StaffManagementWorkspacePage } from './pages/departmentHead/StaffManagementWorkspacePage';
+// Lazy-loaded Citizen Pages
+const CitizenPortal = React.lazy(() => import('./pages/citizen/CitizenPortal').then(m => ({ default: m.CitizenPortal })));
+const MyComplaintsPage = React.lazy(() => import('./pages/citizen/MyComplaintsPage').then(m => ({ default: m.MyComplaintsPage })));
+const NearbyIssuesPage = React.lazy(() => import('./pages/citizen/NearbyIssuesPage').then(m => ({ default: m.NearbyIssuesPage })));
+const ReportIssuePage = React.lazy(() => import('./pages/citizen/ReportIssuePage').then(m => ({ default: m.ReportIssuePage })));
+const SubmissionSuccessPage = React.lazy(() => import('./pages/citizen/SubmissionSuccessPage').then(m => ({ default: m.SubmissionSuccessPage })));
+const ComplaintDetailPage = React.lazy(() => import('./pages/citizen/ComplaintDetailPage').then(m => ({ default: m.ComplaintDetailPage })));
+const CitizenProfilePage = React.lazy(() => import('./pages/citizen/CitizenProfilePage').then(m => ({ default: m.CitizenProfilePage })));
+const CitizenSettingsPage = React.lazy(() => import('./pages/citizen/CitizenSettingsPage').then(m => ({ default: m.CitizenSettingsPage })));
+const CitizenNotificationsPage = React.lazy(() => import('./pages/citizen/CitizenNotificationsPage').then(m => ({ default: m.CitizenNotificationsPage })));
+const AnnouncementDetailPage = React.lazy(() => import('./pages/citizen/AnnouncementDetailPage').then(m => ({ default: m.AnnouncementDetailPage })));
+const CitizenWorkPage = React.lazy(() => import('./pages/citizen/CitizenWorkPage').then(m => ({ default: m.CitizenWorkPage })));
+const MaintenanceDetailPage = React.lazy(() => import('./pages/citizen/MaintenanceDetailPage').then(m => ({ default: m.MaintenanceDetailPage })));
+const TrackComplaintPage = React.lazy(() => import('./pages/citizen/TrackComplaintPage').then(m => ({ default: m.TrackComplaintPage })));
+
+// Lazy-loaded Admin Pages
+const AdminPortal = React.lazy(() => import('./pages/admin/AdminPortal').then(m => ({ default: m.AdminPortal })));
+const AdminComplaintsPage = React.lazy(() => import('./pages/admin/AdminComplaintsPage').then(m => ({ default: m.AdminComplaintsPage })));
+const AdminNewComplaintsPage = React.lazy(() => import('./pages/admin/AdminNewComplaintsPage').then(m => ({ default: m.AdminNewComplaintsPage })));
+const AdminPendingComplaintsPage = React.lazy(() => import('./pages/admin/AdminPendingComplaintsPage').then(m => ({ default: m.AdminPendingComplaintsPage })));
+const AdminInProgressComplaintsPage = React.lazy(() => import('./pages/admin/AdminInProgressComplaintsPage').then(m => ({ default: m.AdminInProgressComplaintsPage })));
+const AdminResolvedComplaintsPage = React.lazy(() => import('./pages/admin/AdminResolvedComplaintsPage').then(m => ({ default: m.AdminResolvedComplaintsPage })));
+const AdminOverdueComplaintsPage = React.lazy(() => import('./pages/admin/AdminOverdueComplaintsPage').then(m => ({ default: m.AdminOverdueComplaintsPage })));
+const AdminDepartmentsPage = React.lazy(() => import('./pages/admin/AdminDepartmentsPage').then(m => ({ default: m.AdminDepartmentsPage })));
+const AdminDepartmentHeadsPage = React.lazy(() => import('./pages/admin/AdminDepartmentHeadsPage').then(m => ({ default: m.AdminDepartmentHeadsPage })));
+const AdminDepartmentDashboardPage = React.lazy(() => import('./pages/admin/AdminDepartmentDashboardPage').then(m => ({ default: m.AdminDepartmentDashboardPage })));
+const AdminCityMapPage = React.lazy(() => import('./pages/admin/AdminCityMapPage').then(m => ({ default: m.AdminCityMapPage })));
+const AdminAnalyticsPage = React.lazy(() => import('./pages/admin/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })));
+const AdminReportsPage = React.lazy(() => import('./pages/admin/AdminReportsPage').then(m => ({ default: m.AdminReportsPage })));
+const AdminNotificationsPage = React.lazy(() => import('./pages/admin/AdminNotificationsPage').then(m => ({ default: m.AdminNotificationsPage })));
+const AdminSettingsPage = React.lazy(() => import('./pages/admin/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
+
+// Lazy-loaded Staff Pages
+const StaffPortal = React.lazy(() => import('./pages/staff/StaffPortal').then(m => ({ default: m.StaffPortal })));
+const StaffNewTasksPage = React.lazy(() => import('./pages/staff/StaffNewTasksPage').then(m => ({ default: m.StaffNewTasksPage })));
+const StaffInProgressTasksPage = React.lazy(() => import('./pages/staff/StaffInProgressTasksPage').then(m => ({ default: m.StaffInProgressTasksPage })));
+const StaffOverdueTasksPage = React.lazy(() => import('./pages/staff/StaffOverdueTasksPage').then(m => ({ default: m.StaffOverdueTasksPage })));
+const StaffCompletedTasksPage = React.lazy(() => import('./pages/staff/StaffCompletedTasksPage').then(m => ({ default: m.StaffCompletedTasksPage })));
+const StaffTaskMapPage = React.lazy(() => import('./pages/staff/StaffTaskMapPage').then(m => ({ default: m.StaffTaskMapPage })));
+const StaffNotificationsPage = React.lazy(() => import('./pages/staff/StaffNotificationsPage').then(m => ({ default: m.StaffNotificationsPage })));
+const StaffSettingsPage = React.lazy(() => import('./pages/staff/StaffSettingsPage').then(m => ({ default: m.StaffSettingsPage })));
+
+// Lazy-loaded Department Head & Announcements Pages
+const DepartmentHeadPortal = React.lazy(() => import('./pages/departmentHead/DepartmentHeadPortal').then(m => ({ default: m.DepartmentHeadPortal })));
+const AnnouncementsWorkspacePage = React.lazy(() => import('./pages/announcements/AnnouncementsWorkspacePage').then(m => ({ default: m.AnnouncementsWorkspacePage })));
+const StaffManagementWorkspacePage = React.lazy(() => import('./pages/departmentHead/StaffManagementWorkspacePage').then(m => ({ default: m.StaffManagementWorkspacePage })));
+
+// Lightweight Route Suspense Fallback
+const PageFallback: React.FC = () => (
+  <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 font-sans">
+    <div className="p-6 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex flex-col items-center space-y-4 max-w-sm w-full text-center">
+      <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+      <div className="space-y-1">
+        <h3 className="text-base font-extrabold font-outfit text-white">NAGARSETU</h3>
+        <p className="text-xs text-slate-400 font-medium">Loading workspace...</p>
+      </div>
+    </div>
+  </div>
+);
 
 export default function App() {
   return (
@@ -58,7 +80,8 @@ export default function App() {
         <LanguageProvider>
           <NotificationProvider>
             <BrowserRouter>
-              <Routes>
+              <Suspense fallback={<PageFallback />}>
+                <Routes>
             {/* Public Landing & Auth Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -514,8 +537,9 @@ export default function App() {
 
             {/* Catch-all redirect to Landing */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
       </NotificationProvider>
     </LanguageProvider>
   </AuthProvider>

@@ -121,7 +121,13 @@ export async function fetchMunicipalDepartmentsApi(): Promise<MunicipalDepartmen
   try {
     const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
     const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
-    const res = await fetch(`${getApiUrl()}/api/admin/departments`, { headers });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${getApiUrl()}/api/admin/departments`, {
+      signal: controller.signal,
+      headers
+    });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.departments) && data.departments.length > 0) {
@@ -342,9 +348,13 @@ export async function fetchDepartmentStaffApi(params?: {
     if (params?.search) qParams.append('search', params.search);
     if (params?.department_id) qParams.append('department_id', params.department_id);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${getApiUrl()}/api/department/staff?${qParams.toString()}`, {
+      signal: controller.signal,
       headers: getAuthHeaders()
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
