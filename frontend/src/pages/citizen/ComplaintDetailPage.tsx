@@ -7,6 +7,7 @@ import { LocationMapPicker } from '../../components/LocationMapPicker';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { RelatedIssuesSection } from '../../components/RelatedIssuesSection';
 import { getComplaintById, getAllComplaints, getCitizenComplaints, submitComplaintFeedback, reopenComplaint } from '../../services/complaintService';
+import { isValidCoordinate } from '../../services/locationService';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, ShieldCheck } from 'lucide-react';
@@ -296,7 +297,7 @@ export const ComplaintDetailPage: React.FC = () => {
               <span className="text-xs text-gray-500 font-mono">{complaint.location_address}</span>
             </div>
 
-            {complaint.latitude != null && complaint.longitude != null && !isNaN(Number(complaint.latitude)) && !isNaN(Number(complaint.longitude)) ? (
+            {isValidCoordinate(complaint.latitude, complaint.longitude) ? (
               <LocationMapPicker
                 initialLat={Number(complaint.latitude)}
                 initialLng={Number(complaint.longitude)}

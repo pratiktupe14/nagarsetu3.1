@@ -176,6 +176,7 @@ function getGeocodeCache(): Record<string, { latitude: number; longitude: number
 
 function setGeocodeCache(key: string, data: { latitude: number; longitude: number; formatted_address: string }) {
   try {
+    if (!key || typeof key !== 'string') return;
     const cache = getGeocodeCache();
     cache[key.toLowerCase().trim()] = data;
     localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
@@ -262,7 +263,7 @@ export async function getGoogleMapsDirections(
 export async function geocodeNashikAddress(
   rawAddress: string
 ): Promise<{ latitude: number; longitude: number; formatted_address: string } | null> {
-  if (!rawAddress || rawAddress.trim().length < 3) return null;
+  if (!rawAddress || typeof rawAddress !== 'string' || rawAddress.trim().length < 3) return null;
 
   const normalizedKey = rawAddress.toLowerCase().trim();
   const cache = getGeocodeCache();
@@ -360,19 +361,47 @@ export async function geocodeComplaintsWithoutCoordinates(complaints: Complaint[
   return updatedComplaints;
 }
 
+/**
+ * Coordinate validator ensuring finite numbers within valid geographic bounds
+ */
+export function isValidCoordinate(lat: unknown, lng: unknown): boolean {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) return false;
+  if (typeof lat === 'string' && lat.trim() === '') return false;
+  if (typeof lng === 'string' && lng.trim() === '') return false;
+  const nLat = typeof lat === 'number' ? lat : Number(lat);
+  const nLng = typeof lng === 'number' ? lng : Number(lng);
+  return (
+    Number.isFinite(nLat) &&
+    Number.isFinite(nLng) &&
+    nLat >= -90 &&
+    nLat <= 90 &&
+    nLng >= -180 &&
+    nLng <= 180 &&
+    !(nLat === 0 && nLng === 0)
+  );
+}
+
 // Calculate distance in meters between two lat/lng pairs using Haversine formula
 export function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
+    return Infinity;
+  }
+  const nLat1 = Number(lat1);
+  const nLon1 = Number(lon1);
+  const nLat2 = Number(lat2);
+  const nLon2 = Number(lon2);
   const R = 6371000;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const dLat = (nLat2 - nLat1) * (Math.PI / 180);
+  const dLon = (nLon2 - nLon1) * (Math.PI / 180);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
+    Math.cos(nLat1 * (Math.PI / 180)) *
+      Math.cos(nLat2 * (Math.PI / 180)) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  const res = R * c;
+  return Number.isFinite(res) ? res : Infinity;
 }
 
 // Client-side EXIF GPS extraction using exifr
@@ -479,18 +508,24 @@ export function calculateDuplicateIntelligenceScore(
 
   // 1. Geographic Location Score (35%)
   let locationScore = 10;
-  if (dist <= 20) locationScore = 100;
-  else if (dist <= 50) locationScore = 85;
-  else if (dist <= 100) locationScore = 70;
-  else if (dist <= 200) locationScore = 40;
+  if (Number.isFinite(dist) && dist !== Infinity) {
+    if (dist <= 20) locationScore = 100;
+    else if (dist <= 50) locationScore = 85;
+    else if (dist <= 100) locationScore = 70;
+    else if (dist <= 200) locationScore = 40;
+  } else {
+    locationScore = 0;
+  }
 
   // 2. Category Match Score (25%)
-  const isSameCat = candidate.category.toLowerCase() === newCategory.toLowerCase();
+  const cat1 = typeof candidate.category === 'string' ? candidate.category.trim().toLowerCase() : '';
+  const cat2 = typeof newCategory === 'string' ? newCategory.trim().toLowerCase() : '';
+  const isSameCat = Boolean(cat1 && cat2 && cat1 === cat2);
   const categoryScore = isSameCat ? 100 : 0;
 
   // 3. Text Similarity Overlap (25%)
-  const words1 = (newTitle || '').toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-  const words2 = (candidate.title + ' ' + candidate.description).toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const words1 = (typeof newTitle === 'string' ? newTitle : '').toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const words2 = (String(candidate.title || '') + ' ' + String(candidate.description || '')).toLowerCase().split(/\s+/).filter((w) => w.length > 3);
   const shared = words1.filter((w) => words2.includes(w));
   const textScore = words1.length > 0 ? Math.min(100, Math.round((shared.length / words1.length) * 100)) : 50;
 
@@ -515,13 +550,13 @@ export function calculateDuplicateIntelligenceScore(
   if (confidenceScore >= 80) matchLevel = '🟢 High Match';
   else if (confidenceScore >= 60) matchLevel = '🟡 Possible Match';
 
-  let reasonSummary = `${dist}m away`;
-  if (isSameCat) reasonSummary += `, Same ${candidate.category} category`;
+  let reasonSummary = Number.isFinite(dist) && dist !== Infinity ? `${dist}m away` : 'Nearby area';
+  if (isSameCat) reasonSummary += `, Same ${candidate.category || 'category'}`;
   if (shared.length > 0) reasonSummary += `, Similar description words`;
 
   return {
     candidateComplaint: candidate,
-    distanceMeters: dist,
+    distanceMeters: Number.isFinite(dist) && dist !== Infinity ? dist : 9999,
     confidenceScore,
     matchLevel,
     locationMatchScore: locationScore,
@@ -543,10 +578,15 @@ export function findDuplicateComplaints(
   category: string = 'Pothole',
   title: string = ''
 ): { complaint: Complaint; distanceMeters: number; match: DuplicateIntelligenceMatch }[] {
+  if (!isValidCoordinate(newLat, newLng) || !Array.isArray(existingComplaints)) {
+    return [];
+  }
   const duplicates: { complaint: Complaint; distanceMeters: number; match: DuplicateIntelligenceMatch }[] = [];
 
   for (const c of existingComplaints) {
+    if (!c) continue;
     if (c.status !== 'Resolved' && c.status !== 'Rejected') {
+      if (!isValidCoordinate(c.latitude, c.longitude)) continue;
       const dist = calculateDistanceMeters(newLat, newLng, Number(c.latitude), Number(c.longitude));
       if (dist <= radiusMeters) {
         const match = calculateDuplicateIntelligenceScore(newLat, newLng, category, title, c);
@@ -569,15 +609,21 @@ export function findRelatedNearbyIssues(
   allComplaints: Complaint[],
   maxRadiusMeters: number = 500
 ): RelatedIssueItem[] {
+  if (!isValidCoordinate(targetLat, targetLng) || !Array.isArray(allComplaints)) {
+    return [];
+  }
   const results: RelatedIssueItem[] = [];
+  const targetCatLower = typeof category === 'string' ? category.trim().toLowerCase() : '';
 
   for (const c of allComplaints) {
-    if (c.id === currentComplaintId) continue;
+    if (!c || c.id === currentComplaintId) continue;
+    if (!isValidCoordinate(c.latitude, c.longitude)) continue;
     const dist = calculateDistanceMeters(targetLat, targetLng, Number(c.latitude), Number(c.longitude));
 
     if (dist <= maxRadiusMeters) {
       let relationType: 'Duplicate Candidate' | 'Similar Issue' | 'Nearby Issue' = 'Nearby Issue';
-      const isSameCategory = c.category.toLowerCase() === category.toLowerCase();
+      const cCatLower = typeof c.category === 'string' ? c.category.trim().toLowerCase() : '';
+      const isSameCategory = Boolean(targetCatLower && cCatLower && cCatLower === targetCatLower);
 
       if (isSameCategory && dist <= 100 && c.status !== 'Resolved') {
         relationType = 'Duplicate Candidate';
@@ -595,11 +641,13 @@ export function findRelatedNearbyIssues(
     }
   }
 
-  return results.sort((a, b) => {
-    if (a.relationType === 'Duplicate Candidate' && b.relationType !== 'Duplicate Candidate') return -1;
-    if (b.relationType === 'Duplicate Candidate' && a.relationType !== 'Duplicate Candidate') return 1;
-    return a.distanceMeters - b.distanceMeters;
-  }).slice(0, 8);
+  return results
+    .sort((a, b) => {
+      if (a.relationType === 'Duplicate Candidate' && b.relationType !== 'Duplicate Candidate') return -1;
+      if (b.relationType === 'Duplicate Candidate' && a.relationType !== 'Duplicate Candidate') return 1;
+      return a.distanceMeters - b.distanceMeters;
+    })
+    .slice(0, 8);
 }
 
 export interface ComplaintLocationAuditReport {

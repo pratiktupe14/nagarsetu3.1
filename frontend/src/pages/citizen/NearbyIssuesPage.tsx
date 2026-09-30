@@ -10,7 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
 import { getAllComplaints, supportDuplicateComplaint } from '../../services/complaintService';
-import { calculateDistanceMeters } from '../../services/locationService';
+import { calculateDistanceMeters, isValidCoordinate } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
@@ -177,28 +177,39 @@ export const NearbyIssuesPage: React.FC = () => {
   const safeComplaints = Array.isArray(allComplaints) ? allComplaints : [];
 
   const nearbyItems = safeComplaints
-    .filter((c) => c.status !== 'Rejected')
+    .filter((c) => c && c.status !== 'Rejected')
     .map((c) => {
-      const dist = calculateDistanceMeters(userLat, userLng, Number(c.latitude), Number(c.longitude));
+      const dist = (isValidCoordinate(userLat, userLng) && isValidCoordinate(c.latitude, c.longitude))
+        ? calculateDistanceMeters(userLat, userLng, Number(c.latitude), Number(c.longitude))
+        : Infinity;
       const isPossibleDuplicate = dist <= 100 && c.status !== 'Resolved';
-      return { complaint: c, distanceMeters: Math.round(dist), isPossibleDuplicate };
+      return { complaint: c, distanceMeters: Number.isFinite(dist) && dist !== Infinity ? Math.round(dist) : 9999, isPossibleDuplicate };
     })
     .filter((item) => item.distanceMeters <= radiusMeters)
     .filter((item) => {
       const c = item.complaint;
       // Search Query
-      const q = searchQuery.toLowerCase();
+      const q = typeof searchQuery === 'string' ? searchQuery.trim().toLowerCase() : '';
+      const cNum = typeof c.complaint_number === 'string' ? c.complaint_number.toLowerCase() : '';
+      const cTitle = typeof c.title === 'string' ? c.title.toLowerCase() : '';
+      const cCat = typeof c.category === 'string' ? c.category.toLowerCase() : '';
+      const cAddr = typeof c.location_address === 'string' ? c.location_address.toLowerCase() : '';
+      const cStatus = typeof c.status === 'string' ? c.status.toLowerCase() : '';
+
       const matchesSearch =
-        c.complaint_number.toLowerCase().includes(q) ||
-        c.title.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q) ||
-        (c.location_address && c.location_address.toLowerCase().includes(q));
+        !q ||
+        cNum.includes(q) ||
+        cTitle.includes(q) ||
+        cCat.includes(q) ||
+        cAddr.includes(q);
 
       // Category Filter
-      const matchesCat = selectedCategory === 'All' || c.category.toLowerCase() === selectedCategory.toLowerCase();
+      const selCat = typeof selectedCategory === 'string' ? selectedCategory.toLowerCase() : '';
+      const matchesCat = selectedCategory === 'All' || cCat === selCat;
 
       // Status Filter
-      const matchesStatus = selectedStatus === 'All' || c.status.toLowerCase() === selectedStatus.toLowerCase();
+      const selStatus = typeof selectedStatus === 'string' ? selectedStatus.toLowerCase() : '';
+      const matchesStatus = selectedStatus === 'All' || cStatus === selStatus;
 
       // Priority Filter
       const matchesPriority = selectedPriority === 'All' || c.priority === selectedPriority;
@@ -215,26 +226,37 @@ export const NearbyIssuesPage: React.FC = () => {
 
   // Auto-fit bounds on initial load if complaints exist
   useEffect(() => {
-    if (nearbyItems.length > 0) {
-      const coords: [number, number][] = [
-        [userLat, userLng],
-        ...nearbyItems.map((item) => [Number(item.complaint.latitude), Number(item.complaint.longitude)] as [number, number])
-      ];
-      setFitBoundsCoords(coords);
+    const validCoords: [number, number][] = [];
+    if (isValidCoordinate(userLat, userLng)) {
+      validCoords.push([userLat, userLng]);
+    }
+    for (const item of nearbyItems) {
+      if (isValidCoordinate(item.complaint.latitude, item.complaint.longitude)) {
+        validCoords.push([Number(item.complaint.latitude), Number(item.complaint.longitude)]);
+      }
+    }
+    if (validCoords.length > 0) {
+      setFitBoundsCoords(validCoords);
+    } else {
+      setFitBoundsCoords(undefined);
     }
   }, [nearbyItems.length, userLat, userLng]);
 
   // Recenter to Citizen Location
   const handleRecenter = () => {
-    setMapCenter([userLat, userLng]);
-    setFitBoundsCoords(undefined);
+    if (isValidCoordinate(userLat, userLng)) {
+      setMapCenter([userLat, userLng]);
+      setFitBoundsCoords(undefined);
+    }
   };
 
   // Card Click -> Center Map & Highlight
   const handleSelectCard = (complaint: Complaint) => {
     setFocusedComplaintId(complaint.id);
-    setMapCenter([Number(complaint.latitude), Number(complaint.longitude)]);
-    setFitBoundsCoords(undefined);
+    if (isValidCoordinate(complaint.latitude, complaint.longitude)) {
+      setMapCenter([Number(complaint.latitude), Number(complaint.longitude)]);
+      setFitBoundsCoords(undefined);
+    }
   };
 
   // Marker Click -> Select & Scroll Card into View
@@ -524,7 +546,7 @@ export const NearbyIssuesPage: React.FC = () => {
                 isFullscreenMap ? 'h-[75vh]' : 'h-[520px]'
               }`}>
                 <MapContainer
-                  center={mapCenter}
+                  center={isValidCoordinate(mapCenter[0], mapCenter[1]) ? mapCenter : [20.0059, 73.7898]}
                   zoom={15}
                   scrollWheelZoom={false}
                   className="w-full h-full"
@@ -534,22 +556,26 @@ export const NearbyIssuesPage: React.FC = () => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
 
-                  <MapController center={mapCenter} fitBounds={fitBoundsCoords} />
+                  <MapController center={isValidCoordinate(mapCenter[0], mapCenter[1]) ? mapCenter : [20.0059, 73.7898]} fitBounds={fitBoundsCoords} />
 
                   {/* CITIZEN LOCATION MARKER */}
-                  <Marker position={[userLat, userLng]} icon={userLocationIcon}>
-                    <Popup>
-                      <div className="text-xs font-sans space-y-1">
-                        <strong className="text-emerald-700 font-outfit block">📍 Your Current Location</strong>
-                        <span className="font-mono text-[10px] text-gray-500 block">
-                          {userLat.toFixed(4)}, {userLng.toFixed(4)}
-                        </span>
-                      </div>
-                    </Popup>
-                  </Marker>
+                  {isValidCoordinate(userLat, userLng) && (
+                    <Marker position={[userLat, userLng]} icon={userLocationIcon}>
+                      <Popup>
+                        <div className="text-xs font-sans space-y-1">
+                          <strong className="text-emerald-700 font-outfit block">📍 Your Current Location</strong>
+                          <span className="font-mono text-[10px] text-gray-500 block">
+                            {userLat.toFixed(4)}, {userLng.toFixed(4)}
+                          </span>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  )}
 
                   {/* NEARBY COMPLAINT MARKERS */}
-                  {nearbyItems.map(({ complaint, distanceMeters }) => (
+                  {nearbyItems
+                    .filter(({ complaint }) => isValidCoordinate(complaint.latitude, complaint.longitude))
+                    .map(({ complaint, distanceMeters }) => (
                     <Marker
                       key={complaint.id}
                       position={[Number(complaint.latitude), Number(complaint.longitude)]}

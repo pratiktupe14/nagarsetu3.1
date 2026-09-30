@@ -24,12 +24,13 @@ export const CitizenAnnouncementsPage: React.FC = () => {
   }, []);
 
   const filtered = announcements.filter((a) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      a.title.toLowerCase().includes(q) ||
-      a.description.toLowerCase().includes(q) ||
-      a.area.toLowerCase().includes(q);
+    if (!a) return false;
+    const q = typeof searchQuery === 'string' ? searchQuery.trim().toLowerCase() : '';
+    const aTitle = typeof a.title === 'string' ? a.title.toLowerCase() : '';
+    const aDesc = typeof a.description === 'string' ? a.description.toLowerCase() : '';
+    const aArea = typeof a.area === 'string' ? a.area.toLowerCase() : '';
 
+    const matchesSearch = !q || aTitle.includes(q) || aDesc.includes(q) || aArea.includes(q);
     const matchesCat = selectedCategory === 'All' || a.category === selectedCategory;
     const matchesPrio = selectedPriority === 'All' || a.priority === selectedPriority;
 

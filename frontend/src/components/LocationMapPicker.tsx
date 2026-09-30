@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { MapPin, Navigation } from 'lucide-react';
 import { LocationPicker } from './LocationPicker';
 import { NagarSetuMap } from './NagarSetuMap';
+import { isValidCoordinate, requestFreshGpsLocation } from '../services/locationService';
 
 // Fix standard Leaflet marker icon asset issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -30,7 +32,7 @@ function MapController({ center, zoom = 16 }: { center: [number, number]; zoom?:
       map.invalidateSize();
     } catch (e) {}
 
-    if (center && typeof center[0] === 'number' && typeof center[1] === 'number' && !isNaN(center[0]) && !isNaN(center[1])) {
+    if (center && isValidCoordinate(center[0], center[1])) {
       map.setView(center, zoom, { animate: true });
     }
 
@@ -41,7 +43,7 @@ function MapController({ center, zoom = 16 }: { center: [number, number]; zoom?:
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [center[0], center[1], zoom, map]);
+  }, [center ? center[0] : 0, center ? center[1] : 0, zoom, map]);
 
   return null;
 }
@@ -49,7 +51,9 @@ function MapController({ center, zoom = 16 }: { center: [number, number]; zoom?:
 function MapClickEvents({ onSelectLocation }: { onSelectLocation: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
-      onSelectLocation(e.latlng.lat, e.latlng.lng);
+      if (e?.latlng && isValidCoordinate(e.latlng.lat, e.latlng.lng)) {
+        onSelectLocation(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
@@ -66,15 +70,22 @@ interface MapPickerProps {
 }
 
 export const LocationMapPicker: React.FC<MapPickerProps> = ({
-  initialLat = 20.0059,
-  initialLng = 73.7898,
+  initialLat,
+  initialLng,
   accuracyMeters = null,
   onLocationSelect,
   interactive = true,
   showDuplicateRadius = false,
   accuracyStatusText = null
 }) => {
-  const [position, setPosition] = useState<[number, number]>([initialLat, initialLng]);
+  const [position, setPosition] = useState<[number, number] | null>(() => {
+    if (isValidCoordinate(initialLat, initialLng)) {
+      return [Number(initialLat), Number(initialLng)];
+    }
+    return null;
+  });
+  const [detectingGps, setDetectingGps] = useState(false);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
 
   const hasGoogleMapsKey = Boolean(
@@ -87,16 +98,39 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
   );
 
   useEffect(() => {
-    if (initialLat != null && initialLng != null && !isNaN(initialLat) && !isNaN(initialLng)) {
-      setPosition([initialLat, initialLng]);
+    if (isValidCoordinate(initialLat, initialLng)) {
+      setPosition([Number(initialLat), Number(initialLng)]);
+      setGpsErrorMsg(null);
     }
   }, [initialLat, initialLng]);
 
   const handleSelect = (lat: number, lng: number) => {
     if (!interactive) return;
-    setPosition([lat, lng]);
-    if (onLocationSelect) {
-      onLocationSelect(lat, lng);
+    if (isValidCoordinate(lat, lng)) {
+      setPosition([lat, lng]);
+      if (onLocationSelect) {
+        onLocationSelect(lat, lng);
+      }
+    }
+  };
+
+  const handleDetectLocation = async () => {
+    setDetectingGps(true);
+    setGpsErrorMsg(null);
+    try {
+      const gps = await requestFreshGpsLocation();
+      if (gps && isValidCoordinate(gps.latitude, gps.longitude)) {
+        setPosition([gps.latitude, gps.longitude]);
+        if (onLocationSelect) {
+          onLocationSelect(gps.latitude, gps.longitude);
+        }
+      } else {
+        setGpsErrorMsg('Could not detect GPS location. Please ensure location services are enabled on your device.');
+      }
+    } catch (e: any) {
+      setGpsErrorMsg(e?.message || 'Location permission denied or unavailable.');
+    } finally {
+      setDetectingGps(false);
     }
   };
 
@@ -106,17 +140,21 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
         const marker = markerRef.current;
         if (marker != null) {
           const latLng = marker.getLatLng();
-          handleSelect(latLng.lat, latLng.lng);
+          if (latLng && isValidCoordinate(latLng.lat, latLng.lng)) {
+            handleSelect(latLng.lat, latLng.lng);
+          }
         }
       },
     }),
     [interactive]
   );
 
+  const hasValidPosition = Boolean(position && isValidCoordinate(position[0], position[1]));
+
   return (
     <div className="w-full flex flex-col space-y-2">
       {/* Engine Switcher Bar */}
-      {hasGoogleMapsKey && (
+      {hasGoogleMapsKey && hasValidPosition && (
         <div className="flex items-center justify-between px-1 text-xs">
           <span className="font-bold text-gray-500 text-[11px] font-outfit uppercase tracking-wider">
             Map Provider
@@ -148,8 +186,44 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
         </div>
       )}
 
-      {/* GOOGLE MAPS ENGINE */}
-      {mapEngine === 'google' && hasGoogleMapsKey ? (
+      {!hasValidPosition ? (
+        <div className="w-full h-full min-h-[360px] rounded-2xl border border-gray-200 shadow-xs relative bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+            <MapPin className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5 max-w-sm">
+            <h4 className="text-base font-extrabold text-gray-900 font-outfit">Location Pin Unavailable</h4>
+            <p className="text-xs text-gray-600">
+              Valid geographic coordinates are not yet available for this map. Enable your device GPS to accurately locate the civic issue.
+            </p>
+            {gpsErrorMsg && (
+              <p className="text-xs text-rose-600 font-medium pt-1">
+                {gpsErrorMsg}
+              </p>
+            )}
+          </div>
+          {interactive && (
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={detectingGps}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center space-x-2 transition-all min-h-[44px]"
+            >
+              {detectingGps ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Detecting GPS Location...</span>
+                </>
+              ) : (
+                <>
+                  <Navigation className="w-4 h-4" />
+                  <span>Turn On / Detect Location</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      ) : mapEngine === 'google' && hasGoogleMapsKey && position ? (
         interactive ? (
           <LocationPicker
             initialPosition={{ lat: position[0], lng: position[1] }}
@@ -165,7 +239,7 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
             />
           </div>
         )
-      ) : (
+      ) : position ? (
         /* LEAFLET / OPENSTREETMAP ENGINE */
         <div className="w-full h-full min-h-[420px] rounded-2xl overflow-hidden border border-gray-200 shadow-xs relative bg-white">
           <MapContainer
@@ -183,7 +257,7 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
             <MapController center={position} zoom={16} />
 
             {/* GPS Accuracy Circle */}
-            {accuracyMeters && accuracyMeters > 0 && (
+            {accuracyMeters && accuracyMeters > 0 && Number.isFinite(accuracyMeters) && (
               <Circle
                 center={position}
                 radius={accuracyMeters}
@@ -236,7 +310,7 @@ export const LocationMapPicker: React.FC<MapPickerProps> = ({
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

@@ -36,12 +36,13 @@ export const CitizenWorkPage: React.FC = () => {
   }, []);
 
   const filtered = works.filter((w) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      w.title.toLowerCase().includes(q) ||
-      w.description.toLowerCase().includes(q) ||
-      w.area.toLowerCase().includes(q);
+    if (!w) return false;
+    const q = typeof searchQuery === 'string' ? searchQuery.trim().toLowerCase() : '';
+    const wTitle = typeof w.title === 'string' ? w.title.toLowerCase() : '';
+    const wDesc = typeof w.description === 'string' ? w.description.toLowerCase() : '';
+    const wArea = typeof w.area === 'string' ? w.area.toLowerCase() : '';
 
+    const matchesSearch = !q || wTitle.includes(q) || wDesc.includes(q) || wArea.includes(q);
     const matchesStatus = selectedStatus === 'All' || w.status === selectedStatus;
     const matchesDept = selectedDept === 'All' || w.department_name === selectedDept;
 

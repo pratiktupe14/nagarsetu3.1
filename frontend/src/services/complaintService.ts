@@ -521,11 +521,65 @@ export async function getAllComplaints(): Promise<Complaint[]> {
       });
     }
 
-    return finalComplaints;
+    return finalComplaints.map(normalizeComplaint);
   }
 
   // If both Express API and Supabase failed, fall back to canonical complaints
-  return [...CANONICAL_MUNICIPAL_COMPLAINTS];
+  return [...CANONICAL_MUNICIPAL_COMPLAINTS].map(normalizeComplaint);
+}
+
+/**
+ * Defensive Normalizer for Complaints
+ * Guarantees string fields are non-null and valid, and coordinates are strictly valid finite numbers or undefined (never NaN).
+ */
+export function normalizeComplaint(c: any): Complaint {
+  if (!c || typeof c !== 'object') {
+    return c;
+  }
+
+  // Parse & validate latitude and longitude
+  let lat: number | undefined = undefined;
+  let lng: number | undefined = undefined;
+
+  if (c.latitude !== null && c.latitude !== undefined && c.latitude !== '') {
+    const parsedLat = Number(c.latitude);
+    if (Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90) {
+      lat = parsedLat;
+    }
+  }
+
+  if (c.longitude !== null && c.longitude !== undefined && c.longitude !== '') {
+    const parsedLng = Number(c.longitude);
+    if (Number.isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180) {
+      lng = parsedLng;
+    }
+  }
+
+  // If one coordinate is missing/invalid or (0,0), treat as undefined
+  if (lat === undefined || lng === undefined || (lat === 0 && lng === 0)) {
+    lat = undefined;
+    lng = undefined;
+  }
+
+  return {
+    ...c,
+    id: String(c.id || ''),
+    complaint_number: typeof c.complaint_number === 'string' && c.complaint_number.trim()
+      ? c.complaint_number.trim()
+      : (c.id ? `CMP-${String(c.id).slice(0, 8)}` : 'CMP-PENDING'),
+    title: typeof c.title === 'string' && c.title.trim() ? c.title.trim() : 'Civic Complaint',
+    description: typeof c.description === 'string' ? c.description : '',
+    category: typeof c.category === 'string' && c.category.trim() ? c.category.trim() : 'General',
+    status: (typeof c.status === 'string' && c.status.trim() ? c.status.trim() : 'Submitted') as ComplaintStatus,
+    priority: (typeof c.priority === 'string' && c.priority.trim() ? c.priority.trim() : 'Medium') as PriorityLevel,
+    location_address: typeof c.location_address === 'string' ? c.location_address : '',
+    department_name: typeof c.department_name === 'string' ? c.department_name : '',
+    department_id: c.department_id ? String(c.department_id) : undefined,
+    latitude: lat as number,
+    longitude: lng as number,
+    created_at: c.created_at || new Date().toISOString(),
+    updated_at: c.updated_at || c.created_at || new Date().toISOString(),
+  };
 }
 
 // Fetch citizen complaints directly from backend API or Supabase
@@ -540,7 +594,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
         const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
-        return cleanList;
+        return cleanList.map(normalizeComplaint);
       }
     } catch (bErr: any) {
       console.warn('Express backend getCitizenComplaints error:', bErr);
@@ -591,7 +645,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
             ...c,
             department_name: c.departments?.name || c.department_name
           }));
-          return (formatted as Complaint[]).filter((c) => !isDemoComplaint(c));
+          return (formatted as Complaint[]).filter((c) => !isDemoComplaint(c)).map(normalizeComplaint);
         }
       }
 
@@ -606,7 +660,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   try {
     const local = getStoredComplaints();
     if (local && local.length > 0) {
-      return local.filter((c) => !isDemoComplaint(c));
+      return local.filter((c) => !isDemoComplaint(c)).map(normalizeComplaint);
     }
   } catch (e) {}
 
@@ -631,7 +685,7 @@ export async function getStaffTasks(
         const data = await res.json();
         const staffTasks: Complaint[] = Array.isArray(data) ? data : (data?.tasks || []);
         if (Array.isArray(staffTasks) && staffTasks.length > 0) {
-          return staffTasks.filter((c: any) => !isDemoComplaint(c));
+          return staffTasks.filter((c: any) => !isDemoComplaint(c)).map(normalizeComplaint);
         }
       }
     } catch (err: any) {
@@ -653,7 +707,7 @@ export async function getStaffTasks(
           ...c,
           department_name: c.departments?.name || c.department_name
         }));
-        return formatted.filter((c) => !isDemoComplaint(c));
+        return formatted.filter((c) => !isDemoComplaint(c)).map(normalizeComplaint);
       }
     } catch (sbErr) {
       console.warn('Supabase getStaffTasks note:', sbErr);
@@ -702,10 +756,10 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
       const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
       const filtered = cleanList.filter(matchesDept);
       if (filtered.length > 0) {
-        return filtered;
+        return filtered.map(normalizeComplaint);
       }
       if (cleanList.length > 0 && !targetDeptId && !targetDeptName) {
-        return cleanList;
+        return cleanList.map(normalizeComplaint);
       }
     }
   } catch (backendErr) {
@@ -728,7 +782,7 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
         const cleanList = (formatted as Complaint[]).filter((c) => !isDemoComplaint(c));
         const filtered = cleanList.filter(matchesDept);
         if (filtered.length > 0) {
-          return filtered;
+          return filtered.map(normalizeComplaint);
         }
       }
     } catch (sbErr) {
@@ -743,9 +797,9 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
       const cleanList = local.filter((c) => !isDemoComplaint(c));
       const filtered = cleanList.filter(matchesDept);
       if (filtered.length > 0) {
-        return filtered;
+        return filtered.map(normalizeComplaint);
       }
-      return cleanList;
+      return cleanList.map(normalizeComplaint);
     }
   } catch (localErr) {
     console.warn('LocalStorage getDepartmentComplaints note:', localErr);
@@ -870,11 +924,10 @@ export async function getComplaintById(idOrNumber: string): Promise<Complaint | 
   }
 
   if (comp) {
-    if (comp.latitude != null) comp.latitude = Number(comp.latitude);
-    if (comp.longitude != null) comp.longitude = Number(comp.longitude);
+    return normalizeComplaint(comp);
   }
 
-  return comp;
+  return null;
 }
 
 // Insert new complaint into PostgreSQL & Supabase

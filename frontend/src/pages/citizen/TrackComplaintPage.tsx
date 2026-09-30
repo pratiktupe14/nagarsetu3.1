@@ -100,7 +100,12 @@ export const TrackComplaintPage: React.FC = () => {
       setComplaints(safeList);
 
       if (!targetComp && lookupId && safeList.length > 0) {
-        targetComp = safeList.find((c) => (c.complaint_number && c.complaint_number.toLowerCase() === lookupId.toLowerCase()) || String(c.id) === String(lookupId)) || null;
+        const cleanLookup = typeof lookupId === 'string' ? lookupId.trim().toLowerCase() : String(lookupId).trim().toLowerCase();
+        targetComp = safeList.find((c) => {
+          if (!c) return false;
+          const cNum = typeof c.complaint_number === 'string' ? c.complaint_number.trim().toLowerCase() : '';
+          return (cNum && cNum === cleanLookup) || String(c.id) === String(lookupId);
+        }) || null;
       } else if (!targetComp && !lookupId && safeList.length > 0) {
         targetComp = safeList[0];
       }

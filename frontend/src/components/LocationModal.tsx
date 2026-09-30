@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { LocationMapPicker } from './LocationMapPicker';
+import { isValidCoordinate } from '../services/locationService';
 import { MapPin, Navigation, X, CheckCircle2, Cpu } from 'lucide-react';
 
 interface LocationModalProps {
@@ -68,30 +69,36 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
           <div className="flex items-center justify-between text-gray-600 font-mono text-[11px] pt-1 border-t border-gray-200">
             <span>Coordinates:</span>
-            <span className="font-bold text-gray-900">{latitude.toFixed(4)}, {longitude.toFixed(4)}</span>
+            <span className="font-bold text-gray-900">
+              {isValidCoordinate(latitude, longitude)
+                ? `${Number(latitude).toFixed(4)}, ${Number(longitude).toFixed(4)}`
+                : 'Coordinates Unavailable'}
+            </span>
           </div>
         </div>
 
         {/* INTERACTIVE LEAFLET MAP */}
         <div className="rounded-xl overflow-hidden border border-gray-200 h-64">
           <LocationMapPicker
-            initialLat={latitude}
-            initialLng={longitude}
+            initialLat={isValidCoordinate(latitude, longitude) ? Number(latitude) : undefined}
+            initialLng={isValidCoordinate(latitude, longitude) ? Number(longitude) : undefined}
             interactive={false}
           />
         </div>
 
         {/* ACTIONS */}
         <div className="flex items-center justify-between pt-2">
-          <a
-            href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 flex items-center space-x-1.5 min-h-[44px]"
-          >
-            <Navigation className="w-4 h-4" />
-            <span>Open in External Maps</span>
-          </a>
+          {isValidCoordinate(latitude, longitude) ? (
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 flex items-center space-x-1.5 min-h-[44px]"
+            >
+              <Navigation className="w-4 h-4" />
+              <span>Open in External Maps</span>
+            </a>
+          ) : <div />}
 
           <button
             onClick={onClose}

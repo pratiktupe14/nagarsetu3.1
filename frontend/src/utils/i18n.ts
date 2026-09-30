@@ -1214,7 +1214,7 @@ export function t(key: string, lang: SupportedLanguage = 'en'): string {
  * Helper to translate Category names dynamically based on DB string or key.
  */
 export function translateCategory(catName?: string, lang: SupportedLanguage = 'en'): string {
-  if (!catName) return '';
+  if (!catName || typeof catName !== 'string') return '';
   const normalized = catName.trim().toLowerCase();
   
   if (normalized.includes('road') || normalized.includes('pothole')) return t('categoryRoadDamage', lang);
@@ -1232,7 +1232,7 @@ export function translateCategory(catName?: string, lang: SupportedLanguage = 'e
  * Helper to translate Complaint Status strings dynamically.
  */
 export function translateStatus(status?: string, lang: SupportedLanguage = 'en'): string {
-  if (!status) return '';
+  if (!status || typeof status !== 'string') return '';
   const normalized = status.trim().toLowerCase();
   
   if (normalized === 'submitted') return t('statusSubmitted', lang);
@@ -1262,7 +1262,7 @@ export function translateStatus(status?: string, lang: SupportedLanguage = 'en')
  * Helper to translate Priority levels.
  */
 export function translatePriority(priority?: string, lang: SupportedLanguage = 'en'): string {
-  if (!priority) return '';
+  if (!priority || typeof priority !== 'string') return '';
   const normalized = priority.trim().toLowerCase();
   
   if (normalized === 'low') return t('priorityLow', lang);
@@ -1277,7 +1277,7 @@ export function translatePriority(priority?: string, lang: SupportedLanguage = '
  * Helper to translate Department Names.
  */
 export function translateDepartment(deptName?: string, lang: SupportedLanguage = 'en'): string {
-  if (!deptName) return '';
+  if (!deptName || typeof deptName !== 'string') return '';
   const normalized = deptName.trim().toLowerCase();
   
   if (normalized.includes('public works') || normalized.includes('pwd') || normalized.includes('road')) return t('deptPWD', lang);

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Complaint } from '../types/database.types';
-import { findRelatedNearbyIssues } from '../services/locationService';
+import { findRelatedNearbyIssues, isValidCoordinate, RelatedIssueItem } from '../services/locationService';
 import { RelatedIssueCard } from './RelatedIssueCard';
 import { StatusBadge } from './StatusBadge';
 import { MapPin, ShieldCheck, PlusCircle } from 'lucide-react';
@@ -26,7 +26,7 @@ function createCustomIcon(color: string) {
 
 const emeraldIcon = createCustomIcon('#059669');
 const amberIcon = createCustomIcon('#d97706');
-const greenIcon = createCustomIcon('#10b981');
+const greenIcon = createCustomIcon('#16a34a');
 const roseIcon = createCustomIcon('#e11d48');
 const blueIcon = createCustomIcon('#2563eb');
 
@@ -43,13 +43,23 @@ export const RelatedIssuesSection: React.FC<RelatedIssuesSectionProps> = ({
   allComplaints,
   onRefresh
 }) => {
-  const relatedItems = findRelatedNearbyIssues(
-    Number(currentComplaint.latitude),
-    Number(currentComplaint.longitude),
-    currentComplaint.category,
-    currentComplaint.id,
-    allComplaints,
-    500
+  const hasValidCoords = Boolean(
+    currentComplaint && isValidCoordinate(currentComplaint.latitude, currentComplaint.longitude)
+  );
+
+  const relatedItems = hasValidCoords
+    ? findRelatedNearbyIssues(
+        Number(currentComplaint.latitude),
+        Number(currentComplaint.longitude),
+        currentComplaint.category || 'General',
+        currentComplaint.id,
+        allComplaints,
+        500
+      )
+    : [];
+
+  const mapItems = relatedItems.filter(
+    (item) => item.complaint && isValidCoordinate(item.complaint.latitude, item.complaint.longitude)
   );
 
   return (
@@ -75,59 +85,69 @@ export const RelatedIssuesSection: React.FC<RelatedIssuesSectionProps> = ({
       </div>
 
       {/* NEARBY MAP OVERVIEW */}
-      <div className="rounded-2xl overflow-hidden border border-gray-200 h-64 relative z-0">
-        <MapContainer
-          center={[Number(currentComplaint.latitude), Number(currentComplaint.longitude)]}
-          zoom={16}
-          scrollWheelZoom={false}
-          className="w-full h-full"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          {/* CURRENT COMPLAINT MARKER */}
-          <Marker
-            position={[Number(currentComplaint.latitude), Number(currentComplaint.longitude)]}
-            icon={emeraldIcon}
+      {hasValidCoords ? (
+        <div className="rounded-2xl overflow-hidden border border-gray-200 h-64 relative z-0">
+          <MapContainer
+            center={[Number(currentComplaint.latitude), Number(currentComplaint.longitude)]}
+            zoom={16}
+            scrollWheelZoom={false}
+            className="w-full h-full"
           >
-            <Popup>
-              <div className="text-xs font-sans space-y-1">
-                <span className="font-mono font-bold text-emerald-700 block">CURRENT ISSUE: {currentComplaint.complaint_number}</span>
-                <strong className="block text-gray-900">{currentComplaint.title}</strong>
-                <StatusBadge status={currentComplaint.status} />
-              </div>
-            </Popup>
-          </Marker>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-          {/* RELATED NEARBY MARKERS */}
-          {relatedItems.map(({ complaint, distanceMeters }) => (
+            {/* CURRENT COMPLAINT MARKER */}
             <Marker
-              key={complaint.id}
-              position={[Number(complaint.latitude), Number(complaint.longitude)]}
-              icon={getMarkerIcon(complaint.status, false)}
+              position={[Number(currentComplaint.latitude), Number(currentComplaint.longitude)]}
+              icon={emeraldIcon}
             >
               <Popup>
-                <div className="text-xs font-sans space-y-1 min-w-[160px]">
-                  <span className="font-mono font-bold text-blue-700 block">{complaint.complaint_number} ({distanceMeters}m away)</span>
-                  <strong className="block text-gray-900">{complaint.title}</strong>
-                  <StatusBadge status={complaint.status} />
-                  <div className="pt-1">
-                    <Link
-                      to={`/citizen/complaint/${complaint.id}`}
-                      className="text-[10px] text-emerald-700 font-extrabold underline block"
-                    >
-                      View Complaint →
-                    </Link>
-                  </div>
+                <div className="text-xs font-sans space-y-1">
+                  <span className="font-mono font-bold text-emerald-700 block">CURRENT ISSUE: {currentComplaint.complaint_number}</span>
+                  <strong className="block text-gray-900">{currentComplaint.title}</strong>
+                  <StatusBadge status={currentComplaint.status} />
                 </div>
               </Popup>
             </Marker>
-          ))}
 
-        </MapContainer>
-      </div>
+            {/* RELATED NEARBY MARKERS */}
+            {mapItems.map(({ complaint, distanceMeters }) => (
+              <Marker
+                key={complaint.id}
+                position={[Number(complaint.latitude), Number(complaint.longitude)]}
+                icon={getMarkerIcon(complaint.status, false)}
+              >
+                <Popup>
+                  <div className="text-xs font-sans space-y-1 min-w-[160px]">
+                    <span className="font-mono font-bold text-blue-700 block">{complaint.complaint_number} ({distanceMeters}m away)</span>
+                    <strong className="block text-gray-900">{complaint.title}</strong>
+                    <StatusBadge status={complaint.status} />
+                    <div className="pt-1">
+                      <Link
+                        to={`/citizen/complaint/${complaint.id}`}
+                        className="text-[10px] text-emerald-700 font-extrabold underline block"
+                      >
+                        View Complaint →
+                      </Link>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+
+          </MapContainer>
+        </div>
+      ) : (
+        <div className="p-8 text-center border border-dashed border-gray-200 rounded-2xl space-y-2 bg-gray-50/50">
+          <MapPin className="w-8 h-8 text-amber-600 mx-auto" />
+          <h4 className="text-sm font-extrabold text-gray-900 font-outfit">Location Pin Not Available</h4>
+          <p className="text-xs text-gray-500">
+            Geographic coordinates were not attached to this complaint. Nearby issue map is disabled.
+          </p>
+        </div>
+      )}
 
       {/* RELATED ISSUES CARDS GRID */}
       {relatedItems.length === 0 ? (

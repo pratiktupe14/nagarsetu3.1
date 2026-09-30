@@ -81,8 +81,8 @@ export const DepartmentHeadAnnouncements: React.FC<DepartmentHeadAnnouncementsPr
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const tMatch = ann.title.toLowerCase().includes(q);
-        const dMatch = ann.description.toLowerCase().includes(q);
+        const tMatch = (ann.title || '').toLowerCase().includes(q);
+        const dMatch = (ann.description || '').toLowerCase().includes(q);
         const deptMatch = (ann.department_name || '').toLowerCase().includes(q);
         const typeMatch = (ann.type || '').toLowerCase().includes(q);
         if (!tMatch && !dMatch && !deptMatch && !typeMatch) return false;

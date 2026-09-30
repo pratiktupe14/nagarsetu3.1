@@ -2,6 +2,7 @@ import React from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import { Complaint } from '../types/database.types';
 import { calculateHotspotClusters, HotspotCluster } from '../services/analyticsService';
+import { isValidCoordinate } from '../services/locationService';
 import { Flame, Info } from 'lucide-react';
 
 interface HotspotDensityMapProps {
@@ -66,7 +67,9 @@ export const HotspotDensityMap: React.FC<HotspotDensityMapProps> = ({ complaints
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {clusters.map((cluster) => {
+          {clusters
+            .filter((cluster) => isValidCoordinate(cluster.latitude, cluster.longitude))
+            .map((cluster) => {
             const style = DENSITY_COLORS[cluster.densityLevel] || DENSITY_COLORS.Low;
 
             return (

@@ -9,7 +9,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { LocationModal } from '../../components/LocationModal';
 import { getCitizenComplaints } from '../../services/complaintService';
 import { formatSlaRemainingTime } from '../../services/adminService';
-import { calculateDistanceMeters } from '../../services/locationService';
+import { calculateDistanceMeters, isValidCoordinate } from '../../services/locationService';
 import { Complaint, PriorityLevel } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
@@ -151,13 +151,21 @@ export const MyComplaintsPage: React.FC = () => {
 
   // Filter & Search Logic
   const filteredComplaints = safeComplaints.filter((c) => {
+    if (!c) return false;
     // Search Query (ID, Title, Category, Location)
-    const q = searchQuery.toLowerCase();
+    const q = typeof searchQuery === 'string' ? searchQuery.trim().toLowerCase() : '';
+    const cNum = typeof c.complaint_number === 'string' ? c.complaint_number.toLowerCase() : '';
+    const cTitle = typeof c.title === 'string' ? c.title.toLowerCase() : '';
+    const cCat = typeof c.category === 'string' ? c.category.toLowerCase() : '';
+    const cAddr = typeof c.location_address === 'string' ? c.location_address.toLowerCase() : '';
+    const cDept = typeof c.department_name === 'string' ? c.department_name.toLowerCase() : '';
+
     const matchesSearch =
-      c.complaint_number.toLowerCase().includes(q) ||
-      c.title.toLowerCase().includes(q) ||
-      c.category.toLowerCase().includes(q) ||
-      (c.location_address && c.location_address.toLowerCase().includes(q));
+      !q ||
+      cNum.includes(q) ||
+      cTitle.includes(q) ||
+      cCat.includes(q) ||
+      cAddr.includes(q);
 
     // Tab Filter
     let matchesTab = true;
@@ -170,16 +178,22 @@ export const MyComplaintsPage: React.FC = () => {
     const matchesPriority = priorityFilter === 'All' || c.priority === priorityFilter;
 
     // Department Filter
-    const matchesDept = departmentFilter === 'All' || (c.department_name && c.department_name.toLowerCase().includes(departmentFilter.toLowerCase()));
+    const filterDeptLower = typeof departmentFilter === 'string' ? departmentFilter.toLowerCase() : '';
+    const matchesDept = departmentFilter === 'All' || (cDept && cDept.includes(filterDeptLower));
 
     // Area Filter
-    const matchesArea = areaFilter === 'All Areas' || (c.location_address && c.location_address.toLowerCase().includes(areaFilter.toLowerCase()));
+    const filterAreaLower = typeof areaFilter === 'string' ? areaFilter.toLowerCase() : '';
+    const matchesArea = areaFilter === 'All Areas' || (cAddr && cAddr.includes(filterAreaLower));
 
     // Near Me GPS Filter (within 2km radius if active)
     let matchesGps = true;
-    if (useNearMeGps && userCoords) {
-      const dist = calculateDistanceMeters(userCoords.lat, userCoords.lng, Number(c.latitude), Number(c.longitude));
-      matchesGps = dist <= 2000;
+    if (useNearMeGps && userCoords && isValidCoordinate(userCoords.lat, userCoords.lng)) {
+      if (isValidCoordinate(c.latitude, c.longitude)) {
+        const dist = calculateDistanceMeters(userCoords.lat, userCoords.lng, Number(c.latitude), Number(c.longitude));
+        matchesGps = dist <= 2000;
+      } else {
+        matchesGps = false;
+      }
     }
 
     // Date Filter

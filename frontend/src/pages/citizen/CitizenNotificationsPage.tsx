@@ -70,11 +70,14 @@ export const CitizenNotificationsPage: React.FC = () => {
       if (activeTab === 'Unread' && n.is_read) return false;
       if (activeTab === 'Read' && !n.is_read) return false;
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = n.title.toLowerCase().includes(q);
-        const matchesMsg = n.message.toLowerCase().includes(q);
-        const matchesNum = (n.complaint_number || '').toLowerCase().includes(q);
+      const q = typeof searchQuery === 'string' ? searchQuery.trim().toLowerCase() : '';
+      if (q) {
+        const nTitle = typeof n?.title === 'string' ? n.title.toLowerCase() : '';
+        const nMsg = typeof n?.message === 'string' ? n.message.toLowerCase() : '';
+        const nNum = typeof n?.complaint_number === 'string' ? n.complaint_number.toLowerCase() : '';
+        const matchesTitle = nTitle.includes(q);
+        const matchesMsg = nMsg.includes(q);
+        const matchesNum = nNum.includes(q);
         if (!matchesTitle && !matchesMsg && !matchesNum) return false;
       }
 
