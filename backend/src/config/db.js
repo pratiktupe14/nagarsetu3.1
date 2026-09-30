@@ -20,8 +20,36 @@ let useSqlite = false;
 
 const DB_TYPE = process.env.DB_TYPE || 'sqlite'; // 'postgres' or 'sqlite'
 
+let isSeeding = false;
+let seeded = false;
+async function ensureDefaultSeeds() {
+  if (isSeeding || seeded) return;
+  isSeeding = true;
+  try {
+    const serverMod = require('../server');
+    if (serverMod && typeof serverMod.seedAll === 'function') {
+      await serverMod.seedAll();
+      seeded = true;
+    } else if (serverMod && typeof serverMod.seedDefaultUsers === 'function') {
+      await serverMod.seedDefaultUsers();
+      seeded = true;
+    }
+  } catch (e) {
+    console.warn('[SEED NOTE] Automatic seed note:', e.message);
+  } finally {
+    isSeeding = false;
+  }
+}
+
 function initDatabase() {
   return new Promise((resolve, reject) => {
+    const onInitSuccess = async () => {
+      try {
+        await ensureDefaultSeeds();
+      } catch (err) {}
+      resolve();
+    };
+
     const isProduction = process.env.NODE_ENV === 'production';
     const isPostgres = DB_TYPE === 'postgres' || isProduction;
     const dbUrl = process.env.DATABASE_URL;
@@ -45,16 +73,16 @@ function initDatabase() {
               return reject(err);
             }
             console.warn('[DATABASE NOTE] PostgreSQL connection check failed (activating fallback SQLite):', err.message);
-            setupSqlite(resolve, resolve);
+            setupSqlite(onInitSuccess, onInitSuccess);
           } else {
             console.log('PostgreSQL connected successfully.');
-            createTablesPostgres().then(resolve).catch(e => {
+            createTablesPostgres().then(onInitSuccess).catch(e => {
               if (isProduction) {
                 console.error('[DATABASE FATAL] PostgreSQL table init failed in production:', e.message);
                 return reject(e);
               }
               console.warn('[DATABASE TABLE INIT NOTE]', e.message);
-              setupSqlite(resolve, resolve);
+              setupSqlite(onInitSuccess, onInitSuccess);
             });
           }
         });
@@ -64,7 +92,7 @@ function initDatabase() {
           return reject(e);
         }
         console.warn('[DATABASE POOL INIT NOTE]', e.message);
-        setupSqlite(resolve, resolve);
+        setupSqlite(onInitSuccess, onInitSuccess);
       }
     } else {
       if (isProduction) {
@@ -73,7 +101,7 @@ function initDatabase() {
         return reject(err);
       }
       console.log('Initializing local development SQLite database...');
-      setupSqlite(resolve, resolve);
+      setupSqlite(onInitSuccess, onInitSuccess);
     }
   });
 }
@@ -269,8 +297,24 @@ function setupSqlite(resolve, reject) {
     console.warn('[SQLITE NOTE] Cannot initialize SQLite without native module.');
     return resolve ? resolve() : null;
   }
+  if (sqliteDb) {
+    return resolve ? resolve() : null;
+  }
+  const isTest = process.env.NODE_ENV === 'test';
   const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
-  const dbPath = isVercel ? path.join('/tmp', 'nagarsetu.sqlite') : path.join(__dirname, '../../nagarsetu.sqlite');
+  let dbPath;
+  if (isTest) {
+    dbPath = process.env.TEST_DB_PATH || path.join(require('os').tmpdir(), `nagarsetu-test-${process.pid}.sqlite`);
+    process.on('exit', () => {
+      try {
+        if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+      } catch (e) {}
+    });
+  } else if (isVercel) {
+    dbPath = path.join('/tmp', 'nagarsetu.sqlite');
+  } else {
+    dbPath = path.join(__dirname, '../../nagarsetu.sqlite');
+  }
   sqliteDb = new sqliteMod.Database(dbPath, (err) => {
     if (err) {
       console.error('Error connecting to SQLite DB:', err);

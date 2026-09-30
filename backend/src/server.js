@@ -21,13 +21,15 @@ async function seedDefaultUsers() {
 
     // 1. Citizen Seed Account (8788562103 / 8788562103)
     const citizenCheck = await query(
-      `SELECT id FROM users WHERE mobile = '8788562103' OR mobile = '+918788562103' LIMIT 1`
+      `SELECT id FROM users WHERE mobile = '8788562103' OR mobile = '+918788562103' OR mobile = '+91 8788562103' OR LOWER(email) = 'citizen8788562103@nagarsetu.gov.in'`
     );
     if (citizenCheck.rows && citizenCheck.rows.length > 0) {
-      await query(
-        `UPDATE users SET password_hash = ?, role = 'citizen', status = 'active' WHERE id = ?`,
-        [citizenHash, citizenCheck.rows[0].id]
-      );
+      for (const row of citizenCheck.rows) {
+        await query(
+          `UPDATE users SET password_hash = ?, role = 'citizen', status = 'active' WHERE id = ?`,
+          [citizenHash, row.id]
+        );
+      }
       console.log('Seeded citizen 8788562103 updated with bcrypt hash.');
     } else {
       await query(
@@ -39,13 +41,15 @@ async function seedDefaultUsers() {
 
     // 2. City Admin (admin@nagarsetu.gov.in / admin@123)
     const adminCheck = await query(
-      `SELECT id FROM users WHERE LOWER(email) = 'admin@nagarsetu.gov.in' OR mobile = '9876543213' LIMIT 1`
+      `SELECT id FROM users WHERE LOWER(email) = 'admin@nagarsetu.gov.in' OR mobile = '9876543213' OR mobile = '+919876543213'`
     );
     if (adminCheck.rows && adminCheck.rows.length > 0) {
-      await query(
-        `UPDATE users SET password_hash = ?, role = 'city_admin', status = 'active' WHERE id = ?`,
-        [adminHash, adminCheck.rows[0].id]
-      );
+      for (const row of adminCheck.rows) {
+        await query(
+          `UPDATE users SET password_hash = ?, role = 'city_admin', status = 'active' WHERE id = ?`,
+          [adminHash, row.id]
+        );
+      }
       console.log('City Admin updated with admin@123 bcrypt hash.');
     } else {
       await query(

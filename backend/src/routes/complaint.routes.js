@@ -319,10 +319,11 @@ const submitComplaintHandler = async (req, res) => {
 
     // Dual-write to Supabase so complaint persists across serverless lambda containers
     let supaComplaintId = null;
-    try {
-      const { getSupabaseClient } = require('../middleware/auth');
-      const supabase = getSupabaseClient();
-      if (supabase) {
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const { getSupabaseClient } = require('../middleware/auth');
+        const supabase = getSupabaseClient();
+        if (supabase) {
         const DEPT_UUID_MAP = {
           '1': '8ed9f760-1314-427c-a515-c2a54d6df6d8',
           '2': '9cabc1f2-fd10-48dd-a5cb-01d05197de22',
@@ -417,6 +418,7 @@ const submitComplaintHandler = async (req, res) => {
     } catch (sErr) {
       console.warn('Supabase mirror insert exception:', sErr.message);
     }
+  }
 
     // Send initial submission notification
     await notifyStatusChange(complaintId, 'Submitted', citizenId).catch(nErr => {

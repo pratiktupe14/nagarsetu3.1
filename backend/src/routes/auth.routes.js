@@ -51,34 +51,60 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   try {
     const { mobileOrEmail, password } = req.body;
 
-    const cleanIdentifier = String(mobileOrEmail).trim().toLowerCase();
-    const rawDigits = cleanIdentifier.replace(/\D/g, '');
-    const normMobile = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+    const normalizedInput = String(mobileOrEmail).trim();
+    const cleanIdentifier = normalizedInput.toLowerCase();
+    const isEmail = normalizedInput.includes('@');
+    let user = null;
 
-    const sql = `SELECT * FROM users WHERE mobile = ? OR mobile = ? OR mobile = ? OR LOWER(email) = ?`;
-    let resUser = await query(sql, [mobileOrEmail.trim(), normMobile, `+91 ${normMobile}`, cleanIdentifier]);
+    if (isEmail) {
+      const cleanEmail = normalizedInput.toLowerCase();
+      const resUser = await query(`SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1`, [cleanEmail]);
+      if (resUser.rows && resUser.rows.length > 0) {
+        user = resUser.rows[0];
+      }
+    } else {
+      const rawDigits = normalizedInput.replace(/\D/g, '');
+      const normMobile = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+      const resUser = await query(
+        `SELECT * FROM users WHERE mobile = ? OR mobile = ? OR mobile = ? OR mobile = ? OR mobile = ? LIMIT 1`,
+        [normalizedInput, normMobile, `+91${normMobile}`, `+91 ${normMobile}`, `+91-${normMobile}`]
+      );
+      if (resUser.rows && resUser.rows.length > 0) {
+        user = resUser.rows[0];
+      }
+    }
 
-    let user = resUser.rows && resUser.rows.length > 0 ? resUser.rows[0] : null;
+    if (!user) {
+      // Backward compatibility lookup
+      const fallbackRes = await query(
+        `SELECT * FROM users WHERE mobile = ? OR LOWER(email) = ? LIMIT 1`,
+        [normalizedInput, normalizedInput.toLowerCase()]
+      );
+      if (fallbackRes.rows && fallbackRes.rows.length > 0) {
+        user = fallbackRes.rows[0];
+      }
+    }
 
     if (!user) {
       const supabase = getSupabaseClient();
       if (supabase) {
         try {
+          const rawDigits = normalizedInput.replace(/\D/g, '');
+          const normMobile = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
           const { data: supaProfile } = await supabase
             .from('profiles')
             .select('*')
-            .or(`mobile.eq.${cleanIdentifier},mobile.eq.${normMobile},email.eq.${cleanIdentifier}`)
+            .or(`mobile.eq.${normalizedInput},mobile.eq.${normMobile},email.eq.${normalizedInput.toLowerCase()}`)
             .maybeSingle();
           if (supaProfile) {
-            user = {
-              id: supaProfile.id,
-              name: supaProfile.full_name || supaProfile.name || 'Citizen User',
-              mobile: supaProfile.mobile || normMobile,
-              email: supaProfile.email || cleanIdentifier,
-              role: supaProfile.role || 'citizen',
-              status: supaProfile.status || 'active',
-              language_pref: supaProfile.language_pref || 'en'
-            };
+            // Step 9: Resolve the corresponding credential-bearing user record from authoritative users table
+            const credRes = await query(
+              `SELECT * FROM users WHERE id = ? OR LOWER(email) = ? OR mobile = ? LIMIT 1`,
+              [supaProfile.id, (supaProfile.email || '').toLowerCase(), supaProfile.mobile || normMobile]
+            );
+            if (credRes.rows && credRes.rows.length > 0) {
+              user = credRes.rows[0];
+            }
           }
         } catch (e) {}
       }

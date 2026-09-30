@@ -677,10 +677,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } else {
           const errData = await response.json().catch(() => ({}));
-          const errMsg = errData.message || errData.error || (response.status === 401 ? 'Invalid login credentials' : 'Authentication failed');
+          const errMsg = errData.message || errData.error || (response.status === 401 ? 'Invalid login credentials. Please check your username/email and password.' : 'Authentication failed');
           console.warn('Express Backend API returned error:', errMsg);
           
-          if (!isSupabaseConfigured()) {
+          if (!isSupabaseConfigured() || !cleanIdentifier.includes('@') || response.status === 401) {
             throw new Error(errMsg);
           }
         }

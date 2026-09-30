@@ -42,6 +42,10 @@ describe('Department Head Staff Isolation & Security Suite', () => {
 
   before(async () => {
     await initDatabase();
+    const seedServiceStaff = require('../src/scripts/seedServiceStaff');
+    if (seedServiceStaff) {
+      await seedServiceStaff();
+    }
 
     const app = express();
     app.use(express.json());
@@ -60,7 +64,9 @@ describe('Department Head Staff Isolation & Security Suite', () => {
 
   after(async () => {
     if (server) {
-      await new Promise((resolve) => server.close(resolve));
+      await new Promise((resolve, reject) => {
+        server.close((err) => err ? reject(err) : resolve());
+      });
     }
   });
 
@@ -168,7 +174,13 @@ describe('Department Head Staff Isolation & Security Suite', () => {
     const compRes = await query(`SELECT id FROM complaints WHERE complaint_number = 'CMP-TEST-PWD-01'`);
     const complaintId = compRes.rows[0].id;
 
-    // PWD Dept Head attempts to assign Sanitation staff member (ID 106)
+    // Dynamically query actual PWD staff and Sanitation staff from database
+    const pwdStaffRow = await query(`SELECT id FROM users WHERE department_id = 1 AND (role = 'service_staff' OR role = 'staff') LIMIT 1`);
+    const sanStaffRow = await query(`SELECT id FROM users WHERE department_id = 2 AND (role = 'service_staff' OR role = 'staff') LIMIT 1`);
+    const pwdStaffId = pwdStaffRow.rows[0]?.id || 101;
+    const sanStaffId = sanStaffRow.rows[0]?.id || 106;
+
+    // PWD Dept Head attempts to assign Sanitation staff member
     const resForbidden = await fetch(`${baseUrl}/api/department/assign`, {
       method: 'POST',
       headers: {
@@ -177,7 +189,7 @@ describe('Department Head Staff Isolation & Security Suite', () => {
       },
       body: JSON.stringify({
         complaint_id: complaintId,
-        staff_id: 106 // Ramesh Shinde from Sanitation
+        staff_id: sanStaffId
       })
     });
 
@@ -185,7 +197,7 @@ describe('Department Head Staff Isolation & Security Suite', () => {
     const errData = await resForbidden.json();
     assert.ok(errData.error.includes('Forbidden'), 'Error message must indicate Forbidden');
 
-    // PWD Dept Head assigns PWD staff member (ID 101) -> must succeed
+    // PWD Dept Head assigns PWD staff member -> must succeed
     const resSuccess = await fetch(`${baseUrl}/api/department/assign`, {
       method: 'POST',
       headers: {
@@ -194,13 +206,13 @@ describe('Department Head Staff Isolation & Security Suite', () => {
       },
       body: JSON.stringify({
         complaint_id: complaintId,
-        staff_id: 101 // Amit Patil from PWD
+        staff_id: pwdStaffId
       })
     });
 
     assert.strictEqual(resSuccess.status, 200, 'In-department staff assignment must succeed');
     const succData = await resSuccess.json();
     assert.strictEqual(succData.success, true);
-    assert.strictEqual(succData.staff_id, 101);
+    assert.strictEqual(succData.staff_id, pwdStaffId);
   });
 });
