@@ -179,11 +179,145 @@ async function checkForDuplicates(latitude, longitude, category, radiusMeters = 
   }
 }
 
+/**
+ * 3-Tier Geolocation Resolution with 100-Meter Validation
+ * Priority 1: EXIF GPS from photo metadata
+ * Priority 2: HTML5 Device GPS (must have accuracy <= 100m)
+ * Priority 3: Interactive Leaflet/Google Map Pin Drop
+ *
+ * Consistency Check:
+ * If EXIF vs Device GPS difference > 100m -> conflict / map confirmation required
+ */
+function resolveGeolocationTier({
+  exifGps = null,
+  deviceGps = null,
+  mapPin = null,
+  mapPinConfirmed = false
+} = {}) {
+  const isCoordValid = (c) =>
+    c &&
+    typeof c.latitude === 'number' &&
+    typeof c.longitude === 'number' &&
+    !isNaN(c.latitude) &&
+    !isNaN(c.longitude) &&
+    c.latitude >= -90 &&
+    c.latitude <= 90 &&
+    c.longitude >= -180 &&
+    c.longitude <= 180;
+
+  // Reject explicitly invalid coordinates if supplied
+  if (exifGps && (typeof exifGps.latitude !== 'number' || typeof exifGps.longitude !== 'number' || !isCoordValid(exifGps))) {
+    return { accepted: false, error: 'INVALID_COORDINATES', message: 'Invalid EXIF GPS coordinates' };
+  }
+  if (deviceGps && (typeof deviceGps.latitude !== 'number' || typeof deviceGps.longitude !== 'number' || !isCoordValid(deviceGps))) {
+    return { accepted: false, error: 'INVALID_COORDINATES', message: 'Invalid Device GPS coordinates' };
+  }
+  if (mapPin && (typeof mapPin.latitude !== 'number' || typeof mapPin.longitude !== 'number' || !isCoordValid(mapPin))) {
+    return { accepted: false, error: 'INVALID_COORDINATES', message: 'Invalid Map Pin coordinates' };
+  }
+
+  const validExif = isCoordValid(exifGps) ? exifGps : null;
+  const validDevice = isCoordValid(deviceGps) ? deviceGps : null;
+  const validMapPin = isCoordValid(mapPin) ? mapPin : null;
+
+  // If user explicitly confirmed map pin (either manually or to resolve conflict)
+  if (mapPinConfirmed && validMapPin) {
+    return {
+      accepted: true,
+      latitude: validMapPin.latitude,
+      longitude: validMapPin.longitude,
+      location_source: validExif || validDevice ? 'map_pin_confirmed' : 'map_pin',
+      requiresConfirmation: false,
+      message: 'Location confirmed by map pin'
+    };
+  }
+
+  // 100-Meter Consistency Check: EXIF vs Device GPS
+  if (validExif && validDevice) {
+    const dist = calculateDistanceMeters(validExif.latitude, validExif.longitude, validDevice.latitude, validDevice.longitude);
+    if (dist > 100) {
+      return {
+        accepted: false,
+        latitude: validExif.latitude,
+        longitude: validExif.longitude,
+        location_source: 'exif',
+        requiresConfirmation: true,
+        conflict: 'exif_vs_device',
+        distanceMeters: Math.round(dist),
+        message: `Photo GPS differs from Device GPS by ${Math.round(dist)}m (>100m). Please confirm location on map.`
+      };
+    }
+  }
+
+  // Priority 1: Hardware EXIF GPS
+  if (validExif) {
+    return {
+      accepted: true,
+      latitude: validExif.latitude,
+      longitude: validExif.longitude,
+      location_source: 'exif',
+      accuracy: validExif.accuracy || null,
+      requiresConfirmation: false,
+      message: 'Location detected from photo GPS'
+    };
+  }
+
+  // Priority 2: HTML5 Live GPS
+  if (validDevice) {
+    const acc = typeof validDevice.accuracy === 'number' && !isNaN(validDevice.accuracy) ? validDevice.accuracy : 15;
+    if (acc <= 100) {
+      return {
+        accepted: true,
+        latitude: validDevice.latitude,
+        longitude: validDevice.longitude,
+        location_source: 'device_gps',
+        location_accuracy_m: acc,
+        requiresConfirmation: false,
+        message: `Live GPS verified (±${Math.round(acc)}m)`
+      };
+    } else {
+      return {
+        accepted: false,
+        latitude: validDevice.latitude,
+        longitude: validDevice.longitude,
+        location_source: 'device_gps',
+        location_accuracy_m: acc,
+        requiresConfirmation: true,
+        lowAccuracy: true,
+        message: 'GPS accuracy low — please confirm on map'
+      };
+    }
+  }
+
+  // Priority 3: Interactive Map Pin
+  if (validMapPin) {
+    return {
+      accepted: true,
+      latitude: validMapPin.latitude,
+      longitude: validMapPin.longitude,
+      location_source: 'map_pin',
+      requiresConfirmation: false,
+      message: 'Location confirmed by map pin'
+    };
+  }
+
+  return {
+    accepted: false,
+    latitude: null,
+    longitude: null,
+    location_source: null,
+    requiresConfirmation: true,
+    message: 'No valid location provided'
+  };
+}
+
 module.exports = {
   calculateDistanceMeters,
   extractExifGps,
   resolveLocation,
+  resolveGeolocationTier,
   checkForDuplicates,
   isValidCoordinate,
   normalizeCategory
 };
+

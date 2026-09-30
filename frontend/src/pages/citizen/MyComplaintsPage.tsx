@@ -72,7 +72,7 @@ export const MyComplaintsPage: React.FC = () => {
     address: string;
     latitude: number;
     longitude: number;
-    source?: 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
+    source?: 'exif' | 'device_gps' | 'map_pin' | 'map_pin_confirmed' | 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
   }>({
     isOpen: false,
     title: '',

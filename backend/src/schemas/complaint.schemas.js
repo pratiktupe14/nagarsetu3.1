@@ -11,7 +11,9 @@ const createComplaintSchema = {
     department_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow('', null).optional(),
     latitude: Joi.number().min(-90).max(90).required(),
     longitude: Joi.number().min(-180).max(180).required(),
-    location_source: Joi.string().allow('', null).optional(),
+    location_source: Joi.string().valid('exif', 'device_gps', 'map_pin', 'map_pin_confirmed', 'live_gps', 'exif_gps', 'manual_pin').required(),
+    location_accuracy_m: Joi.number().min(0).allow(null).optional(),
+    location_accuracy: Joi.number().min(0).allow(null).optional(),
     location_address: Joi.string().max(500).allow('', null).optional(),
     duplicate_of_id: Joi.alternatives().try(Joi.number().integer().positive(), Joi.string()).allow('', null).optional()
   }).unknown(true)

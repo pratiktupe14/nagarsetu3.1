@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
+import { RiskAssessmentCard } from '../../components/RiskAssessmentCard';
 import { LocationMapPicker } from '../../components/LocationMapPicker';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 import { RelatedIssuesSection } from '../../components/RelatedIssuesSection';
@@ -216,6 +217,17 @@ export const ComplaintDetailPage: React.FC = () => {
               <span>Submitted: {formatPortalDateTime(complaint.created_at)}</span>
             </div>
           </div>
+
+          {/* 4-QUADRANT RISK ASSESSMENT */}
+          <RiskAssessmentCard
+            safety_score={complaint.safety_score}
+            disruption_score={complaint.disruption_score}
+            health_environment_score={complaint.health_environment_score}
+            defect_severity_score={complaint.defect_severity_score}
+            risk_score={complaint.risk_score}
+            priority_rank={complaint.priority_rank}
+            priority={complaint.priority}
+          />
 
           {/* COMMUNITY IMPACT & DUPLICATE INTELLIGENCE CARD */}
           <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-300 space-y-3">

@@ -11,7 +11,7 @@ interface LocationModalProps {
   address: string;
   latitude: number;
   longitude: number;
-  locationSource?: 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
+  locationSource?: 'exif' | 'device_gps' | 'map_pin' | 'map_pin_confirmed' | 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
 }
 
 export const LocationModal: React.FC<LocationModalProps> = ({
@@ -34,7 +34,14 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const sourceLabel = locationSource === 'live_gps' ? 'Live GPS Location' : locationSource === 'exif_gps' ? 'Photo EXIF GPS' : 'Manual Pin Drop';
+  const sourceLabel =
+    locationSource === 'exif' || locationSource === 'exif_gps'
+      ? 'Photo EXIF GPS'
+      : locationSource === 'device_gps' || locationSource === 'live_gps'
+      ? 'Live GPS Location'
+      : locationSource === 'map_pin_confirmed'
+      ? 'Confirmed Map Pin'
+      : 'Manual Pin Drop';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-xs font-sans" role="dialog" aria-modal="true" aria-label="Location Details">

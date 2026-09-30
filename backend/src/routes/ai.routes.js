@@ -59,6 +59,28 @@ router.post('/analyze', authenticateToken, uploadSingleImage('photo'), async (re
     }
 
     console.log(`[${reqTime}] [NAGARSETU AI] Success: model="${aiAnalysis.model}", category="${aiAnalysis.category}", department="${aiAnalysis.recommended_department}"`);
+
+    // Attach 4-Quadrant Risk Matrix to AI classification
+    try {
+      const { calculateRiskAssessment, inferRiskScores } = require('../services/riskMatrixService');
+      const inferred = inferRiskScores(aiAnalysis);
+      const riskAssessment = calculateRiskAssessment({
+        ...inferred,
+        category: aiAnalysis.category,
+        priority: aiAnalysis.priority || aiAnalysis.urgency,
+        support_count: 1
+      });
+      aiAnalysis.risk_assessment = riskAssessment;
+      aiAnalysis.safety_score = riskAssessment.safety_score;
+      aiAnalysis.disruption_score = riskAssessment.disruption_score;
+      aiAnalysis.health_environment_score = riskAssessment.health_environment_score;
+      aiAnalysis.defect_severity_score = riskAssessment.defect_severity_score;
+      aiAnalysis.risk_score = riskAssessment.risk_score;
+      aiAnalysis.priority_rank = riskAssessment.priority_rank;
+    } catch (riskErr) {
+      console.warn('[NAGARSETU AI] Risk assessment computation note:', riskErr.message);
+    }
+
     return res.json({
       success: true,
       photo_url: photoUrl,

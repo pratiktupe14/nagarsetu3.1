@@ -248,10 +248,17 @@ export interface Complaint {
   department_name?: string;
   latitude: number;
   longitude: number;
-  location_source?: 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
+  location_source?: 'exif' | 'device_gps' | 'map_pin' | 'map_pin_confirmed' | 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
+  location_accuracy_m?: number | null;
   location_address?: string;
   duplicate_of_id?: string;
   support_count?: number;
+  safety_score?: number;
+  disruption_score?: number;
+  health_environment_score?: number;
+  defect_severity_score?: number;
+  risk_score?: number;
+  priority_rank?: number;
   assigned_staff_id?: string;
   assigned_staff_name?: string;
   assigned_staff_email?: string;

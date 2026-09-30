@@ -279,6 +279,35 @@ const submitComplaintHandler = async (req, res) => {
       duplicate_of_id
     } = req.body;
 
+    // Strict 3-Tier Geolocation Resolution & 100-Meter Validation
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+    if (isNaN(latNum) || isNaN(lngNum) || latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return res.status(400).json({ error: 'Invalid latitude or longitude coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.' });
+    }
+
+    let normLocationSource = String(location_source || '').toLowerCase().trim();
+    if (normLocationSource === 'live_gps') normLocationSource = 'device_gps';
+    if (normLocationSource === 'exif_gps') normLocationSource = 'exif';
+    if (normLocationSource === 'manual_pin') normLocationSource = 'map_pin';
+
+    const validSources = ['exif', 'device_gps', 'map_pin', 'map_pin_confirmed'];
+    if (!validSources.includes(normLocationSource)) {
+      return res.status(400).json({ error: `Invalid location_source "${location_source}". Allowed values: ${validSources.join(', ')}` });
+    }
+
+    const accuracyNum = req.body.location_accuracy_m !== undefined && req.body.location_accuracy_m !== null
+      ? Number(req.body.location_accuracy_m)
+      : (req.body.location_accuracy !== undefined && req.body.location_accuracy !== null ? Number(req.body.location_accuracy) : null);
+
+    if (accuracyNum !== null && (isNaN(accuracyNum) || accuracyNum < 0)) {
+      return res.status(400).json({ error: 'location_accuracy_m must be a non-negative number' });
+    }
+
+    if (normLocationSource === 'device_gps' && accuracyNum !== null && accuracyNum > 100) {
+      return res.status(400).json({ error: 'Device GPS accuracy is lower than 100m. Please confirm defect location on the map.' });
+    }
+
     // Always generate complaint_number authoritatively on the server side
     const finalComplaintNumber = `NS-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -443,21 +472,34 @@ const submitComplaintHandler = async (req, res) => {
       duplicateDistanceM = Math.round(otherCitizenNearbyMatch.dist);
     }
 
-    // Calculate initial severity weight and ranking score
-    const pLower = String(priority || '').trim().toLowerCase();
-    const severityWeight = pLower === 'critical' ? 8 : (pLower === 'high' ? 5 : (pLower === 'medium' ? 2 : 0));
+    // Calculate 4-Quadrant Risk Matrix & Priority Rank
+    const { calculateRiskAssessment } = require('../services/riskMatrixService');
+    const riskAssessment = calculateRiskAssessment({
+      safety_score: req.body.safety_score,
+      disruption_score: req.body.disruption_score,
+      health_environment_score: req.body.health_environment_score,
+      defect_severity_score: req.body.defect_severity_score,
+      support_count: 1,
+      sla_deadline: slaDeadline,
+      category,
+      priority,
+      ai_evidence: req.body.ai_evidence || description
+    });
+
     const initialSupportCount = 1;
-    const initialRankingScore = initialSupportCount + severityWeight;
+    const initialRankingScore = riskAssessment.priority_rank;
+    const computedPriority = riskAssessment.severity.charAt(0).toUpperCase() + riskAssessment.severity.slice(1).toLowerCase();
 
     const insertSql = `
       INSERT INTO complaints (
         complaint_number, citizen_id, photo_before_url, category, title, description, priority,
-        status, department_id, latitude, longitude, location_source, location_address, duplicate_of_id,
+        status, department_id, latitude, longitude, location_source, location_accuracy_m, location_address, duplicate_of_id,
         photo_front_url, photo_left_url, photo_right_url, photo_closeup_url, angle_photos, additional_photos,
         sla_deadline, response_time_hours, support_count, ranking_score, is_potential_duplicate,
-        potential_parent_id, duplicate_distance_m
+        potential_parent_id, duplicate_distance_m,
+        safety_score, disruption_score, health_environment_score, defect_severity_score, risk_score, priority_rank
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const result = await query(insertSql, [
@@ -467,11 +509,12 @@ const submitComplaintHandler = async (req, res) => {
       category,
       title,
       description || '',
-      priority,
+      computedPriority,
       finalDeptId,
-      latitude,
-      longitude,
-      location_source || 'manual_pin',
+      latNum,
+      lngNum,
+      normLocationSource,
+      accuracyNum,
       location_address || '',
       duplicate_of_id || null,
       finalPhotoFront,
@@ -486,7 +529,13 @@ const submitComplaintHandler = async (req, res) => {
       initialRankingScore,
       isPotentialDuplicate,
       potentialParentId,
-      duplicateDistanceM
+      duplicateDistanceM,
+      riskAssessment.safety_score,
+      riskAssessment.disruption_score,
+      riskAssessment.health_environment_score,
+      riskAssessment.defect_severity_score,
+      riskAssessment.risk_score,
+      riskAssessment.priority_rank
     ]);
 
     const complaintId = result.rows[0].id;
@@ -610,10 +659,38 @@ const submitComplaintHandler = async (req, res) => {
     }
   }
 
-    // Send initial submission notification
-    await notifyStatusChange(complaintId, 'Submitted', citizenId).catch(nErr => {
-      console.warn('Initial submission notification note:', nErr.message);
-    });
+    // Trigger automatic staff assignment based on department workload, availability, and performance
+    let currentStatus = 'Submitted';
+    let assignedStaffId = null;
+    let assignedStaffName = null;
+    let assignedStaffEmail = null;
+    let assignedAt = null;
+
+    try {
+      const { autoAssignComplaint } = require('../services/autoAssignmentService');
+      const assignResult = await autoAssignComplaint(complaintId, finalDeptId, {
+        priority,
+        citizenId,
+        departmentName: finalDeptName
+      });
+
+      if (assignResult.assigned && assignResult.staff) {
+        currentStatus = 'Staff Assigned';
+        assignedStaffId = String(assignResult.staff.id);
+        assignedStaffName = assignResult.staff.name;
+        assignedStaffEmail = assignResult.staff.email;
+        assignedAt = new Date().toISOString();
+      }
+    } catch (assignErr) {
+      console.warn('Auto-assignment non-fatal exception:', assignErr.message);
+    }
+
+    // Send initial submission notification (if not already notified by auto-assignment)
+    if (currentStatus === 'Submitted') {
+      await notifyStatusChange(complaintId, 'Submitted', citizenId).catch(nErr => {
+        console.warn('Initial submission notification note:', nErr.message);
+      });
+    }
 
     const returnedId = complaintId || supaComplaintId || finalComplaintNumber;
 
@@ -636,16 +713,27 @@ const submitComplaintHandler = async (req, res) => {
         title,
         description: description || '',
         priority,
-        status: 'Submitted',
+        status: currentStatus,
+        assigned_staff_id: assignedStaffId,
+        assigned_staff_name: assignedStaffName,
+        assigned_staff_email: assignedStaffEmail,
+        assigned_at: assignedAt,
         department_id: finalDeptId,
         department_name: finalDeptName,
         department_code: finalDeptCode,
-        latitude,
-        longitude,
-        location_source: location_source || 'manual_pin',
+        latitude: latNum,
+        longitude: lngNum,
+        location_source: normLocationSource,
+        location_accuracy_m: accuracyNum,
         location_address: location_address || '',
         sla_deadline: slaDeadline,
         response_time_hours: slaHours,
+        safety_score: riskAssessment.safety_score,
+        disruption_score: riskAssessment.disruption_score,
+        health_environment_score: riskAssessment.health_environment_score,
+        defect_severity_score: riskAssessment.defect_severity_score,
+        risk_score: riskAssessment.risk_score,
+        priority_rank: riskAssessment.priority_rank,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, req)
@@ -723,16 +811,19 @@ router.post('/:id/merge', authenticateToken, async (req, res) => {
       newSupport = currentSupport + 1;
     }
 
-    // 3. Recalculate ranking score
+    // 3. Recalculate ranking score and 4-quadrant priority rank
     const p = String(masterComp.priority || '').toLowerCase();
     const severityWeight = p === 'critical' ? 8 : (p === 'high' ? 5 : (p === 'medium' ? 2 : 0));
     const isOverdue = masterComp.sla_deadline && new Date() > new Date(masterComp.sla_deadline);
     const overdueWeight = isOverdue ? 4 : 0;
     const newRankingScore = newSupport + severityWeight + overdueWeight;
 
+    const baseRiskScore = Number(masterComp.risk_score ?? (p === 'critical' ? 10 : (p === 'high' ? 7 : (p === 'medium' ? 4 : 1))));
+    const newPriorityRank = (baseRiskScore * 10) + Math.min(newSupport, 10) + (isOverdue ? 10 : 0);
+
     await query(
-      `UPDATE complaints SET support_count = ?, ranking_score = ? WHERE id = ?`,
-      [newSupport, newRankingScore, masterComp.id]
+      `UPDATE complaints SET support_count = ?, ranking_score = ?, priority_rank = ? WHERE id = ?`,
+      [newSupport, newRankingScore, newPriorityRank, masterComp.id]
     );
 
     // 4. History log
@@ -754,11 +845,97 @@ router.post('/:id/merge', authenticateToken, async (req, res) => {
       message: `Merged complaint ${duplicateComp.complaint_number || duplicateComp.id} into ${masterComp.complaint_number || masterComp.id}`,
       master_complaint_id: masterComp.id,
       support_count: newSupport,
-      ranking_score: newRankingScore
+      ranking_score: newRankingScore,
+      priority_rank: newPriorityRank
     });
   } catch (err) {
     console.error('Merge complaint error:', err);
     return res.status(500).json({ error: 'Failed to merge complaints' });
+  }
+});
+
+// Admin / Department Head manual override for severity & risk scores
+router.patch('/:id/risk', authenticateToken, async (req, res) => {
+  try {
+    const userRole = req.user?.role || 'citizen';
+    if (!['admin', 'city_admin', 'department_head', 'officer'].includes(userRole)) {
+      return res.status(403).json({ error: 'Forbidden: Only Admins or Department Heads can override severity or risk scores' });
+    }
+
+    const complaintId = req.params.id;
+    const { severity, safety_score, disruption_score, health_environment_score, defect_severity_score, reason } = req.body;
+
+    const compRes = await query(`SELECT * FROM complaints WHERE id = ? OR complaint_number = ? OR CAST(id AS TEXT) = ?`, [complaintId, complaintId, complaintId]);
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+    const comp = compRes.rows[0];
+
+    const oldSeverity = comp.priority || comp.severity || 'Medium';
+    let targetSeverity = severity ? severity.trim().toUpperCase() : oldSeverity.toUpperCase();
+    if (!['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(targetSeverity)) {
+      targetSeverity = 'MEDIUM';
+    }
+    const normalizedNewSeverity = targetSeverity.charAt(0).toUpperCase() + targetSeverity.slice(1).toLowerCase();
+
+    const { calculateRiskAssessment } = require('../services/riskMatrixService');
+    const assessed = calculateRiskAssessment({
+      safety_score: safety_score !== undefined ? safety_score : comp.safety_score,
+      disruption_score: disruption_score !== undefined ? disruption_score : comp.disruption_score,
+      health_environment_score: health_environment_score !== undefined ? health_environment_score : comp.health_environment_score,
+      defect_severity_score: defect_severity_score !== undefined ? defect_severity_score : comp.defect_severity_score,
+      support_count: comp.support_count || 1,
+      sla_deadline: comp.sla_deadline,
+      priority: normalizedNewSeverity
+    });
+
+    const finalPriority = severity ? normalizedNewSeverity : (assessed.severity.charAt(0).toUpperCase() + assessed.severity.slice(1).toLowerCase());
+
+    await query(
+      `UPDATE complaints 
+       SET priority = ?, safety_score = ?, disruption_score = ?, health_environment_score = ?, defect_severity_score = ?, risk_score = ?, priority_rank = ?, updated_at = ?
+       WHERE id = ?`,
+      [
+        finalPriority,
+        assessed.safety_score,
+        assessed.disruption_score,
+        assessed.health_environment_score,
+        assessed.defect_severity_score,
+        assessed.risk_score,
+        assessed.priority_rank,
+        new Date().toISOString(),
+        comp.id
+      ]
+    );
+
+    // Record audit history
+    try {
+      await query(
+        `INSERT INTO complaint_status_history (complaint_id, status, remark, department, updated_by) VALUES (?, ?, ?, ?, ?)`,
+        [
+          comp.id,
+          comp.status || 'Updated',
+          `Severity overridden from ${oldSeverity} to ${finalPriority}. Reason: ${reason || 'Administrative risk review'}.`,
+          'Administration',
+          String(req.user.name || req.user.email || 'Admin/HOD')
+        ]
+      );
+    } catch (hErr) {}
+
+    return res.json({
+      success: true,
+      message: 'Risk assessment & severity updated successfully',
+      complaint_id: comp.id,
+      old_severity: oldSeverity,
+      new_severity: finalPriority,
+      risk_score: assessed.risk_score,
+      priority_rank: assessed.priority_rank,
+      updated_by: req.user.name || req.user.email,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Risk override error:', err);
+    return res.status(500).json({ error: 'Failed to override risk assessment' });
   }
 });
 
@@ -821,7 +998,7 @@ router.get('/:id/history', authenticateToken, async (req, res) => {
 });
 
 // Helper to safely merge authorized records from both PostgreSQL and Supabase
-function mergeComplaintRows(primaryList = [], secondaryList = []) {
+function mergeComplaintRows(primaryList = [], secondaryList = [], sortByOperational = false) {
   const mergedMap = new Map();
   const getRecordKey = (c) => c.complaint_number || String(c.id);
 
@@ -845,7 +1022,13 @@ function mergeComplaintRows(primaryList = [], secondaryList = []) {
       'title',
       'citizen_id',
       'citizen_name',
-      'citizen_mobile'
+      'citizen_mobile',
+      'safety_score',
+      'disruption_score',
+      'health_environment_score',
+      'defect_severity_score',
+      'risk_score',
+      'priority_rank'
     ];
     for (const f of fieldsToFill) {
       if ((result[f] === null || result[f] === undefined || result[f] === '') && older[f] !== null && older[f] !== undefined && older[f] !== '') {
@@ -872,7 +1055,25 @@ function mergeComplaintRows(primaryList = [], secondaryList = []) {
     }
   }
 
-  return Array.from(mergedMap.values()).sort((a, b) => {
+  const items = Array.from(mergedMap.values());
+  if (sortByOperational) {
+    const severityOrder = { critical: 1, high: 2, medium: 3, low: 4 };
+    return items.sort((a, b) => {
+      const sevA = severityOrder[String(a.priority || a.severity || '').toLowerCase()] || 5;
+      const sevB = severityOrder[String(b.priority || b.severity || '').toLowerCase()] || 5;
+      if (sevA !== sevB) {
+        return sevA - sevB;
+      }
+      const rankA = Number(a.priority_rank ?? a.ranking_score ?? 0);
+      const rankB = Number(b.priority_rank ?? b.ranking_score ?? 0);
+      if (rankA !== rankB) {
+        return rankB - rankA;
+      }
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
+  }
+
+  return items.sort((a, b) => {
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
 }
@@ -943,7 +1144,7 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     }
 
-    const merged = mergeComplaintRows(pgRows, supaRows);
+    const merged = mergeComplaintRows(pgRows, supaRows, !isCitizen);
     return res.json({ complaints: merged.map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch all complaints error:', err);

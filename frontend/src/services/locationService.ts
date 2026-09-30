@@ -2,12 +2,30 @@ import exifr from 'exifr';
 import { Complaint } from '../types/database.types';
 import { getApiUrl } from '../config/apiConfig';
 
+export type LocationSourceType =
+  | 'exif'
+  | 'device_gps'
+  | 'map_pin'
+  | 'map_pin_confirmed'
+  | 'live_gps'
+  | 'exif_gps'
+  | 'manual_pin'
+  | 'geocoded'
+  | 'geocode_failed'
+  | 'unavailable'
+  | 'gps';
+
 export interface LocationResult {
   latitude: number | null;
   longitude: number | null;
-  source: 'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps';
+  source: LocationSourceType;
+  accuracy?: number | null;
   requiresManualPin: boolean;
   requiresChoice: boolean;
+  requiresConfirmation?: boolean;
+  lowAccuracy?: boolean;
+  conflict?: string;
+  distanceMeters?: number;
   message?: string;
   exifCoords?: { latitude: number; longitude: number };
   liveCoords?: { latitude: number; longitude: number };
@@ -418,77 +436,135 @@ export async function extractExifGps(file: File): Promise<{ latitude: number | n
 }
 
 /**
- * Priority Location Resolver:
- * 1. Live camera capture -> current GPS (live_gps)
- * 2. EXIF GPS -> photo embedded metadata (exif_gps)
- * 3. EXIF stripped & no live GPS -> manual Leaflet map pin (manual_pin)
- * 4. >500m conflict check if both live GPS and EXIF exist
+ * 3-Tier Geolocation Resolution with 100-Meter Validation
+ * Priority 1: Hardware EXIF GPS from camera/image metadata
+ * Priority 2: Device HTML5 live GPS (accuracy <= 100m)
+ * Priority 3: Interactive Leaflet/Google Map pin drop
+ *
+ * 100-Meter Consistency Check:
+ * If EXIF vs Device GPS difference > 100m -> conflict / map confirmation required
  */
 export async function resolveIssueLocation(
-  file: File,
+  file?: File | null,
   liveLat?: number | null,
   liveLng?: number | null,
   manualLat?: number | null,
-  manualLng?: number | null
+  manualLng?: number | null,
+  liveAccuracy?: number | null,
+  mapPinConfirmed: boolean = false
 ): Promise<LocationResult> {
-  const exif = await extractExifGps(file);
+  const exif = file ? await extractExifGps(file) : { latitude: null, longitude: null, hasExif: false };
 
-  const hasLive = typeof liveLat === 'number' && typeof liveLng === 'number' && !isNaN(liveLat) && !isNaN(liveLng);
-  const hasExif = exif.hasExif && exif.latitude !== null && exif.longitude !== null;
-  const hasManual = typeof manualLat === 'number' && typeof manualLng === 'number' && !isNaN(manualLat) && !isNaN(manualLng);
+  const isCoordValid = (lat?: number | null, lng?: number | null) =>
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    !isNaN(lat) &&
+    !isNaN(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180;
 
-  if (hasManual) {
+  const hasExif = exif.hasExif && isCoordValid(exif.latitude, exif.longitude);
+  const hasLive = isCoordValid(liveLat, liveLng);
+  const hasManual = isCoordValid(manualLat, manualLng);
+
+  // If user explicitly confirmed map pin (either manually or to resolve conflict)
+  if (mapPinConfirmed && hasManual) {
     return {
       latitude: manualLat!,
       longitude: manualLng!,
-      source: 'manual_pin',
+      source: hasExif || hasLive ? 'map_pin_confirmed' : 'map_pin',
       requiresManualPin: false,
-      requiresChoice: false
+      requiresChoice: false,
+      requiresConfirmation: false,
+      message: 'Location confirmed by map pin'
     };
   }
 
-  if (hasLive && hasExif) {
+  // 100-Meter Consistency Check: EXIF vs Device Live GPS
+  if (hasExif && hasLive) {
     const dist = calculateDistanceMeters(liveLat!, liveLng!, exif.latitude!, exif.longitude!);
-    if (dist > 500) {
+    if (dist > 100) {
       return {
-        latitude: liveLat!,
-        longitude: liveLng!,
-        source: 'live_gps',
+        latitude: exif.latitude!,
+        longitude: exif.longitude!,
+        source: 'exif',
         requiresManualPin: false,
         requiresChoice: true,
+        requiresConfirmation: true,
+        conflict: 'exif_vs_device',
+        distanceMeters: Math.round(dist),
         exifCoords: { latitude: exif.latitude!, longitude: exif.longitude! },
         liveCoords: { latitude: liveLat!, longitude: liveLng! },
-        message: `Photo EXIF location differs from current device GPS by ${Math.round(dist)}m. Please choose which location to use.`
+        message: `Photo GPS differs from Device GPS by ${Math.round(dist)}m (>100m). Please confirm location on map.`
       };
     }
   }
 
-  if (hasLive) {
-    return {
-      latitude: liveLat!,
-      longitude: liveLng!,
-      source: 'live_gps',
-      requiresManualPin: false,
-      requiresChoice: false
-    };
-  }
-
+  // Priority 1: Hardware EXIF GPS
   if (hasExif) {
     return {
       latitude: exif.latitude!,
       longitude: exif.longitude!,
-      source: 'exif_gps',
+      source: 'exif',
       requiresManualPin: false,
-      requiresChoice: false
+      requiresChoice: false,
+      requiresConfirmation: false,
+      message: 'Location detected from photo GPS'
+    };
+  }
+
+  // Priority 2: Device HTML5 Live GPS (accuracy <= 100m)
+  if (hasLive) {
+    const acc = typeof liveAccuracy === 'number' && !isNaN(liveAccuracy) ? liveAccuracy : 15;
+    if (acc <= 100) {
+      return {
+        latitude: liveLat!,
+        longitude: liveLng!,
+        source: 'device_gps',
+        accuracy: acc,
+        requiresManualPin: false,
+        requiresChoice: false,
+        requiresConfirmation: false,
+        message: `Live GPS verified (±${Math.round(acc)}m)`
+      };
+    } else {
+      // Accuracy > 100m: do not silently accept as final -> require manual map confirmation
+      return {
+        latitude: liveLat!,
+        longitude: liveLng!,
+        source: 'device_gps',
+        accuracy: acc,
+        requiresManualPin: true,
+        requiresChoice: false,
+        requiresConfirmation: true,
+        lowAccuracy: true,
+        message: 'GPS accuracy low — please confirm on map'
+      };
+    }
+  }
+
+  // Priority 3: Interactive Map Pin Drop
+  if (hasManual) {
+    return {
+      latitude: manualLat!,
+      longitude: manualLng!,
+      source: 'map_pin',
+      requiresManualPin: false,
+      requiresChoice: false,
+      requiresConfirmation: false,
+      message: 'Location confirmed by map pin'
     };
   }
 
   return {
     latitude: null,
     longitude: null,
-    source: 'manual_pin',
+    source: 'map_pin',
     requiresManualPin: true,
     requiresChoice: false,
+    requiresConfirmation: true,
     message: "We couldn't detect the location for this photo. Please mark the issue location on the map."
   };
 }

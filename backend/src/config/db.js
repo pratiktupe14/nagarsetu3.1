@@ -192,6 +192,7 @@ async function createTablesPostgres() {
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_into_id TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_at TIMESTAMP;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_by TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS location_accuracy_m REAL;`).catch(() => {});
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS assignments (
@@ -499,6 +500,7 @@ function createTablesSqlite() {
         sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${colDef}`, () => {});
       };
       safeAddSqliteColumn('users', "designation TEXT DEFAULT 'Field Service Staff'");
+      safeAddSqliteColumn('users', 'last_assigned_at DATETIME');
       safeAddSqliteColumn('announcements', "status TEXT DEFAULT 'Published'");
       safeAddSqliteColumn('announcements', "target_audience TEXT DEFAULT 'all_departments'");
       safeAddSqliteColumn('announcements', 'target_role TEXT');
@@ -510,6 +512,7 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'assigned_staff_email TEXT');
       safeAddSqliteColumn('complaints', 'assigned_by TEXT');
       safeAddSqliteColumn('complaints', 'assigned_by_name TEXT');
+      safeAddSqliteColumn('complaints', 'assigned_at DATETIME');
       safeAddSqliteColumn('complaints', 'sla_deadline DATETIME');
       safeAddSqliteColumn('complaints', 'response_time_hours INTEGER');
       safeAddSqliteColumn('complaints', 'photo_front_url TEXT');
@@ -527,6 +530,13 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'merged_into_id TEXT');
       safeAddSqliteColumn('complaints', 'merged_at DATETIME');
       safeAddSqliteColumn('complaints', 'merged_by TEXT');
+      safeAddSqliteColumn('complaints', 'safety_score INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'disruption_score INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'health_environment_score INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'defect_severity_score INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'risk_score INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'priority_rank INTEGER DEFAULT 0');
+      safeAddSqliteColumn('complaints', 'location_accuracy_m REAL');
       safeAddSqliteColumn('departments', 'code TEXT');
 
       sqliteDb.run(`

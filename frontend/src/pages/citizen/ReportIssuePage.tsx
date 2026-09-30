@@ -12,7 +12,9 @@ import {
   findDuplicateComplaints,
   isWithinNashikServiceArea,
   requestFreshGpsLocation,
-  reverseGeocodeCoordinates
+  reverseGeocodeCoordinates,
+  isValidCoordinate,
+  LocationSourceType
 } from '../../services/locationService';
 import {
   detectCivicIssue,
@@ -155,7 +157,8 @@ export const ReportIssuePage: React.FC = () => {
   const [lat, setLat] = useState<number>(20.0059);
   const [lng, setLng] = useState<number>(73.7898);
   const [locationAccuracy, setLocationAccuracy] = useState<number | undefined>(15);
-  const [locationSource, setLocationSource] = useState<'live_gps' | 'exif_gps' | 'manual_pin' | 'geocoded' | 'geocode_failed' | 'unavailable' | 'gps'>('manual_pin');
+  const [locationSource, setLocationSource] = useState<LocationSourceType>('map_pin');
+  const [mapPinConfirmed, setMapPinConfirmed] = useState<boolean>(false);
   const [locationStatusText, setLocationStatusText] = useState<string>('Select defect location on Leaflet map pin');
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [detectingLocation, setDetectingLocation] = useState<boolean>(false);
@@ -231,12 +234,21 @@ export const ReportIssuePage: React.FC = () => {
     try {
       const gps = await requestFreshGpsLocation();
       if (gps && gps.latitude && gps.longitude) {
+        const acc = gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10;
         setLat(gps.latitude);
         setLng(gps.longitude);
-        setLocationAccuracy(gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10);
-        setLocationSource('live_gps');
-        setLocationStatusText(`Verified Live GPS Location (±${gps.accuracyMeters ? Math.round(gps.accuracyMeters) : 10}m accuracy)`);
-        setShowLocationPromptModal(false);
+        setLocationAccuracy(acc);
+
+        if (acc <= 100) {
+          setLocationSource('device_gps');
+          setLocationStatusText(`Live GPS verified (±${acc}m)`);
+          setShowLocationPromptModal(false);
+        } else {
+          setLocationSource('device_gps');
+          setLocationStatusText('GPS accuracy low — please confirm on map');
+          toast.warning(`Device GPS accuracy is low (±${acc}m). Please confirm defect location on the map.`);
+          setShowLocationPromptModal(true);
+        }
         runDuplicateCheck(gps.latitude, gps.longitude);
 
         const addr = await reverseGeocodeCoordinates(gps.latitude, gps.longitude);
@@ -318,18 +330,22 @@ export const ReportIssuePage: React.FC = () => {
 
     // Extract EXIF location if available and not set by live GPS
     try {
-      const resolvedLoc = await resolveIssueLocation(file, lat, lng);
+      const resolvedLoc = await resolveIssueLocation(file, lat, lng, null, null, locationAccuracy, mapPinConfirmed);
       if (resolvedLoc.latitude && resolvedLoc.longitude) {
         setLat(resolvedLoc.latitude);
         setLng(resolvedLoc.longitude);
         setLocationSource(resolvedLoc.source);
         setLocationStatusText(
-          resolvedLoc.source === 'live_gps'
-            ? '✓ Verified Live GPS Device Location'
-            : resolvedLoc.source === 'exif_gps'
-            ? '📷 Location Extracted from Photo EXIF Metadata'
-            : '📍 Location Pin Set Manually'
+          resolvedLoc.message ||
+          (resolvedLoc.source === 'exif'
+            ? 'Location detected from photo GPS'
+            : resolvedLoc.source === 'device_gps'
+            ? (resolvedLoc.lowAccuracy ? 'GPS accuracy low — please confirm on map' : `Live GPS verified (±${resolvedLoc.accuracy || 15}m)`)
+            : 'Location confirmed by map pin')
         );
+        if (resolvedLoc.requiresConfirmation) {
+          toast.warning(resolvedLoc.message || 'Please confirm the complaint location on the map.');
+        }
         runDuplicateCheck(resolvedLoc.latitude, resolvedLoc.longitude);
 
         const addr = await reverseGeocodeCoordinates(resolvedLoc.latitude, resolvedLoc.longitude);
@@ -413,16 +429,26 @@ export const ReportIssuePage: React.FC = () => {
     try {
       const complaintNumber = generateComplaintNumber();
 
-      const hasAnyPhoto = Boolean(
-        angleSlots.front.previewUrl ||
-        angleSlots.left.previewUrl ||
-        angleSlots.right.previewUrl ||
-        angleSlots.closeup.previewUrl ||
-        photoPreviewUrl
-      );
+      const validPhotoCount = Object.values(angleSlots).filter((s) => Boolean(s.previewUrl || s.file)).length;
 
-      if (!hasAnyPhoto) {
-        toast.warning('Please capture or upload at least one photo (Front View recommended).');
+      if (validPhotoCount < 2) {
+        toast.warning(`At least 2 evidence photos from any view are compulsory. Currently uploaded: ${validPhotoCount}/4. Please upload ${2 - validPhotoCount} more photo${2 - validPhotoCount > 1 ? 's' : ''} to proceed.`);
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+
+      // 3-Tier Geolocation Validation
+      if (!isValidCoordinate(lat, lng)) {
+        toast.error('Valid complaint coordinates are required. Please mark the defect location on the map.');
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+
+      if (locationSource === 'device_gps' && locationAccuracy && locationAccuracy > 100 && !mapPinConfirmed) {
+        toast.warning('Device GPS accuracy is lower than 100m. Please confirm defect location on the map.');
+        setShowLocationPromptModal(true);
         isSubmittingRef.current = false;
         setSubmitting(false);
         return;
@@ -510,6 +536,7 @@ export const ReportIssuePage: React.FC = () => {
         latitude: lat,
         longitude: lng,
         location_source: locationSource,
+        location_accuracy_m: locationAccuracy,
         location_address: locationAddress,
         ai_category: aiResult?.category || category,
         ai_specific_issue: aiResult?.issue_type || category,
@@ -620,19 +647,46 @@ export const ReportIssuePage: React.FC = () => {
                         <span>Complaint Evidence Photos</span>
                       </h2>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Swipe or navigate through 4 angles. Front View is recommended as primary.
+                        Swipe or navigate through 4 angles. Minimum 2 photos required from any view.
                       </p>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
                       <span className={`text-xs font-mono font-extrabold px-2.5 py-1 rounded-full border shadow-2xs ${
-                        addedCount > 0
+                        addedCount >= 2
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-200'
-                          : 'bg-gray-100 text-gray-600 border-gray-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-300 ring-1 ring-amber-200'
                       }`}>
-                        {addedCount} / 4 Added
+                        {addedCount} / 4 Added {addedCount < 2 ? `(Min 2 Compulsory)` : `✓ Ready`}
                       </span>
                     </div>
                   </div>
+
+                  {/* Compulsory 2-Photo Requirement Banner */}
+                  {addedCount < 2 ? (
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs font-medium flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          <strong>Compulsory requirement:</strong> Please upload at least <strong>2 photos</strong> (any view) before proceeding.
+                        </span>
+                      </div>
+                      <span className="font-mono font-extrabold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[11px] shrink-0">
+                        {addedCount}/2 Uploaded
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs font-medium flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>
+                          <strong>Requirement met!</strong> {addedCount} photos uploaded (minimum 2 satisfied). You can proceed to submit.
+                        </span>
+                      </div>
+                      <span className="font-mono font-extrabold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded text-[11px] shrink-0">
+                        ✓ Unlocked
+                      </span>
+                    </div>
+                  )}
 
                   {/* Carousel Step / Dot Navigation Tabs */}
                   <div className="flex items-center justify-between gap-1.5 p-1.5 bg-gray-50 rounded-xl border border-gray-200">
@@ -697,8 +751,12 @@ export const ReportIssuePage: React.FC = () => {
                         </div>
 
                         <div className="flex items-center space-x-1.5">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-mono font-extrabold shadow-2xs">
-                            {addedCount}/4
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-mono font-extrabold shadow-2xs ${
+                            addedCount >= 2
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-50 text-amber-800 border-amber-300'
+                          }`}>
+                            {addedCount}/4 {addedCount < 2 ? '(Min 2)' : ''}
                           </span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
                             isFront
@@ -1012,26 +1070,47 @@ export const ReportIssuePage: React.FC = () => {
 
               {/* LOCATION STATUS & ACCURACY BADGE */}
               <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
-                locationSource === 'live_gps'
+                locationSource === 'exif' || locationSource === 'exif_gps'
+                  ? 'bg-purple-50 text-purple-900 border-purple-200'
+                  : locationSource === 'device_gps' || locationSource === 'live_gps'
                   ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                   : 'bg-blue-50 text-blue-900 border-blue-200'
               }`}>
-                <span className="flex items-center space-x-1.5">
+                <span className="flex items-center space-x-1.5 truncate mr-2">
                   {detectingLocation ? (
-                    <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
-                  ) : locationSource === 'live_gps' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin shrink-0" />
+                  ) : locationSource === 'exif' || locationSource === 'exif_gps' ? (
+                    <Camera className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  ) : locationSource === 'device_gps' || locationSource === 'live_gps' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   ) : (
-                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   )}
-                  <span>{locationStatusText}</span>
+                  <span className="truncate">{locationStatusText}</span>
                 </span>
 
-                {locationAccuracy && (
-                  <span className="font-mono text-[10px] font-extrabold bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
-                    ±{locationAccuracy}m
+                <div className="flex items-center space-x-1.5 shrink-0">
+                  {/* SOURCE BADGE */}
+                  <span className={`font-mono text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                    locationSource === 'exif' || locationSource === 'exif_gps'
+                      ? 'bg-purple-100 text-purple-800 border-purple-300'
+                      : locationSource === 'device_gps' || locationSource === 'live_gps'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-blue-100 text-blue-800 border-blue-300'
+                  }`}>
+                    {locationSource === 'exif' || locationSource === 'exif_gps'
+                      ? 'EXIF GPS'
+                      : locationSource === 'device_gps' || locationSource === 'live_gps'
+                      ? 'LIVE GPS'
+                      : 'MAP PIN'}
                   </span>
-                )}
+
+                  {locationAccuracy && (
+                    <span className="font-mono text-[10px] font-extrabold bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+                      ±{locationAccuracy}m
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* EMBEDDED MAP PICKER */}
@@ -1040,12 +1119,19 @@ export const ReportIssuePage: React.FC = () => {
                   initialLat={lat}
                   initialLng={lng}
                   accuracyMeters={locationAccuracy}
-                  accuracyStatusText={locationSource === 'live_gps' ? '✓ Live GPS' : '📍 Manual Pin'}
+                  accuracyStatusText={
+                    locationSource === 'exif' || locationSource === 'exif_gps'
+                      ? '📷 EXIF GPS'
+                      : locationSource === 'device_gps' || locationSource === 'live_gps'
+                      ? '✓ Live GPS'
+                      : '📍 Map Pin'
+                  }
                   onLocationSelect={async (newLat, newLng) => {
                     setLat(newLat);
                     setLng(newLng);
-                    setLocationSource('manual_pin');
-                    setLocationStatusText(`Location pin set to ${newLat.toFixed(4)}, ${newLng.toFixed(4)}`);
+                    setMapPinConfirmed(true);
+                    setLocationSource(locationSource === 'exif' || locationSource === 'device_gps' ? 'map_pin_confirmed' : 'map_pin');
+                    setLocationStatusText('Location confirmed by map pin');
                     runDuplicateCheck(newLat, newLng);
 
                     const addr = await reverseGeocodeCoordinates(newLat, newLng);
@@ -1228,10 +1314,30 @@ export const ReportIssuePage: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setShowReviewModal(true)}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px] flex items-center justify-center space-x-2 transition-all"
+                onClick={() => {
+                  const uploadedCount = Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length;
+                  if (uploadedCount < 2) {
+                    toast.warning(`At least 2 evidence photos from any view are compulsory. Currently uploaded: ${uploadedCount}/4. Please upload ${2 - uploadedCount} more photo${2 - uploadedCount > 1 ? 's' : ''} to proceed.`);
+                    return;
+                  }
+                  setShowReviewModal(true);
+                }}
+                className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-sm min-h-[44px] flex items-center justify-center space-x-2 transition-all ${
+                  Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length >= 2
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer ring-2 ring-emerald-400/50'
+                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer'
+                }`}
+                title={
+                  Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length < 2
+                    ? `Compulsory: Upload at least 2 photos from any view to proceed (${Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length}/2)`
+                    : 'Review and Submit Complaint'
+                }
               >
-                <span>{t('reviewComplaint')} ({Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length} Photos)</span>
+                <span>
+                  {t('reviewComplaint')} ({Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length}/4 Photos
+                  {Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length < 2 ? ' • Min 2 Required' : ' • Ready'}
+                  )
+                </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -1404,11 +1510,18 @@ export const ReportIssuePage: React.FC = () => {
                 {t('editForm')}
               </button>
 
+              {Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length < 2 && (
+                <div className="w-full p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>At least 2 evidence photos (any view) are compulsory to submit. Please edit and add {2 - Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length} more photo(s).</span>
+                </div>
+              )}
+
               <button
                 type="button"
                 id="btn-submit-complaint-final"
                 onClick={handleFinalSubmit}
-                disabled={submitting || isSubmittingRef.current}
+                disabled={submitting || isSubmittingRef.current || Object.values(angleSlots).filter((s) => Boolean(s.previewUrl)).length < 2}
                 className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase min-h-[44px] flex items-center space-x-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-all"
               >
                 {submitting || isSubmittingRef.current ? (
