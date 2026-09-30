@@ -41,7 +41,7 @@ describe('Role-Routing and Authentication Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mobileOrEmail: '8788562103',
-        password: 'password123'
+        password: '8788562103'
       })
     });
 
@@ -73,7 +73,7 @@ describe('Role-Routing and Authentication Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mobileOrEmail: 'admin@nagarsetu.gov.in',
-        password: 'NagarSetu@Admin2026!'
+        password: 'admin@123'
       })
     });
 
@@ -106,7 +106,7 @@ describe('Role-Routing and Authentication Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mobileOrEmail: '8788562103',
-        password: 'password123'
+        password: '8788562103'
       })
     });
     const { token: citizenToken } = await loginRes.json();
@@ -130,7 +130,7 @@ describe('Role-Routing and Authentication Verification Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mobileOrEmail: 'admin@nagarsetu.gov.in',
-        password: 'NagarSetu@Admin2026!'
+        password: 'admin@123'
       })
     });
     const { token: adminToken } = await loginRes.json();
