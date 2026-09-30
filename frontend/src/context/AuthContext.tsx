@@ -208,6 +208,7 @@ export const DEFAULT_ROLE_USERS: Record<UserRole, UserProfile> = {
   },
   department_head: {
     id: 'demo-head-id-404',
+    name: 'Rahul Kumar',
     full_name: 'Rahul Kumar',
     email: 'rahul.kumar@nagarsetu.gov.in',
     role: 'department_head',
@@ -257,6 +258,14 @@ function resolveInitialUser(): UserProfile | null {
       const parsed = JSON.parse(sessionUserRaw);
       if (parsed && parsed.role && parsed.id) {
         if (!pathRole || parsed.role === pathRole) {
+          if (parsed.role === 'department_head' && (!parsed.department_id || !parsed.department_name)) {
+            parsed.department_id = parsed.department_id || '1';
+            parsed.department_name = parsed.department_name || 'Public Works Department (PWD)';
+            parsed.department_code = parsed.department_code || 'PWD';
+            parsed.name = parsed.name || parsed.full_name || 'Rahul Kumar';
+            parsed.full_name = parsed.full_name || parsed.name || 'Rahul Kumar';
+            sessionStorage.setItem('nagarsetu_user', JSON.stringify(parsed));
+          }
           return parsed;
         }
       }

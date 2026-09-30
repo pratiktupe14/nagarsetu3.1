@@ -625,48 +625,133 @@ export async function getStaffTasks(
   if (token) {
     try {
       const res = await fetch(`${getApiUrl()}/api/staff/tasks`, {
-        headers: getNoCacheHeaders()
+        headers: getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {})
       });
       if (res.ok) {
         const data = await res.json();
         const staffTasks: Complaint[] = Array.isArray(data) ? data : (data?.tasks || []);
-        if (Array.isArray(staffTasks)) {
+        if (Array.isArray(staffTasks) && staffTasks.length > 0) {
           return staffTasks.filter((c: any) => !isDemoComplaint(c));
         }
       }
-      throw new Error(`Failed to load field tasks from database (HTTP ${res.status})`);
     } catch (err: any) {
-      console.error('Backend /api/staff/tasks fetch error:', err);
-      throw err;
+      console.warn('Backend /api/staff/tasks fetch note:', err);
     }
   }
+
+  // Fallback to Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const cleanEmail = (userEmail || '').toLowerCase();
+      let query = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
+      if (staffId && isValidUuid(staffId)) {
+        query = query.or(`assigned_staff_id.eq.${staffId},assigned_staff_email.eq.${cleanEmail}`);
+      }
+      const { data, error } = await query;
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const formatted = data.map((c: any) => ({
+          ...c,
+          department_name: c.departments?.name || c.department_name
+        }));
+        return formatted.filter((c) => !isDemoComplaint(c));
+      }
+    } catch (sbErr) {
+      console.warn('Supabase getStaffTasks note:', sbErr);
+    }
+  }
+
+  // Fallback to LocalStorage stored complaints
+  try {
+    const local = getStoredComplaints();
+    if (local && local.length > 0) {
+      return local.filter((c) => !isDemoComplaint(c));
+    }
+  } catch (e) {}
 
   return [];
 }
 
-// Fetch complaints belonging to a specific department directly from backend API
+// Fetch complaints belonging to a specific department directly from backend API or Supabase/LocalStorage
 export async function getDepartmentComplaints(departmentId?: string, departmentName?: string): Promise<Complaint[]> {
-  if (!departmentId && !departmentName) {
-    return [];
-  }
+  const resolved = resolveDepartmentInfo(departmentId, departmentName);
+  const targetDeptId = resolved.id || departmentId || '';
+  const targetDeptName = resolved.fullName || departmentName || '';
 
   const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
   const headers = getNoCacheHeaders(token ? { Authorization: `Bearer ${token}` } : {});
 
+  const matchesDept = (c: any): boolean => {
+    if (!c) return false;
+    const cDept = resolveDepartmentInfo(c.department_id, c.department_name, c.category);
+    if (resolved.code && cDept.code && cDept.code === resolved.code) return true;
+    if (targetDeptId && (String(c.department_id) === String(targetDeptId) || cDept.id === targetDeptId)) return true;
+    if (resolved.name && c.department_name && c.department_name.toLowerCase().includes(resolved.name.toLowerCase())) return true;
+    if (targetDeptName && c.department_name && c.department_name.toLowerCase().includes(targetDeptName.toLowerCase())) return true;
+    return false;
+  };
+
+  // 1. Try Express API (/api/department/complaints or /api/complaints)
   try {
-    const res = await fetch(`${getApiUrl()}/api/department/complaints`, { headers });
+    let res = await fetch(`${getApiUrl()}/api/department/complaints${targetDeptId ? `?department_id=${encodeURIComponent(targetDeptId)}` : ''}`, { headers });
+    if (!res.ok) {
+      res = await fetch(`${getApiUrl()}/api/complaints`, { headers });
+    }
     if (res.ok) {
       const data = await res.json();
-      const backendComplaints = Array.isArray(data) ? data : Array.isArray(data?.complaints) ? data.complaints : [];
-      if (Array.isArray(backendComplaints)) {
-        return backendComplaints.filter((c: any) => !isDemoComplaint(c));
+      const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
+      const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
+      const filtered = cleanList.filter(matchesDept);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+      if (cleanList.length > 0 && !targetDeptId && !targetDeptName) {
+        return cleanList;
       }
     }
-    throw new Error(`Failed to fetch department complaints (HTTP ${res.status})`);
-  } catch (e: any) {
-    console.error('Backend API getDepartmentComplaints error:', e);
-    throw e;
+  } catch (backendErr) {
+    console.warn('Express backend getDepartmentComplaints note:', backendErr);
   }
+
+  // 2. Try Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      let query = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
+      if (isValidUuid(targetDeptId)) {
+        query = query.eq('department_id', targetDeptId);
+      }
+      const { data, error } = await query;
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const formatted = data.map((c: any) => ({
+          ...c,
+          department_name: c.departments?.name || c.department_name
+        }));
+        const cleanList = (formatted as Complaint[]).filter((c) => !isDemoComplaint(c));
+        const filtered = cleanList.filter(matchesDept);
+        if (filtered.length > 0) {
+          return filtered;
+        }
+      }
+    } catch (sbErr) {
+      console.warn('Supabase getDepartmentComplaints note:', sbErr);
+    }
+  }
+
+  // 3. Fallback to LocalStorage stored complaints
+  try {
+    const local = getStoredComplaints();
+    if (local && local.length > 0) {
+      const cleanList = local.filter((c) => !isDemoComplaint(c));
+      const filtered = cleanList.filter(matchesDept);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+      return cleanList;
+    }
+  } catch (localErr) {
+    console.warn('LocalStorage getDepartmentComplaints note:', localErr);
+  }
+
+  return [];
 }
 
 

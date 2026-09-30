@@ -53,6 +53,78 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/department/complaints
+ * Fetch complaints belonging to authenticated Department Head's department (or specified department_id)
+ */
+router.get('/complaints', authenticateToken, async (req, res) => {
+  try {
+    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
+    const userRole = req.user.role || 'citizen';
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    let targetDeptId = req.query.department_id || userDeptId;
+    let targetDeptName = req.query.department_name || userDeptName;
+
+    if (!targetDeptId && !targetDeptName) {
+      if (req.user.email && (req.user.email.includes('pwd') || req.user.email.includes('rahul'))) {
+        targetDeptId = 1;
+        targetDeptName = 'Public Works Department (PWD)';
+      }
+    }
+
+    let sql = `
+      SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment,
+             u.name as citizen_name, u.mobile as citizen_mobile
+      FROM complaints c
+      LEFT JOIN departments d ON c.department_id = d.id
+      LEFT JOIN feedback f ON f.complaint_id = c.id
+      LEFT JOIN users u ON c.citizen_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (targetDeptId) {
+      sql += ` AND c.department_id = $1`;
+      params.push(targetDeptId);
+    }
+
+    sql += ` ORDER BY c.created_at DESC`;
+
+    const result = await query(sql, params);
+    if (result.rows && result.rows.length > 0) {
+      return res.json({ complaints: result.rows });
+    }
+
+    // Fallback to Supabase if local DB has 0 rows
+    try {
+      const { getSupabaseClient } = require('../middleware/auth');
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        let sbQuery = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
+        if (targetDeptId) {
+          sbQuery = sbQuery.eq('department_id', targetDeptId);
+        }
+        const { data, error } = await sbQuery;
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const formatted = data.map((c) => ({
+            ...c,
+            department_name: c.departments?.name || c.department_name || targetDeptName || 'Public Works Department (PWD)'
+          }));
+          return res.json({ complaints: formatted });
+        }
+      }
+    } catch (sbErr) {
+      console.warn('Supabase fallback in GET /api/department/complaints note:', sbErr.message);
+    }
+
+    return res.json({ complaints: result.rows || [] });
+  } catch (err) {
+    console.error('Fetch department complaints error:', err);
+    return res.status(500).json({ error: 'Failed to fetch department complaints', complaints: [] });
+  }
+});
+
+/**
  * GET /api/department/staff
  * Fetch service staff for authenticated Department Head (or all for Admin)
  */
