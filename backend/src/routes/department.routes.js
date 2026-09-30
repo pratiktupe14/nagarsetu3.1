@@ -13,32 +13,159 @@ router.use((req, res, next) => {
 });
 
 /**
- * Helper: Resolve department ID and Name for current user
+ * Canonical Department Mapping
+ * Maps integer ID, code, UUID, and partial terms to authoritative department objects
+ */
+function getCanonicalDepartment(val) {
+  if (!val) return null;
+  const s = String(val).trim().toLowerCase();
+
+  // 1. PWD
+  if (
+    s === '1' || s === 'pwd' || s === 'dept-pwd' || s === 'dept-1' ||
+    s.includes('pwd') || s.includes('public works') || s.includes('8ed9f760')
+  ) {
+    return { id: 1, code: 'PWD', name: 'Public Works Department (PWD)', uuid: '8ed9f760-1314-427c-a515-c2a54d6df6d8' };
+  }
+  // 2. SAN
+  if (
+    s === '2' || s === 'san' || s === 'dept-san' || s === 'dept-2' ||
+    s.includes('san') || s.includes('waste') || s.includes('9cabc1f2')
+  ) {
+    return { id: 2, code: 'SAN', name: 'Sanitation & Waste Management', uuid: '9cabc1f2-fd10-48dd-a5cb-01d05197de22' };
+  }
+  // 3. WTR
+  if (
+    s === '3' || s === 'wtr' || s === 'dept-wtr' || s === 'dept-3' ||
+    s.includes('wtr') || s.includes('water') || s.includes('sewerage board') || s.includes('ead370cc')
+  ) {
+    return { id: 3, code: 'WTR', name: 'Water Supply & Sewerage Board', uuid: 'ead370cc-459c-44f0-899f-8a97f0928beb' };
+  }
+  // 4. DRN
+  if (
+    s === '4' || s === 'drn' || s === 'dept-drn' || s === 'dept-4' ||
+    s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('ee73cb82')
+  ) {
+    return { id: 4, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
+  }
+  // 5. ELE
+  if (
+    s === '5' || s === 'ele' || s === 'dept-ele' || s === 'dept-5' ||
+    s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('31842723')
+  ) {
+    return { id: 5, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
+  }
+  // 6. TRF
+  if (
+    s === '6' || s === 'trf' || s === 'dept-trf' || s === 'dept-6' ||
+    s.includes('trf') || s.includes('traffic') || s.includes('ae5e4d0c')
+  ) {
+    return { id: 6, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
+  }
+  // 7. MNT
+  if (
+    s === '7' || s === 'mnt' || s === 'dept-mnt' || s === 'dept-7' ||
+    s.includes('mnt') || s.includes('maint') || s.includes('71542723')
+  ) {
+    return { id: 7, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
+  }
+  return null;
+}
+
+const DEPT_HEAD_EMAIL_MAP = {
+  'rahul.kumar@nagarsetu.gov.in': 'PWD',
+  'amit.sharma@nagarsetu.gov.in': 'SAN',
+  'vikram.patil@nagarsetu.gov.in': 'WTR',
+  'sanjay.more@nagarsetu.gov.in': 'DRN',
+  'aditya.joshi@nagarsetu.gov.in': 'ELE',
+  'kunal.kulkarni@nagarsetu.gov.in': 'ELE',
+  'rohan.deshmukh@nagarsetu.gov.in': 'TRF'
+};
+
+function staffMatchesDept(staff, targetDept) {
+  if (!targetDept) return true;
+  if (!staff) return false;
+
+  const staffDept =
+    getCanonicalDepartment(staff.department_id) ||
+    getCanonicalDepartment(staff.employee_id) ||
+    getCanonicalDepartment(staff.department_name);
+
+  if (staffDept && staffDept.code === targetDept.code) return true;
+  if (String(staff.department_id) === String(targetDept.id)) return true;
+  if (String(staff.department_id) === String(targetDept.uuid)) return true;
+  if (staff.employee_id && String(staff.employee_id).toUpperCase().startsWith(targetDept.code)) return true;
+  return false;
+}
+
+/**
+ * Helper: Authoritatively resolve canonical department for authenticated user from session/database
  */
 async function resolveUserDepartment(req) {
-  let userDeptId = req.user.department_id || null;
-  let userDeptName = req.user.department_name || '';
+  if (['admin', 'city_admin'].includes(req.user.role)) {
+    return {
+      userDeptId: null,
+      userDeptName: 'City Administration',
+      canonicalDept: null
+    };
+  }
 
-  if (!userDeptId || !userDeptName) {
-    const uRes = await query('SELECT department_id, role FROM users WHERE id = $1 OR email = $2', [req.user.id, req.user.email]);
-    if (uRes.rows.length > 0) {
-      userDeptId = uRes.rows[0].department_id || userDeptId;
-    }
+  let rawDept = req.user.department_id || req.user.department_code || req.user.department_name;
+  let canonical = getCanonicalDepartment(rawDept);
 
-    const dhRes = await query(
-      `SELECT dh.department_id, d.name as department_name 
-       FROM department_heads dh 
-       LEFT JOIN departments d ON d.id = dh.department_id 
-       WHERE dh.user_id = $1 OR dh.email = $2`,
-      [req.user.id, req.user.email]
-    );
-    if (dhRes.rows.length > 0) {
-      userDeptId = dhRes.rows[0].department_id || userDeptId;
-      userDeptName = dhRes.rows[0].department_name || userDeptName;
+  const cleanEmail = (req.user.email || '').toLowerCase().trim();
+
+  // If not resolved from token, check email map
+  if (!canonical && cleanEmail) {
+    if (DEPT_HEAD_EMAIL_MAP[cleanEmail]) {
+      canonical = getCanonicalDepartment(DEPT_HEAD_EMAIL_MAP[cleanEmail]);
+    } else if (cleanEmail.includes('pwd') || cleanEmail.includes('rahul')) {
+      canonical = getCanonicalDepartment('PWD');
+    } else if (cleanEmail.includes('san') || cleanEmail.includes('amit.sharma')) {
+      canonical = getCanonicalDepartment('SAN');
+    } else if (cleanEmail.includes('wtr') || cleanEmail.includes('vikram')) {
+      canonical = getCanonicalDepartment('WTR');
+    } else if (cleanEmail.includes('drn') || cleanEmail.includes('sanjay.more')) {
+      canonical = getCanonicalDepartment('DRN');
+    } else if (cleanEmail.includes('ele')) {
+      canonical = getCanonicalDepartment('ELE');
+    } else if (cleanEmail.includes('trf') || cleanEmail.includes('rohan')) {
+      canonical = getCanonicalDepartment('TRF');
+    } else if (cleanEmail.includes('mnt')) {
+      canonical = getCanonicalDepartment('MNT');
     }
   }
 
-  return { userDeptId, userDeptName };
+  // If still not resolved, query database
+  if (!canonical && req.user.id) {
+    try {
+      const dhRes = await query(
+        `SELECT dh.department_id, d.name as department_name
+         FROM department_heads dh 
+         LEFT JOIN departments d ON d.id = dh.department_id 
+         WHERE (dh.user_id = $1 OR LOWER(dh.email) = $2) AND dh.status = 'active'`,
+        [req.user.id, cleanEmail]
+      );
+      if (dhRes.rows && dhRes.rows.length > 0) {
+        canonical = getCanonicalDepartment(dhRes.rows[0].department_id || dhRes.rows[0].department_name);
+      }
+    } catch (e) {
+      console.warn('DB resolve department note:', e);
+    }
+  }
+
+  // Default fallback for department head if somehow still unresolved
+  if (!canonical && req.user.role === 'department_head') {
+    canonical = getCanonicalDepartment('PWD');
+  }
+
+  return {
+    userDeptId: canonical ? canonical.id : null,
+    userDeptName: canonical ? canonical.name : '',
+    userDeptCode: canonical ? canonical.code : '',
+    userDeptUuid: canonical ? canonical.uuid : '',
+    canonicalDept: canonical
+  };
 }
 
 // Public or authenticated list of municipal departments
@@ -54,22 +181,20 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/department/complaints
- * Fetch complaints belonging to authenticated Department Head's department (or specified department_id)
+ * Fetch complaints strictly belonging to authenticated Department Head's department (or specified for Admin)
  */
 router.get('/complaints', authenticateToken, async (req, res) => {
   try {
-    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
-    const userRole = req.user.role || 'citizen';
-    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const { canonicalDept } = await resolveUserDepartment(req);
+    const userRole = (req.user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'city_admin', 'super_admin', 'municipal_admin'].includes(userRole);
 
-    let targetDeptId = req.query.department_id || userDeptId;
-    let targetDeptName = req.query.department_name || userDeptName;
-
-    if (!targetDeptId && !targetDeptName) {
-      if (req.user.email && (req.user.email.includes('pwd') || req.user.email.includes('rahul'))) {
-        targetDeptId = 1;
-        targetDeptName = 'Public Works Department (PWD)';
-      }
+    // SECURITY RULE: Department Head CANNOT override department filter with query params
+    let filterDept = null;
+    if (!isAdmin) {
+      filterDept = canonicalDept;
+    } else if (req.query.department_id || req.query.department || req.query.department_code) {
+      filterDept = getCanonicalDepartment(req.query.department_id || req.query.department || req.query.department_code);
     }
 
     let sql = `
@@ -83,41 +208,47 @@ router.get('/complaints', authenticateToken, async (req, res) => {
     `;
     const params = [];
 
-    if (targetDeptId) {
-      sql += ` AND c.department_id = $1`;
-      params.push(targetDeptId);
+    if (filterDept) {
+      sql += ` AND (c.department_id = $1 OR c.department_id = $2)`;
+      params.push(filterDept.id, filterDept.uuid);
     }
 
     sql += ` ORDER BY c.created_at DESC`;
 
     const result = await query(sql, params);
-    if (result.rows && result.rows.length > 0) {
-      return res.json({ complaints: result.rows });
+    let compRows = result.rows || [];
+
+    if (filterDept) {
+      compRows = compRows.filter(c => staffMatchesDept(c, filterDept));
     }
 
     // Fallback to Supabase if local DB has 0 rows
-    try {
-      const { getSupabaseClient } = require('../middleware/auth');
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        let sbQuery = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
-        if (targetDeptId) {
-          sbQuery = sbQuery.eq('department_id', targetDeptId);
+    if (compRows.length === 0) {
+      try {
+        const { getSupabaseClient } = require('../middleware/auth');
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          let sbQuery = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
+          if (filterDept) {
+            sbQuery = sbQuery.eq('department_id', filterDept.uuid);
+          }
+          const { data, error } = await sbQuery;
+          if (!error && Array.isArray(data) && data.length > 0) {
+            compRows = data.map((c) => ({
+              ...c,
+              department_name: c.departments?.name || c.department_name || (filterDept ? filterDept.name : 'Municipal Department')
+            }));
+            if (filterDept) {
+              compRows = compRows.filter(c => staffMatchesDept(c, filterDept));
+            }
+          }
         }
-        const { data, error } = await sbQuery;
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const formatted = data.map((c) => ({
-            ...c,
-            department_name: c.departments?.name || c.department_name || targetDeptName || 'Public Works Department (PWD)'
-          }));
-          return res.json({ complaints: formatted });
-        }
+      } catch (sbErr) {
+        console.warn('Supabase fallback in GET /api/department/complaints note:', sbErr.message);
       }
-    } catch (sbErr) {
-      console.warn('Supabase fallback in GET /api/department/complaints note:', sbErr.message);
     }
 
-    return res.json({ complaints: result.rows || [] });
+    return res.json({ complaints: compRows });
   } catch (err) {
     console.error('Fetch department complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch department complaints', complaints: [] });
@@ -126,15 +257,30 @@ router.get('/complaints', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/department/staff
- * Fetch service staff for authenticated Department Head (or all for Admin)
+ * Fetch service staff.
+ * SECURITY REQUIREMENT:
+ * - Department Head sees ONLY field staff belonging to their department.
+ * - Department Head CANNOT bypass filter by changing query parameters.
+ * - City Admin sees ALL field staff (or can filter by query parameter).
  */
 router.get('/staff', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
-    const { userDeptId, userDeptName } = await resolveUserDepartment(req);
-    const userRole = req.user.role || 'citizen';
-    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const { canonicalDept } = await resolveUserDepartment(req);
+    const userRole = (req.user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'city_admin', 'super_admin', 'municipal_admin'].includes(userRole);
     const filterStatus = (req.query.status || 'all').toLowerCase();
     const searchQuery = (req.query.search || '').toLowerCase().trim();
+
+    // SECURITY ENFORCEMENT:
+    // Department Head: strictly locked to server-side authenticated department.
+    // Query params (?department_id=, ?department=, ?department_code=) are strictly IGNORED for Dept Heads.
+    // City Admin: can see all staff, or optionally filter by query params.
+    let filterDept = null;
+    if (!isAdmin) {
+      filterDept = canonicalDept;
+    } else if (req.query.department_id || req.query.department || req.query.department_code) {
+      filterDept = getCanonicalDepartment(req.query.department_id || req.query.department || req.query.department_code);
+    }
 
     let sql = `
       SELECT u.id, u.name, u.email, u.mobile, u.employee_id, u.role, u.department_id,
@@ -167,41 +313,9 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
 
     const params = [];
 
-    // Department Isolation for Department Head
-    if (!isAdmin) {
-      sql += ` AND u.department_id = $1`;
-      params.push(userDeptId || -1);
-    } else if (req.query.department_id) {
-      let deptFilterId = req.query.department_id;
-      const codeToIdMap = {
-        PWD: 1, 'DEPT-1': 1, 'DEPT-PWD': 1,
-        SAN: 2, 'DEPT-2': 2, 'DEPT-SAN': 2,
-        WTR: 3, 'DEPT-3': 3, 'DEPT-WTR': 3,
-        DRN: 4, 'DEPT-4': 4, 'DEPT-DRN': 4,
-        ELE: 5, 'DEPT-5': 5, 'DEPT-ELE': 5,
-        TRF: 6, 'DEPT-6': 6, 'DEPT-TRF': 6,
-        MNT: 7, 'DEPT-7': 7, 'DEPT-MNT': 7,
-        '8ED9F760-1314-427C-A515-C2A54D6DF6D8': 1,
-        '9CABC1F2-FD10-48DD-A5CB-01D05197DE22': 2,
-        'EAD370CC-459C-44F0-899F-8A97F0928BEB': 3,
-        'EE73CB82-CC47-4333-B7D6-4491353C1354': 4,
-        '31842723-23AC-490B-912B-9F6D9AFBDFB3': 5,
-        'AE5E4D0C-996F-4D81-9528-D642664C93AE': 6,
-        '71542723-23AC-490B-912B-9F6D9AFBDFB7': 7
-      };
-      if (typeof deptFilterId === 'string') {
-        const cleanUpper = deptFilterId.toUpperCase().trim();
-        if (codeToIdMap[cleanUpper]) {
-          deptFilterId = codeToIdMap[cleanUpper];
-        } else {
-          const cleanCode = cleanUpper.split('-')[0].replace('DEPT', '').trim();
-          if (codeToIdMap[cleanCode]) {
-            deptFilterId = codeToIdMap[cleanCode];
-          }
-        }
-      }
-      sql += ` AND u.department_id = $1`;
-      params.push(deptFilterId);
+    if (filterDept) {
+      sql += ` AND (u.department_id = $1 OR u.department_id = $2 OR UPPER(COALESCE(u.employee_id, '')) LIKE $3)`;
+      params.push(filterDept.id, filterDept.uuid, `${filterDept.code}%`);
     }
 
     if (filterStatus === 'active') {
@@ -221,8 +335,14 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
     sql += ` ORDER BY u.created_at DESC`;
 
     const result = await query(sql, params);
-    let staffRows = result.rows;
+    let staffRows = result.rows || [];
 
+    // CRITICAL: Guarantee server-side department isolation even if query engine returned unfiltered rows (e.g. SQLite runMemQuery)
+    if (filterDept) {
+      staffRows = staffRows.filter(s => staffMatchesDept(s, filterDept));
+    }
+
+    // Supabase fallback if local DB returned 0 rows
     if (staffRows.length === 0) {
       try {
         const { getSupabaseClient } = require('../middleware/auth');
@@ -231,17 +351,7 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
           const { data: sbProfiles } = await sb.from('profiles').select('*').eq('role', 'service_staff');
           if (sbProfiles && sbProfiles.length > 0) {
             staffRows = sbProfiles.map((p) => {
-              let deptId = null;
-              let deptName = 'Municipal Department';
-              const empId = p.employee_id || '';
-              if (empId.startsWith('PWD') || p.department_id === '8ed9f760-1314-427c-a515-c2a54d6df6d8') { deptId = 1; deptName = 'Roads & Public Works (PWD)'; }
-              else if (empId.startsWith('SAN') || p.department_id === '9cabc1f2-fd10-48dd-a5cb-01d05197de22') { deptId = 2; deptName = 'Sanitation & Waste Management'; }
-              else if (empId.startsWith('WTR') || p.department_id === 'ead370cc-459c-44f0-899f-8a97f0928beb') { deptId = 3; deptName = 'Water Supply & Sewerage Board'; }
-              else if (empId.startsWith('DRN') || p.department_id === 'ee73cb82-cc47-4333-b7d6-4491353c1354') { deptId = 4; deptName = 'Drainage & Sewage Department'; }
-              else if (empId.startsWith('ELE') || p.department_id === '31842723-23ac-490b-912b-9f6d9afbdfb3') { deptId = 5; deptName = 'Electrical & Lighting Dept'; }
-              else if (empId.startsWith('TRF') || p.department_id === 'ae5e4d0c-996f-4d81-9528-d642664c93ae') { deptId = 6; deptName = 'Traffic Management Dept'; }
-              else if (empId.startsWith('MNT') || p.department_id === '71542723-23ac-490b-912b-9f6d9afbdfb7') { deptId = 7; deptName = 'Maintenance Department'; }
-
+              const pDept = getCanonicalDepartment(p.department_id) || getCanonicalDepartment(p.employee_id) || getCanonicalDepartment(p.department_name);
               return {
                 id: p.id,
                 name: p.full_name || p.name || 'Staff Member',
@@ -249,8 +359,8 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
                 mobile: p.mobile || '',
                 employee_id: p.employee_id || `STF-${String(p.id).slice(0, 4).toUpperCase()}`,
                 designation: 'Field Service Staff',
-                department_id: deptId,
-                department_name: deptName,
+                department_id: pDept ? pDept.id : null,
+                department_name: pDept ? pDept.name : 'Municipal Department',
                 status: p.status || 'active',
                 language_pref: p.language_pref || 'en',
                 created_at: p.created_at,
@@ -260,27 +370,8 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
               };
             });
 
-            if (!isAdmin) {
-              staffRows = staffRows.filter(s => s.department_id == userDeptId);
-            } else if (req.query.department_id) {
-              const filterId = codeToIdMap[String(req.query.department_id).toUpperCase()] || req.query.department_id;
-              staffRows = staffRows.filter(s => s.department_id == filterId);
-            }
-
-            if (filterStatus === 'active') {
-              staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'active');
-            } else if (filterStatus === 'inactive') {
-              staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'inactive');
-            }
-
-            if (searchQuery) {
-              const q = searchQuery.toLowerCase();
-              staffRows = staffRows.filter(s =>
-                s.name.toLowerCase().includes(q) ||
-                s.email.toLowerCase().includes(q) ||
-                s.mobile.toLowerCase().includes(q) ||
-                s.employee_id.toLowerCase().includes(q)
-              );
+            if (filterDept) {
+              staffRows = staffRows.filter(s => staffMatchesDept(s, filterDept));
             }
           }
         }
@@ -289,97 +380,84 @@ router.get('/staff', authenticateToken, requireRole(['department_head', 'admin',
       }
     }
 
-    const staffList = staffRows.map((row) => ({
-      id: String(row.id),
-      name: row.name,
-      email: row.email || '',
-      mobile: row.mobile || '',
-      contact_number: row.mobile || '',
-      employee_id: row.employee_id || `STF-${String(row.id).padStart(3, '0')}`,
-      designation: row.designation || 'Field Service Staff',
-      department_id: row.department_id ? String(row.department_id) : null,
-      department_name: row.department_name || userDeptName || 'Municipal Department',
-      status: (row.status || 'active').toLowerCase() === 'active' ? 'Active' : (row.status || 'inactive').toLowerCase() === 'inactive' ? 'Inactive' : 'Archived',
-      active_tasks: parseInt(row.active_tasks || 0, 10),
-      completed_tasks: parseInt(row.completed_tasks || 0, 10),
-      overdue_tasks: parseInt(row.overdue_tasks || 0, 10),
-      language: row.language_pref || 'en',
-      joined_date: row.created_at,
-      created_at: row.created_at
-    }));
-
-    // Calculate Summary Stats from DB
-    let statsSql = `SELECT status, COUNT(*) as count FROM users WHERE (role = 'service_staff' OR role = 'staff')`;
-    let statsParams = [];
-    if (!isAdmin) {
-      statsSql += ` AND department_id = $1`;
-      statsParams.push(userDeptId || -1);
+    // MemStore fallback (from db.js seed) if still 0 rows
+    if (staffRows.length === 0) {
+      try {
+        const { getMemStore } = require('../config/db');
+        const memStore = getMemStore ? getMemStore() : null;
+        if (memStore && Array.isArray(memStore.users)) {
+          const seedStaff = memStore.users.filter(u => u.role === 'service_staff' || u.role === 'staff');
+          staffRows = filterDept ? seedStaff.filter(s => staffMatchesDept(s, filterDept)) : seedStaff;
+        }
+      } catch (e) {}
     }
-    statsSql += ` GROUP BY status`;
-    const statsRes = await query(statsSql, statsParams);
 
-    let totalStaff = 0;
-    let activeStaff = 0;
-    let inactiveStaff = 0;
+    // Apply status and search filters on final in-memory rows if needed
+    if (filterStatus === 'active') {
+      staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'active');
+    } else if (filterStatus === 'inactive') {
+      staffRows = staffRows.filter(s => (s.status || '').toLowerCase() === 'inactive');
+    }
 
-    statsRes.rows.forEach((r) => {
-      const cnt = parseInt(r.count, 10);
-      const st = (r.status || '').toLowerCase();
-      if (st === 'active') activeStaff += cnt;
-      if (st === 'inactive') inactiveStaff += cnt;
-      if (st !== 'archived') totalStaff += cnt;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      staffRows = staffRows.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.email || '').toLowerCase().includes(q) ||
+        (s.mobile || '').toLowerCase().includes(q) ||
+        (s.employee_id || '').toLowerCase().includes(q)
+      );
+    }
+
+    const staffList = staffRows.map((row) => {
+      const sDept = getCanonicalDepartment(row.department_id) || getCanonicalDepartment(row.employee_id) || getCanonicalDepartment(row.department_name);
+      return {
+        id: String(row.id),
+        name: row.name,
+        email: row.email || '',
+        mobile: row.mobile || '',
+        contact_number: row.mobile || '',
+        employee_id: row.employee_id || `STF-${String(row.id).padStart(3, '0')}`,
+        designation: row.designation || 'Field Service Staff',
+        department_id: sDept ? String(sDept.id) : (row.department_id ? String(row.department_id) : null),
+        department_name: sDept ? sDept.name : (row.department_name || (canonicalDept ? canonicalDept.name : 'Municipal Department')),
+        status: (row.status || 'active').toLowerCase() === 'active' ? 'Active' : (row.status || 'inactive').toLowerCase() === 'inactive' ? 'Inactive' : 'Archived',
+        active_tasks: parseInt(row.active_tasks || 0, 10),
+        completed_tasks: parseInt(row.completed_tasks || 0, 10),
+        overdue_tasks: parseInt(row.overdue_tasks || 0, 10),
+        language: row.language_pref || 'en',
+        joined_date: row.created_at,
+        created_at: row.created_at
+      };
     });
 
-    if (totalStaff === 0 && staffList.length > 0) {
-      staffList.forEach((s) => {
-        const st = (s.status || '').toLowerCase();
-        if (st === 'active') activeStaff++;
-        if (st === 'inactive') inactiveStaff++;
-        if (st !== 'archived') totalStaff++;
-      });
-    }
+    // Summary reflects ONLY the returned staff records for strict isolation
+    const summary = {
+      totalStaff: staffList.length,
+      activeStaff: staffList.filter((s) => s.status === 'Active').length,
+      inactiveStaff: staffList.filter((s) => s.status === 'Inactive').length,
+      activeTasks: staffList.reduce((acc, s) => acc + (s.active_tasks || 0), 0)
+    };
 
-    // Total Active Tasks Across Department Staff
-    let taskSql = `
-      SELECT COUNT(DISTINCT a.id) as active_tasks_count
-      FROM assignments a
-      JOIN complaints c ON c.id = a.complaint_id
-      JOIN users u ON u.id = a.staff_id
-      WHERE (u.role = 'service_staff' OR u.role = 'staff')
-        AND c.status IN ('Assigned', 'In Progress', 'Verified')
-    `;
-    let taskParams = [];
-    if (!isAdmin) {
-      taskSql += ` AND u.department_id = $1`;
-      taskParams.push(userDeptId || -1);
-    }
-    const taskRes = await query(taskSql, taskParams);
-    const activeTasksCount = parseInt(taskRes.rows[0]?.active_tasks_count || 0, 10);
-
-    return res.json({
-      staff: staffList,
-      summary: {
-        totalStaff,
-        activeStaff,
-        inactiveStaff,
-        activeTasks: activeTasksCount
-      }
-    });
+    return res.json({ staff: staffList, summary });
   } catch (err) {
-    console.error('Fetch staff list error:', err);
-    return res.status(500).json({ error: 'Failed to fetch department staff' });
+    console.error('Fetch department staff error:', err);
+    return res.status(500).json({ error: 'Failed to fetch department staff', staff: [], summary: { totalStaff: 0, activeStaff: 0, inactiveStaff: 0, activeTasks: 0 } });
   }
 });
 
 /**
  * GET /api/department/staff/assignable
  * Fetch ONLY ACTIVE staff members for complaint task assignment dropdowns
+ * Department Head sees ONLY active staff from their own department.
  */
 router.get('/staff/assignable', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'officer']), async (req, res) => {
   try {
-    const { userDeptId } = await resolveUserDepartment(req);
-    const userRole = req.user.role || 'citizen';
+    const { canonicalDept } = await resolveUserDepartment(req);
+    const userRole = (req.user.role || '').toLowerCase();
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
+
+    let filterDept = !isAdmin ? canonicalDept : (req.query.department_id ? getCanonicalDepartment(req.query.department_id) : null);
 
     let sql = `
       SELECT id, name, mobile, email, employee_id, department_id, designation
@@ -389,15 +467,32 @@ router.get('/staff/assignable', authenticateToken, requireRole(['department_head
     `;
     const params = [];
 
-    if (!isAdmin) {
-      sql += ` AND department_id = $1`;
-      params.push(userDeptId || -1);
+    if (filterDept) {
+      sql += ` AND (department_id = $1 OR department_id = $2 OR UPPER(COALESCE(employee_id, '')) LIKE $3)`;
+      params.push(filterDept.id, filterDept.uuid, `${filterDept.code}%`);
     }
 
     sql += ` ORDER BY name ASC`;
 
     const result = await query(sql, params);
-    return res.json({ staff: result.rows });
+    let rows = result.rows || [];
+
+    if (filterDept) {
+      rows = rows.filter(s => staffMatchesDept(s, filterDept));
+    }
+
+    if (rows.length === 0) {
+      try {
+        const { getMemStore } = require('../config/db');
+        const memStore = getMemStore ? getMemStore() : null;
+        if (memStore && Array.isArray(memStore.users)) {
+          const seedStaff = memStore.users.filter(u => (u.role === 'service_staff' || u.role === 'staff') && (u.status || 'active').toLowerCase() === 'active');
+          rows = filterDept ? seedStaff.filter(s => staffMatchesDept(s, filterDept)) : seedStaff;
+        }
+      } catch (e) {}
+    }
+
+    return res.json({ staff: rows });
   } catch (err) {
     console.error('Fetch assignable staff error:', err);
     return res.status(500).json({ error: 'Failed to fetch assignable staff' });
@@ -487,16 +582,16 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
     const staffId = req.params.id;
     const { name, mobile, designation, language, employee_id } = req.body;
 
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     // SECURITY CHECK: Ensure staff member belongs to Department Head's department
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT * FROM users WHERE id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
-      if (String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
+      if (canonicalDept && !staffMatchesDept(verifyRes.rows[0], canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You can only edit staff members in your department' });
       }
     }
@@ -526,15 +621,15 @@ router.put('/staff/:id', authenticateToken, requireRole(['department_head', 'adm
 router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
     const staffId = req.params.id;
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT * FROM users WHERE id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
-      if (String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
+      if (canonicalDept && !staffMatchesDept(verifyRes.rows[0], canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You can only deactivate staff members in your department' });
       }
     }
@@ -555,15 +650,15 @@ router.post('/staff/:id/deactivate', authenticateToken, requireRole(['department
 router.post('/staff/:id/activate', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
     const staffId = req.params.id;
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT * FROM users WHERE id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
-      if (String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
+      if (canonicalDept && !staffMatchesDept(verifyRes.rows[0], canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You can only activate staff members in your department' });
       }
     }
@@ -584,15 +679,15 @@ router.post('/staff/:id/activate', authenticateToken, requireRole(['department_h
 router.delete('/staff/:id', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
   try {
     const staffId = req.params.id;
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
     const isAdmin = ['admin', 'city_admin'].includes(req.user.role);
 
     if (!isAdmin) {
-      const verifyRes = await query('SELECT department_id FROM users WHERE id = $1', [staffId]);
+      const verifyRes = await query('SELECT * FROM users WHERE id = $1', [staffId]);
       if (verifyRes.rows.length === 0) {
         return res.status(404).json({ error: 'Staff member not found' });
       }
-      if (String(verifyRes.rows[0].department_id) !== String(userDeptId)) {
+      if (canonicalDept && !staffMatchesDept(verifyRes.rows[0], canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You can only remove staff members in your department' });
       }
     }
@@ -618,7 +713,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: 'Complaint ID and Staff ID are required.' });
     }
 
-    const { userDeptId } = await resolveUserDepartment(req);
+    const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
     const userRole = req.user.role || 'citizen';
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
@@ -630,40 +725,42 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     const complaint = compRes.rows[0];
 
     // 2. Fetch Selected Staff Member by ID, Employee ID or Email
-    const staffRes = await query(`SELECT id, name, email, mobile, department_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR email = $1) AND (role = 'service_staff' OR role = 'staff')`, [staff_id]);
-    if (!staffRes.rows || staffRes.rows.length === 0) {
+    const staffRes = await query(`SELECT id, name, email, mobile, department_id, employee_id, status FROM users WHERE (id = $1 OR employee_id = $1 OR email = $1) AND (role = 'service_staff' OR role = 'staff')`, [staff_id]);
+    let staff = (staffRes.rows && staffRes.rows.length > 0) ? staffRes.rows[0] : null;
+
+    if (!staff) {
+      try {
+        const { getMemStore } = require('../config/db');
+        const memStore = getMemStore ? getMemStore() : null;
+        if (memStore && Array.isArray(memStore.users)) {
+          staff = memStore.users.find(u =>
+            (String(u.id) === String(staff_id) || u.employee_id === String(staff_id) || (u.email && u.email.toLowerCase() === String(staff_id).toLowerCase())) &&
+            (u.role === 'service_staff' || u.role === 'staff')
+          ) || null;
+        }
+      } catch (e) {}
+    }
+
+    if (!staff) {
       return res.status(404).json({ error: 'Selected service staff member not found.' });
     }
-    const staff = staffRes.rows[0];
 
     // 3. Status Check: Staff must be active
     if ((staff.status || 'active').toLowerCase() !== 'active') {
       return res.status(400).json({ error: `Cannot assign task: Staff member '${staff.name}' is currently inactive.` });
     }
 
-    // Helper: Normalize department code/id for secure isolation check
-    const normDept = (d) => {
-      const s = String(d || '').trim().toLowerCase();
-      if (s === '1' || s.includes('pwd') || s.includes('road')) return 'PWD';
-      if (s === '2' || s.includes('san') || s.includes('waste')) return 'SAN';
-      if (s === '3' || s.includes('wtr') || s.includes('water')) return 'WTR';
-      if (s === '4' || s === '7' || s.includes('drn') || s.includes('drain')) return 'DRN';
-      if (s === '5' || s === '4' || s.includes('ele') || s.includes('electric')) return 'ELE';
-      if (s === '6' || s.includes('trf') || s.includes('traffic')) return 'TRF';
-      if (s === '7' || s === '6' || s.includes('mnt') || s.includes('maint')) return 'MNT';
-      return s.toUpperCase();
-    };
-
     // 4. Department Isolation Security Check
     if (!isAdmin) {
-      if (userDeptId && complaint.department_id && normDept(userDeptId) !== normDept(complaint.department_id)) {
+      if (canonicalDept && !staffMatchesDept(complaint, canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign complaints outside your department.' });
       }
-      if (userDeptId && staff.department_id && normDept(userDeptId) !== normDept(staff.department_id)) {
+      if (canonicalDept && !staffMatchesDept(staff, canonicalDept)) {
         return res.status(403).json({ error: 'Forbidden: You cannot assign staff members belonging to another department.' });
       }
     } else {
-      if (complaint.department_id && staff.department_id && normDept(complaint.department_id) !== normDept(staff.department_id)) {
+      const complaintDept = getCanonicalDepartment(complaint.department_id || complaint.department);
+      if (complaintDept && !staffMatchesDept(staff, complaintDept)) {
         return res.status(400).json({ error: 'Invalid assignment: Selected staff member does not belong to the complaint department.' });
       }
     }

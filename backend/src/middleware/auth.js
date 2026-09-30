@@ -58,10 +58,13 @@ function generateToken(user) {
   return jwt.sign(
     {
       id: user.id,
-      name: user.name,
+      name: user.name || user.full_name,
       mobile: user.mobile,
       email: user.email,
       role: user.role,
+      department_id: user.department_id,
+      department_name: user.department_name,
+      department_code: user.department_code,
       language_pref: user.language_pref
     },
     JWT_SECRET,
@@ -94,6 +97,7 @@ const DEMO_USER_TOKENS = {
     role: 'department_head',
     department_id: 1,
     department_name: 'Public Works Department (PWD)',
+    department_code: 'PWD',
     language_pref: 'en'
   },
   'demo-token-service-staff': {

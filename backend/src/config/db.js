@@ -419,6 +419,8 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'assigned_staff_id TEXT');
       safeAddSqliteColumn('complaints', 'assigned_staff_name TEXT');
       safeAddSqliteColumn('complaints', 'assigned_staff_email TEXT');
+      safeAddSqliteColumn('complaints', 'assigned_by TEXT');
+      safeAddSqliteColumn('complaints', 'assigned_by_name TEXT');
       safeAddSqliteColumn('complaints', 'sla_deadline DATETIME');
 
       sqliteDb.run(`
@@ -628,5 +630,6 @@ async function query(sql, params = []) {
 module.exports = {
   initDatabase,
   query,
-  getIsSqlite: () => useSqlite
+  getIsSqlite: () => useSqlite,
+  getMemStore: () => memStore
 };

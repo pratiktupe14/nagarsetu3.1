@@ -348,7 +348,7 @@ export async function fetchDepartmentStaffApi(params?: {
 
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.staff) && data.staff.length > 0) {
+      if (Array.isArray(data.staff)) {
         const mappedStaff: ServiceStaffMemberRecord[] = data.staff.map((s: any) => {
           const resolvedDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
           return {
@@ -368,9 +368,7 @@ export async function fetchDepartmentStaffApi(params?: {
             overdue_tasks: s.overdue_tasks || 0
           };
         });
-        if (mappedStaff.length > 0) {
-          memoryStaffRecords = mappedStaff;
-        }
+        memoryStaffRecords = mappedStaff;
         return {
           staff: data.staff,
           summary: data.summary || {
@@ -500,7 +498,7 @@ export async function fetchDepartmentStaffApi(params?: {
     }
   }
 
-  const defaultMapped: DepartmentStaffApiItem[] = DEFAULT_SERVICE_STAFF.map((s) => {
+  let defaultMapped: DepartmentStaffApiItem[] = DEFAULT_SERVICE_STAFF.map((s) => {
     const resolved = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
     return {
       id: s.id,
@@ -522,7 +520,13 @@ export async function fetchDepartmentStaffApi(params?: {
     };
   });
 
-  memoryStaffRecords = DEFAULT_SERVICE_STAFF;
+  if (params?.department_id) {
+    const targetDept = resolveDepartmentInfo(params.department_id);
+    defaultMapped = defaultMapped.filter((s) => {
+      const sDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+      return sDept.code === targetDept.code || String(s.department_id) === String(params.department_id);
+    });
+  }
 
   return {
     staff: defaultMapped,
@@ -895,7 +899,11 @@ export async function getDepartmentServiceStaff(departmentId?: string, departmen
     }
   }
 
-  return [];
+  const targetDept = resolveDepartmentInfo(departmentId, departmentName);
+  return DEFAULT_SERVICE_STAFF.filter((s) => {
+    const sDept = resolveDepartmentInfo(s.department_id || s.employee_id, s.department_name);
+    return sDept.code === targetDept.code || (departmentId && String(s.department_id) === String(departmentId));
+  });
 }
 
 export async function getStaffMemberById(staffId: string): Promise<ServiceStaffMemberRecord | null> {
