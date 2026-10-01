@@ -384,10 +384,7 @@ const submitComplaintHandler = async (req, res) => {
     const finalAnglePhotos = angle_photos ? (typeof angle_photos === 'string' ? angle_photos : JSON.stringify(angle_photos)) : null;
     const finalAdditionalPhotos = additional_photos ? (typeof additional_photos === 'string' ? additional_photos : JSON.stringify(additional_photos)) : null;
 
-    let citizenId = req.user?.id ? String(req.user.id) : 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-    if (citizenId === 'c-8788562103' || req.user?.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
-      citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-    }
+    const citizenId = req.user?.id ? String(req.user.id) : (req.body?.citizen_id ? String(req.body.citizen_id) : '1');
 
     // Authoritative server-side SLA deadline calculation (ignores client-supplied deadline/response time)
     const { hours: slaHours, deadline: slaDeadline } = calculateSlaDeadline(
@@ -1120,9 +1117,19 @@ router.get('/', authenticateToken, async (req, res) => {
       ${!isCitizen ? 'LEFT JOIN users u ON c.citizen_id = u.id' : ''}
     `;
     const params = [];
+    const rawCitizenId = req.user?.id != null ? String(req.user.id) : '';
+    const citizenMobile = req.user?.mobile ? String(req.user.mobile) : '';
+    const isSpecialDemoCitizen = rawCitizenId === '1' || rawCitizenId === 'c-8788562103' || citizenMobile === '8788562103' || (req.user?.email && req.user.email.includes('8788'));
+    const demoCitizenUuid = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
+
     if (isCitizen) {
-      sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
-      params.push(req.user.id, String(req.user.id));
+      if (isSpecialDemoCitizen) {
+        sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ? OR c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ? OR c.citizen_id = ?)`;
+        params.push(rawCitizenId, rawCitizenId, demoCitizenUuid, demoCitizenUuid, 'c-8788562103');
+      } else {
+        sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
+        params.push(rawCitizenId, rawCitizenId);
+      }
     } else if (isDeptHead && req.user?.department_id) {
       sql += ` WHERE (c.department_id = ? OR CAST(c.department_id AS TEXT) = ? OR d.id = ? OR CAST(d.id AS TEXT) = ?)`;
       params.push(req.user.department_id, String(req.user.department_id), req.user.department_id, String(req.user.department_id));
@@ -1141,20 +1148,27 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get user's complaint history
 router.get('/my', authenticateToken, async (req, res) => {
   try {
-    let citizenId = req.user.id;
-    if (citizenId === 'c-8788562103' || req.user.mobile === '8788562103' || (req.user?.email && req.user?.email.includes('8788'))) {
-      citizenId = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
-    }
+    const rawCitizenId = req.user?.id != null ? String(req.user.id) : '';
+    const citizenMobile = req.user?.mobile ? String(req.user.mobile) : '';
+    const isSpecialDemoCitizen = rawCitizenId === '1' || rawCitizenId === 'c-8788562103' || citizenMobile === '8788562103' || (req.user?.email && req.user.email.includes('8788'));
+    const demoCitizenUuid = 'e2a4338c-5d49-4ae3-b766-40d99fb26f87';
 
-    const sql = `
+    let sql = `
       SELECT c.*, d.name as department_name, f.rating, f.comment as feedback_comment
       FROM complaints c
       LEFT JOIN departments d ON c.department_id = d.id
       LEFT JOIN feedback f ON f.complaint_id = c.id
-      WHERE c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?
-      ORDER BY c.created_at DESC
     `;
-    const result = await query(sql, [citizenId, String(citizenId)]);
+    const params = [];
+    if (isSpecialDemoCitizen) {
+      sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ? OR c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ? OR c.citizen_id = ?)`;
+      params.push(rawCitizenId, rawCitizenId, demoCitizenUuid, demoCitizenUuid, 'c-8788562103');
+    } else {
+      sql += ` WHERE (c.citizen_id = ? OR CAST(c.citizen_id AS TEXT) = ?)`;
+      params.push(rawCitizenId, rawCitizenId);
+    }
+    sql += ` ORDER BY c.created_at DESC`;
+    const result = await query(sql, params);
     const pgRows = result.rows || [];
 
     return res.json({ complaints: pgRows.map(c => normalizeComplaintPhotoUrls(c, req)) });

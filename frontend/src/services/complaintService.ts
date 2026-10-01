@@ -452,7 +452,7 @@ export async function getCitizenComplaints(citizenId: string): Promise<Complaint
   if (token) {
     try {
       const res = await fetch(`${getApiUrl()}/api/complaints/my`, {
-        headers: getNoCacheHeaders()
+        headers: getNoCacheHeaders({ Authorization: `Bearer ${token}` })
       });
       if (res.ok) {
         const data = await res.json();
