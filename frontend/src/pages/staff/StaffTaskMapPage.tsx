@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -95,6 +96,7 @@ function MapFlyToController({ center, zoom }: { center: [number, number] | null;
 
 export const StaffTaskMapPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useNotification();
 
   // Staff Identity & Department
@@ -423,7 +425,7 @@ export const StaffTaskMapPage: React.FC = () => {
           </div>
 
           <div className="p-3 text-center space-y-0.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">New Assignments</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('newAssignments')}</span>
             <span className="text-xl font-extrabold text-blue-700 font-mono block">{metrics.newTasks}</span>
           </div>
 
@@ -433,7 +435,7 @@ export const StaffTaskMapPage: React.FC = () => {
           </div>
 
           <div className="p-3 text-center space-y-0.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue SLA</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('overdueSla')}</span>
             <span className="text-xl font-extrabold text-rose-700 font-mono block">{metrics.overdue}</span>
           </div>
 
@@ -475,9 +477,9 @@ export const StaffTaskMapPage: React.FC = () => {
                 className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800"
               >
                 <option value="All">All Task Statuses</option>
-                <option value="New">New Assignments</option>
+                <option value="New">{t('newAssignments')}</option>
                 <option value="In Progress">In Progress</option>
-                <option value="Overdue">Overdue SLA</option>
+                <option value="Overdue">{t('overdueSla')}</option>
                 <option value="Completed">Completed</option>
               </select>
             </div>

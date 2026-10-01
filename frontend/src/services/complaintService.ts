@@ -1,5 +1,6 @@
 import { Complaint, ComplaintStatus, PriorityLevel, StaffPerformanceMetrics } from '../types/database.types';
 import { supabase, isSupabaseConfigured, isValidUuid, DEFAULT_CIVIC_IMAGE_PLACEHOLDER, getValidImageUrl } from '../lib/supabase';
+import { resolveMediaUrl } from '../utils/mediaUtils';
 import { broadcastComplaintChange } from './realtimeService';
 import { pushNotification } from './notificationService';
 import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
@@ -606,14 +607,42 @@ export function normalizeComplaint(c: any): Complaint {
     lng = undefined;
   }
 
-  // Normalise photo URLs so every portal always has a valid, absolute, browser-renderable URL
-  let rawPhoto = c.photo_before_url || c.photo_front_url || c.photo_url || '';
-  if (!rawPhoto || typeof rawPhoto !== 'string' || rawPhoto.trim() === '' || rawPhoto.startsWith('blob:')) {
-    rawPhoto = DEFAULT_CIVIC_IMAGE_PLACEHOLDER;
-  }
-  const photoBefore = getValidImageUrl(rawPhoto);
-  const photoFront = c.photo_front_url && !c.photo_front_url.startsWith('blob:') ? getValidImageUrl(c.photo_front_url) : photoBefore;
-  const photoAfter = c.photo_after_url && !c.photo_after_url.startsWith('blob:') ? getValidImageUrl(c.photo_after_url) : '';
+  // Extract citizen evidence photo from all possible fields returned by API or stored
+  const extractRawCitizenPhoto = (): string => {
+    const isRealUrl = (u: any) => typeof u === 'string' && u.trim() !== '' && !u.includes('civic-default.jpg') && !u.includes('600x400');
+    if (isRealUrl(c.photo_before_url)) return c.photo_before_url;
+    if (isRealUrl(c.photo_front_url)) return c.photo_front_url;
+    if (isRealUrl(c.photo_url)) return c.photo_url;
+    if (isRealUrl(c.photo)) return c.photo;
+    if (isRealUrl(c.image_url)) return c.image_url;
+    if (isRealUrl(c.image_path)) return c.image_path;
+    if (isRealUrl(c.primary_image)) return c.primary_image;
+    if (isRealUrl(c.primary_photo)) return c.primary_photo;
+    if (isRealUrl(c.before_photo)) return c.before_photo;
+    if (isRealUrl(c.before_image)) return c.before_image;
+    if (Array.isArray(c.evidence_photos) && c.evidence_photos.length > 0) {
+      const first = typeof c.evidence_photos[0] === 'string' ? c.evidence_photos[0] : c.evidence_photos[0]?.url;
+      if (isRealUrl(first)) return first;
+    }
+    if (Array.isArray(c.photos) && c.photos.length > 0) {
+      const first = typeof c.photos[0] === 'string' ? c.photos[0] : c.photos[0]?.url;
+      if (isRealUrl(first)) return first;
+    }
+    if (Array.isArray(c.attachments) && c.attachments.length > 0) {
+      const first = typeof c.attachments[0] === 'string' ? c.attachments[0] : c.attachments[0]?.url;
+      if (isRealUrl(first)) return first;
+    }
+    return '';
+  };
+
+  const rawPhoto = extractRawCitizenPhoto();
+  const photoBefore = resolveMediaUrl(rawPhoto);
+  const photoFront = c.photo_front_url && !c.photo_front_url.startsWith('blob:') && !c.photo_front_url.includes('civic-default.jpg')
+    ? resolveMediaUrl(c.photo_front_url)
+    : photoBefore;
+  const photoAfter = c.photo_after_url && !c.photo_after_url.startsWith('blob:') && !c.photo_after_url.includes('civic-default.jpg')
+    ? resolveMediaUrl(c.photo_after_url)
+    : '';
 
   return {
     ...c,

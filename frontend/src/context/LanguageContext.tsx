@@ -16,6 +16,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface LanguageContextType {
   lang: SupportedLanguage;
+  language: SupportedLanguage;
   changeLanguage: (newLang: SupportedLanguage) => Promise<void>;
   t: (key: string) => string;
   translateStatus: (status?: string) => string;
@@ -98,6 +99,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     <LanguageContext.Provider
       value={{
         lang,
+        language: lang,
         changeLanguage,
         t,
         translateStatus,
@@ -121,6 +123,7 @@ export const useLanguage = (): LanguageContextType => {
     // Fallback safe dummy context if used outside provider during initialization
     return {
       lang: 'en',
+      language: 'en',
       changeLanguage: async () => {},
       t: (key: string) => tFunction(key, 'en'),
       translateStatus: (status?: string) => translateStatusFn(status, 'en'),

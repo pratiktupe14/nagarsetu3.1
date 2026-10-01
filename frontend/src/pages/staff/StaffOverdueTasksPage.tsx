@@ -356,7 +356,7 @@ export const StaffOverdueTasksPage: React.FC = () => {
             <div className="flex items-center space-x-3 text-rose-900">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
               <div>
-                <span className="font-extrabold font-outfit text-sm block">OVERDUE SLA ALERT</span>
+                <span className="font-extrabold font-outfit text-sm block">{t('overdueSlaAlert')}</span>
                 <span className="text-rose-800">
                   You have <span className="font-mono font-extrabold">{metrics.totalOverdue}</span> {metrics.totalOverdue === 1 ? 'task that has' : 'tasks that have'} exceeded their SLA completion deadline.
                 </span>
@@ -520,9 +520,9 @@ export const StaffOverdueTasksPage: React.FC = () => {
                     <th className="py-3 px-3">Complaint ID</th>
                     <th className="py-3 px-3">Issue Title</th>
                     <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3">Priority</th>
-                    <th className="py-3 px-3">Location</th>
-                    <th className="py-3 px-3 font-mono">SLA Deadline</th>
+                    <th className="py-3 px-3">{t('priority')}</th>
+                    <th className="py-3 px-3">{t('location')}</th>
+                    <th className="py-3 px-3 font-mono">{t('slaDeadline')}</th>
                     <th className="py-3 px-3 font-mono">Overdue Duration</th>
                     <th className="py-3 px-3">Current Status</th>
                     <th className="py-3 px-3 text-right">Actions</th>

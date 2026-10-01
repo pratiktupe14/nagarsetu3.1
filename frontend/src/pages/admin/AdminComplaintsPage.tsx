@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../../context/NotificationContext';
 import { useLocation } from 'react-router-dom';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -40,6 +41,7 @@ const CATEGORY_OPTIONS = [
 
 export const AdminComplaintsPage: React.FC = () => {
   const { toast } = useNotification();
+  const { t } = useLanguage();
   const location = useLocation();
   const isNewComplaintsPage = location.pathname.includes('/new');
 
@@ -403,18 +405,18 @@ export const AdminComplaintsPage: React.FC = () => {
                     />
                   </th>
                   <th className="p-3.5">COMPLAINT ID</th>
-                  <th className="p-3.5">ISSUE</th>
-                  <th className="p-3.5">CATEGORY</th>
-                  <th className="p-3.5">LOCATION</th>
-                  <th className="p-3.5">PRIORITY</th>
+                  <th className="p-3.5">{t('issue').toUpperCase()}</th>
+                  <th className="p-3.5">{t('category').toUpperCase()}</th>
+                  <th className="p-3.5">{t('location').toUpperCase()}</th>
+                  <th className="p-3.5">{t('priority').toUpperCase()}</th>
                   <th className="p-3.5 cursor-pointer select-none" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                     <span className="flex items-center space-x-1">
-                      <span>REPORTED ON</span>
+                      <span>{t('reportedOn').toUpperCase()}</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </span>
                   </th>
-                  <th className="p-3.5">STATUS</th>
-                  <th className="p-3.5 text-right">ACTION</th>
+                  <th className="p-3.5">{t('status').toUpperCase()}</th>
+                  <th className="p-3.5 text-right">{t('action').toUpperCase()}</th>
                 </tr>
               </thead>
 

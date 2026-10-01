@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../../context/NotificationContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -38,6 +39,7 @@ const CATEGORY_OPTIONS = [
 
 export const AdminInProgressComplaintsPage: React.FC = () => {
   const { toast } = useNotification();
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -188,7 +190,7 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs text-center space-y-0.5">
-            <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider block font-outfit">Due Soon</span>
+            <span className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider block font-outfit">{t('dueSoon')}</span>
             <div className="text-xl font-extrabold text-amber-800 font-mono">{dueSoonCount}</div>
           </div>
 
@@ -262,8 +264,8 @@ export const AdminInProgressComplaintsPage: React.FC = () => {
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">SLA Status: All ▼</option>
-                <option value="Near SLA">Near SLA Deadline</option>
-                <option value="Overdue">Overdue</option>
+                <option value="Near SLA">{t('nearSlaDeadline')}</option>
+                <option value="Overdue">{t('overdue')}</option>
               </select>
 
               <input aria-label="date  filter"

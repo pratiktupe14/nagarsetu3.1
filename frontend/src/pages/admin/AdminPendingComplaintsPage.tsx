@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../../context/NotificationContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -40,6 +41,7 @@ const CATEGORY_OPTIONS = [
 
 export const AdminPendingComplaintsPage: React.FC = () => {
   const { toast } = useNotification();
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -322,8 +324,8 @@ export const AdminPendingComplaintsPage: React.FC = () => {
                 className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:border-emerald-500 min-h-[44px]"
               >
                 <option value="All">SLA Status: All ▼</option>
-                <option value="Near SLA">Near SLA Deadline</option>
-                <option value="Overdue">Overdue</option>
+                <option value="Near SLA">{t('nearSlaDeadline')}</option>
+                <option value="Overdue">{t('overdue')}</option>
               </select>
 
               <input aria-label="date  filter"
@@ -363,20 +365,20 @@ export const AdminPendingComplaintsPage: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50 border-b border-gray-200 text-[11px] font-extrabold text-gray-600 uppercase tracking-wider font-outfit">
                   <th className="p-3.5">COMPLAINT ID</th>
-                  <th className="p-3.5">ISSUE</th>
-                  <th className="p-3.5">CATEGORY</th>
-                  <th className="p-3.5">LOCATION</th>
-                  <th className="p-3.5">PRIORITY</th>
-                  <th className="p-3.5">CURRENT STAGE</th>
-                  <th className="p-3.5">DEPARTMENT</th>
+                  <th className="p-3.5">{t('issue').toUpperCase()}</th>
+                  <th className="p-3.5">{t('category').toUpperCase()}</th>
+                  <th className="p-3.5">{t('location').toUpperCase()}</th>
+                  <th className="p-3.5">{t('priority').toUpperCase()}</th>
+                  <th className="p-3.5">{t('status').toUpperCase()}</th>
+                  <th className="p-3.5">{t('department').toUpperCase()}</th>
                   <th className="p-3.5 cursor-pointer select-none" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                     <span className="flex items-center space-x-1">
-                      <span>REPORTED ON</span>
+                      <span>{t('reportedOn').toUpperCase()}</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </span>
                   </th>
                   <th className="p-3.5">SLA</th>
-                  <th className="p-3.5 text-right">ACTION</th>
+                  <th className="p-3.5 text-right">{t('action').toUpperCase()}</th>
                 </tr>
               </thead>
 

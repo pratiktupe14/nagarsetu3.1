@@ -147,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse
 }) => {
   const { user, role, logout } = useAuth();
-  const { t, translateDepartment, translateRole } = useLanguage();
+  const { t, language, translateDepartment, translateRole } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -647,7 +647,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 font-outfit flex items-center space-x-2">
                 <LogOut className="w-5 h-5 text-rose-600" />
-                <span>Confirm Logout</span>
+                <span>{t('confirmLogout')}</span>
               </h3>
               <button
                 onClick={() => setShowLogoutConfirm(false)}
@@ -658,7 +658,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <p className="text-xs text-gray-600 font-medium">
-              Are you sure you want to logout? You will be signed out of your NAGARSETU session.
+              {language === 'hi'
+                ? 'क्या आप निश्चित रूप से लॉगआउट करना चाहते हैं? आप नगरसेतु सत्र से बाहर हो जाएंगे।'
+                : language === 'mr'
+                  ? 'तुम्हाला खात्री आहे की तुम्ही लॉगआउट करू इच्छिता? तुम्ही नगरसेतू सत्रातून बाहेर पडाल.'
+                  : 'Are you sure you want to logout? You will be signed out of your NAGARSETU session.'}
             </p>
 
             {logoutError && (
@@ -673,7 +677,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setShowLogoutConfirm(false)}
                 className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs min-h-[44px]"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -681,7 +685,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 disabled={loggingOut}
                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs uppercase min-h-[44px]"
               >
-                {loggingOut ? 'Logging out...' : 'Logout'}
+                {loggingOut ? t('loading') : t('logout')}
               </button>
             </div>
           </div>

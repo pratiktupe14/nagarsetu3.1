@@ -352,7 +352,7 @@ export const StaffNewTasksPage: React.FC = () => {
                 : 'bg-blue-50 border-blue-200 hover:bg-blue-100/60'
             }`}
           >
-            <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block font-outfit">New Assignments</span>
+            <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block font-outfit">{t('newAssignments')}</span>
             <span className="text-xl font-extrabold text-blue-950 font-mono block">{newMetrics.totalNew}</span>
           </button>
 
@@ -445,10 +445,10 @@ export const StaffNewTasksPage: React.FC = () => {
                 className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 focus:ring-1 focus:ring-emerald-500"
               >
                 <option value="All">SLA: All</option>
-                <option value="Due Today">Due Today</option>
-                <option value="Due Soon">Due Soon</option>
-                <option value="Within SLA">Within SLA</option>
-                <option value="Overdue">Overdue</option>
+                <option value="Due Today">{t('dueToday')}</option>
+                <option value="Due Soon">{t('dueSoon')}</option>
+                <option value="Within SLA">{t('withinSla')}</option>
+                <option value="Overdue">{t('overdue')}</option>
               </select>
 
               <select aria-label="date  filter"
@@ -540,9 +540,9 @@ export const StaffNewTasksPage: React.FC = () => {
                     <th className="py-3 px-3">Category</th>
                     <th className="py-3 px-3">Priority</th>
                     <th className="py-3 px-3">Location</th>
-                    <th className="py-3 px-3 font-mono">Assigned Date</th>
-                    <th className="py-3 px-3 font-mono">SLA Deadline</th>
-                    <th className="py-3 px-3 font-mono">Remaining SLA</th>
+                    <th className="py-3 px-3 font-mono">{t('reportedOn')}</th>
+                    <th className="py-3 px-3 font-mono">{t('slaDeadline')}</th>
+                    <th className="py-3 px-3 font-mono">{t('remainingSla')}</th>
                     <th className="py-3 px-3">Status</th>
                     <th className="py-3 px-3 text-right">Actions</th>
                   </tr>

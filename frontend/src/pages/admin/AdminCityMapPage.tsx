@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../context/LanguageContext';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { DashboardLayout } from '../../components/DashboardLayout';
@@ -95,6 +96,7 @@ function MapRecenter({ center, zoom }: { center: [number, number]; zoom: number 
 
 export const AdminCityMapPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [staffRecords, setStaffRecords] = useState<ServiceStaffMemberRecord[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -514,7 +516,7 @@ export const AdminCityMapPage: React.FC = () => {
                 <option value="Resolution Submitted">Resolution Submitted</option>
                 <option value="Resolved">Resolved</option>
                 <option value="Reopened">Reopened</option>
-                <option value="Overdue">Overdue SLA</option>
+                <option value="Overdue">{t('overdueSla')}</option>
               </select>
             </div>
 
@@ -827,7 +829,7 @@ export const AdminCityMapPage: React.FC = () => {
 
                 <div className="flex items-center space-x-1.5 col-span-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse" />
-                  <span className="text-rose-700">Critical / Overdue SLA</span>
+                  <span className="text-rose-700">{t('criticalOverdueSla')}</span>
                 </div>
               </div>
             </div>
@@ -880,7 +882,7 @@ export const AdminCityMapPage: React.FC = () => {
             </div>
 
             <div className="p-3 text-center space-y-0.5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue SLA</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('overdueSla')}</span>
               <span className="text-lg font-mono font-extrabold text-rose-700 block">{mapStats.overdueCount}</span>
             </div>
 

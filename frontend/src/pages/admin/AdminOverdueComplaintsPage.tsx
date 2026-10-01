@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -50,6 +51,7 @@ const WARD_OPTIONS = [
 type SortField = 'complaint_number' | 'priority' | 'overdue_ms' | 'created_at' | 'department_name' | 'assigned_staff_name';
 
 export const AdminOverdueComplaintsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -743,12 +745,12 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                       className="py-3 px-4 cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
                     >
                       <div className="flex items-center space-x-1">
-                        <span>Reported On</span>
+                        <span>{t('reportedOn')}</span>
                         <ArrowUpDown className="w-3 h-3 text-gray-400" />
                       </div>
                     </th>
 
-                    <th className="py-3 px-4 text-right whitespace-nowrap">Action</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">{t('action')}</th>
 
                   </tr>
                 </thead>
@@ -974,14 +976,14 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Reported On</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">{t('reportedOn')}</span>
                       <span className="font-mono font-bold text-gray-900 block">
                         {new Date(selectedComplaint.created_at).toLocaleString()}
                       </span>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">SLA Deadline</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">{t('slaDeadline')}</span>
                       <span className="font-mono font-bold text-rose-700 block">
                         {selectedComplaint.sla_deadline ? new Date(selectedComplaint.sla_deadline).toLocaleString() : '24h SLA'}
                       </span>
@@ -1248,7 +1250,7 @@ export const AdminOverdueComplaintsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">New SLA Deadline Extension (Hours)</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">{t('newSlaDeadlineExtension')}</label>
                   <select aria-label="reassign Sla Hours"
                     value={reassignSlaHours}
                     onChange={(e) => setReassignSlaHours(Number(e.target.value))}

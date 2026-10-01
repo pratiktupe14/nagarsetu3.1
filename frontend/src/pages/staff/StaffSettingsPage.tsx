@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LanguageSelector } from '../../components/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import {
   User, Bell, Clock, Globe, ShieldCheck, LogOut, CheckCircle2,
@@ -12,6 +13,7 @@ import {
 
 export const StaffSettingsPage: React.FC = () => {
   const { user, logout, changePassword, updateUserProfile } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -267,7 +269,7 @@ export const StaffSettingsPage: React.FC = () => {
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-extrabold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
               >
                 <LogOut className="w-4 h-4 text-rose-600" />
-                <span>Logout Session</span>
+                <span>{t('logoutSession')}</span>
               </button>
             </div>
           </div>
@@ -465,7 +467,7 @@ export const StaffSettingsPage: React.FC = () => {
 
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
                       <div>
-                        <span className="font-bold text-rose-900 block">Immediate Overdue SLA Alert</span>
+                        <span className="font-bold text-rose-900 block">{t('immediateOverdueAlert')}</span>
                         <span className="text-[11px] text-rose-700">Receive persistent alerts when SLA target is breached.</span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -655,7 +657,7 @@ export const StaffSettingsPage: React.FC = () => {
                     className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Logout Session</span>
+                    <span>{t('logoutSession')}</span>
                   </button>
                 </div>
               </div>
@@ -671,7 +673,7 @@ export const StaffSettingsPage: React.FC = () => {
             <div className="max-w-md w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-md space-y-4">
               <div className="flex items-center space-x-3 text-rose-600">
                 <LogOut className="w-6 h-6 shrink-0" />
-                <h3 className="text-base font-extrabold text-gray-900 font-outfit">Confirm Session Logout</h3>
+                <h3 className="text-base font-extrabold text-gray-900 font-outfit">{t('confirmSessionLogout')}</h3>
               </div>
 
               <p className="text-xs text-gray-600 leading-relaxed">

@@ -19,6 +19,8 @@ import { getNotificationsForRole, syncNotificationsFromBackend, markNotification
 import { Complaint, ComplaintStatus, NotificationItem, ComplaintActivityLog, extractComplaintAnglePhotos } from '../../types/database.types';
 import { useRealtimeComplaints } from '../../hooks/useRealtimeComplaints';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
+import { resolveMediaUrl } from '../../utils/mediaUtils';
+import { formatPortalDateTime, formatPortalTime, formatPortalDate } from '../../utils/dateUtils';
 import { openGoogleMapsDirections } from '../../utils/navigation';
 import {
   Wrench, CheckCircle2, Clock, AlertTriangle, MapPin, Upload,
@@ -692,27 +694,27 @@ export const StaffPortal: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-5 border border-gray-200 rounded-xl divide-x divide-y sm:divide-y-0 divide-gray-200 bg-white shadow-xs overflow-hidden">
           
           <Link to="/staff/tasks/new" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">New Assignments</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('newAssignments')}</span>
             <span className="text-xl font-extrabold text-blue-700 font-mono block">{metrics.newTasks}</span>
           </Link>
 
           <Link to="/staff/tasks/in-progress" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">In Progress</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('inProgress')}</span>
             <span className="text-xl font-extrabold text-amber-700 font-mono block">{metrics.activeTasks}</span>
           </Link>
 
           <Link to="/staff/tasks" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Due Soon</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('dueSoon')}</span>
             <span className="text-xl font-extrabold text-orange-700 font-mono block">{metrics.dueSoon}</span>
           </Link>
 
           <Link to="/staff/tasks/overdue" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue SLA</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('overdueSla')}</span>
             <span className="text-xl font-extrabold text-rose-700 font-mono block">{metrics.overdueCount}</span>
           </Link>
 
           <Link to="/staff/tasks/completed" className="p-3.5 text-center space-y-0.5 hover:bg-slate-50 transition-colors">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Completed</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('completed')}</span>
             <span className="text-xl font-extrabold text-emerald-700 font-mono block">{metrics.completed}</span>
           </Link>
 
@@ -726,9 +728,9 @@ export const StaffPortal: React.FC = () => {
             <div className="flex items-center space-x-3 text-rose-900">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
               <div>
-                <span className="font-extrabold font-outfit text-sm block">OVERDUE SLA ALERT</span>
+                <span className="font-extrabold font-outfit text-sm block">{t('overdueSlaAlert')}</span>
                 <span className="text-rose-800">
-                  You have <span className="font-mono font-extrabold">{metrics.overdueCount}</span> tasks that have exceeded their SLA completion deadline.
+                  {lang === 'hi' ? 'आपके पास अतिदेय कार्य हैं:' : lang === 'mr' ? 'तुमच्याकडे मुदत संपलेली कामे आहेत:' : 'You have tasks that have exceeded their SLA:'} <span className="font-mono font-extrabold">{metrics.overdueCount}</span>
                 </span>
               </div>
             </div>
@@ -737,14 +739,14 @@ export const StaffPortal: React.FC = () => {
               to="/staff/tasks/overdue"
               className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg transition-colors shrink-0 inline-flex items-center space-x-1"
             >
-              <span>View Overdue Tasks</span>
+              <span>{t('viewOverdueTasks')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         ) : (
           <div className="p-3 px-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center space-x-2 text-xs font-bold text-emerald-900">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>All assigned tasks are within SLA. Great work!</span>
+            <span>{t('allTasksWithinSla')}</span>
           </div>
         )}
 
@@ -752,14 +754,14 @@ export const StaffPortal: React.FC = () => {
         {/* 13. QUICK ACTIONS TOOLBAR */}
         {/* ================================================== */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider font-outfit mr-1">Quick Actions:</span>
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider font-outfit mr-1">{t('quickActions')}</span>
           
           <Link
             to="/staff/tasks"
             className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
           >
             <FileText className="w-4 h-4 text-emerald-600" />
-            <span>My Tasks</span>
+            <span>{t('myTasks')}</span>
           </Link>
 
           <Link
@@ -767,7 +769,7 @@ export const StaffPortal: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
           >
             <Map className="w-4 h-4 text-emerald-600" />
-            <span>Task Map</span>
+            <span>{t('taskMap')}</span>
           </Link>
 
           <Link
@@ -775,7 +777,7 @@ export const StaffPortal: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
           >
             <Bell className="w-4 h-4 text-emerald-600" />
-            <span>Notifications</span>
+            <span>{t('notifications')}</span>
           </Link>
 
           <Link
@@ -783,7 +785,7 @@ export const StaffPortal: React.FC = () => {
             className="px-3.5 py-2 rounded-xl bg-slate-50 border border-gray-200 text-gray-800 font-bold text-xs hover:bg-white hover:border-gray-300 transition-colors inline-flex items-center space-x-1.5 min-h-[44px]"
           >
             <Sliders className="w-4 h-4 text-emerald-600" />
-            <span>Settings</span>
+            <span>{t('settings')}</span>
           </Link>
         </div>
 
@@ -796,11 +798,11 @@ export const StaffPortal: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Zap className="w-4 h-4 text-amber-600" />
                 <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                  Priority Tasks
+                  {t('priority')} {t('myTasks')}
                 </h3>
               </div>
               <Link to="/staff/tasks" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 inline-flex items-center space-x-1">
-                <span>View All Tasks</span>
+                <span>{t('viewAllTasks')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -1081,7 +1083,7 @@ export const StaffPortal: React.FC = () => {
                     <div key={n.id} className="p-2.5 bg-slate-50 border border-gray-200 rounded-xl space-y-0.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 block truncate">{n.title}</span>
-                        <span className="font-mono text-[10px] text-gray-400">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="font-mono text-[10px] text-gray-400">{formatPortalTime(n.created_at)}</span>
                       </div>
                       <p className="text-[11px] text-gray-600 line-clamp-1">{n.message}</p>
                     </div>
@@ -1104,7 +1106,7 @@ export const StaffPortal: React.FC = () => {
                       <div className="space-y-0.5">
                         <span className="font-bold text-gray-900 block">{act.action}</span>
                         <p className="text-[11px] text-gray-600">{act.notes}</p>
-                        <span className="font-mono text-[10px] text-gray-400 block">{new Date(act.created_at).toLocaleString()}</span>
+                        <span className="font-mono text-[10px] text-gray-400 block">{formatPortalDateTime(act.created_at)}</span>
                       </div>
                     </div>
                   ))}
@@ -1206,52 +1208,102 @@ export const StaffPortal: React.FC = () => {
                 </div>
               )}
 
+              {/* TASK TIMESTAMPS & SLA METRICS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 border border-gray-200 rounded-xl text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{t('reportedOn')}</span>
+                  <span className="font-mono text-gray-900 font-semibold">{formatPortalDateTime(selectedTask.created_at, false, lang)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{t('slaDeadline')}</span>
+                  <span className={`font-mono font-semibold ${selectedTask.sla_deadline && new Date(selectedTask.sla_deadline) < new Date() && selectedTask.status !== 'Resolved' ? 'text-rose-600' : 'text-gray-900'}`}>
+                    {formatPortalDateTime(selectedTask.sla_deadline, false, lang)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{t('lastUpdated')}</span>
+                  <span className="font-mono text-gray-900 font-semibold">{formatPortalDateTime(selectedTask.updated_at, false, lang)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{t('departments')}</span>
+                  <span className="font-bold text-gray-900 truncate block">{translateDepartment(selectedTask.department_name) || translateDepartment(staffDepartmentFull)}</span>
+                </div>
+              </div>
+
               {/* BEFORE / AFTER PHOTO GALLERY */}
               <div className="space-y-2 text-xs border-t border-gray-200 pt-4">
                 <h4 className="font-extrabold text-gray-900 font-outfit text-sm">{t('complaintPhotoEvidence')}</h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-gray-700 text-xs">{t('beforeCitizenReportLocked')}</span>
-                      {extractComplaintAnglePhotos(selectedTask).length > 1 && (
-                        <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          {extractComplaintAnglePhotos(selectedTask).length} Angles
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
-                      <img
-                        src={getValidImageUrl(selectedTask.photo_before_url || extractComplaintAnglePhotos(selectedTask)[0]?.url)}
-                        alt="Before"
-                        className="w-full h-full object-cover"
-                        onError={(e) => { e.currentTarget.src = DEFAULT_CIVIC_IMAGE_PLACEHOLDER; }}
-                      />
-                      <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold">
-                        {extractComplaintAnglePhotos(selectedTask)[0]?.label || 'Front View'}
-                      </span>
-                    </div>
+                    {(() => {
+                      const anglePhotos = extractComplaintAnglePhotos(selectedTask)
+                        .map(p => ({ ...p, url: resolveMediaUrl(p.url) }))
+                        .filter(p => Boolean(p.url));
+                      const primaryBeforeUrl = resolveMediaUrl(selectedTask.photo_before_url) || resolveMediaUrl(selectedTask.photo_front_url) || anglePhotos[0]?.url || '';
 
-                    {/* All Angle Thumbnails for Staff */}
-                    {extractComplaintAnglePhotos(selectedTask).length > 1 && (
-                      <div className="grid grid-cols-4 gap-1.5 pt-1.5">
-                        {extractComplaintAnglePhotos(selectedTask).map((photoItem, pIdx) => (
-                          <div
-                            key={pIdx}
-                            className="relative aspect-4/3 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all"
-                            onClick={() => {
-                              window.open(photoItem.url, '_blank');
-                            }}
-                            title={`View ${photoItem.label}`}
-                          >
-                            <img src={getValidImageUrl(photoItem.url)} alt={photoItem.label} className="w-full h-full object-cover" />
-                            <span className="absolute bottom-0.5 inset-x-0 bg-gray-900/80 text-white text-[8px] text-center font-mono truncate px-0.5">
-                              {photoItem.label}
-                            </span>
+                      return (
+                        <>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-gray-700 text-xs">{t('beforeCitizenReportLocked')}</span>
+                            {anglePhotos.length > 1 && (
+                              <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                {anglePhotos.length} {t('cameraAngles')}
+                              </span>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {primaryBeforeUrl ? (
+                            <div className="relative rounded-xl overflow-hidden h-44 bg-gray-100 border border-gray-200">
+                              <img
+                                src={primaryBeforeUrl}
+                                alt={t('beforeCitizenReportLocked')}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const parent = e.currentTarget.parentElement;
+                                  const fallbackEl = parent?.querySelector('.citizen-photo-fallback') as HTMLElement;
+                                  if (fallbackEl) fallbackEl.style.display = 'flex';
+                                }}
+                              />
+                              <div className="citizen-photo-fallback hidden w-full h-full flex-col items-center justify-center p-4 text-center bg-gray-50 text-gray-500">
+                                <span className="text-xs font-semibold text-gray-600">{t('noCitizenEvidencePhoto')}</span>
+                                <span className="text-[10px] text-gray-400">{t('lockedCitizenRecord')}</span>
+                              </div>
+                              <span className="absolute bottom-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center space-x-1">
+                                <Lock className="w-3 h-3 text-emerald-400" />
+                                <span>{anglePhotos[0]?.label || t('frontView')}</span>
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 h-44 flex flex-col items-center justify-center p-4 text-center text-gray-500">
+                              <span className="text-xs font-semibold text-gray-600">{t('noCitizenEvidencePhoto')}</span>
+                              <span className="text-[10px] text-gray-400">{t('lockedCitizenRecord')}</span>
+                            </div>
+                          )}
+
+                          {/* All Angle Thumbnails for Staff */}
+                          {anglePhotos.length > 1 && (
+                            <div className="grid grid-cols-4 gap-1.5 pt-1.5">
+                              {anglePhotos.map((photoItem, pIdx) => (
+                                <div
+                                  key={pIdx}
+                                  className="relative aspect-4/3 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all"
+                                  onClick={() => {
+                                    window.open(photoItem.url, '_blank');
+                                  }}
+                                  title={`View ${photoItem.label}`}
+                                >
+                                  <img src={photoItem.url} alt={photoItem.label} className="w-full h-full object-cover" />
+                                  <span className="absolute bottom-0.5 inset-x-0 bg-gray-900/80 text-white text-[8px] text-center font-mono truncate px-0.5">
+                                    {photoItem.label}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div>

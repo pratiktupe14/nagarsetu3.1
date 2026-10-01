@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { LanguageSelector } from '../../components/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   User, Bell, Clock, Globe, ShieldCheck, LogOut, CheckCircle2,
   AlertTriangle, Save, RefreshCw, Building2, Key, Sliders, Smartphone, Mail
@@ -10,6 +11,7 @@ import {
 
 export const AdminSettingsPage: React.FC = () => {
   const { user, logout, changePassword, updateUserProfile } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Active Navigation Section
@@ -168,7 +170,7 @@ export const AdminSettingsPage: React.FC = () => {
               className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
             >
               <Save className="w-4 h-4" />
-              <span>Save Changes</span>
+              <span>{t('saveChanges')}</span>
             </button>
           </div>
         </div>
@@ -662,7 +664,7 @@ export const AdminSettingsPage: React.FC = () => {
                     className="px-4 py-2 bg-rose-50 border border-rose-300 text-rose-800 font-bold text-xs rounded-lg hover:bg-rose-100 transition-colors flex items-center space-x-2"
                   >
                     <LogOut className="w-4 h-4 text-rose-600" />
-                    <span>Sign Out Administrator</span>
+                    <span>{t('signOutAdmin')}</span>
                   </button>
                 </div>
               </div>

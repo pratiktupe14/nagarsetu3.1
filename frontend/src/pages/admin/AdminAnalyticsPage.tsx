@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { getAllComplaints } from '../../services/complaintService';
 import {
@@ -45,6 +46,7 @@ ChartJS.register(
 );
 
 export const AdminAnalyticsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -589,7 +591,7 @@ export const AdminAnalyticsPage: React.FC = () => {
                 <option value="In Progress">In Progress</option>
                 <option value="Resolved">Resolved</option>
                 <option value="Reopened">Reopened</option>
-                <option value="Overdue">Overdue SLA</option>
+                <option value="Overdue">{t('overdueSla')}</option>
               </select>
             </div>
           </div>
@@ -621,7 +623,7 @@ export const AdminAnalyticsPage: React.FC = () => {
           </div>
 
           <div className="p-3 text-center space-y-0.5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">Overdue SLA</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block font-outfit">{t('overdueSla')}</span>
             <span className="text-xl font-extrabold text-rose-700 font-mono block">{kpiStats.overdue}</span>
           </div>
 

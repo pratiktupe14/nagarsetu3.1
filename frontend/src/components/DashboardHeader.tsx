@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
 import { UserRole } from '../types/database.types';
@@ -18,6 +19,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   isMobileMenuOpen = false
 }) => {
   const { user, role, logout } = useAuth();
+  const { t, translateRole, translateDepartment } = useLanguage();
   const navigate = useNavigate();
   const activeRole: UserRole = role || user?.role || 'citizen';
 
@@ -59,27 +61,27 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <div className="hidden sm:flex items-center space-x-3 pl-2 border-l border-gray-200 text-right">
           <div>
             <span className="text-xs font-bold text-gray-900 block leading-tight">
-              {user?.full_name || (user as any)?.name || (activeRole === 'city_admin' ? 'Municipal Admin' : activeRole === 'citizen' ? 'Citizen' : 'Officer')}
+              {user?.full_name || (user as any)?.name || translateRole(activeRole)}
             </span>
             <span className="text-[10px] text-gray-500 font-medium block capitalize">
               {activeRole === 'city_admin'
-                ? 'City Administrator'
+                ? t('roleAdmin')
                 : activeRole === 'department_head'
-                  ? (user?.department_name ? `${user.department_name.split('(')[0].trim()} Head` : 'Department Head')
+                  ? (user?.department_name ? `${translateDepartment(user.department_name)} - ${t('roleDeptHead')}` : t('roleDeptHead'))
                   : activeRole === 'service_staff'
-                    ? (user?.department_name ? `${user.department_name.split('(')[0].trim()} Staff` : 'Field Staff')
-                    : 'Citizen'}
+                    ? (user?.department_name ? `${translateDepartment(user.department_name)} - ${t('roleStaff')}` : t('roleStaff'))
+                    : t('roleCitizen')}
             </span>
           </div>
 
           <button
             onClick={handleLogout}
             className="p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center space-x-1.5"
-            title="Logout"
-            aria-label="Logout"
+            title={t('logout')}
+            aria-label={t('logout')}
           >
             <LogOut className="w-4 h-4 text-gray-500 hover:text-rose-600" />
-            <span className="hidden lg:inline text-xs font-bold text-gray-600 hover:text-rose-600">Logout</span>
+            <span className="hidden lg:inline text-xs font-bold text-gray-600 hover:text-rose-600">{t('logout')}</span>
           </button>
         </div>
 
@@ -87,8 +89,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <button
           onClick={handleLogout}
           className="flex sm:hidden p-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition-colors min-h-[44px] min-w-[44px] items-center justify-center"
-          title="Logout"
-          aria-label="Logout"
+          title={t('logout')}
+          aria-label={t('logout')}
         >
           <LogOut className="w-4 h-4 text-gray-500" />
         </button>

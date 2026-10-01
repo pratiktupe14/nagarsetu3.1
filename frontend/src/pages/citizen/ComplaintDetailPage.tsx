@@ -14,6 +14,7 @@ import { Complaint, ComplaintStatus } from '../../types/database.types';
 import { Star, ArrowLeft, Send, RotateCcw, UserCheck, Zap, MapPin, Flame, Users, Layers, Clock } from 'lucide-react';
 import { getValidImageUrl, DEFAULT_CIVIC_IMAGE_PLACEHOLDER } from '../../lib/supabase';
 import { formatPortalDateTime, formatPortalDate, formatPortalTime } from '../../utils/dateUtils';
+import { useLanguage } from '../../context/LanguageContext';
 
 function formatResponseTimeLabel(hours?: number, deadline?: string, createdAt?: string): string {
   if (hours) {
@@ -38,6 +39,7 @@ function formatResponseTimeLabel(hours?: number, deadline?: string, createdAt?: 
 
 export const ComplaintDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { t, lang, translateCategory, translateStatus, translatePriority, translateDepartment } = useLanguage();
 
   const [complaint, setComplaint] = useState<Complaint | null>(null);
   const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
@@ -190,7 +192,7 @@ export const ComplaintDetailPage: React.FC = () => {
             className="inline-flex items-center space-x-1.5 text-xs font-bold text-gray-600 hover:text-emerald-600 transition-colors min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to My Complaints</span>
+            <span>{t('backToMyComplaints')}</span>
           </Link>
 
           <span className="font-mono text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PriorityBadge } from '../../components/PriorityBadge';
@@ -43,6 +44,7 @@ interface SavedReportItem {
 }
 
 export const AdminReportsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -559,7 +561,7 @@ export const AdminReportsPage: React.FC = () => {
                 <option value="Approved">Approved</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Resolved">Resolved</option>
-                <option value="Overdue">Overdue SLA</option>
+                <option value="Overdue">{t('overdueSla')}</option>
               </select>
             </div>
 
@@ -748,7 +750,7 @@ export const AdminReportsPage: React.FC = () => {
                 </div>
 
                 <div className="p-3 space-y-0.5">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">Overdue SLA</span>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase block font-outfit">{t('overdueSla')}</span>
                   <span className="text-base font-mono font-extrabold text-rose-700 block">{reportSummary.overdue}</span>
                 </div>
 

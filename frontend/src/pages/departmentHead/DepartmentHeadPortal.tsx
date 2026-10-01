@@ -2366,7 +2366,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                 <div className="flex items-center space-x-3 text-rose-900">
                   <AlertTriangle className="w-6 h-6 text-rose-600 animate-pulse shrink-0" />
                   <div>
-                    <h4 className="font-extrabold font-outfit text-sm tracking-tight text-rose-950 uppercase">⚠ OVERDUE SLA ALERT</h4>
+                    <h4 className="font-extrabold font-outfit text-sm tracking-tight text-rose-950 uppercase">⚠ {t('overdueSlaAlert')}</h4>
                     <p className="text-xs text-rose-800 font-medium">
                       You have <span className="font-extrabold text-rose-950">{overdueMetrics.totalOverdue}</span> task{overdueMetrics.totalOverdue > 1 ? 's' : ''} that have exceeded their SLA completion deadline across {deptInfo.fullName}.
                     </p>
@@ -4381,10 +4381,10 @@ export const DepartmentHeadPortal: React.FC = () => {
                   onChange={(e) => setSlaFilter(e.target.value)}
                   className="bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-semibold focus:outline-none focus:border-emerald-600 min-h-[40px]"
                 >
-                  <option value="All">All SLA Deadlines</option>
+                  <option value="All">{t('allSlaDeadlines')}</option>
                   <option value="Within SLA">Within SLA</option>
-                  <option value="Due Today">Due Today</option>
-                  <option value="Overdue">Overdue SLA</option>
+                  <option value="Due Today">{t('dueToday')}</option>
+                  <option value="Overdue">{t('overdueSla')}</option>
                 </select>
 
                 <select aria-label="date  filter"
@@ -4483,7 +4483,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                           <th className="p-3.5">Priority</th>
                           <th className="p-3.5">Reported Date</th>
                           <th className="p-3.5">Assigned Staff</th>
-                          <th className="p-3.5">SLA Deadline</th>
+                          <th className="p-3.5">{t('slaDeadline')}</th>
                           <th className="p-3.5">Status</th>
                           <th className="p-3.5 text-right">Action</th>
                         </tr>

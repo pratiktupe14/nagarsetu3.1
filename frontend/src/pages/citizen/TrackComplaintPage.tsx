@@ -73,7 +73,7 @@ const TIMELINE_STEPS: TimelineStep[] = [
 export const TrackComplaintPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const { t, translateCategory, translateStatus } = useLanguage();
+  const { t, language, translateCategory, translateStatus } = useLanguage();
   const navigate = useNavigate();
 
   const [searchInput, setSearchInput] = useState('');
@@ -400,16 +400,16 @@ export const TrackComplaintPage: React.FC = () => {
                   </div>
 
                   <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Reported On</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">{t('reportedOn')}</span>
                     <span className="font-mono text-[10px] text-gray-700 block">
-                      {formatPortalDate(activeComplaint.created_at)}
+                      {formatPortalDate(activeComplaint.created_at, language)}
                     </span>
                   </div>
 
                   <div className="bg-slate-50/80 p-2.5 rounded-xl border border-gray-100 space-y-0.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">Last Updated</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-mono">{t('lastUpdated')}</span>
                     <span className="font-mono text-[10px] text-gray-700 block">
-                      {formatPortalDateTime(activeComplaint.updated_at || activeComplaint.created_at)}
+                      {formatPortalDateTime(activeComplaint.updated_at || activeComplaint.created_at, false, language)}
                     </span>
                   </div>
                 </div>
@@ -418,7 +418,7 @@ export const TrackComplaintPage: React.FC = () => {
                 {activeComplaint.photo_before_url && (
                   <div className="pt-2 border-t border-gray-100">
                     <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block font-mono mb-1.5">
-                      Photo Evidence
+                      {t('complaintPhotoEvidence')}
                     </span>
                     <div className="flex space-x-2">
                       <div className="w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0 bg-gray-100">
