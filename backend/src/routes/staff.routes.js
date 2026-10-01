@@ -11,24 +11,70 @@ const { notifyStatusChange } = require('../services/notificationService');
 router.use(authenticateToken);
 router.use(requireRole(['staff', 'service_staff', 'officer', 'admin', 'city_admin']));
 
+// Canonical Department Mapping Helper for Staff Task Isolation
+function getCanonicalDepartment(val) {
+  if (!val) return null;
+  const s = String(val).trim().toLowerCase();
+  if (s === '1' || s === 'pwd' || s.includes('pwd') || s.includes('public works') || s.includes('8ed9f760')) {
+    return { id: 1, code: 'PWD', name: 'Public Works Department (PWD)', uuid: '8ed9f760-1314-427c-a515-c2a54d6df6d8' };
+  }
+  if (s === '2' || s === 'san' || s.includes('san') || s.includes('waste') || s.includes('garbage') || s.includes('9cabc1f2')) {
+    return { id: 2, code: 'SAN', name: 'Sanitation & Waste Management', uuid: '9cabc1f2-fd10-48dd-a5cb-01d05197de22' };
+  }
+  if (s === '3' || s === 'wtr' || s.includes('wtr') || s.includes('water') || s.includes('ead370cc')) {
+    return { id: 3, code: 'WTR', name: 'Water Supply & Sewerage Board', uuid: 'ead370cc-459c-44f0-899f-8a97f0928beb' };
+  }
+  if (s === '4' || s === 'drn' || s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('ee73cb82')) {
+    return { id: 4, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' };
+  }
+  if (s === '5' || s === 'ele' || s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('31842723')) {
+    return { id: 5, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' };
+  }
+  if (s === '6' || s === 'trf' || s.includes('trf') || s.includes('traffic') || s.includes('signal') || s.includes('ae5e4d0c')) {
+    return { id: 6, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' };
+  }
+  if (s === '7' || s === 'mnt' || s.includes('mnt') || s.includes('maint') || s.includes('71542723')) {
+    return { id: 7, code: 'MNT', name: 'Maintenance Department', uuid: '71542723-23ac-490b-912b-9f6d9afbdfb7' };
+  }
+  return null;
+}
+
 // Get assigned tasks for current field staff member with strict staff and department isolation
 router.get('/tasks', async (req, res) => {
   try {
-    const userDeptId = req.user.department_id;
     const staffId = req.user.id;
+    const staffEmail = (req.user.email || '').toLowerCase().trim();
+    const staffName = req.user.name || '';
+    const staffEmpId = req.user.employee_id || '';
+    const userDeptId = req.user.department_id;
+    const canonicalDept = getCanonicalDepartment(userDeptId);
 
     let sql = `
-      SELECT c.*, a.id as assignment_id, a.assigned_at, a.resolved_at, d.name as department_name
+      SELECT c.*,
+             a.id as assignment_id, a.assigned_at, a.resolved_at,
+             COALESCE((SELECT name FROM departments WHERE id = c.department_id OR CAST(id AS TEXT) = CAST(c.department_id AS TEXT) LIMIT 1), $6) as department_name
       FROM complaints c
-      LEFT JOIN assignments a ON a.complaint_id = c.id
-      LEFT JOIN departments d ON c.department_id = d.id
-      WHERE (c.assigned_staff_id = $1 OR a.staff_id = $1 OR c.assigned_staff_email = $2 OR c.assigned_staff_name = $3)
+      LEFT JOIN assignments a ON a.id = (SELECT id FROM assignments WHERE complaint_id = c.id ORDER BY id DESC LIMIT 1)
+      WHERE (
+        c.assigned_staff_id = $1
+        OR CAST(c.assigned_staff_id AS TEXT) = $2
+        OR (c.assigned_staff_email IS NOT NULL AND LOWER(c.assigned_staff_email) = $3)
+        OR ($5 != '' AND c.assigned_staff_id = $5)
+        OR (c.assigned_staff_name IS NOT NULL AND c.assigned_staff_name = $4 AND (c.assigned_staff_id IS NULL OR c.assigned_staff_id = '' OR c.assigned_staff_id = $1 OR CAST(c.assigned_staff_id AS TEXT) = $2))
+      )
     `;
-    const params = [staffId, req.user.email || '', req.user.name || ''];
+    const params = [
+      staffId,
+      String(staffId),
+      staffEmail,
+      staffName,
+      staffEmpId,
+      canonicalDept ? canonicalDept.name : 'Municipal Department'
+    ];
 
-    if (userDeptId) {
-      sql += ` AND (c.department_id = $4 OR d.id = $4)`;
-      params.push(userDeptId);
+    if (canonicalDept) {
+      sql += ` AND (c.department_id = $7 OR CAST(c.department_id AS TEXT) = $8 OR c.department_id = $9)`;
+      params.push(canonicalDept.id, String(canonicalDept.id), canonicalDept.uuid);
     }
 
     sql += ` ORDER BY c.created_at DESC`;

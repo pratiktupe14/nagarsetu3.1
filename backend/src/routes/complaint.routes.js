@@ -1131,47 +1131,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const result = await query(sql, params);
     const pgRows = result.rows || [];
 
-    let supaRows = [];
-    if (process.env.NODE_ENV !== 'test') {
-      try {
-        const { getSupabaseClient } = require('../middleware/auth');
-        const supabase = getSupabaseClient();
-        if (supabase) {
-          let supaQuery = supabase
-            .from('complaints')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (isCitizen) {
-            supaQuery = supaQuery.eq('citizen_id', req.user.id);
-          } else if (isDeptHead && req.user?.department_id) {
-            supaQuery = supaQuery.eq('department_id', req.user.department_id);
-          }
-
-          const { data, error } = await supaQuery;
-
-          if (!error && Array.isArray(data) && data.length > 0) {
-            let deptMap = {};
-            try {
-              const { data: depts } = await supabase.from('departments').select('id, name');
-              if (depts) {
-                depts.forEach((d) => { deptMap[d.id] = d.name; });
-              }
-            } catch (e) {}
-
-            supaRows = data.map((c) => ({
-              ...c,
-              department_name: deptMap[c.department_id] || c.department_name || 'Public Works Department (PWD)'
-            }));
-          }
-        }
-      } catch (sErr) {
-        console.warn('Supabase fetch in GET / warning:', sErr.message);
-      }
-    }
-
-    const merged = mergeComplaintRows(pgRows, supaRows, !isCitizen);
-    return res.json({ complaints: merged.map(c => normalizeComplaintPhotoUrls(c, req)) });
+    return res.json({ complaints: pgRows.map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch all complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -1197,32 +1157,7 @@ router.get('/my', authenticateToken, async (req, res) => {
     const result = await query(sql, [citizenId, String(citizenId)]);
     const pgRows = result.rows || [];
 
-    let supaRows = [];
-    if (process.env.NODE_ENV !== 'test') {
-      try {
-        const { getSupabaseClient } = require('../middleware/auth');
-        const supabase = getSupabaseClient();
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('complaints')
-            .select('*, departments(name)')
-            .eq('citizen_id', citizenId)
-            .order('created_at', { ascending: false });
-
-          if (!error && Array.isArray(data) && data.length > 0) {
-            supaRows = data.map((c) => ({
-              ...c,
-              department_name: c.departments?.name || c.department_name
-            }));
-          }
-        }
-      } catch (sErr) {
-        console.warn('Supabase fetch in GET /my warning:', sErr.message);
-      }
-    }
-
-    const merged = mergeComplaintRows(pgRows, supaRows);
-    return res.json({ complaints: merged.map(c => normalizeComplaintPhotoUrls(c, req)) });
+    return res.json({ complaints: pgRows.map(c => normalizeComplaintPhotoUrls(c, req)) });
   } catch (err) {
     console.error('Fetch my complaints error:', err);
     return res.status(500).json({ error: 'Failed to fetch complaints' });
@@ -1245,35 +1180,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
     `;
     let result = await query(sql, [idParam, idParam, idParam]);
     let complaint = result.rows && result.rows.length > 0 ? result.rows[0] : null;
-
-    // Supabase fallback if local database returned 0 rows
-    if (!complaint) {
-      try {
-        const { getSupabaseClient } = require('../middleware/auth');
-        const supabase = getSupabaseClient();
-        if (supabase) {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
-          let supaQuery;
-          if (isUuid) {
-            supaQuery = supabase.from('complaints').select('*, departments(name)').or(`id.eq.${idParam},complaint_number.eq.${idParam}`).maybeSingle();
-          } else if (idParam.startsWith('NS-')) {
-            supaQuery = supabase.from('complaints').select('*, departments(name)').eq('complaint_number', idParam).maybeSingle();
-          } else {
-            supaQuery = supabase.from('complaints').select('*, departments(name)').or(`complaint_number.eq.${idParam}`).maybeSingle();
-          }
-
-          const { data: supaData } = await supaQuery;
-          if (supaData) {
-            complaint = {
-              ...supaData,
-              department_name: supaData.departments?.name || supaData.department_name
-            };
-          }
-        }
-      } catch (sErr) {
-        console.warn('Supabase complaint detail fallback note:', sErr.message);
-      }
-    }
 
     if (!complaint) {
       return res.status(404).json({ error: 'Complaint not found' });

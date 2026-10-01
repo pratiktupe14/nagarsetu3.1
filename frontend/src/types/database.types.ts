@@ -89,6 +89,7 @@ export interface UserProfile {
   employee_id?: string;
   avatar_url?: string;
   address?: string;
+  residential_address?: string;
   language_pref?: string;
   status?: 'Active' | 'Inactive' | 'active' | 'inactive';
   must_change_password?: boolean;

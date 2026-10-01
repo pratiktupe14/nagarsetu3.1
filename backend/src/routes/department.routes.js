@@ -240,32 +240,6 @@ router.get('/complaints', authenticateToken, async (req, res) => {
       compRows = compRows.filter(c => staffMatchesDept(c, filterDept));
     }
 
-    // Fallback to Supabase if local DB has 0 rows
-    if (compRows.length === 0) {
-      try {
-        const { getSupabaseClient } = require('../middleware/auth');
-        const supabase = getSupabaseClient();
-        if (supabase) {
-          let sbQuery = supabase.from('complaints').select('*, departments(name)').order('created_at', { ascending: false });
-          if (filterDept) {
-            sbQuery = sbQuery.eq('department_id', filterDept.uuid);
-          }
-          const { data, error } = await sbQuery;
-          if (!error && Array.isArray(data) && data.length > 0) {
-            compRows = data.map((c) => ({
-              ...c,
-              department_name: c.departments?.name || c.department_name || (filterDept ? filterDept.name : 'Municipal Department')
-            }));
-            if (filterDept) {
-              compRows = compRows.filter(c => staffMatchesDept(c, filterDept));
-            }
-          }
-        }
-      } catch (sbErr) {
-        console.warn('Supabase fallback in GET /api/department/complaints note:', sbErr.message);
-      }
-    }
-
     return res.json({ complaints: compRows });
   } catch (err) {
     console.error('Fetch department complaints error:', err);

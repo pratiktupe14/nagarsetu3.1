@@ -234,224 +234,7 @@ export async function uploadComplaintImage(file: File, bucketName: string = 'iss
   });
 }
 
-export const CANONICAL_MUNICIPAL_COMPLAINTS: Complaint[] = [
-  {
-    id: 'comp-canon-001',
-    complaint_number: 'NS-2026-891024',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Deep pothole on MG Road near City Hospital',
-    category: 'Roads & Footpaths',
-    description: 'Severe pothole crater causing dangerous vehicle jerks and risk to two-wheelers outside City Hospital emergency ward.',
-    priority: 'High',
-    status: 'Submitted',
-    department_id: '1',
-    department_name: 'Public Works Department (PWD)',
-    latitude: 19.9975,
-    longitude: 73.7898,
-    location_source: 'live_gps',
-    location_address: 'MG Road, Near City Civil Hospital, Ward 14, Nashik, Maharashtra 422001',
-    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-    support_count: 5
-  },
-  {
-    id: 'comp-canon-002',
-    complaint_number: 'NS-2026-782341',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Underground Water Pipeline Burst and Leakage',
-    category: 'Water Supply / Leakage',
-    description: 'High-pressure municipal potable water main ruptured under pavement, flooding street and causing severe clean water wastage.',
-    priority: 'High',
-    status: 'Approved',
-    department_id: '3',
-    department_name: 'Water Supply & Sewerage Board',
-    latitude: 20.0054,
-    longitude: 73.7912,
-    location_source: 'live_gps',
-    location_address: 'Gangapur Road, Near KTHM College Gate, Nashik, Maharashtra 422002',
-    created_at: new Date(Date.now() - 3600000 * 18).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    assigned_staff_name: 'Suresh Shinde',
-    assigned_staff_id: 'staff-103',
-    support_count: 8
-  },
-  {
-    id: 'comp-canon-003',
-    complaint_number: 'NS-2026-673412',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Solid Waste and Commercial Dumpster Overflow',
-    category: 'Garbage & Sanitation',
-    description: 'Public community garbage bin overflowing onto roadway, foul odor creating health hazard near vegetable market entrance.',
-    priority: 'Critical',
-    status: 'Submitted',
-    department_id: '2',
-    department_name: 'Sanitation & Waste Management',
-    latitude: 19.9912,
-    longitude: 73.7745,
-    location_source: 'live_gps',
-    location_address: 'Market Yard Chowk, Panchavati, Nashik, Maharashtra 422003',
-    created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-    support_count: 12
-  },
-  {
-    id: 'comp-canon-004',
-    complaint_number: 'NS-2026-564523',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Main Underground Sewage Manhole Overflowing',
-    category: 'Drainage & Sewage',
-    description: 'Sewage backup bubbling through manhole cover onto pedestrian walkway, emitting noxious stench.',
-    priority: 'Critical',
-    status: 'In Progress',
-    department_id: '4',
-    department_name: 'Drainage & Sewage Department',
-    latitude: 19.9881,
-    longitude: 73.7829,
-    location_source: 'live_gps',
-    location_address: 'Station Road, Near Railway Colony, Nashik Road, Maharashtra 422101',
-    created_at: new Date(Date.now() - 86400000 * 1.5).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 3).toISOString(),
-    assigned_staff_name: 'Dinesh Sonawane',
-    assigned_staff_id: 'staff-104',
-    support_count: 14
-  },
-  {
-    id: 'comp-canon-005',
-    complaint_number: 'NS-2026-455634',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Series of Streetlights Non-Functional on Main Arterial Road',
-    category: 'Electricity / Streetlight',
-    description: 'Continuous stretch of 6 LED streetlights completely dark along ring road, causing black spots and accident vulnerability.',
-    priority: 'Medium',
-    status: 'Approved',
-    department_id: '5',
-    department_name: 'Electrical & Street Lighting',
-    latitude: 20.0123,
-    longitude: 73.7654,
-    location_source: 'manual_pin',
-    location_address: 'Trimbak Road, Near ITI Signal, Satpur, Nashik, Maharashtra 422007',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-    assigned_staff_name: 'Ganesh Kadam',
-    assigned_staff_id: 'staff-105',
-    support_count: 3
-  },
-  {
-    id: 'comp-canon-006',
-    complaint_number: 'NS-2026-346745',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Traffic Signal System Frozen at Busy Junction',
-    category: 'Traffic / Signals',
-    description: 'Automated 4-way traffic signals stuck on blinking yellow during morning rush hour, leading to complete gridlock.',
-    priority: 'High',
-    status: 'In Progress',
-    department_id: '6',
-    department_name: 'Traffic Management Department',
-    latitude: 19.9998,
-    longitude: 73.7852,
-    location_source: 'live_gps',
-    location_address: 'CBS Circle Junction, Old Agra Road, Nashik, Maharashtra 422001',
-    created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 1).toISOString(),
-    assigned_staff_name: 'Nitin Pawar',
-    assigned_staff_id: 'staff-106',
-    support_count: 19
-  },
-  {
-    id: 'comp-canon-007',
-    complaint_number: 'NS-2026-237856',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Dangerous Concrete Road Sinking Near Drainage Grate',
-    category: 'Roads & Footpaths',
-    description: 'Road surface depressed by 4 inches around storm grate, posing flip hazard for two-wheelers.',
-    priority: 'High',
-    status: 'Resolved',
-    department_id: '1',
-    department_name: 'Public Works Department (PWD)',
-    latitude: 19.9845,
-    longitude: 73.7712,
-    location_source: 'live_gps',
-    location_address: 'College Road, Near Thatte Nagar, Nashik, Maharashtra 422005',
-    created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-    updated_at: new Date(Date.now() - 86400000 * 1).toISOString(),
-    assigned_staff_name: 'Amit Patil',
-    assigned_staff_id: 'staff-101',
-    support_count: 7
-  },
-  {
-    id: 'comp-canon-008',
-    complaint_number: 'NS-2026-128967',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Open Electric Junction Box with Exposed High-Voltage Wires',
-    category: 'Electricity / Streetlight',
-    description: 'Street-level junction feeder box metal door ripped off, live busbars exposed directly next to school pedestrian gate.',
-    priority: 'Critical',
-    status: 'In Progress',
-    department_id: '5',
-    department_name: 'Electrical & Street Lighting',
-    latitude: 20.0076,
-    longitude: 73.7834,
-    location_source: 'live_gps',
-    location_address: 'Sharanpur Road, Opposite St. Francis School, Nashik, Maharashtra 422002',
-    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    assigned_staff_name: 'Ganesh Kadam',
-    assigned_staff_id: 'staff-105',
-    support_count: 22
-  },
-  {
-    id: 'comp-canon-009',
-    complaint_number: 'NS-2026-019078',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Persistent Illegal Garbage Dumping in Open Municipal Plot',
-    category: 'Garbage & Sanitation',
-    description: 'Commercial debris and household waste dumped repeatedly in municipal reserve plot, attracting stray cattle.',
-    priority: 'Medium',
-    status: 'Reopened',
-    department_id: '2',
-    department_name: 'Sanitation & Waste Management',
-    latitude: 19.9754,
-    longitude: 73.7991,
-    location_source: 'live_gps',
-    location_address: 'Govind Nagar, Near City Center Mall, Nashik, Maharashtra 422009',
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-    assigned_staff_name: 'Rajesh Gawali',
-    assigned_staff_id: 'staff-102',
-    support_count: 11
-  },
-  {
-    id: 'comp-canon-010',
-    complaint_number: 'NS-2026-908189',
-    citizen_id: 'e2a4338c-5d49-4ae3-b766-40d99fb26f87',
-    photo_before_url: DEFAULT_CIVIC_IMAGE_PLACEHOLDER,
-    title: 'Broken Stormwater Grating and Silt Blockage',
-    category: 'Drainage & Sewage',
-    description: 'Cast-iron drain grate collapsed into gutter, creating large hole in road shoulder.',
-    priority: 'High',
-    status: 'Approved',
-    department_id: '4',
-    department_name: 'Drainage & Sewage Department',
-    latitude: 19.9921,
-    longitude: 73.8043,
-    location_source: 'live_gps',
-    location_address: 'Jail Road, Ward 22, Nashik Road, Maharashtra 422101',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 6).toISOString(),
-    assigned_staff_name: 'Dinesh Sonawane',
-    assigned_staff_id: 'staff-104',
-    support_count: 6
-  }
-];
+export const CANONICAL_MUNICIPAL_COMPLAINTS: Complaint[] = [];
 
 // Fetch all complaints from Supabase with real geocoding fallback
 export async function getAllComplaints(): Promise<Complaint[]> {
@@ -496,7 +279,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   }
 
   // 2. Fallback to or merge Supabase if Express API was unreachable or returned 0 complaints
-  if ((responseStatus !== 200 || list.length === 0) && isSupabaseConfigured()) {
+  if (responseStatus !== 200 && isSupabaseConfigured()) {
     try {
       const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
       const supaTimeoutMs = isLocalhost ? 6000 : 15000;
@@ -534,10 +317,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   }
 
   // 3. Fallback to canonical municipal seed complaints if both API and Supabase returned 0 items
-  if (list.length === 0) {
-    list = [...CANONICAL_MUNICIPAL_COMPLAINTS];
-    responseStatus = 200;
-  }
+  // No fallback to mock data
 
   // 4. DB state is authoritative when backend or Supabase query succeeds
   if (responseStatus === 200) {
@@ -552,9 +332,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
       }, 50);
     }
 
-    if (finalComplaints.length === 0) {
-      finalComplaints = [...CANONICAL_MUNICIPAL_COMPLAINTS];
-    }
+    // Empty list preserved
 
     if (import.meta.env.DEV) {
       console.log('[ADMIN DATA SYNC]', {
@@ -571,7 +349,7 @@ export async function getAllComplaints(): Promise<Complaint[]> {
   }
 
   // If both Express API and Supabase failed, fall back to canonical complaints
-  return [...CANONICAL_MUNICIPAL_COMPLAINTS].map(normalizeComplaint);
+  return [];
 }
 
 /**
@@ -770,7 +548,7 @@ export async function getStaffTasks(
       if (res.ok) {
         const data = await res.json();
         const staffTasks: Complaint[] = Array.isArray(data) ? data : (data?.tasks || []);
-        if (Array.isArray(staffTasks) && staffTasks.length > 0) {
+        if (Array.isArray(staffTasks)) {
           return staffTasks.filter((c: any) => !isDemoComplaint(c)).map(normalizeComplaint);
         }
       }
@@ -840,13 +618,8 @@ export async function getDepartmentComplaints(departmentId?: string, departmentN
       const data = await res.json();
       const rawList = Array.isArray(data) ? data : (data && Array.isArray(data.complaints) ? data.complaints : []);
       const cleanList = (rawList as Complaint[]).filter((c) => !isDemoComplaint(c));
-      const filtered = cleanList.filter(matchesDept);
-      if (filtered.length > 0) {
-        return filtered.map(normalizeComplaint);
-      }
-      if (cleanList.length > 0 && !targetDeptId && !targetDeptName) {
-        return cleanList.map(normalizeComplaint);
-      }
+      const filtered = (targetDeptId || targetDeptName) ? cleanList.filter(matchesDept) : cleanList;
+      return filtered.map(normalizeComplaint);
     }
   } catch (backendErr) {
     console.warn('Express backend getDepartmentComplaints note:', backendErr);

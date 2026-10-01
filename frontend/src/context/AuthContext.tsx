@@ -1078,7 +1078,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateUserProfile = async (payload: Partial<UserProfile>): Promise<UserProfile> => {
     try {
-      const token = localStorage.getItem('nagarsetu_token');
+      const token =
+        localStorage.getItem('nagarsetu_token') ||
+        sessionStorage.getItem('nagarsetu_token') ||
+        localStorage.getItem('token') ||
+        sessionStorage.getItem('auth_token') ||
+        localStorage.getItem('nagarsetu_token_citizen');
       const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
         method: 'PUT',
         headers: {
@@ -1086,11 +1091,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          name: payload.full_name || payload.name,
-          mobile: payload.mobile,
-          email: payload.email,
-          language_pref: payload.language_pref,
-          address: payload.address
+          full_name: payload.full_name || payload.name,
+          name: payload.name || payload.full_name,
+          residential_address: payload.address !== undefined ? payload.address : payload.residential_address,
+          address: payload.address !== undefined ? payload.address : payload.residential_address,
+          preferred_language: payload.language_pref,
+          language_pref: payload.language_pref
         })
       });
 
@@ -1100,11 +1106,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const resData = await response.json();
+      const updatedAddress = resData.user?.address ?? resData.user?.residential_address ?? payload.address ?? payload.residential_address ?? user?.address ?? '';
       const updatedUser: UserProfile = {
         ...(user || ({} as UserProfile)),
         ...resData.user,
         full_name: resData.user?.name || resData.user?.full_name || payload.full_name || payload.name || user?.full_name || '',
-        name: resData.user?.name || resData.user?.full_name || payload.name || payload.full_name || user?.name || ''
+        name: resData.user?.name || resData.user?.full_name || payload.name || payload.full_name || user?.name || '',
+        address: updatedAddress,
+        residential_address: updatedAddress,
+        language_pref: resData.user?.language_pref || payload.language_pref || user?.language_pref || 'en'
       };
 
       setUser(updatedUser);
@@ -1118,7 +1128,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             full_name: updatedUser.full_name,
             mobile: updatedUser.mobile,
             email: updatedUser.email,
-            language_pref: updatedUser.language_pref
+            language_pref: updatedUser.language_pref,
+            address: updatedAddress,
+            residential_address: updatedAddress
           }).eq('id', user.id);
         } catch (sErr) {
           console.warn('[SUPABASE_PROFILE_SYNC_NOTE]:', sErr);

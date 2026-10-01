@@ -143,7 +143,14 @@ export async function checkAiHealth(): Promise<{ configured: boolean; model: str
     const endpoint = baseUrl ? `${baseUrl}/api/ai/health` : '/api/ai/health';
     const res = await fetch(endpoint);
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      const isConfigured = Boolean(data.configured ?? data.aiConfigured ?? data.geminiConfigured);
+      return {
+        configured: isConfigured,
+        reachable: data.reachable !== undefined ? Boolean(data.reachable) : isConfigured,
+        model: data.model || 'gemini-2.5-flash',
+        reply: data.reply
+      };
     } else {
       const errText = await res.text();
       return { configured: true, model: 'gemini-2.5-flash', reachable: false, error: `Backend returned status ${res.status}: ${errText}` };

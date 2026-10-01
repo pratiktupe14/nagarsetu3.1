@@ -14,6 +14,69 @@ const { notifyStatusChange } = require('./notificationService');
  * @param {string} [priority] - Complaint priority ('Low' | 'Medium' | 'High' | 'Critical')
  * @returns {Object|null} Selected staff member or null if none eligible
  */
+const CANONICAL_DEPARTMENTS = [
+  { id: 1, code: 'PWD', name: 'Public Works Department (PWD)', uuid: '8ed9f760-1314-427c-a515-c2a54d6df6d8' },
+  { id: 2, code: 'SAN', name: 'Sanitation & Waste Management', uuid: '9cabc1f2-fd10-48dd-a5cb-01d05197de22' },
+  { id: 3, code: 'WTR', name: 'Water Supply & Sewerage Board', uuid: 'ead370cc-459c-44f0-899f-8a97f0928beb' },
+  { id: 4, code: 'ELE', name: 'Electrical & Street Lighting', uuid: '31842723-23ac-490b-912b-9f6d9afbdfb3' },
+  { id: 5, code: 'TRF', name: 'Traffic Management Department', uuid: 'ae5e4d0c-996f-4d81-9528-d642664c93ae' },
+  { id: 6, code: 'MNT', name: 'Maintenance Department', uuid: '8ed9f760-1314-427c-a515-c2a54d6df6d8' },
+  { id: 7, code: 'DRN', name: 'Drainage & Sewage Department', uuid: 'ee73cb82-cc47-4333-b7d6-4491353c1354' }
+];
+
+function getCanonicalDepartment(val) {
+  if (!val) return null;
+  const s = String(val).trim().toLowerCase();
+
+  for (const dept of CANONICAL_DEPARTMENTS) {
+    if (
+      String(dept.id) === s ||
+      dept.code.toLowerCase() === s ||
+      dept.uuid.toLowerCase() === s ||
+      s.includes(dept.uuid.toLowerCase())
+    ) {
+      return dept;
+    }
+  }
+
+  if (s === '1' || s.includes('pwd') || s.includes('public works') || s.includes('road') || s.includes('pothole') || s.includes('8ed9f760')) {
+    return CANONICAL_DEPARTMENTS[0];
+  }
+  if (s === '2' || s.includes('san') || s.includes('waste') || s.includes('garbage') || s.includes('clean') || s.includes('9cabc1f2')) {
+    return CANONICAL_DEPARTMENTS[1];
+  }
+  if (s === '3' || s.includes('wtr') || s.includes('water') || s.includes('pipeline') || s.includes('sewerage') || s.includes('ead370cc')) {
+    return CANONICAL_DEPARTMENTS[2];
+  }
+  if (s === '4' || s.includes('ele') || s.includes('electric') || s.includes('light') || s.includes('streetlight') || s.includes('31842723')) {
+    return CANONICAL_DEPARTMENTS[3];
+  }
+  if (s === '5' || s.includes('trf') || s.includes('traffic') || s.includes('signal') || s.includes('sign') || s.includes('ae5e4d0c')) {
+    return CANONICAL_DEPARTMENTS[4];
+  }
+  if (s === '6' || s.includes('mnt') || s.includes('maintenance') || s.includes('facility') || s.includes('park')) {
+    return CANONICAL_DEPARTMENTS[5];
+  }
+  if (s === '7' || s.includes('drn') || s.includes('drain') || s.includes('sewage') || s.includes('sewer') || s.includes('gutter') || s.includes('ee73cb82')) {
+    return CANONICAL_DEPARTMENTS[6];
+  }
+
+  return null;
+}
+
+/**
+ * Determine the best eligible field staff member based on NagarSetu priority rules:
+ * 1. Correct department only (strictly isolated)
+ * 2. Active eligible staff only
+ * 3. Lowest active task count first
+ * 4. Among equal workload, fair round-robin (oldest last_assigned_at)
+ * 5. If still tied: better existing performance metric (SLA rate, completed tasks, lower overdue)
+ * 6. If still tied: oldest last_assigned_at / ID tie-breaker
+ *
+ * @param {Array} staffList - Array of staff objects with metrics
+ * @param {string} [priority] - Complaint priority ('Low' | 'Medium' | 'High' | 'Critical')
+ * @returns {Object|null} Selected staff member or null if none eligible
+ */
 function selectBestStaff(staffList, priority = 'Medium') {
   if (!staffList || staffList.length === 0) return null;
 
@@ -31,45 +94,35 @@ function selectBestStaff(staffList, priority = 'Medium') {
     const aActive = Number(a.active_task_count || 0);
     const bActive = Number(b.active_task_count || 0);
 
-    // Rule 2 & 4: Lowest active task count first
+    // Rule 1: Lowest active task count first
     if (aActive !== bActive) {
       return aActive - bActive;
     }
 
-    // Rule 3: If both have 0 active tasks, enforce pure round-robin rotation
-    if (aActive === 0 && bActive === 0) {
-      const aTime = a.last_assigned_at ? new Date(a.last_assigned_at).getTime() : 0;
-      const bTime = b.last_assigned_at ? new Date(b.last_assigned_at).getTime() : 0;
-      if (aTime !== bTime) {
-        return aTime - bTime; // Oldest assigned (or never assigned) comes first
-      }
-      return Number(a.id) - Number(b.id);
+    // Rule 2: Among equal workload, fair round-robin via oldest last_assigned_at
+    const aTime = a.last_assigned_at ? new Date(a.last_assigned_at).getTime() : 0;
+    const bTime = b.last_assigned_at ? new Date(b.last_assigned_at).getTime() : 0;
+    if (aTime !== bTime) {
+      return aTime - bTime;
     }
 
-    // Rule 5: Everyone has work (>0) and active count tied: Performance tie-breaker
+    // Rule 3: Better existing performance metrics if tied
     const aSla = typeof a.sla_success_rate === 'number' ? a.sla_success_rate : 1.0;
     const bSla = typeof b.sla_success_rate === 'number' ? b.sla_success_rate : 1.0;
     if (aSla !== bSla) {
-      return bSla - aSla; // Higher SLA success rate first
+      return bSla - aSla;
     }
 
     const aCompleted = Number(a.completed_task_count || 0);
     const bCompleted = Number(b.completed_task_count || 0);
     if (aCompleted !== bCompleted) {
-      return bCompleted - aCompleted; // Higher completed tasks first
+      return bCompleted - aCompleted;
     }
 
     const aOverdue = Number(a.overdue_task_count || 0);
     const bOverdue = Number(b.overdue_task_count || 0);
     if (aOverdue !== bOverdue) {
-      return aOverdue - bOverdue; // Lower overdue tasks first
-    }
-
-    // Rule 6: Still tied: oldest last_assigned_at / round-robin
-    const aTime = a.last_assigned_at ? new Date(a.last_assigned_at).getTime() : 0;
-    const bTime = b.last_assigned_at ? new Date(b.last_assigned_at).getTime() : 0;
-    if (aTime !== bTime) {
-      return aTime - bTime;
+      return aOverdue - bOverdue;
     }
 
     return Number(a.id) - Number(b.id);
@@ -87,6 +140,11 @@ function selectBestStaff(staffList, priority = 'Medium') {
 async function getEligibleDepartmentStaff(departmentId) {
   if (!departmentId) return [];
 
+  const canonicalDept = getCanonicalDepartment(departmentId);
+  const deptNumericId = canonicalDept ? canonicalDept.id : Number(departmentId);
+  const deptUuid = canonicalDept ? canonicalDept.uuid : String(departmentId);
+  const deptCode = canonicalDept ? canonicalDept.code : '';
+
   // Query only active field service staff belonging strictly to this department
   const staffQuery = `
     SELECT u.id, u.name, u.email, u.mobile, u.role, u.department_id, u.status, u.last_assigned_at,
@@ -94,7 +152,8 @@ async function getEligibleDepartmentStaff(departmentId) {
              SELECT COUNT(DISTINCT c.id)
              FROM complaints c
              WHERE (c.assigned_staff_id = CAST(u.id AS TEXT) OR LOWER(c.assigned_staff_email) = LOWER(u.email) OR c.assigned_staff_name = u.name)
-               AND c.status IN ('Assigned', 'Staff Assigned', 'Department Assigned', 'In Progress', 'Accepted', 'On the Way', 'Resolution Submitted', 'Verified')
+               AND c.status NOT IN ('Resolved', 'Closed', 'Completed', 'Rejected', 'Submitted')
+               AND c.status IS NOT NULL
            ) as active_task_count,
            (
              SELECT COUNT(DISTINCT c.id)
@@ -111,12 +170,38 @@ async function getEligibleDepartmentStaff(departmentId) {
     FROM users u
     WHERE (u.role = 'service_staff' OR u.role = 'staff')
       AND LOWER(COALESCE(u.status, 'active')) = 'active'
-      AND (u.department_id = ? OR CAST(u.department_id AS TEXT) = ?)
+      AND (
+        u.department_id = ?
+        OR CAST(u.department_id AS TEXT) = ?
+        OR u.department_id = ?
+      )
   `;
 
   try {
-    const res = await query(staffQuery, [departmentId, String(departmentId)]);
-    const staffRows = res.rows || [];
+    const res = await query(staffQuery, [
+      deptNumericId,
+      String(deptNumericId),
+      deptUuid
+    ]);
+    let staffRows = res.rows || [];
+
+    if (staffRows.length === 0) {
+      try {
+        const { getMemStore } = require('../config/db');
+        const memStore = getMemStore ? getMemStore() : null;
+        if (memStore && Array.isArray(memStore.users)) {
+          staffRows = memStore.users.filter(u =>
+            (u.role === 'service_staff' || u.role === 'staff') &&
+            (u.status || 'active').toLowerCase() === 'active' &&
+            (
+              u.department_id === deptNumericId ||
+              String(u.department_id) === String(deptNumericId) ||
+              u.department_id === deptUuid
+            )
+          );
+        }
+      } catch (e) {}
+    }
 
     // Calculate SLA success rate
     return staffRows.map((s) => {
@@ -187,7 +272,7 @@ async function autoAssignComplaint(complaintId, departmentId, options = {}) {
       String(complaintId)
     ]);
 
-    // 2. Insert into assignments table
+    // 2. Insert into assignments and task_assignments tables
     const insertAssignSql = `
       INSERT INTO assignments (complaint_id, staff_id, assigned_by, assigned_at)
       VALUES (?, ?, 'system_auto_assign', CURRENT_TIMESTAMP)
@@ -195,6 +280,12 @@ async function autoAssignComplaint(complaintId, departmentId, options = {}) {
     await query(insertAssignSql, [complaintId, chosenStaff.id]).catch((aErr) => {
       console.warn('Assignment table insert note:', aErr.message);
     });
+
+    const insertTaskAssignSql = `
+      INSERT INTO task_assignments (complaint_id, staff_id, assigned_by, created_at)
+      VALUES (?, ?, 'system_auto_assign', CURRENT_TIMESTAMP)
+    `;
+    await query(insertTaskAssignSql, [complaintId, chosenStaff.id]).catch(() => {});
 
     // 3. Update staff member's last_assigned_at for fair round-robin rotation
     const updateStaffSql = `

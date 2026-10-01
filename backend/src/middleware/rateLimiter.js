@@ -39,6 +39,11 @@ if (cleanupTimer && typeof cleanupTimer.unref === 'function') {
  * Enforces per-IP and per-account limits with progressive retry delays instead of hard lockout.
  */
 function authRateLimiter(req, res, next) {
+  // Authenticated profile operations and session inspection are not credential-guessing attempts
+  if (req.path === '/profile' || req.path === '/me' || (req.headers && req.headers['authorization'])) {
+    return next();
+  }
+
   const windowMs = getEnvInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000); // Default 15 minutes
   const maxAttempts = getEnvInt('RATE_LIMIT_AUTH_MAX', 5); // Allow 5 free attempts before backoff
   const baseBackoffSec = getEnvInt('RATE_LIMIT_AUTH_BACKOFF_BASE_SEC', 30); // 30s base multiplier

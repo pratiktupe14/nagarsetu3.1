@@ -10,11 +10,36 @@ const { authenticateToken } = require('../middleware/auth');
  * Returns status based strictly on environment configuration without external API calls
  */
 router.get('/health', (req, res) => {
-  const key = process.env.GEMINI_API_KEY;
-  const geminiConfigured = Boolean(key && key.trim() !== '' && key !== 'your_gemini_api_key_here');
+  let configuredKeyCount = 0;
+  for (let i = 1; i <= 5; i++) {
+    const k = process.env[`GEMINI_API_KEY_${i}`];
+    if (k && k.trim() !== '' && k !== 'your_gemini_api_key_here' && !k.includes('placeholder')) {
+      configuredKeyCount++;
+    }
+  }
+
+  // Fallback to legacy single or comma-separated GEMINI_API_KEY if slot keys not set
+  if (configuredKeyCount === 0 && process.env.GEMINI_API_KEY) {
+    const raw = process.env.GEMINI_API_KEY.trim();
+    if (raw && raw !== 'your_gemini_api_key_here' && !raw.includes('placeholder')) {
+      if (raw.includes(',')) {
+        configuredKeyCount = raw.split(',').map(s => s.trim()).filter(k => k && k !== 'your_gemini_api_key_here' && !k.includes('placeholder')).length;
+      } else {
+        configuredKeyCount = 1;
+      }
+    }
+  }
+
+  const aiConfigured = configuredKeyCount > 0;
+
   return res.status(200).json({
     status: 'ok',
-    geminiConfigured
+    aiConfigured,
+    geminiConfigured: aiConfigured,
+    configured: aiConfigured,
+    reachable: aiConfigured,
+    configuredKeyCount,
+    model: 'gemini-2.5-flash'
   });
 });
 

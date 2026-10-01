@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
+const { executeWithFailover } = require('./geminiKeyManager');
 
 const VALID_TAXONOMY = {
   'Road Damage / Pothole': 'Public Works Department (PWD)',
@@ -86,20 +87,10 @@ function mapDepartment(category) {
 }
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
-  const apiKey = process.env.GEMINI_API_KEY;
   const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
 
   console.log(`[GEMINI] Request started`);
-  console.log(`[GEMINI] API key configured: ${Boolean(apiKey && apiKey.trim() !== '')}`);
   console.log(`[GEMINI] Target Model: ${model}`);
-
-  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
-    console.error('[GEMINI ERROR] GEMINI_API_KEY is missing or unconfigured in environment.');
-    const errObj = new Error('Gemini analysis failed: GEMINI_API_KEY is not configured in server environment.');
-    errObj.statusCode = 503;
-    errObj.errorCode = 'AI_SERVICE_UNCONFIGURED';
-    throw errObj;
-  }
 
   let fileBuffer;
   let mimeType = 'image/jpeg';
@@ -141,128 +132,110 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
   const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   const analysisId = crypto.randomUUID();
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  return executeWithFailover(async (apiKey) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const payload = JSON.stringify({
-    contents: [
-      {
-        parts: [
-          { text: SYSTEM_PROMPT },
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Image
+    return new Promise((resolve, reject) => {
+      const options = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        },
+        timeout: 30000
+      };
+
+      const req = https.request(url, options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const parsed = JSON.parse(data);
+              const rawText = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (!rawText) throw new Error('Empty response payload from Gemini model.');
+
+              let cleanText = rawText.trim();
+              if (cleanText.startsWith('```')) {
+                cleanText = cleanText.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '').trim();
+              }
+
+              const resultObj = JSON.parse(cleanText);
+              const category = (resultObj.category && Object.prototype.hasOwnProperty.call(VALID_TAXONOMY, resultObj.category))
+                ? resultObj.category
+                : 'Other Civic Issue';
+              const department = mapDepartment(category);
+              const confidence = typeof resultObj.confidence === 'number' ? resultObj.confidence : 0.92;
+
+              resolve({
+                success: true,
+                analysis_id: analysisId,
+                image_hash: imageHash,
+                model: model,
+                is_civic_issue: resultObj.is_civic_issue ?? true,
+                category: category,
+                title: resultObj.title || `${category} Defect`,
+                description: resultObj.description || 'Vision AI identified civic issue based on visual evidence.',
+                severity: (resultObj.severity || 'HIGH').toUpperCase(),
+                priority: (resultObj.priority || 'High').charAt(0).toUpperCase() + (resultObj.priority || 'High').slice(1).toLowerCase(),
+                recommended_department: department,
+                confidence: confidence,
+                detected_features: resultObj.detected_features || [],
+                needs_manual_verification: resultObj.needs_manual_verification ?? (confidence < 0.80)
+              });
+            } catch (e) {
+              const errObj = new Error(`Structured JSON parse error: ${e.message}`);
+              errObj.statusCode = 422;
+              errObj.errorCode = 'AI_PARSE_ERROR';
+              reject(errObj);
             }
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      response_mime_type: 'application/json',
-      temperature: 0.1
-    }
-  });
+          } else {
+            let errorCode = 'AI_SERVER_ERROR';
+            let errorReason = `Gemini API returned status ${res.statusCode}`;
 
-  return new Promise((resolve, reject) => {
-    const options = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      },
-      timeout: 30000
-    };
-
-    const req = https.request(url, options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const parsed = JSON.parse(data);
-            const rawText = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!rawText) throw new Error('Empty response payload from Gemini model.');
-
-            let cleanText = rawText.trim();
-            if (cleanText.startsWith('```')) {
-              cleanText = cleanText.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '').trim();
+            if (res.statusCode === 429) {
+              errorCode = 'AI_QUOTA_EXCEEDED';
+              errorReason = 'AI Vision temporarily unavailable because the AI service quota has been reached.';
+            } else if (res.statusCode === 401) {
+              errorCode = 'AI_AUTHENTICATION_ERROR';
+              errorReason = 'Gemini API Authentication Failed (HTTP 401). Please check GEMINI_API_KEY.';
+            } else if (res.statusCode === 403) {
+              errorCode = 'AI_PERMISSION_ERROR';
+              errorReason = 'Gemini API Permission Denied (HTTP 403).';
+            } else if (res.statusCode === 404) {
+              errorCode = 'AI_MODEL_NOT_FOUND';
+              errorReason = 'Configured Gemini Model Not Found (HTTP 404).';
+            } else if (res.statusCode === 400) {
+              errorCode = 'AI_INVALID_PAYLOAD';
+              errorReason = 'Invalid Image Payload or Request (HTTP 400 Bad Request).';
             }
 
-            const resultObj = JSON.parse(cleanText);
-            const category = (resultObj.category && Object.prototype.hasOwnProperty.call(VALID_TAXONOMY, resultObj.category))
-              ? resultObj.category
-              : 'Other Civic Issue';
-            const department = mapDepartment(category);
-            const confidence = typeof resultObj.confidence === 'number' ? resultObj.confidence : 0.92;
-
-            resolve({
-              success: true,
-              analysis_id: analysisId,
-              image_hash: imageHash,
-              model: model,
-              is_civic_issue: resultObj.is_civic_issue ?? true,
-              category: category,
-              title: resultObj.title || `${category} Defect`,
-              description: resultObj.description || 'Vision AI identified civic issue based on visual evidence.',
-              severity: (resultObj.severity || 'HIGH').toUpperCase(),
-              priority: (resultObj.priority || 'High').charAt(0).toUpperCase() + (resultObj.priority || 'High').slice(1).toLowerCase(),
-              recommended_department: department,
-              confidence: confidence,
-              detected_features: resultObj.detected_features || [],
-              needs_manual_verification: resultObj.needs_manual_verification ?? (confidence < 0.80)
-            });
-          } catch (e) {
-            const errObj = new Error(`Structured JSON parse error: ${e.message}`);
-            errObj.statusCode = 422;
-            errObj.errorCode = 'AI_PARSE_ERROR';
+            const errObj = new Error(errorReason);
+            errObj.statusCode = res.statusCode;
+            errObj.errorCode = errorCode;
             reject(errObj);
           }
-        } else {
-          let errorCode = 'AI_SERVER_ERROR';
-          let errorReason = `Gemini API returned status ${res.statusCode}`;
-
-          if (res.statusCode === 429) {
-            errorCode = 'AI_QUOTA_EXCEEDED';
-            errorReason = 'AI Vision temporarily unavailable because the AI service quota has been reached.';
-          } else if (res.statusCode === 401) {
-            errorCode = 'AI_AUTHENTICATION_ERROR';
-            errorReason = 'Gemini API Authentication Failed (HTTP 401). Please check GEMINI_API_KEY.';
-          } else if (res.statusCode === 403) {
-            errorCode = 'AI_PERMISSION_ERROR';
-            errorReason = 'Gemini API Permission Denied (HTTP 403).';
-          } else if (res.statusCode === 404) {
-            errorCode = 'AI_MODEL_NOT_FOUND';
-            errorReason = 'Configured Gemini Model Not Found (HTTP 404).';
-          } else if (res.statusCode === 400) {
-            errorCode = 'AI_INVALID_PAYLOAD';
-            errorReason = 'Invalid Image Payload or Request (HTTP 400 Bad Request).';
-          }
-
-          const errObj = new Error(errorReason);
-          errObj.statusCode = res.statusCode;
-          errObj.errorCode = errorCode;
-          reject(errObj);
-        }
+        });
       });
-    });
 
-    req.on('error', (err) => {
-      const errObj = new Error(`Network transport error: ${err.message}`);
-      errObj.statusCode = 500;
-      errObj.errorCode = 'AI_NETWORK_ERROR';
-      reject(errObj);
-    });
+      req.on('error', (err) => {
+        const errObj = new Error(`Network transport error: ${err.message}`);
+        errObj.statusCode = 500;
+        errObj.errorCode = 'AI_NETWORK_ERROR';
+        reject(errObj);
+      });
 
-    req.on('timeout', () => {
-      req.destroy();
-      const errObj = new Error('API connection timeout (30s)');
-      errObj.statusCode = 504;
-      errObj.errorCode = 'AI_TIMEOUT';
-      reject(errObj);
-    });
+      req.on('timeout', () => {
+        req.destroy();
+        const errObj = new Error('API connection timeout (30s)');
+        errObj.statusCode = 504;
+        errObj.errorCode = 'AI_TIMEOUT';
+        reject(errObj);
+      });
 
-    req.write(payload);
-    req.end();
+      req.write(payload);
+      req.end();
+    });
   });
 }
 
@@ -362,16 +335,6 @@ async function compareImagesForSamePhysicalIssue(img1, img2, options = {}) {
   }
 
   // Layer 2: Visual / Angle-Invariant Match with Gemini Vision
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
-    return {
-      same_physical_issue: false,
-      confidence: 0,
-      match_type: 'visual',
-      reason: 'AI service unconfigured'
-    };
-  }
-
   try {
     const preparePart = (input) => {
       let buf = null;
@@ -422,7 +385,6 @@ Respond ONLY with a valid JSON object matching this exact structure:
 }`;
 
     const model = process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const payload = JSON.stringify({
       contents: [
@@ -442,36 +404,54 @@ Respond ONLY with a valid JSON object matching this exact structure:
       }
     });
 
-    const parsed = await new Promise((resolve) => {
-      const u = new URL(url);
-      const req = https.request({
-        hostname: u.hostname,
-        path: u.pathname + u.search,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-      }, (res) => {
-        let data = '';
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => {
-          try {
-            const body = JSON.parse(data);
-            const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-              resolve(JSON.parse(cleaned));
+    const parsed = await executeWithFailover(async (apiKey) => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      return new Promise((resolve, reject) => {
+        const u = new URL(url);
+        const req = https.request({
+          hostname: u.hostname,
+          path: u.pathname + u.search,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => { data += chunk; });
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              try {
+                const body = JSON.parse(data);
+                const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                  resolve(JSON.parse(cleaned));
+                } else {
+                  resolve({ same_physical_issue: false, confidence: 0, reason: 'Empty AI response' });
+                }
+              } catch (e) {
+                resolve({ same_physical_issue: false, confidence: 0, reason: 'Failed to parse AI response' });
+              }
             } else {
-              resolve({ same_physical_issue: false, confidence: 0, reason: 'Empty AI response' });
+              const err = new Error(`Gemini status ${res.statusCode}`);
+              err.statusCode = res.statusCode;
+              reject(err);
             }
-          } catch (e) {
-            resolve({ same_physical_issue: false, confidence: 0, reason: 'Failed to parse AI response' });
-          }
+          });
         });
+        req.on('error', (err) => {
+          const e = new Error(`Network error: ${err.message}`);
+          e.statusCode = 500;
+          reject(e);
+        });
+        req.setTimeout(10000, () => {
+          req.destroy();
+          const e = new Error('AI request timed out');
+          e.statusCode = 504;
+          reject(e);
+        });
+        req.write(payload);
+        req.end();
       });
-      req.on('error', () => resolve({ same_physical_issue: false, confidence: 0, reason: 'Network error contacting AI' }));
-      req.setTimeout(10000, () => { req.destroy(); resolve({ same_physical_issue: false, confidence: 0, reason: 'AI request timed out' }); });
-      req.write(payload);
-      req.end();
-    });
+    }).catch(err => ({ same_physical_issue: false, confidence: 0, reason: err.message }));
 
     return {
       same_physical_issue: Boolean(parsed.same_physical_issue),

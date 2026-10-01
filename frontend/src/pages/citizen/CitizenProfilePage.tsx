@@ -24,13 +24,18 @@ export const CitizenProfilePage: React.FC = () => {
     setSaved(false);
 
     try {
-      await updateUserProfile({
+      const updated = await updateUserProfile({
         full_name: fullName.trim(),
         mobile: mobile.trim(),
         email: email.trim(),
         address: address.trim(),
         language_pref: langPref
       });
+      if (updated) {
+        if (updated.full_name || updated.name) setFullName(updated.full_name || updated.name || '');
+        if (updated.address !== undefined) setAddress(updated.address);
+        if (updated.language_pref) setLangPref(updated.language_pref);
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     } catch (err: any) {
@@ -72,7 +77,7 @@ export const CitizenProfilePage: React.FC = () => {
           {saved && (
             <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Profile updated and saved to database successfully!</span>
+              <span>Profile updated successfully</span>
             </div>
           )}
 

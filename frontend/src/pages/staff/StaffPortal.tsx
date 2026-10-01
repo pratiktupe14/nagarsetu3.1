@@ -256,7 +256,10 @@ export const StaffPortal: React.FC = () => {
   // TASK SUMMARY METRICS
   const metrics = useMemo(() => {
     const total = tasks.length;
-    const newTasks = tasks.filter((t) => t.status === 'Department Assigned' || t.status === 'Staff Assigned').length;
+    const newTasks = tasks.filter((t) => {
+      const s = String(t.status || '').toLowerCase().trim();
+      return s === 'department assigned' || s === 'staff assigned' || s === 'assigned' || s === 'staff_assigned';
+    }).length;
     const activeTasks = tasks.filter((t) => t.status === 'Accepted' || t.status === 'On the Way' || t.status === 'In Progress').length;
     
     const criticalCount = tasks.filter((t) => t.priority === 'Critical').length;
@@ -322,7 +325,10 @@ export const StaffPortal: React.FC = () => {
 
   // NEW ASSIGNMENTS FOR DASHBOARD & METRICS
   const newAssignmentsListAll = useMemo(() => {
-    return tasks.filter((t) => (t.status as string) === 'Department Assigned' || (t.status as string) === 'Staff Assigned' || (t.status as string) === 'ASSIGNED');
+    return tasks.filter((t) => {
+      const s = String(t.status || '').toLowerCase().trim();
+      return s === 'department assigned' || s === 'staff assigned' || s === 'assigned' || s === 'staff_assigned';
+    });
   }, [tasks]);
 
   const newAssignmentsList = useMemo(() => {

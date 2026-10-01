@@ -274,9 +274,227 @@ router.post('/otp-verify', validateInput(otpVerifySchema), async (req, res) => {
 });
 
 // Get current user profile
-router.get('/me', authenticateToken, (req, res) => {
-  return res.json({ user: req.user });
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const authUserId = req.user.id;
+    let userRow = null;
+    const byId = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [authUserId]);
+    if (byId.rows && byId.rows.length > 0) {
+      userRow = byId.rows[0];
+    } else if (req.user.mobile || req.user.email) {
+      const byContact = await query(
+        'SELECT * FROM users WHERE mobile = ? OR (email IS NOT NULL AND LOWER(email) = ?) LIMIT 1',
+        [req.user.mobile || '', (req.user.email || '').toLowerCase()]
+      );
+      if (byContact.rows && byContact.rows.length > 0) {
+        userRow = byContact.rows[0];
+      }
+    }
+
+    if (userRow) {
+      return res.json({
+        user: {
+          id: userRow.id,
+          name: userRow.name,
+          full_name: userRow.name,
+          email: userRow.email,
+          mobile: userRow.mobile,
+          role: userRow.role,
+          address: userRow.address || userRow.residential_address || '',
+          residential_address: userRow.residential_address || userRow.address || '',
+          language_pref: userRow.language_pref || 'en'
+        }
+      });
+    }
+
+    return res.json({ user: req.user });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    return res.status(500).json({ error: 'Server error retrieving profile' });
+  }
 });
+
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const authUserId = req.user.id;
+    let userRow = null;
+    const byId = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [authUserId]);
+    if (byId.rows && byId.rows.length > 0) {
+      userRow = byId.rows[0];
+    } else if (req.user.mobile || req.user.email) {
+      const byContact = await query(
+        'SELECT * FROM users WHERE mobile = ? OR (email IS NOT NULL AND LOWER(email) = ?) LIMIT 1',
+        [req.user.mobile || '', (req.user.email || '').toLowerCase()]
+      );
+      if (byContact.rows && byContact.rows.length > 0) {
+        userRow = byContact.rows[0];
+      }
+    }
+
+    if (userRow) {
+      return res.json({
+        user: {
+          ...req.user,
+          id: userRow.id,
+          name: userRow.name,
+          full_name: userRow.name,
+          email: userRow.email,
+          mobile: userRow.mobile,
+          role: userRow.role,
+          address: userRow.address || userRow.residential_address || '',
+          residential_address: userRow.residential_address || userRow.address || '',
+          language_pref: userRow.language_pref || 'en'
+        }
+      });
+    }
+
+    return res.json({ user: req.user });
+  } catch (err) {
+    return res.json({ user: req.user });
+  }
+});
+
+// Update profile handler (PUT and PATCH)
+const handleProfileUpdate = async (req, res) => {
+  try {
+    // Step 2: Backend must identify citizen from verified auth context
+    const authUser = req.user;
+    if (!authUser || !authUser.id) {
+      return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+    }
+
+    // Check if client is trying to target another user
+    const targetId = req.body?.profile_id || req.body?.citizen_id || req.body?.user_id || req.query?.profile_id || req.query?.citizen_id || req.query?.user_id;
+
+    // Step 3: Resolve canonical user row from database
+    let userRow = null;
+    const byId = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [authUser.id]);
+    if (byId.rows && byId.rows.length > 0) {
+      userRow = byId.rows[0];
+    } else if (authUser.mobile || authUser.email) {
+      const byContact = await query(
+        'SELECT * FROM users WHERE mobile = ? OR (email IS NOT NULL AND LOWER(email) = ?) LIMIT 1',
+        [authUser.mobile || '', (authUser.email || '').toLowerCase()]
+      );
+      if (byContact.rows && byContact.rows.length > 0) {
+        userRow = byContact.rows[0];
+      }
+    }
+
+    // TEST 4: Citizen attempts to update another user's profile -> 403 / blocked
+    if (targetId && String(targetId) !== String(authUser.id) && (!userRow || String(targetId) !== String(userRow.id))) {
+      return res.status(403).json({ error: 'Forbidden: You cannot update another user profile' });
+    }
+
+    // Step 4: Whitelist allowed fields only
+    // Whitelist: full_name, residential_address, preferred_language
+    // Ignore/reject privileged fields: role, department, user_id, auth identity, account status
+    const rawName = req.body.full_name !== undefined ? req.body.full_name : req.body.name;
+    const rawAddress = req.body.residential_address !== undefined ? req.body.residential_address : req.body.address;
+    const rawLang = req.body.preferred_language !== undefined ? req.body.preferred_language : req.body.language_pref;
+
+    // Validate name if provided
+    let updatedName = userRow ? userRow.name : (authUser.name || 'Citizen');
+    if (rawName !== undefined) {
+      const trimmed = String(rawName).trim();
+      if (!trimmed) {
+        return res.status(400).json({ error: 'Full name cannot be empty' });
+      }
+      updatedName = trimmed;
+    }
+
+    // Step 5: Address is optional; blank address is valid
+    let updatedAddress = userRow ? (userRow.address || userRow.residential_address || '') : '';
+    if (rawAddress !== undefined) {
+      updatedAddress = rawAddress === null ? '' : String(rawAddress).trim();
+    }
+
+    // Validate preferred language against allowed values: en, hi, mr
+    let updatedLang = userRow ? (userRow.language_pref || 'en') : (authUser.language_pref || 'en');
+    if (rawLang !== undefined && rawLang !== null) {
+      let lang = String(rawLang).trim().toLowerCase();
+      if (lang === 'english') lang = 'en';
+      else if (lang === 'hindi') lang = 'hi';
+      else if (lang === 'marathi') lang = 'mr';
+
+      if (!['en', 'hi', 'mr'].includes(lang)) {
+        return res.status(400).json({ error: 'Invalid preferred language. Allowed values: en, hi, mr' });
+      }
+      updatedLang = lang;
+    }
+
+    // Persist to database
+    if (userRow) {
+      try {
+        await query(
+          'UPDATE users SET name = ?, language_pref = ?, address = ?, residential_address = ? WHERE id = ?',
+          [updatedName, updatedLang, updatedAddress, updatedAddress, userRow.id]
+        );
+      } catch (dbErr) {
+        console.error('Error updating users record:', dbErr.message);
+        return res.status(500).json({ error: 'Database error updating profile' });
+      }
+    } else {
+      // Create user row for demo/external auth user
+      try {
+        const ins = await query(
+          'INSERT INTO users (name, mobile, email, password_hash, role, language_pref, address, residential_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [updatedName, authUser.mobile || '8788562103', (authUser.email || '').toLowerCase() || null, 'oauth_or_demo_hash', 'citizen', updatedLang, updatedAddress, updatedAddress]
+        );
+        const newId = ins.rows && ins.rows[0] ? ins.rows[0].id : authUser.id;
+        userRow = { id: newId, role: 'citizen', email: authUser.email, mobile: authUser.mobile };
+      } catch (insErr) {
+        console.warn('Fallback insert user row note:', insErr.message);
+      }
+    }
+
+    // Step 7: Supabase sync if configured (without weakening RLS)
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        const supaPayload = {
+          full_name: updatedName,
+          language_pref: updatedLang,
+          address: updatedAddress,
+          residential_address: updatedAddress
+        };
+        if (authUser.id && typeof authUser.id === 'string' && authUser.id.includes('-')) {
+          await supabase.from('profiles').update(supaPayload).eq('id', authUser.id);
+        } else if (userRow?.email) {
+          await supabase.from('profiles').update(supaPayload).eq('email', userRow.email.toLowerCase());
+        } else if (userRow?.mobile) {
+          await supabase.from('profiles').update(supaPayload).eq('mobile', userRow.mobile);
+        }
+      } catch (sErr) {
+        console.warn('[SUPABASE_PROFILE_SYNC_NOTE]:', sErr.message);
+      }
+    }
+
+    const updatedUserObj = {
+      id: userRow ? userRow.id : authUser.id,
+      name: updatedName,
+      full_name: updatedName,
+      email: userRow?.email || authUser.email,
+      mobile: userRow?.mobile || authUser.mobile,
+      role: userRow?.role || authUser.role || 'citizen',
+      address: updatedAddress,
+      residential_address: updatedAddress,
+      language_pref: updatedLang
+    };
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedUserObj
+    });
+  } catch (err) {
+    console.error('Profile update handler error:', err);
+    return res.status(500).json({ error: err.message || 'Server error updating profile' });
+  }
+};
+
+router.put('/profile', authenticateToken, handleProfileUpdate);
+router.patch('/profile', authenticateToken, handleProfileUpdate);
 
 // Quick demo token generation endpoint for seamless offline/fallback portals (development & test only)
 router.post('/demo-token', (req, res) => {

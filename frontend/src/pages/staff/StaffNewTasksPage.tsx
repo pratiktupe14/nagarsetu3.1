@@ -151,8 +151,8 @@ export const StaffNewTasksPage: React.FC = () => {
   // Filter ONLY new assignments
   const newAssignmentsListAll = useMemo(() => {
     return tasks.filter((t) => {
-      const st = t.status as string;
-      return st === 'Department Assigned' || st === 'Staff Assigned' || st === 'ASSIGNED';
+      const st = String(t.status || '').toLowerCase().trim();
+      return st === 'department assigned' || st === 'staff assigned' || st === 'assigned' || st === 'staff_assigned';
     });
   }, [tasks]);
 

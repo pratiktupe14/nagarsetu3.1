@@ -178,6 +178,8 @@ async function createTablesPostgres() {
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_front_url TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_left_url TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_right_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS residential_address TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_closeup_url TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS angle_photos TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_photos TEXT;`).catch(() => {});
@@ -383,6 +385,8 @@ function createTablesSqlite() {
       safeAddColumn('users', 'employee_id TEXT');
       safeAddColumn('users', 'designation TEXT DEFAULT "Field Service Staff"');
       safeAddColumn('users', 'status TEXT DEFAULT "active"');
+      safeAddColumn('users', 'address TEXT');
+      safeAddColumn('users', 'residential_address TEXT');
       safeAddColumn('complaints', 'location_address TEXT');
       safeAddColumn('complaints', 'complaint_number TEXT');
 
@@ -502,6 +506,8 @@ function createTablesSqlite() {
       };
       safeAddSqliteColumn('users', "designation TEXT DEFAULT 'Field Service Staff'");
       safeAddSqliteColumn('users', 'last_assigned_at DATETIME');
+      safeAddSqliteColumn('users', 'address TEXT');
+      safeAddSqliteColumn('users', 'residential_address TEXT');
       safeAddSqliteColumn('announcements', "status TEXT DEFAULT 'Published'");
       safeAddSqliteColumn('announcements', "target_audience TEXT DEFAULT 'all_departments'");
       safeAddSqliteColumn('announcements', 'target_role TEXT');
