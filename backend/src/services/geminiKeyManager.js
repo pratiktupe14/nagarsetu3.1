@@ -37,6 +37,28 @@ function getAvailableKeys() {
   return keys;
 }
 
+function isInvalidKeyError(err) {
+  if (!err) return false;
+  const status = err.statusCode || err.status || (err.response && err.response.status);
+  const msg = String(err.message || err.error || '').toLowerCase();
+  const code = String(err.errorCode || err.code || '').toLowerCase();
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    code.includes('api_key_invalid') ||
+    code.includes('invalid_api_key') ||
+    code.includes('ai_authentication_error') ||
+    code.includes('ai_permission_error') ||
+    msg.includes('api_key_invalid') ||
+    msg.includes('api key not valid') ||
+    msg.includes('invalid api key') ||
+    msg.includes('api_key_expired') ||
+    msg.includes('authentication failed') ||
+    msg.includes('permission denied')
+  );
+}
+
 function isQuotaError(err) {
   if (!err) return false;
   const status = err.statusCode || err.status || (err.response && err.response.status);
@@ -59,10 +81,13 @@ function isRetryableError(err) {
   const msg = String(err.message || err.error || '').toLowerCase();
   const code = String(err.errorCode || err.code || '').toLowerCase();
 
-  // Quota / Rate limit
+  // Invalid API key / Auth / Forbidden (401, 403, API_KEY_INVALID)
+  if (isInvalidKeyError(err)) return true;
+
+  // Quota / Rate limit / RESOURCE_EXHAUSTED (429)
   if (isQuotaError(err)) return true;
 
-  // Temporary 5xx or server errors
+  // Server errors (500, 502, 503, 504)
   if (status >= 500 && status <= 504) return true;
 
   // Network transport / timeouts
@@ -145,7 +170,13 @@ async function executeWithFailover(apiCallFn) {
       lastRetryableError = err;
       const nextSlotHumanNumber = ((selectedSlot + 1) % keys.length) + 1;
 
-      if (isQuotaError(err)) {
+      if (isInvalidKeyError(err)) {
+        keyHealth.set(selectedSlot, {
+          unavailableUntil: Date.now() + 24 * 60 * 60 * 1000,
+          reason: 'API_KEY_INVALID'
+        });
+        console.warn(`[GEMINI FAILOVER] Gemini key ${slotHumanNumber} invalid/unauthorized (status ${err.statusCode || err.status}); switching to key ${nextSlotHumanNumber}`);
+      } else if (isQuotaError(err)) {
         keyHealth.set(selectedSlot, {
           unavailableUntil: Date.now() + COOLDOWN_QUOTA_MS,
           reason: 'QUOTA_EXHAUSTED'
@@ -193,6 +224,7 @@ function _getKeyHealth(slotIndex) {
 module.exports = {
   executeWithFailover,
   isRetryableError,
+  isInvalidKeyError,
   isQuotaError,
   COOLDOWN_QUOTA_MS,
   COOLDOWN_TEMP_MS,

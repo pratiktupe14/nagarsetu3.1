@@ -87,7 +87,8 @@ function mapDepartment(category) {
 }
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
-  const model = targetModel || process.env.GEMINI_VISION_MODEL || 'gemini-3.6-flash';
+  const configuredModel = process.env.GEMINI_VISION_MODEL;
+  const model = targetModel || ((configuredModel && !configuredModel.includes('3.6') && !configuredModel.includes('3.5')) ? configuredModel : 'gemini-2.5-flash');
 
   console.log(`[GEMINI] Request started`);
   console.log(`[GEMINI] Target Model: ${model}`);
@@ -131,6 +132,26 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
   const base64Image = fileBuffer.toString('base64');
   const imageHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   const analysisId = crypto.randomUUID();
+
+  const payload = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          { text: SYSTEM_PROMPT },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64Image
+            }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      response_mime_type: 'application/json'
+    }
+  });
 
   return executeWithFailover(async (apiKey) => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -178,6 +199,7 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
                 description: resultObj.description || 'Vision AI identified civic issue based on visual evidence.',
                 severity: (resultObj.severity || 'HIGH').toUpperCase(),
                 priority: (resultObj.priority || 'High').charAt(0).toUpperCase() + (resultObj.priority || 'High').slice(1).toLowerCase(),
+                department: department,
                 recommended_department: department,
                 confidence: confidence,
                 detected_features: resultObj.detected_features || [],
@@ -193,14 +215,29 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
             let errorCode = 'AI_SERVER_ERROR';
             let errorReason = `Gemini API returned status ${res.statusCode}`;
 
-            if (res.statusCode === 429) {
+            try {
+              const errBody = JSON.parse(data);
+              const errMsg = errBody.error?.message || '';
+              if (
+                errMsg.toLowerCase().includes('api key') ||
+                errMsg.toLowerCase().includes('api_key_invalid') ||
+                (errBody.error?.status === 'INVALID_ARGUMENT' && errMsg.toLowerCase().includes('key'))
+              ) {
+                errorCode = 'API_KEY_INVALID';
+                errorReason = `Gemini API Key Invalid: ${errMsg}`;
+              }
+            } catch (e) {}
+
+            if (errorCode === 'API_KEY_INVALID') {
+              // Handled by isInvalidKeyError
+            } else if (res.statusCode === 429) {
               errorCode = 'AI_QUOTA_EXCEEDED';
               errorReason = 'AI Vision temporarily unavailable because the AI service quota has been reached.';
             } else if (res.statusCode === 401) {
-              errorCode = 'AI_AUTHENTICATION_ERROR';
-              errorReason = 'Gemini API Authentication Failed (HTTP 401). Please check GEMINI_API_KEY.';
+              errorCode = 'API_KEY_INVALID';
+              errorReason = 'Gemini API Authentication Failed (HTTP 401).';
             } else if (res.statusCode === 403) {
-              errorCode = 'AI_PERMISSION_ERROR';
+              errorCode = 'API_KEY_INVALID';
               errorReason = 'Gemini API Permission Denied (HTTP 403).';
             } else if (res.statusCode === 404) {
               errorCode = 'AI_MODEL_NOT_FOUND';
@@ -255,8 +292,8 @@ async function analyzeComplaintPhoto(fileInput) {
   } catch (err) {
     if (err.statusCode === 404 || err.errorCode === 'AI_MODEL_NOT_FOUND') {
       try {
-        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-3.5-flash...');
-        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-3.5-flash');
+        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-1.5-flash...');
+        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-1.5-flash');
         return fallbackResult;
       } catch (fbErr) {
         err = fbErr;
@@ -274,10 +311,11 @@ async function analyzeComplaintPhoto(fileInput) {
       model: 'none',
       is_civic_issue: false,
       category: 'Other Civic Issue',
-      title: '', // Keep title clean
-      description: '', // Keep description clean
+      title: 'General Civic Defect / Public Grievance',
+      description: 'Civic issue reported for municipal review and inspection.',
       priority: 'Medium',
-      recommended_department: 'Roads & Public Works Department (PWD)',
+      department: 'Maintenance Department',
+      recommended_department: 'Maintenance Department',
       confidence: 0.0,
       detected_features: [],
       needs_manual_verification: true

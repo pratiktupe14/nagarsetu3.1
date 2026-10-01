@@ -419,16 +419,43 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
   const baseUrl = getApiUrl();
   const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';
 
+  let token = localStorage.getItem('token') || 
+              localStorage.getItem('access_token') || 
+              localStorage.getItem('authToken') ||
+              localStorage.getItem('nagarsetu_auth_token');
+
+  if (!token && isSupabaseConfigured()) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token || null;
+    } catch (e) {}
+  }
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
+      headers,
       body: formData
     });
 
     const json = await res.json().catch(() => ({}));
 
-    if (res.ok && json.success && json.ai) {
-      return json.ai;
+    if (res.ok && (json.success || json.ai)) {
+      const rawAi = json.ai || json;
+      return {
+        ...rawAi,
+        category: rawAi.category || json.category,
+        title: rawAi.title || json.title,
+        description: rawAi.description || json.description,
+        priority: rawAi.priority || json.priority,
+        department: rawAi.department || rawAi.recommended_department || json.department,
+        recommended_department: rawAi.department || rawAi.recommended_department || json.department
+      };
     }
 
     if (json.ai && json.ai.success !== false) {

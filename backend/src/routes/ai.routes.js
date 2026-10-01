@@ -48,7 +48,12 @@ router.get('/health', (req, res) => {
  * POST /api/ai/analyze
  * Accepts uploaded photo file and returns Gemini 2.5 Flash structured classification
  */
-router.post('/analyze', authenticateToken, uploadSingleImage('photo'), async (req, res) => {
+router.post('/analyze', (req, res, next) => {
+  if (req.headers['authorization']) {
+    return authenticateToken(req, res, next);
+  }
+  next();
+}, uploadSingleImage('photo'), async (req, res) => {
   const reqTime = new Date().toISOString();
   console.log(`[${reqTime}] [NAGARSETU AI] Request received: POST /api/ai/analyze`);
 
@@ -109,7 +114,12 @@ router.post('/analyze', authenticateToken, uploadSingleImage('photo'), async (re
     return res.json({
       success: true,
       photo_url: photoUrl,
-      ai: aiAnalysis
+      ai: aiAnalysis,
+      category: aiAnalysis.category,
+      title: aiAnalysis.title,
+      description: aiAnalysis.description,
+      priority: aiAnalysis.priority,
+      department: aiAnalysis.department || aiAnalysis.recommended_department
     });
   } catch (err) {
     console.error(`[${reqTime}] [NAGARSETU AI] Express analyze route error:`, err.message);

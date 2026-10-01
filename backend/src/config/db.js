@@ -194,7 +194,12 @@ async function createTablesPostgres() {
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_into_id TEXT;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_at TIMESTAMP;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS merged_by TEXT;`).catch(() => {});
-    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS location_accuracy_m REAL;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS photo_after_url TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolution_notes TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS work_performed TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS materials_used TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_notes TEXT;`).catch(() => {});
+    await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;`).catch(() => {});
     await pgPool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS primary_image_hash TEXT;`).catch(() => {});
 
     await pgPool.query(`
@@ -544,6 +549,12 @@ function createTablesSqlite() {
       safeAddSqliteColumn('complaints', 'risk_score INTEGER DEFAULT 0');
       safeAddSqliteColumn('complaints', 'priority_rank INTEGER DEFAULT 0');
       safeAddSqliteColumn('complaints', 'location_accuracy_m REAL');
+      safeAddSqliteColumn('complaints', 'photo_after_url TEXT');
+      safeAddSqliteColumn('complaints', 'resolution_notes TEXT');
+      safeAddSqliteColumn('complaints', 'work_performed TEXT');
+      safeAddSqliteColumn('complaints', 'materials_used TEXT');
+      safeAddSqliteColumn('complaints', 'additional_notes TEXT');
+      safeAddSqliteColumn('complaints', 'resolved_at DATETIME');
       safeAddSqliteColumn('complaints', 'primary_image_hash TEXT');
       safeAddSqliteColumn('departments', 'code TEXT');
 
