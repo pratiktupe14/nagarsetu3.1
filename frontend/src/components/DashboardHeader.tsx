@@ -4,9 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
 import { UserRole } from '../types/database.types';
-import {
-  Menu, Search, User, Building2, Wrench, ChevronDown, ShieldCheck, Zap, LogOut
-} from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 
 interface DashboardHeaderProps {
   title?: string;
@@ -19,17 +17,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onMobileMenuOpen,
   isMobileMenuOpen = false
 }) => {
-  const { user, role, switchRole, logout } = useAuth();
+  const { user, role, logout } = useAuth();
   const navigate = useNavigate();
   const activeRole: UserRole = role || user?.role || 'citizen';
-
-  const handleRoleSwitch = async (targetRole: UserRole) => {
-    await switchRole(targetRole);
-    if (targetRole === 'citizen') navigate('/citizen/portal');
-    if (targetRole === 'city_admin') navigate('/admin/dashboard');
-    if (targetRole === 'department_head') navigate('/department/portal');
-    if (targetRole === 'service_staff') navigate('/staff/portal');
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -57,45 +47,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       </div>
 
       {/* RIGHT: LANGUAGE SELECTOR, NOTIFICATIONS, USER PROFILE & LOGOUT */}
-      <div className="flex items-center space-x-2.5">
+      <div className="flex items-center space-x-3">
         
         {/* COMPACT LANGUAGE SELECTOR */}
         <LanguageSelector variant="compact" />
-
-        {/* DEMO ROLE SWITCHER DROPDOWN */}
-        {activeRole !== 'department_head' && (
-          <div className="relative group">
-            <button aria-label="Switch User Role" className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="capitalize">{activeRole.replace('_', ' ')}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-            </button>
-
-            <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
-              <button
-                onClick={() => handleRoleSwitch('citizen')}
-                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-              >
-                <User className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Citizen View</span>
-              </button>
-              <button
-                onClick={() => handleRoleSwitch('city_admin')}
-                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-              >
-                <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                <span>City Administration View</span>
-              </button>
-              <button
-                onClick={() => handleRoleSwitch('service_staff')}
-                className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-              >
-                <Wrench className="w-3.5 h-3.5 text-amber-600" />
-                <span>Field Staff View</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* NOTIFICATION CENTER */}
         <NotificationCenter />

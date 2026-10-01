@@ -136,6 +136,7 @@ async function authenticateToken(req, res, next) {
   const isDevOrTest = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
   if (isDevOrTest && DEMO_USER_TOKENS[token]) {
     req.user = { ...DEMO_USER_TOKENS[token] };
+    req.user.role = normalizeRole(req.user.role);
     return next();
   }
 
@@ -144,6 +145,7 @@ async function authenticateToken(req, res, next) {
     const verifiedUser = jwt.verify(token, JWT_SECRET);
     if (verifiedUser) {
       req.user = verifiedUser;
+      req.user.role = normalizeRole(req.user.role);
       return next();
     }
   } catch (expressErr) {
@@ -239,7 +241,7 @@ async function authenticateToken(req, res, next) {
       role = authUser.app_metadata?.role || authUser.user_metadata?.role || ((authUser.email || '').toLowerCase().includes('admin') ? 'city_admin' : 'citizen');
     }
 
-    const normalizedRole = role === 'admin' ? 'city_admin' : role === 'staff' ? 'service_staff' : role;
+    const normalizedRole = normalizeRole(role);
 
     req.user = {
       id: authUser.id,
@@ -256,12 +258,36 @@ async function authenticateToken(req, res, next) {
   }
 }
 
+function normalizeRole(role) {
+  if (!role || typeof role !== 'string') return 'citizen';
+  const clean = role.trim().toLowerCase().replace(/[-\s]+/g, '_');
+  if (['admin', 'city_admin', 'super_admin', 'municipal_admin'].includes(clean)) {
+    return 'city_admin';
+  }
+  if (['department_head', 'dept_head', 'hod', 'head_of_department', 'departmenthead'].includes(clean)) {
+    return 'department_head';
+  }
+  if (['staff', 'service_staff', 'field_staff', 'worker'].includes(clean)) {
+    return 'service_staff';
+  }
+  if (['officer', 'dept_officer', 'department_officer'].includes(clean)) {
+    return 'officer';
+  }
+  if (clean === 'overseer') {
+    return 'overseer';
+  }
+  return clean;
+}
+
 function requireRole(roles = []) {
+  const allowedRoles = roles.map(r => normalizeRole(r));
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    if (roles.length && !roles.includes(req.user.role)) {
+    const userRole = normalizeRole(req.user.role);
+    req.user.role = userRole;
+    if (allowedRoles.length && !allowedRoles.includes(userRole)) {
       return res.status(403).json({ error: 'Forbidden: Access denied for user role' });
     }
     next();
@@ -295,5 +321,6 @@ module.exports = {
   authenticateToken,
   optionalAuthenticateToken,
   requireRole,
+  normalizeRole,
   getSupabaseClient
 };

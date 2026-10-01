@@ -147,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse
 }) => {
   const { user, role, logout } = useAuth();
-  const { t } = useLanguage();
+  const { t, translateDepartment, translateRole } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -234,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { label: t('trackComplaint'), path: '/citizen/track', icon: Activity },
         { label: t('reportComplaint'), path: '/citizen/report', icon: PlusCircle },
         { label: t('nearbyIssues'), path: '/citizen/nearby', icon: MapPin },
-        { label: 'Civic Works', path: '/citizen/work', icon: Wrench },
+        { label: t('civicWorks'), path: '/citizen/work', icon: Wrench },
         { label: t('notifications'), path: '/citizen/notifications', icon: Bell }
       ]
     },
@@ -399,12 +399,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : citizenNav;
 
   const roleLabel = activeRole === 'city_admin' 
-    ? 'CITY ADMINISTRATION' 
+    ? t('roleAdmin') 
     : activeRole === 'department_head'
-    ? 'DEPARTMENT HEAD'
+    ? t('roleDeptHead')
     : activeRole === 'service_staff' 
-    ? 'FIELD STAFF' 
-    : 'CITIZEN';
+    ? t('roleStaff') 
+    : t('roleCitizen');
 
   const roleBadgeStyle = activeRole === 'city_admin' 
     ? 'bg-blue-50 text-blue-700 border-blue-200' 
@@ -450,17 +450,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && (
             activeRole === 'department_head' ? (
               <div className="px-2 py-1.5 rounded-lg border bg-purple-50 text-purple-800 border-purple-200 text-[10px] font-extrabold tracking-wider font-mono uppercase text-center leading-tight flex flex-col items-center justify-center space-y-0.5 break-words">
-                <span className="block leading-tight">{deptHeadLabel.mainTitle}</span>
-                <span className="block leading-tight text-purple-900 font-black">{deptHeadLabel.subtitle}</span>
+                <span className="block leading-tight">{translateDepartment(deptHeadLabel.mainTitle)}</span>
+                <span className="block leading-tight text-purple-900 font-black">{t('deptHeadPortal')}</span>
               </div>
             ) : activeRole === 'service_staff' ? (
               <div className="px-2 py-1.5 rounded-lg border bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-extrabold tracking-wider font-mono uppercase text-center leading-tight flex flex-col items-center justify-center space-y-0.5 break-words">
-                <span className="block leading-tight">{staffDeptLabel.name.toUpperCase()}</span>
-                <span className="block leading-tight text-amber-900 font-black">({staffDeptLabel.code}) FIELD STAFF PORTAL</span>
+                <span className="block leading-tight">{translateDepartment(staffDeptLabel.name).toUpperCase()}</span>
+                <span className="block leading-tight text-amber-900 font-black">({staffDeptLabel.code}) {t('fieldStaffPortal')}</span>
               </div>
             ) : (
               <div className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold tracking-wider font-mono uppercase text-center ${roleBadgeStyle}`}>
-                {roleLabel} PORTAL
+                {roleLabel} {activeRole === 'city_admin' ? '' : t('dashboard')}
               </div>
             )
           )}
@@ -564,11 +564,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1 text-xs text-gray-500 pb-2 border-b border-gray-100">
             <a href="#help" className="flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors">
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Help & Support</span>
+              <span>{t('helpSupport')}</span>
             </a>
             <a href="#about" className="flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors">
               <Info className="w-3.5 h-3.5" />
-              <span>About NAGARSETU</span>
+              <span>{t('aboutNagarsetu')}</span>
             </a>
           </div>
         )}

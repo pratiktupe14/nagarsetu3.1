@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { NotificationCenter } from './NotificationCenter';
 import { LanguageSelector } from './LanguageSelector';
-import { User, LogOut, Menu, X, Building2, Wrench, ChevronDown } from 'lucide-react';
+import { User, LogOut, Menu, X } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, role, logout, switchRole } = useAuth();
+  const { user, role, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,14 +20,6 @@ export const Navbar: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/login', { replace: true });
-  };
-
-  const handleRoleSwitch = async (targetRole: 'citizen' | 'city_admin' | 'department_head' | 'service_staff') => {
-    await switchRole(targetRole);
-    if (targetRole === 'citizen') navigate('/citizen/portal');
-    if (targetRole === 'city_admin') navigate('/admin/dashboard');
-    if (targetRole === 'department_head') navigate('/department/portal');
-    if (targetRole === 'service_staff') navigate('/staff/portal');
   };
 
   return (
@@ -105,41 +97,6 @@ export const Navbar: React.FC = () => {
             
             {/* Language Selector */}
             <LanguageSelector variant="compact" />
-
-            {/* Demo Role Selector */}
-            {!isPublicPage && (
-              <div className="relative group">
-                <button className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800 hover:bg-gray-100 flex items-center space-x-1.5 min-h-[44px]">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="capitalize">{activeRole ? activeRole.replace('_', ' ') : 'Switch Role'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                </button>
-
-                <div className="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-gray-200 shadow-lg py-1 hidden group-hover:block z-50 text-xs font-medium">
-                  <button
-                    onClick={() => handleRoleSwitch('citizen')}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                  >
-                    <User className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Citizen View</span>
-                  </button>
-                  <button
-                    onClick={() => handleRoleSwitch('city_admin')}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                  >
-                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                    <span>City Administration View</span>
-                  </button>
-                  <button
-                    onClick={() => handleRoleSwitch('service_staff')}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-800"
-                  >
-                    <Wrench className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Field Staff View</span>
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* NOTIFICATION CENTER DROPDOWN */}
             {!isPublicPage && <NotificationCenter />}

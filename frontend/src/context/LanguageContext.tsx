@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { SupportedLanguage, t as tFunction, translateStatus as translateStatusFn, translateCategory as translateCategoryFn, translatePriority as translatePriorityFn, translateDepartment as translateDepartmentFn } from '../utils/i18n';
+import {
+  SupportedLanguage,
+  t as tFunction,
+  translateStatus as translateStatusFn,
+  translateCategory as translateCategoryFn,
+  translatePriority as translatePriorityFn,
+  translateDepartment as translateDepartmentFn,
+  translateSeverity as translateSeverityFn,
+  translateRole as translateRoleFn,
+  translateLocationSource as translateLocationSourceFn,
+  translateDraftStatus as translateDraftStatusFn
+} from '../utils/i18n';
 import { useAuth } from './AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -11,6 +22,10 @@ interface LanguageContextType {
   translateCategory: (category?: string) => string;
   translatePriority: (priority?: string) => string;
   translateDepartment: (department?: string) => string;
+  translateSeverity: (severity?: string) => string;
+  translateRole: (role?: string) => string;
+  translateLocationSource: (source?: string) => string;
+  translateDraftStatus: (status?: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -74,6 +89,10 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   const translateCategory = (category?: string): string => translateCategoryFn(category, lang);
   const translatePriority = (priority?: string): string => translatePriorityFn(priority, lang);
   const translateDepartment = (department?: string): string => translateDepartmentFn(department, lang);
+  const translateSeverity = (severity?: string): string => translateSeverityFn(severity, lang);
+  const translateRole = (role?: string): string => translateRoleFn(role, lang);
+  const translateLocationSource = (source?: string): string => translateLocationSourceFn(source, lang);
+  const translateDraftStatus = (status?: string): string => translateDraftStatusFn(status, lang);
 
   return (
     <LanguageContext.Provider
@@ -84,7 +103,11 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         translateStatus,
         translateCategory,
         translatePriority,
-        translateDepartment
+        translateDepartment,
+        translateSeverity,
+        translateRole,
+        translateLocationSource,
+        translateDraftStatus
       }}
     >
       {children}
@@ -103,7 +126,11 @@ export const useLanguage = (): LanguageContextType => {
       translateStatus: (status?: string) => translateStatusFn(status, 'en'),
       translateCategory: (category?: string) => translateCategoryFn(category, 'en'),
       translatePriority: (priority?: string) => translatePriorityFn(priority, 'en'),
-      translateDepartment: (department?: string) => translateDepartmentFn(department, 'en')
+      translateDepartment: (department?: string) => translateDepartmentFn(department, 'en'),
+      translateSeverity: (severity?: string) => translateSeverityFn(severity, 'en'),
+      translateRole: (role?: string) => translateRoleFn(role, 'en'),
+      translateLocationSource: (source?: string) => translateLocationSourceFn(source, 'en'),
+      translateDraftStatus: (status?: string) => translateDraftStatusFn(status, 'en')
     };
   }
   return context;

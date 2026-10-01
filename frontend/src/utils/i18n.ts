@@ -405,7 +405,75 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     termsOfService: "Terms of Service",
     municipalHelpdesk: "Municipal Helpdesk",
     allRightsReserved: "All rights reserved.",
-    governancePlatform: "AI-Powered Municipal Governance Platform"
+    governancePlatform: "AI-Powered Municipal Governance Platform",
+
+    // Missing Global & Portal UI Keys
+    all: "All",
+    noImage: "No image",
+    liveUpdates: "Live Updates",
+    realtime: "Realtime",
+    resumeDraft: "Resume Draft",
+    draftSavedOffline: "Draft Saved Offline",
+    draftSavedOfflineNotice: "saved draft complaint(s) pending online submission.",
+    helpSupport: "Help & Support",
+    aboutNagarsetu: "About NAGARSETU",
+    goodMorning: "Good Morning",
+    goodAfternoon: "Good Afternoon",
+    goodEvening: "Good Evening",
+    deptHeadPortal: "Department Head Portal",
+    fieldStaffPortal: "Field Staff Portal",
+    cityAdminPortal: "City Administration Portal",
+    citizenPortal: "Citizen Portal",
+    primaryWork: "Primary Work:",
+    takePhoto: "Take Photo",
+    fromGallery: "From Gallery",
+    submitResolution: "Submit Resolution",
+    resolutionDetails: "Resolution Details & Proof Submission",
+    workResolutionNotes: "Work Resolution Notes",
+    materialsEquipmentUsed: "Materials / Equipment Used",
+    markWorkCompleted: "Mark Work Completed (Send for Admin Verification)",
+    submittingProof: "Submitting Proof...",
+    acceptTaskAssignment: "Accept Task Assignment",
+    navigateViaGoogleMaps: "Navigate via Google Maps",
+    markOnTheWay: 'Mark "On the Way to Site"',
+    startWork: "Start Work (In Progress)",
+    changePhoto: "Change Photo",
+    captureOrSelectPhoto: "Capture or Select Evidence Photo",
+    beforeCitizenReportLocked: "BEFORE (Citizen Report - Locked)",
+    afterResolutionProof: "AFTER (Resolution Proof Photo)",
+    complaintPhotoEvidence: "Complaint Photo Evidence",
+    adminInstructions: "Admin Instructions",
+    fieldExecutionActions: "Field Execution Lifecycle Actions",
+    myActiveTasks: "My Active Tasks",
+    noActiveTasks: "No active field tasks currently in progress.",
+    viewAllActive: "View All Active →",
+    viewAllNew: "View All New →",
+    noNewTasks: "No new tasks assigned.",
+    recentActivity: "Recent Activity",
+    viewTask: "View Task",
+    dueToday: "Due Today",
+    dueSoon: "Due Soon",
+    withinSla: "Within SLA",
+    last7Days: "Last 7 Days",
+    today: "Today",
+    older: "Older",
+    locationSourceExif: "EXIF GPS",
+    locationSourceLive: "Live GPS",
+    locationSourceMap: "Map Pin",
+    draftStatusDraft: "Draft",
+    draftStatusSavedOffline: "Saved Offline",
+    draftStatusReadySubmit: "Ready to Submit",
+    severityLow: "Low Severity",
+    severityMedium: "Medium Severity",
+    severityHigh: "High Severity",
+    severityCritical: "Critical Severity",
+    reassignStaff: "Reassign Staff",
+    assignStaffLabel: "Assign Staff",
+    workload: "Workload",
+    activeTasks: "Active Tasks",
+    availability: "Availability",
+    closed: "Closed",
+    needsVerification: "Needs Verification"
   },
 
   hi: {
@@ -800,7 +868,75 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     termsOfService: "सेवा की शर्तें",
     municipalHelpdesk: "नगर निगम हेल्पडेस्क",
     allRightsReserved: "सर्वाधिकार सुरक्षित।",
-    governancePlatform: "एआई-संचालित नगर निगम प्रशासन मंच"
+    governancePlatform: "एआई-संचालित नगर निगम प्रशासन मंच",
+
+    // Missing Global & Portal UI Keys
+    all: "सभी",
+    noImage: "कोई छवि नहीं",
+    liveUpdates: "लाइव अपडेट",
+    realtime: "रीयल-टाइम",
+    resumeDraft: "ड्राफ्ट जारी रखें",
+    draftSavedOffline: "ड्राफ्ट ऑफ़लाइन सहेजा गया",
+    draftSavedOfflineNotice: "ऑनलाइन सबमिशन के लिए लंबित सहेजी गई ड्राफ्ट शिकायतें हैं।",
+    helpSupport: "सहायता और समर्थन",
+    aboutNagarsetu: "नगरसेतु के बारे में",
+    goodMorning: "शुभ प्रभात",
+    goodAfternoon: "शुभ दोपहर",
+    goodEvening: "शुभ संध्या",
+    deptHeadPortal: "विभागाध्यक्ष पोर्टल",
+    fieldStaffPortal: "फील्ड स्टाफ पोर्टल",
+    cityAdminPortal: "नगर प्रशासन पोर्टल",
+    citizenPortal: "नागरिक पोर्टल",
+    primaryWork: "प्राथमिक कार्य:",
+    takePhoto: "फोटो लें",
+    fromGallery: "गैलरी से",
+    submitResolution: "समाधान सबमिट करें",
+    resolutionDetails: "समाधान विवरण एवं साक्ष्य सबमिशन",
+    workResolutionNotes: "कार्य समाधान नोट्स",
+    materialsEquipmentUsed: "प्रयुक्त सामग्री / उपकरण",
+    markWorkCompleted: "कार्य पूर्ण चिह्नित करें (प्रशासन सत्यापन हेतु भेजें)",
+    submittingProof: "प्रमाण सबमिट हो रहा है...",
+    acceptTaskAssignment: "कार्य सौंपना स्वीकार करें",
+    navigateViaGoogleMaps: "गूगल मैप्स से नेविगेट करें",
+    markOnTheWay: '"साइट के रास्ते में" चिह्नित करें',
+    startWork: "कार्य शुरू करें (प्रगति पर)",
+    changePhoto: "फोटो बदलें",
+    captureOrSelectPhoto: "प्रमाण फोटो खींचें या चुनें",
+    beforeCitizenReportLocked: "पहले (नागरिक रिपोर्ट - लॉक किया गया)",
+    afterResolutionProof: "बाद में (समाधान प्रमाण फोटो)",
+    complaintPhotoEvidence: "शिकायत फोटो साक्ष्य",
+    adminInstructions: "प्रशासन निर्देश",
+    fieldExecutionActions: "फील्ड निष्पादन कार्य",
+    myActiveTasks: "मेरे सक्रिय कार्य",
+    noActiveTasks: "वर्तमान में कोई सक्रिय फील्ड कार्य प्रगति पर नहीं है।",
+    viewAllActive: "सभी सक्रिय देखें →",
+    viewAllNew: "सभी नए देखें →",
+    noNewTasks: "कोई नया कार्य नहीं सौंपा गया।",
+    recentActivity: "हाल की गतिविधि",
+    viewTask: "कार्य देखें",
+    dueToday: "आज देय",
+    dueSoon: "शीघ्र देय",
+    withinSla: "समय सीमा के भीतर (SLA)",
+    last7Days: "पिछले 7 दिन",
+    today: "आज",
+    older: "पुराना",
+    locationSourceExif: "EXIF GPS",
+    locationSourceLive: "लाइव GPS",
+    locationSourceMap: "मानचित्र पिन",
+    draftStatusDraft: "ड्राफ्ट",
+    draftStatusSavedOffline: "ऑफ़लाइन सहेजा गया",
+    draftStatusReadySubmit: "सबमिट करने के लिए तैयार",
+    severityLow: "कम गंभीरता",
+    severityMedium: "मध्यम गंभीरता",
+    severityHigh: "उच्च गंभीरता",
+    severityCritical: "गंभीर तीव्रता",
+    reassignStaff: "स्टाफ पुनः सौंपें",
+    assignStaffLabel: "स्टाफ सौंपें",
+    workload: "कार्यभार",
+    activeTasks: "सक्रिय कार्य",
+    availability: "उपलब्धता",
+    closed: "बंद",
+    needsVerification: "सत्यापन आवश्यक"
   },
 
   mr: {
@@ -1193,7 +1329,75 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     termsOfService: "सेवा अटी",
     municipalHelpdesk: "महापालिका हेल्पडेस्क",
     allRightsReserved: "सर्व हक्क राखीव.",
-    governancePlatform: "एआय-आधारित महापालिका प्रशासन व्यासपीठ"
+    governancePlatform: "एआय-आधारित महापालिका प्रशासन व्यासपीठ",
+
+    // Missing Global & Portal UI Keys
+    all: "सर्व",
+    noImage: "कोणतीही प्रतिमा नाही",
+    liveUpdates: "थेट अपडेट",
+    realtime: "रिअल-टाइम",
+    resumeDraft: "मसुदा पुढे सुरू ठेवा",
+    draftSavedOffline: "मसुदा ऑफलाइन सेव्ह केला",
+    draftSavedOfflineNotice: "ऑनलाइन सबमिशनसाठी प्रलंबित सेव्ह केलेल्या मसुदा तक्रारी आहेत.",
+    helpSupport: "मदत आणि समर्थन",
+    aboutNagarsetu: "नगरसेतू बद्दल",
+    goodMorning: "शुभ सकाळ",
+    goodAfternoon: "शुभ दुपार",
+    goodEvening: "शुभ संध्याकाळ",
+    deptHeadPortal: "विभागप्रमुख पोर्टल",
+    fieldStaffPortal: "फील्ड कर्मचारी पोर्टल",
+    cityAdminPortal: "शहर प्रशासन पोर्टल",
+    citizenPortal: "नागरिक पोर्टल",
+    primaryWork: "प्राथमिक काम:",
+    takePhoto: "फोटो काढा",
+    fromGallery: "गॅलरीतून",
+    submitResolution: "निराकरण सबमिट करा",
+    resolutionDetails: "निराकरण तपशील आणि पुरावा सबमिशन",
+    workResolutionNotes: "काम निराकरण नोंदी",
+    materialsEquipmentUsed: "वापरलेले साहित्य / उपकरणे",
+    markWorkCompleted: "काम पूर्ण झाले म्हणून चिन्हांकित करा (प्रशासकीय पडताळणीसाठी पाठवा)",
+    submittingProof: "पुरावा सबमिट होत आहे...",
+    acceptTaskAssignment: "कार्य वाटप स्वीकारा",
+    navigateViaGoogleMaps: "गुगल मॅप्सद्वारे नेव्हिगेट करा",
+    markOnTheWay: '"घटनास्थळाकडे निघालो" चिन्हांकित करा',
+    startWork: "काम सुरू करा (प्रगतीपथावर)",
+    changePhoto: "फोटो बदला",
+    captureOrSelectPhoto: "पुराव्याचा फोटो काढा किंवा निवडा",
+    beforeCitizenReportLocked: "आधी (नागरिक अहवाल - लॉक केलेले)",
+    afterResolutionProof: "नंतर (निराकरण पुरावा फोटो)",
+    complaintPhotoEvidence: "तक्रार फोटो पुरावा",
+    adminInstructions: "प्रशासन सूचना",
+    fieldExecutionActions: "फील्ड अंमलबजावणी कृती",
+    myActiveTasks: "माझी सक्रिय कामे",
+    noActiveTasks: "सध्या प्रगतीपथावर कोणतेही सक्रिय फील्ड काम नाही.",
+    viewAllActive: "सर्व सक्रिय पहा →",
+    viewAllNew: "सर्व नवीन पहा →",
+    noNewTasks: "कोणतेही नवीन काम नियुक्त केलेले नाही.",
+    recentActivity: "अलीकडील घडामोडी",
+    viewTask: "काम पहा",
+    dueToday: "आज देय",
+    dueSoon: "लवकरच देय",
+    withinSla: "मुदतीमध्ये (SLA)",
+    last7Days: "मागील ७ दिवस",
+    today: "आज",
+    older: "जुने",
+    locationSourceExif: "EXIF GPS",
+    locationSourceLive: "थेट GPS",
+    locationSourceMap: "नकाशा पिन",
+    draftStatusDraft: "मसुदा",
+    draftStatusSavedOffline: "ऑफलाइन सेव्ह केले",
+    draftStatusReadySubmit: "सबमिट करण्यासाठी तयार",
+    severityLow: "कमी तीव्रता",
+    severityMedium: "मध्यम तीव्रता",
+    severityHigh: "उच्च तीव्रता",
+    severityCritical: "अतिगंभीर तीव्रता",
+    reassignStaff: "कर्मचारी पुन्हा नियुक्त करा",
+    assignStaffLabel: "कर्मचारी नियुक्त करा",
+    workload: "कामाचा ताण",
+    activeTasks: "सक्रिय कामे",
+    availability: "उपलब्धता",
+    closed: "बंद",
+    needsVerification: "पडताळणी आवश्यक"
   }
 };
 
@@ -1237,19 +1441,18 @@ export function translateStatus(status?: string, lang: SupportedLanguage = 'en')
   
   if (normalized === 'submitted') return t('statusSubmitted', lang);
   if (normalized === 'needs_verification' || normalized === 'needs verification') {
-    if (lang === 'hi') return 'सत्यापन आवश्यक';
-    if (lang === 'mr') return 'पडताळणी आवश्यक';
-    return 'Needs Verification';
+    return t('needsVerification', lang);
   }
   if (normalized === 'verified') return t('statusVerified', lang);
   if (normalized === 'approved') return t('statusApproved', lang);
-  if (normalized === 'department assigned' || normalized === 'dept_assigned') return t('statusDeptAssigned', lang);
-  if (normalized === 'staff assigned' || normalized === 'staff_assigned') return t('statusStaffAssigned', lang);
+  if (normalized === 'department assigned' || normalized === 'dept_assigned' || normalized === 'department_assigned') return t('statusDeptAssigned', lang);
+  if (normalized === 'staff assigned' || normalized === 'staff_assigned' || normalized === 'assigned') return t('statusStaffAssigned', lang);
   if (normalized === 'accepted') return t('statusAccepted', lang);
   if (normalized === 'on the way' || normalized === 'ontheway') return t('statusOnTheWay', lang);
   if (normalized === 'in progress' || normalized === 'in_progress') return t('statusInProgress', lang);
-  if (normalized === 'resolution submitted') return t('statusResolutionSubmitted', lang);
+  if (normalized === 'resolution submitted' || normalized === 'resolution_submitted' || normalized === 'pending_review' || normalized === 'pending review') return t('statusResolutionSubmitted', lang);
   if (normalized === 'resolved') return t('statusResolved', lang);
+  if (normalized === 'closed') return t('closed', lang);
   if (normalized === 'reopened') return t('statusReopened', lang);
   if (normalized === 'rejected') return t('statusRejected', lang);
   if (normalized === 'pending') return t('statusPending', lang);
@@ -1274,19 +1477,78 @@ export function translatePriority(priority?: string, lang: SupportedLanguage = '
 }
 
 /**
- * Helper to translate Department Names.
+ * Helper to translate Severity levels.
+ */
+export function translateSeverity(severity?: string, lang: SupportedLanguage = 'en'): string {
+  if (!severity || typeof severity !== 'string') return '';
+  const normalized = severity.trim().toLowerCase();
+  
+  if (normalized === 'low') return t('severityLow', lang);
+  if (normalized === 'medium') return t('severityMedium', lang);
+  if (normalized === 'high') return t('severityHigh', lang);
+  if (normalized === 'critical') return t('severityCritical', lang);
+  
+  return severity;
+}
+
+/**
+ * Helper to translate User Roles.
+ */
+export function translateRole(role?: string, lang: SupportedLanguage = 'en'): string {
+  if (!role || typeof role !== 'string') return '';
+  const normalized = role.trim().toLowerCase();
+  
+  if (normalized === 'citizen') return t('roleCitizen', lang);
+  if (normalized === 'city_admin' || normalized === 'admin') return t('roleAdmin', lang);
+  if (normalized === 'department_head' || normalized === 'dept_head') return t('roleDeptHead', lang);
+  if (normalized === 'service_staff' || normalized === 'field_staff' || normalized === 'staff') return t('roleStaff', lang);
+  if (normalized === 'officer' || normalized === 'municipal_officer') return t('roleOfficer', lang);
+  
+  return role;
+}
+
+/**
+ * Helper to translate Location Sources.
+ */
+export function translateLocationSource(source?: string, lang: SupportedLanguage = 'en'): string {
+  if (!source || typeof source !== 'string') return '';
+  const normalized = source.trim().toLowerCase();
+  
+  if (normalized.includes('exif')) return t('locationSourceExif', lang);
+  if (normalized.includes('live') || normalized.includes('device')) return t('locationSourceLive', lang);
+  if (normalized.includes('pin') || normalized.includes('map') || normalized.includes('manual')) return t('locationSourceMap', lang);
+  
+  return source;
+}
+
+/**
+ * Helper to translate Draft Status strings.
+ */
+export function translateDraftStatus(status?: string, lang: SupportedLanguage = 'en'): string {
+  if (!status || typeof status !== 'string') return '';
+  const normalized = status.trim().toLowerCase();
+  
+  if (normalized === 'draft') return t('draftStatusDraft', lang);
+  if (normalized.includes('offline')) return t('draftStatusSavedOffline', lang);
+  if (normalized.includes('ready')) return t('draftStatusReadySubmit', lang);
+  
+  return status;
+}
+
+/**
+ * Helper to translate Department Names and Canonical Codes.
  */
 export function translateDepartment(deptName?: string, lang: SupportedLanguage = 'en'): string {
   if (!deptName || typeof deptName !== 'string') return '';
   const normalized = deptName.trim().toLowerCase();
   
-  if (normalized.includes('public works') || normalized.includes('pwd') || normalized.includes('road')) return t('deptPWD', lang);
-  if (normalized.includes('sanitation') || normalized.includes('waste') || normalized.includes('garbage')) return t('deptSanitation', lang);
-  if (normalized.includes('water') || normalized.includes('pipeline')) return t('deptWater', lang);
-  if (normalized.includes('drainage') || normalized.includes('sewerage') || normalized.includes('sewage')) return t('deptDrainage', lang);
-  if (normalized.includes('electrical') || normalized.includes('light') || normalized.includes('lighting')) return t('deptElectrical', lang);
-  if (normalized.includes('traffic') || normalized.includes('signal')) return t('deptTraffic', lang);
-  if (normalized.includes('maintenance') || normalized.includes('mnt')) return t('deptMaintenance', lang);
+  if (normalized === 'pwd' || normalized.includes('public works') || normalized.includes('road')) return t('deptPWD', lang);
+  if (normalized === 'san' || normalized.includes('sanitation') || normalized.includes('waste') || normalized.includes('garbage')) return t('deptSanitation', lang);
+  if (normalized === 'wtr' || normalized.includes('water') || normalized.includes('pipeline') || normalized.includes('sewerage board')) return t('deptWater', lang);
+  if (normalized === 'drn' || normalized.includes('drainage') || normalized.includes('sewerage') || normalized.includes('sewage')) return t('deptDrainage', lang);
+  if (normalized === 'ele' || normalized.includes('electrical') || normalized.includes('light') || normalized.includes('lighting')) return t('deptElectrical', lang);
+  if (normalized === 'tra' || normalized === 'trf' || normalized.includes('traffic') || normalized.includes('signal')) return t('deptTraffic', lang);
+  if (normalized === 'mnt' || normalized.includes('maintenance')) return t('deptMaintenance', lang);
   
   return deptName;
 }

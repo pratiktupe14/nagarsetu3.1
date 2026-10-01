@@ -146,15 +146,15 @@ export const CitizenPortal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <WifiOff className="w-5 h-5 text-amber-600 shrink-0" />
               <div>
-                <span className="font-bold block text-gray-900">Draft Saved Offline</span>
-                <span>You have {offlineDraftsCount} saved draft complaint(s) pending online submission.</span>
+                <span className="font-bold block text-gray-900">{t('draftSavedOffline')}</span>
+                <span>{offlineDraftsCount} {t('draftSavedOfflineNotice')}</span>
               </div>
             </div>
             <button
               onClick={() => navigate('/citizen/report')}
               className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs min-h-[44px]"
             >
-              Resume Draft
+              {t('resumeDraft')}
             </button>
           </div>
         )}
@@ -168,7 +168,7 @@ export const CitizenPortal: React.FC = () => {
               </span>
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
                 <Zap className="w-3 h-3 text-blue-600" />
-                <span>Realtime</span>
+                <span>{t('realtime')}</span>
               </span>
             </div>
 
@@ -204,7 +204,7 @@ export const CitizenPortal: React.FC = () => {
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 flex items-center space-x-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-1" />
-                <span>Live Updates</span>
+                <span>{t('liveUpdates')}</span>
               </span>
             </div>
             <h2 className="text-xl font-extrabold text-white font-outfit">{t('myComplaints')}</h2>
@@ -263,7 +263,7 @@ export const CitizenPortal: React.FC = () => {
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  {tab === 'All' ? 'All' : tab === 'Pending' ? t('pending') : tab === 'In Progress' ? t('inProgress') : tab === 'Resolved' ? t('resolved') : tab}
+                  {tab === 'All' ? t('all') : tab === 'Pending' ? t('pending') : tab === 'In Progress' ? t('inProgress') : tab === 'Resolved' ? t('resolved') : t('statusReopened')}
                 </button>
               ))}
             </div>
@@ -304,7 +304,7 @@ export const CitizenPortal: React.FC = () => {
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-400 space-y-1">
                           <FileText className="w-6 h-6 text-gray-300" />
-                          <span className="text-[11px] font-semibold text-gray-400">No image</span>
+                          <span className="text-[11px] font-semibold text-gray-400">{t('noImage')}</span>
                         </div>
                       )}
                       <div className="absolute top-2 left-2">

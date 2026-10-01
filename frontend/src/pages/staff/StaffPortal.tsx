@@ -240,15 +240,16 @@ export const StaffPortal: React.FC = () => {
   // Greeting Time of Day
   const greetingTime = useMemo(() => {
     const hrs = now.getHours();
-    if (hrs < 12) return 'Good Morning';
-    if (hrs < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  }, [now]);
+    if (hrs < 12) return t('goodMorning');
+    if (hrs < 17) return t('goodAfternoon');
+    return t('goodEvening');
+  }, [now, t]);
 
   // Date String
   const currentDateFormatted = useMemo(() => {
-    return now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  }, [now]);
+    const locale = lang === 'hi' ? 'hi-IN' : lang === 'mr' ? 'mr-IN' : 'en-IN';
+    return now.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  }, [now, lang]);
 
   // TASK SUMMARY METRICS
   const metrics = useMemo(() => {
@@ -542,7 +543,7 @@ export const StaffPortal: React.FC = () => {
   };
 
   return (
-    <DashboardLayout title={isDashboardView ? 'Dashboard' : 'My Tasks'}>
+    <DashboardLayout title={isDashboardView ? t('dashboard') : t('myTasks')}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto text-gray-900 bg-white min-h-screen font-sans">
         
         {/* ================================================== */}
@@ -555,9 +556,9 @@ export const StaffPortal: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{deptInfo.fullName}</h2>
+                <h2 className="text-lg font-extrabold text-gray-900 font-outfit">{translateDepartment(deptInfo.fullName)}</h2>
                 <span className="font-mono text-[10px] font-bold bg-white text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
-                  Field Staff Portal
+                  {t('fieldStaffPortal')}
                 </span>
               </div>
               <p className="text-xs text-gray-600 font-medium mt-0.5">{deptInfo.description}</p>
@@ -565,11 +566,11 @@ export const StaffPortal: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-2 shrink-0 text-xs">
-            <span className="font-bold text-gray-500 uppercase tracking-wider font-outfit text-[10px]">Primary Work:</span>
+            <span className="font-bold text-gray-500 uppercase tracking-wider font-outfit text-[10px]">{t('primaryWork')}</span>
             <div className="flex flex-wrap gap-1">
-              {deptInfo.taskTypes.map((t) => (
-                <span key={t} className="px-2 py-0.5 bg-white text-gray-700 font-mono text-[10px] font-bold rounded border border-gray-200">
-                  {t}
+              {deptInfo.taskTypes.map((tItem) => (
+                <span key={tItem} className="px-2 py-0.5 bg-white text-gray-700 font-mono text-[10px] font-bold rounded border border-gray-200">
+                  {tItem}
                 </span>
               ))}
             </div>
@@ -583,17 +584,17 @@ export const StaffPortal: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight font-outfit">
-                {isProfilePage ? 'Staff Profile' : 'My Tasks'}
+                {isProfilePage ? t('profile') : t('myTasks')}
               </h1>
               <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-50 text-emerald-800 border border-emerald-300">
                 <deptInfo.icon className="w-3.5 h-3.5 text-emerald-700" />
-                <span>{deptInfo.shortName} Command</span>
+                <span>{deptInfo.shortName}</span>
               </span>
             </div>
             <p className="text-sm text-gray-600 font-medium">
               {isProfilePage
                 ? 'Your authenticated municipal staff identity and department credentials.'
-                : 'Here is your field work overview and priority assignments for today.'}
+                : `${greetingTime}! Here is your field work overview and priority assignments.`}
             </p>
           </div>
 
@@ -604,7 +605,7 @@ export const StaffPortal: React.FC = () => {
                 <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <div>
                   <div className="flex items-center space-x-1">
-                    <span className="font-extrabold text-gray-900 font-outfit">{staffDepartment}</span>
+                    <span className="font-extrabold text-gray-900 font-outfit">{translateDepartment(staffDepartment)}</span>
                     <Lock className="w-3 h-3 text-gray-400" />
                   </div>
                   <span className="font-mono text-[10px] text-gray-500 font-bold block">{staffEmployeeId}</span>
@@ -617,7 +618,7 @@ export const StaffPortal: React.FC = () => {
                 <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
                 <div>
                   <span className="font-mono font-extrabold text-gray-900 block">{currentDateFormatted}</span>
-                  <span className="text-[10px] text-gray-500 font-medium block">Today</span>
+                  <span className="text-[10px] text-gray-500 font-medium block">{t('today')}</span>
                 </div>
               </div>
             </div>
@@ -812,26 +813,26 @@ export const StaffPortal: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                {priorityTasksList.map((t) => {
-                  const slaInfo = formatSlaRemainingTime(t.sla_deadline);
-                  const isOverdue = slaInfo.isOverdue && t.status !== 'Resolved';
+                {priorityTasksList.map((taskItem) => {
+                  const slaInfo = formatSlaRemainingTime(taskItem.sla_deadline);
+                  const isOverdue = slaInfo.isOverdue && taskItem.status !== 'Resolved';
 
                   return (
                     <div
-                      key={t.id}
+                      key={taskItem.id}
                       className={`p-4 rounded-xl border space-y-3 bg-white hover:shadow-xs transition-shadow flex flex-col justify-between ${
                         isOverdue ? 'border-rose-300 bg-rose-50/20' : 'border-gray-200'
                       }`}
                     >
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-extrabold text-emerald-700">{t.complaint_number}</span>
-                          <PriorityBadge priority={t.priority} />
+                          <span className="font-mono text-xs font-extrabold text-emerald-700">{taskItem.complaint_number}</span>
+                          <PriorityBadge priority={taskItem.priority} />
                         </div>
 
                         <div>
-                          <h4 className="font-bold text-gray-900 text-xs line-clamp-1">{t.title}</h4>
-                          <p className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{t.location_address}</p>
+                          <h4 className="font-bold text-gray-900 text-xs line-clamp-1">{taskItem.title}</h4>
+                          <p className="text-[11px] text-gray-600 line-clamp-1 mt-0.5">{taskItem.location_address}</p>
                         </div>
                       </div>
 
@@ -840,15 +841,15 @@ export const StaffPortal: React.FC = () => {
                           <span className={isOverdue ? 'text-rose-700 font-bold' : 'text-gray-600'}>
                             {slaInfo.text}
                           </span>
-                          <StatusBadge status={t.status} />
+                          <StatusBadge status={taskItem.status} />
                         </div>
 
                         <button
-                          onClick={() => setSelectedTask(t)}
+                          onClick={() => setSelectedTask(taskItem)}
                           className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>View Task</span>
+                          <span>{t('viewTask')}</span>
                         </button>
                       </div>
                     </div>
@@ -873,41 +874,41 @@ export const StaffPortal: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Activity className="w-4 h-4 text-amber-600" />
                     <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                      My Active Tasks
+                      {t('myActiveTasks')}
                     </h3>
                   </div>
                   <Link to="/staff/tasks/in-progress" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
-                    View All Active →
+                    {t('viewAllActive')}
                   </Link>
                 </div>
 
                 {activeTasksList.length === 0 ? (
                   <div className="p-6 text-center text-xs text-gray-500 font-medium">
-                    No active field tasks currently in progress.
+                    {t('noActiveTasks')}
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {activeTasksList.map((t) => {
-                      const slaInfo = formatSlaRemainingTime(t.sla_deadline);
+                    {activeTasksList.map((tItem) => {
+                      const slaInfo = formatSlaRemainingTime(tItem.sla_deadline);
 
                       return (
-                        <div key={t.id} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                        <div key={tItem.id} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3 text-xs">
                           <div className="space-y-0.5">
                             <div className="flex items-center space-x-2">
-                              <span className="font-mono font-extrabold text-emerald-700">{t.complaint_number}</span>
-                              <PriorityBadge priority={t.priority} />
+                              <span className="font-mono font-extrabold text-emerald-700">{tItem.complaint_number}</span>
+                              <PriorityBadge priority={tItem.priority} />
                             </div>
-                            <span className="font-bold text-gray-900 block truncate max-w-[240px]">{t.title}</span>
-                            <span className="text-[11px] text-gray-500 block truncate">{t.location_address}</span>
+                            <span className="font-bold text-gray-900 block truncate max-w-[240px]">{tItem.title}</span>
+                            <span className="text-[11px] text-gray-500 block truncate">{tItem.location_address}</span>
                           </div>
 
                           <div className="flex items-center space-x-3 shrink-0">
                             <div className="text-right">
-                              <StatusBadge status={t.status} />
+                              <StatusBadge status={tItem.status} />
                               <span className="font-mono text-[10px] text-gray-500 block mt-0.5">{slaInfo.text}</span>
                             </div>
                             <button
-                              onClick={() => setSelectedTask(t)}
+                              onClick={() => setSelectedTask(tItem)}
                               className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                             >
                               <Eye className="w-4 h-4" />
@@ -926,17 +927,17 @@ export const StaffPortal: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <FileText className="w-4 h-4 text-blue-600" />
                     <h3 className="text-sm font-extrabold text-gray-900 font-outfit uppercase tracking-wider">
-                      New Assignments
+                      {t('newAssignments')}
                     </h3>
                   </div>
                   <Link to="/staff/tasks/new" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
-                    View All New →
+                    {t('viewAllNew')}
                   </Link>
                 </div>
 
                 {newAssignmentsList.length === 0 ? (
                   <div className="p-6 text-center text-xs text-gray-500 font-medium">
-                    No new tasks assigned.
+                    {t('noNewTasks')}
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -1145,7 +1146,7 @@ export const StaffPortal: React.FC = () => {
               {/* ADMIN INSTRUCTIONS CALLOUT */}
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
                 <span className="font-extrabold text-amber-900 font-outfit uppercase tracking-wider block">
-                  Admin Instructions
+                  {t('adminInstructions')}
                 </span>
                 <p className="text-amber-800">
                   {selectedTask.additional_notes || 'Inspect site, repair damaged civic infrastructure, and upload clear after-work photograph proof for approval.'}
@@ -1155,7 +1156,7 @@ export const StaffPortal: React.FC = () => {
               {/* FIELD WORKFLOW TRANSITION BUTTONS */}
               {selectedTask.status !== 'Resolved' && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
-                  <span className="font-extrabold text-gray-900 font-outfit block">Field Execution Lifecycle Actions</span>
+                  <span className="font-extrabold text-gray-900 font-outfit block">{t('fieldExecutionActions')}</span>
                   <div className="flex flex-wrap gap-2">
                     
                     {/* Step 1: Accept Task */}
@@ -1165,7 +1166,7 @@ export const StaffPortal: React.FC = () => {
                         className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
                       >
                         <Check className="w-4 h-4" />
-                        <span>Accept Task Assignment</span>
+                        <span>{t('acceptTaskAssignment')}</span>
                       </button>
                     )}
 
@@ -1176,7 +1177,7 @@ export const StaffPortal: React.FC = () => {
                       className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px] cursor-pointer"
                     >
                       <Navigation className="w-4 h-4" />
-                      <span>Navigate via Google Maps</span>
+                      <span>{t('navigateViaGoogleMaps')}</span>
                     </button>
 
                     {/* Step 3: Mark On the Way */}
@@ -1186,7 +1187,7 @@ export const StaffPortal: React.FC = () => {
                         className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold flex items-center space-x-1.5 min-h-[44px]"
                       >
                         <Navigation className="w-4 h-4" />
-                        <span>Mark "On the Way to Site"</span>
+                        <span>{t('markOnTheWay')}</span>
                       </button>
                     )}
 
@@ -1197,7 +1198,7 @@ export const StaffPortal: React.FC = () => {
                         className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center space-x-1.5 min-h-[44px]"
                       >
                         <Play className="w-4 h-4" />
-                        <span>Start Work (In Progress)</span>
+                        <span>{t('startWork')}</span>
                       </button>
                     )}
 
@@ -1207,12 +1208,12 @@ export const StaffPortal: React.FC = () => {
 
               {/* BEFORE / AFTER PHOTO GALLERY */}
               <div className="space-y-2 text-xs border-t border-gray-200 pt-4">
-                <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Complaint Photo Evidence</h4>
+                <h4 className="font-extrabold text-gray-900 font-outfit text-sm">{t('complaintPhotoEvidence')}</h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-gray-700 text-xs">BEFORE (Citizen Report - Locked)</span>
+                      <span className="font-bold text-gray-700 text-xs">{t('beforeCitizenReportLocked')}</span>
                       {extractComplaintAnglePhotos(selectedTask).length > 1 && (
                         <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                           {extractComplaintAnglePhotos(selectedTask).length} Angles
@@ -1254,7 +1255,7 @@ export const StaffPortal: React.FC = () => {
                   </div>
 
                   <div>
-                    <span className="font-bold text-gray-700 block mb-1">AFTER (Resolution Proof Photo)</span>
+                    <span className="font-bold text-gray-700 block mb-1">{t('afterResolutionProof')}</span>
                     {photoAfterPreview || selectedTask.photo_after_url ? (
                       <div className="relative rounded-xl overflow-hidden h-44 border border-emerald-400">
                         <img
@@ -1268,13 +1269,13 @@ export const StaffPortal: React.FC = () => {
                             onClick={() => setPhotoAfterPreview('')}
                             className="absolute top-2 right-2 bg-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold"
                           >
-                            Change Photo
+                            {t('changePhoto')}
                           </button>
                         )}
                       </div>
                     ) : (
                       <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 text-center space-y-2 bg-gray-50/50 h-44 flex flex-col items-center justify-center">
-                        <span className="text-[11px] font-bold text-gray-700 block">Capture or Select Evidence Photo</span>
+                        <span className="text-[11px] font-bold text-gray-700 block">{t('captureOrSelectPhoto')}</span>
                         
                         <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
                           {/* Option A: Take Photo with Camera */}
@@ -1296,7 +1297,7 @@ export const StaffPortal: React.FC = () => {
                             className="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer min-h-[40px] flex items-center justify-center space-x-1 shadow-xs"
                           >
                             <Camera className="w-3.5 h-3.5" />
-                            <span>Take Photo</span>
+                            <span>{t('takePhoto')}</span>
                           </label>
 
                           {/* Option B: Choose from Gallery / Files */}
@@ -1317,7 +1318,7 @@ export const StaffPortal: React.FC = () => {
                             className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer min-h-[40px] flex items-center justify-center space-x-1 shadow-xs"
                           >
                             <Upload className="w-3.5 h-3.5" />
-                            <span>From Gallery</span>
+                            <span>{t('fromGallery')}</span>
                           </label>
                         </div>
                       </div>
@@ -1329,11 +1330,11 @@ export const StaffPortal: React.FC = () => {
               {/* COMPLETE TASK FORM */}
               {selectedTask.status !== 'Resolved' && (
                 <form onSubmit={handleSubmitResolutionProof} className="space-y-4 pt-2 border-t border-gray-200 text-xs">
-                  <h4 className="font-extrabold text-gray-900 font-outfit text-sm">Resolution Details & Proof Submission</h4>
+                  <h4 className="font-extrabold text-gray-900 font-outfit text-sm">{t('resolutionDetails')}</h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold text-gray-700 mb-1">Work Resolution Notes *</label>
+                      <label className="block font-bold text-gray-700 mb-1">{t('workResolutionNotes')} *</label>
                       <input aria-label="work Notes"
                         type="text"
                         required
@@ -1345,7 +1346,7 @@ export const StaffPortal: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block font-bold text-gray-700 mb-1">Materials / Equipment Used</label>
+                      <label className="block font-bold text-gray-700 mb-1">{t('materialsEquipmentUsed')}</label>
                       <input aria-label="materials Used"
                         type="text"
                         value={materialsUsed}
@@ -1362,7 +1363,7 @@ export const StaffPortal: React.FC = () => {
                     className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-sm flex items-center justify-center space-x-1.5 min-h-[44px] disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-5 h-5" />
-                    <span>{submittingResolution ? 'Submitting Proof...' : 'Mark Work Completed (Send for Admin Verification)'}</span>
+                    <span>{submittingResolution ? t('submittingProof') : t('markWorkCompleted')}</span>
                   </button>
                 </form>
               )}

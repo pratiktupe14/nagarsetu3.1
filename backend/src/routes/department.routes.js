@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { query } = require('../config/db');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, normalizeRole } = require('../middleware/auth');
 
 // No-cache middleware for dynamic department data
 router.use((req, res, next) => {
@@ -110,7 +110,8 @@ function staffMatchesDept(staff, targetDept) {
  * Helper: Authoritatively resolve canonical department for authenticated user from session/database
  */
 async function resolveUserDepartment(req) {
-  if (['admin', 'city_admin'].includes(req.user.role)) {
+  const userRole = normalizeRole(req.user.role);
+  if (['admin', 'city_admin'].includes(userRole)) {
     return {
       userDeptId: null,
       userDeptName: 'City Administration',
@@ -142,6 +143,15 @@ async function resolveUserDepartment(req) {
     } else if (cleanEmail.includes('mnt')) {
       canonical = getCanonicalDepartment('MNT');
     }
+  }
+
+  if (!canonical && req.user.id) {
+    try {
+      const uRes = await query('SELECT department_id, department_name, department_code FROM users WHERE id = ?', [req.user.id]);
+      if (uRes.rows && uRes.rows[0]) {
+        canonical = getCanonicalDepartment(uRes.rows[0].department_id || uRes.rows[0].department_code || uRes.rows[0].department_name);
+      }
+    } catch (e) {}
   }
 
   // If still not resolved, query database
@@ -722,7 +732,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
     }
 
     const { userDeptId, canonicalDept } = await resolveUserDepartment(req);
-    const userRole = req.user.role || 'citizen';
+    const userRole = normalizeRole(req.user.role || 'citizen');
     const isAdmin = ['admin', 'city_admin'].includes(userRole);
 
     // 1. Fetch Complaint by ID or Complaint Number

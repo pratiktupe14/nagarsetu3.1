@@ -37,12 +37,20 @@ import {
   AuthError,
   isNetworkError
 } from '../../services/complaintService';
+import {
+  saveDraft as saveIndexedDBDraft,
+  getDraft as getIndexedDBDraft,
+  getDrafts as getIndexedDBDrafts,
+  deleteDraft as deleteIndexedDBDraft,
+  OfflineDraft,
+  OfflineDraftImage
+} from '../../services/offlineDraftService';
 import { resolveDepartmentInfo } from '../../services/departmentService';
 import { PriorityLevel, AIVisionResult, VisualFeatures, ImageSimilarityResult, ComplaintAngle, ComplaintAnglePhoto } from '../../types/database.types';
 import {
   Camera, Upload, Sparkles, AlertTriangle, CheckCircle2, MapPin,
   ArrowRight, ArrowLeft, RefreshCw, ShieldCheck, WifiOff, FileText, X, Edit3, Save, ThumbsUp, Plus, Image as ImageIcon, Eye, ZoomIn,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Trash2, FolderOpen, Wifi
 } from 'lucide-react';
 
 interface AngleSlotData {
@@ -175,51 +183,122 @@ export const ReportIssuePage: React.FC = () => {
     existingComplaintId?: string;
     distanceM?: number;
   } | null>(null);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [draftCreatedAt, setDraftCreatedAt] = useState<string | null>(null);
+  const [originalCaptureTime, setOriginalCaptureTime] = useState<string | null>(null);
+  const [exifGpsData, setExifGpsData] = useState<any | null>(null);
+  const [savedDraftsList, setSavedDraftsList] = useState<OfflineDraft[]>([]);
+  const [showDraftsModal, setShowDraftsModal] = useState<boolean>(false);
+  const [isOnlineStatus, setIsOnlineStatus] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const isDraftLoadedRef = React.useRef<boolean>(false);
   const isSubmittingRef = React.useRef<boolean>(false);
   const cachedComplaintsRef = React.useRef<any[] | null>(null);
+
+  // Restore a specific draft into the form
+  const restoreDraft = (draft: OfflineDraft) => {
+    setCurrentDraftId(draft.draft_id);
+    setDraftCreatedAt(draft.created_at);
+    setOriginalCaptureTime(draft.original_capture_time || draft.created_at);
+    isDraftLoadedRef.current = true;
+
+    if (draft.title) setTitle(draft.title);
+    if (draft.description) setDescription(draft.description);
+    if (draft.category) setCategory(draft.category as CivicCategory);
+    if (draft.priority) setPriority(draft.priority as PriorityLevel);
+    if (draft.department) setDepartment(draft.department);
+
+    // PRESERVE ORIGINAL ISSUE-SITE COORDINATES
+    if (draft.latitude != null && !isNaN(Number(draft.latitude))) setLat(Number(draft.latitude));
+    if (draft.longitude != null && !isNaN(Number(draft.longitude))) setLng(Number(draft.longitude));
+    if (draft.location_source) setLocationSource(draft.location_source as LocationSourceType);
+    if (draft.location_accuracy_m) setLocationAccuracy(draft.location_accuracy_m);
+    if (draft.exif_gps) setExifGpsData(draft.exif_gps);
+    if (draft.manual_address) setLocationAddress(draft.manual_address);
+
+    // Restore photos from stored Blobs/Files with fresh object URLs
+    if (draft.images && draft.images.length > 0) {
+      const updatedSlots = { ...angleSlots };
+      draft.images.forEach((img) => {
+        const file = img.blob instanceof File
+          ? img.blob
+          : new File([img.blob], img.name || `${img.angle}-view.jpg`, { type: img.type || 'image/jpeg' });
+        const previewUrl = URL.createObjectURL(file);
+        updatedSlots[img.angle] = { file, previewUrl };
+        if (img.angle === 'front') {
+          setSelectedPhotoFile(file);
+          setPhotoPreviewUrl(previewUrl);
+        }
+      });
+      setAngleSlots(updatedSlots);
+    }
+    setShowDraftsModal(false);
+    toast.info(`Restored draft: "${draft.title || draft.category}"`);
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    await deleteIndexedDBDraft(draftId);
+    if (currentDraftId === draftId) {
+      setCurrentDraftId(null);
+      isDraftLoadedRef.current = false;
+    }
+    const updated = await getIndexedDBDrafts(user?.id);
+    setSavedDraftsList(updated);
+    toast.info("Draft deleted.");
+  };
+
+  // Online / Offline Network Restoration Listeners
+  React.useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnlineStatus(true);
+      const drafts = await getIndexedDBDrafts(user?.id);
+      setSavedDraftsList(drafts);
+      if (drafts.length > 0) {
+        toast.info(
+          `You're back online. You have ${drafts.length} saved complaint${drafts.length === 1 ? '' : 's'} ready to submit.`
+        );
+        // MANDATORY: DO NOT AUTO-SUBMIT, DO NOT AUTO-UPLOAD, DO NOT AUTO-DELETE
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnlineStatus(false);
+      toast.warning("You're offline. Draft complaints and photos will be saved locally on this device.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [user?.id, toast]);
 
   // Initial AI Health & Location Check & Resume Offline Draft if present
   React.useEffect(() => {
     checkAiHealth().then(setAiHealth).catch(() => setAiHealth({ reachable: false, configured: false, model: 'Offline' }));
-    requestFreshLocation(false);
 
-    try {
-      const drafts = getOfflineDrafts();
-      if (drafts && drafts.length > 0) {
-        const latest = drafts[0] as any;
-        if (latest) {
-          if (latest.category) setCategory(latest.category as CivicCategory);
-          if (latest.title) setTitle(latest.title);
-          if (latest.description) setDescription(latest.description);
-          if (latest.priority) setPriority(latest.priority);
-          if (latest.department) setDepartment(latest.department);
-          if (latest.lat != null && !isNaN(Number(latest.lat))) setLat(Number(latest.lat));
-          if (latest.lng != null && !isNaN(Number(latest.lng))) setLng(Number(latest.lng));
-          if (latest.locationAddress) setLocationAddress(latest.locationAddress);
-          if (latest.angleDrafts) {
-            setAngleSlots({
-              front: { file: null, previewUrl: latest.angleDrafts.front || latest.photoPreviewUrl || '' },
-              left: { file: null, previewUrl: latest.angleDrafts.left || '' },
-              right: { file: null, previewUrl: latest.angleDrafts.right || '' },
-              closeup: { file: null, previewUrl: latest.angleDrafts.closeup || '' },
-            });
-            if (latest.angleDrafts.front || latest.photoPreviewUrl) {
-              setPhotoPreviewUrl(latest.angleDrafts.front || latest.photoPreviewUrl);
-            }
-          } else if (latest.photoPreviewUrl) {
-            setPhotoPreviewUrl(latest.photoPreviewUrl);
-            setAngleSlots((prev) => ({
-              ...prev,
-              front: { file: null, previewUrl: latest.photoPreviewUrl }
-            }));
-          }
-        }
+    // Load drafts from IndexedDB
+    getIndexedDBDrafts(user?.id).then((drafts) => {
+      setSavedDraftsList(drafts);
+      if (drafts && drafts.length > 0 && !currentDraftId) {
+        // Automatically restore newest draft if form is empty
+        restoreDraft(drafts[0]);
+      } else {
+        requestFreshLocation(false);
       }
-    } catch (e) {}
-  }, []);
+    }).catch(() => {
+      requestFreshLocation(false);
+    });
+  }, [user?.id]);
 
   // Request Fresh Live GPS Location & Check whether browser/device location is enabled
   const requestFreshLocation = async (isUserAction: boolean = false) => {
+    // PRESERVE ORIGINAL ISSUE-SITE COORDINATES: Never overwrite restored draft location in background
+    if (!isUserAction && isDraftLoadedRef.current) {
+      return true;
+    }
+
     setDetectingLocation(true);
 
     // Fast-path permission check via navigator.permissions if supported
@@ -395,26 +474,67 @@ export const ReportIssuePage: React.FC = () => {
     }
   };
 
-  const handleSaveDraft = () => {
-    saveOfflineDraft({
-      category,
-      title,
-      description,
-      priority,
-      department,
-      lat,
-      lng,
-      locationAddress,
-      photoPreviewUrl: angleSlots.front.previewUrl || photoPreviewUrl,
-      angleDrafts: {
-        front: angleSlots.front.previewUrl,
-        left: angleSlots.left.previewUrl,
-        right: angleSlots.right.previewUrl,
-        closeup: angleSlots.closeup.previewUrl,
+  const handleSaveDraft = async () => {
+    try {
+      const images: OfflineDraftImage[] = [];
+      (Object.keys(angleSlots) as ComplaintAngle[]).forEach((angle) => {
+        const slot = angleSlots[angle];
+        if (slot.file) {
+          images.push({
+            angle,
+            blob: slot.file,
+            name: slot.file.name,
+            type: slot.file.type || 'image/jpeg',
+            size: slot.file.size,
+            lastModified: slot.file.lastModified
+          });
+        }
+      });
+
+      const draftId = currentDraftId || `draft_${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      const draftData: OfflineDraft = {
+        draft_id: draftId,
+        citizen_id: user?.id,
+        created_at: draftCreatedAt || nowIso,
+        updated_at: nowIso,
+        draft_status: 'local_draft',
+        title: title || `${category} Issue Reported`,
+        description,
+        category,
+        priority,
+        department,
+        latitude: lat,
+        longitude: lng,
+        location_source: locationSource,
+        location_accuracy_m: locationAccuracy,
+        original_capture_time: originalCaptureTime || nowIso,
+        exif_gps: exifGpsData,
+        manual_address: locationAddress,
+        images
+      };
+
+      await saveIndexedDBDraft(draftData);
+      setCurrentDraftId(draftId);
+      isDraftLoadedRef.current = true;
+
+      const updatedDrafts = await getIndexedDBDrafts(user?.id);
+      setSavedDraftsList(updatedDrafts);
+
+      // SAVE DRAFT UI
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        toast.info(
+          "You're offline. Your complaint and photos are safely saved on this device. You can review and submit it once you're back online."
+        );
+      } else {
+        toast.success("Draft saved on this device.");
       }
-    } as any);
-    setDraftSavedToast(true);
-    setTimeout(() => setDraftSavedToast(false), 3000);
+      setDraftSavedToast(true);
+      setTimeout(() => setDraftSavedToast(false), 3000);
+    } catch (e: any) {
+      console.error("Save draft failed:", e);
+      toast.error("Failed to save draft locally.");
+    }
   };
 
   // Final Complaint Submission
@@ -428,6 +548,18 @@ export const ReportIssuePage: React.FC = () => {
     if (isSubmittingRef.current || submitting) {
       return;
     }
+
+    // MANUAL ONLINE SUBMISSION RULE:
+    // If offline: do not submit, keep draft safe
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
+      setShowReviewModal(false);
+      toast.warning("No internet connection. Your draft is safe. Submit it when you're back online.");
+      await handleSaveDraft();
+      return;
+    }
+
     isSubmittingRef.current = true;
     setSubmitting(true);
 
@@ -555,8 +687,12 @@ export const ReportIssuePage: React.FC = () => {
       };
 
       const created = await createComplaint(newComplaintData);
+      if (currentDraftId) {
+        await deleteIndexedDBDraft(currentDraftId);
+      }
       clearOfflineDrafts();
       setShowReviewModal(false);
+      toast.success("Complaint submitted successfully.");
       // Keep isSubmittingRef.current = true to lock against any duplicate submissions during redirection
       navigate('/citizen/success', { state: { complaint: created } });
     } catch (err: any) {
@@ -673,6 +809,117 @@ export const ReportIssuePage: React.FC = () => {
                 </Link>
               </div>
             )}
+          </div>
+        )}
+
+        {/* NETWORK & OFFLINE DRAFT BANNER */}
+        {!isOnlineStatus && (
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-white shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <WifiOff className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <p className="text-sm font-bold">You're currently offline</p>
+                <p className="text-xs text-slate-300">
+                  Your complaint and photos are safely saved on this device. You can review and submit it once you're back online.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold rounded-lg shadow-sm"
+            >
+              Save Draft
+            </button>
+          </div>
+        )}
+
+        {isOnlineStatus && savedDraftsList.length > 0 && (
+          <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <FolderOpen className="w-5 h-5 text-blue-600 shrink-0" />
+              <div>
+                <p className="text-sm font-bold">
+                  You're back online. You have {savedDraftsList.length} saved complaint{savedDraftsList.length === 1 ? '' : 's'} ready to submit.
+                </p>
+                <p className="text-xs text-blue-700">
+                  Select a saved draft to review its original issue-site coordinates and submit.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDraftsModal(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm"
+            >
+              View Saved Drafts ({savedDraftsList.length})
+            </button>
+          </div>
+        )}
+
+        {/* SAVED DRAFTS MODAL */}
+        {showDraftsModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-gray-200">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                <div className="flex items-center space-x-2">
+                  <FolderOpen className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-bold text-gray-900 text-base">Saved Offline Drafts ({savedDraftsList.length})</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDraftsModal(false)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                {savedDraftsList.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">No drafts saved on this device.</p>
+                ) : (
+                  savedDraftsList.map((d) => (
+                    <div key={d.draft_id} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">{d.category}</span>
+                          <h4 className="font-bold text-gray-900 text-sm">{d.title}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Saved on {new Date(d.updated_at).toLocaleString('en-IN')} • {d.images?.length || 0} photo(s)
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                          Saved Offline
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                        <span>Site Coords: {d.latitude.toFixed(5)}, {d.longitude.toFixed(5)} ({d.location_source})</span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDraft(d.draft_id)}
+                          className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-1 font-semibold"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete Draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => restoreDraft(d)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          Continue Editing & Submit
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
 

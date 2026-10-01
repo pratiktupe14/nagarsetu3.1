@@ -4427,13 +4427,13 @@ export const DepartmentHeadPortal: React.FC = () => {
                     className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs flex items-center space-x-1"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>Assign Staff</span>
+                    <span>{t('assignStaffLabel')}</span>
                   </button>
                   <button
                     onClick={() => setSelectedComplaints([])}
                     className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-800 text-emerald-200 rounded-lg font-bold text-xs"
                   >
-                    Clear Selection
+                    {t('cancel')}
                   </button>
                 </div>
               </div>
@@ -4551,14 +4551,14 @@ export const DepartmentHeadPortal: React.FC = () => {
                                     }}
                                     className="text-amber-800 font-bold bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-300 text-[11px]"
                                   >
-                                    + Assign Staff
+                                    + {t('assignStaffLabel')}
                                   </button>
                                 )}
                               </td>
                               <td className="p-3.5 whitespace-nowrap font-mono text-[11px]">
                                 {isOver && comp.status !== 'Resolved' ? (
                                   <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-900 font-extrabold border border-rose-300">
-                                    OVERDUE
+                                    {t('statusOverdue')}
                                   </span>
                                 ) : (
                                   <span className="text-gray-700 font-semibold">{slaText}</span>
@@ -4988,7 +4988,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-xs flex items-center space-x-1.5 shadow-xs"
                     >
                       <UserPlus className="w-4 h-4" />
-                      <span>Assign Staff Member</span>
+                      <span>{t('assignFieldStaffMember')}</span>
                     </button>
                   )}
                   {detailModalComplaint.status === 'Resolution Submitted' && (
@@ -5001,7 +5001,7 @@ export const DepartmentHeadPortal: React.FC = () => {
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center space-x-1.5 shadow-xs"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Verify Work Evidence</span>
+                      <span>{t('verifyApprove')}</span>
                     </button>
                   )}
                 </div>

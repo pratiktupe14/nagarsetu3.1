@@ -5,6 +5,7 @@ import { pushNotification } from './notificationService';
 import { getApiUrl, getNoCacheHeaders } from '../config/apiConfig';
 import { geocodeComplaintsWithoutCoordinates, auditAndRepairComplaintLocations } from './locationService';
 import { resolveDepartmentInfo } from './departmentService';
+import { deleteDraft as deleteIndexedDBDraft } from './offlineDraftService';
 
 const LOCAL_STORAGE_COMPLAINTS_KEY = 'nagarsetu_citizen_complaints_v3';
 const LOCAL_STORAGE_OFFLINE_DRAFTS_KEY = 'nagarsetu_offline_drafts_v3';
@@ -1885,6 +1886,9 @@ export async function submitOfflineDraft(draft: any): Promise<Complaint> {
   };
 
   const created = await createComplaint(newComplaintData);
+  if (draft.draft_id || draft.id) {
+    await deleteIndexedDBDraft(draft.draft_id || draft.id).catch(() => {});
+  }
   removeOfflineDraft(draft.id || draft.savedAt);
   return created;
 }
@@ -1923,7 +1927,11 @@ export async function assignTaskByDepartmentHead(
 
   // 1. Try Backend API first
   try {
-    const token = localStorage.getItem('nagarsetu_token') || sessionStorage.getItem('nagarsetu_token');
+    const token =
+      localStorage.getItem('nagarsetu_token_department_head') ||
+      sessionStorage.getItem('nagarsetu_token_department_head') ||
+      localStorage.getItem('nagarsetu_token') ||
+      sessionStorage.getItem('nagarsetu_token');
     const apiRes = await fetch(`${getApiUrl()}/api/department/assign`, {
       method: 'POST',
       headers: {
