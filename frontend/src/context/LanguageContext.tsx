@@ -18,6 +18,7 @@ interface LanguageContextType {
   lang: SupportedLanguage;
   language: SupportedLanguage;
   changeLanguage: (newLang: SupportedLanguage) => Promise<void>;
+  setLanguage: (newLang: SupportedLanguage) => Promise<void>;
   t: (key: string) => string;
   translateStatus: (status?: string) => string;
   translateCategory: (category?: string) => string;
@@ -36,19 +37,26 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   const user = auth?.user;
 
   const [lang, setLang] = useState<SupportedLanguage>(() => {
-    const savedUserPref = user?.language_pref as SupportedLanguage;
-    if (savedUserPref && ['en', 'hi', 'mr'].includes(savedUserPref)) {
-      return savedUserPref;
-    }
     const savedLocal = localStorage.getItem('nagarsetu_lang') as SupportedLanguage;
     if (savedLocal && ['en', 'hi', 'mr'].includes(savedLocal)) {
       return savedLocal;
+    }
+    const savedUserPref = user?.language_pref as SupportedLanguage;
+    if (savedUserPref && ['en', 'hi', 'mr'].includes(savedUserPref)) {
+      return savedUserPref;
     }
     return 'en';
   });
 
   // Sync state if user changes in AuthContext or has loaded profile preference
   useEffect(() => {
+    const savedLocal = localStorage.getItem('nagarsetu_lang') as SupportedLanguage;
+    if (savedLocal && ['en', 'hi', 'mr'].includes(savedLocal)) {
+      if (savedLocal !== lang) {
+        setLang(savedLocal);
+      }
+      return;
+    }
     if (user?.language_pref && ['en', 'hi', 'mr'].includes(user.language_pref)) {
       const userLang = user.language_pref as SupportedLanguage;
       if (userLang !== lang) {
@@ -101,6 +109,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         lang,
         language: lang,
         changeLanguage,
+        setLanguage: changeLanguage,
         t,
         translateStatus,
         translateCategory,
@@ -125,6 +134,7 @@ export const useLanguage = (): LanguageContextType => {
       lang: 'en',
       language: 'en',
       changeLanguage: async () => {},
+      setLanguage: async () => {},
       t: (key: string) => tFunction(key, 'en'),
       translateStatus: (status?: string) => translateStatusFn(status, 'en'),
       translateCategory: (category?: string) => translateCategoryFn(category, 'en'),

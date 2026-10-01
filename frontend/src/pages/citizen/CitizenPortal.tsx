@@ -27,7 +27,7 @@ function getMaintenanceBadge(status: MaintenanceWork['status']) {
 
 export const CitizenPortal: React.FC = () => {
   const { user } = useAuth();
-  const { t, translateCategory } = useLanguage();
+  const { language, t, translateCategory } = useLanguage();
   const navigate = useNavigate();
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -68,7 +68,7 @@ export const CitizenPortal: React.FC = () => {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [user, t]);
+  }, [user, language]);
 
   useEffect(() => {
     loadComplaints(true);
@@ -173,7 +173,7 @@ export const CitizenPortal: React.FC = () => {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-outfit">
-              {t('welcome')}, {user?.full_name || (user as any)?.name || 'Citizen'}
+              {t('welcome')}, {user?.full_name || (user as any)?.name || t('roleCitizen')}
             </h1>
             <p className="text-xs sm:text-sm text-gray-600">
               {t('tagline')}
@@ -226,7 +226,7 @@ export const CitizenPortal: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('totalComplaints')}</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('total')}</span>
             <div className="text-3xl font-extrabold text-gray-900 font-mono">{activeCount}</div>
           </div>
 

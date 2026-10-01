@@ -12,7 +12,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   variant = 'compact',
   className = ''
 }) => {
-  const { lang, changeLanguage } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -27,7 +27,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const currentOption = LANGUAGE_OPTIONS.find((opt) => opt.code === lang) || LANGUAGE_OPTIONS[0];
+  const currentOption = LANGUAGE_OPTIONS.find((opt) => opt.code === language) || LANGUAGE_OPTIONS[0];
 
   if (variant === 'full') {
     return (
@@ -37,12 +37,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {LANGUAGE_OPTIONS.map((opt) => {
-            const isSelected = lang === opt.code;
+            const isSelected = language === opt.code;
             return (
               <button
                 key={opt.code}
                 type="button"
-                onClick={() => changeLanguage(opt.code)}
+                onClick={() => setLanguage(opt.code)}
                 aria-pressed={isSelected}
                 className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all duration-200 ${
                   isSelected
@@ -78,12 +78,12 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     return (
       <div className={`inline-flex items-center gap-0.5 sm:gap-1 bg-gray-100/90 p-1 rounded-xl border border-gray-200/80 shrink-0 ${className}`}>
         {LANGUAGE_OPTIONS.map((opt) => {
-          const isSelected = lang === opt.code;
+          const isSelected = language === opt.code;
           return (
             <button
               key={opt.code}
               type="button"
-              onClick={() => changeLanguage(opt.code)}
+              onClick={() => setLanguage(opt.code)}
               aria-pressed={isSelected}
               title={opt.label}
               className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition-all ${
@@ -124,13 +124,13 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         >
           <div className="py-1">
             {LANGUAGE_OPTIONS.map((opt) => {
-              const isSelected = lang === opt.code;
+              const isSelected = language === opt.code;
               return (
                 <button
                   key={opt.code}
                   type="button"
                   onClick={() => {
-                    changeLanguage(opt.code);
+                    setLanguage(opt.code);
                     setIsOpen(false);
                   }}
                   className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between transition-colors ${

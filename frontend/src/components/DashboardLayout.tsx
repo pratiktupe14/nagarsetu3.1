@@ -5,6 +5,8 @@ import { DashboardHeader } from './DashboardHeader';
 import { Footer } from './Footer';
 import { ForcePasswordChangeModal } from './ForcePasswordChangeModal';
 
+import { useLanguage } from '../context/LanguageContext';
+
 interface LayoutContextType {
   isInside: boolean;
   setTitle: (title: string) => void;
@@ -17,15 +19,24 @@ interface DashboardLayoutProps {
   title?: string;
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, title = 'Dashboard' }) => {
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, title }) => {
+  const { t } = useLanguage();
   const parentLayout = useContext(DashboardLayoutContext);
-  const [currentTitle, setCurrentTitle] = useState(title);
+  const [currentTitle, setCurrentTitle] = useState(() => title || t('dashboard'));
 
   useEffect(() => {
-    if (parentLayout && title) {
-      parentLayout.setTitle(title);
+    if (parentLayout) {
+      if (title) {
+        parentLayout.setTitle(title);
+      }
+    } else {
+      if (title) {
+        setCurrentTitle(title);
+      } else {
+        setCurrentTitle(t('dashboard'));
+      }
     }
-  }, [parentLayout, title]);
+  }, [parentLayout, title, t]);
 
   useEffect(() => {
     const activeTitle = parentLayout ? title : currentTitle;
