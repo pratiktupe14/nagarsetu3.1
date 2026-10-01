@@ -88,7 +88,7 @@ function mapDepartment(category) {
 
 async function callDirectGeminiVision(fileInput, targetModel = null) {
   const configuredModel = process.env.GEMINI_VISION_MODEL;
-  const model = targetModel || ((configuredModel && !configuredModel.includes('3.6') && !configuredModel.includes('3.5')) ? configuredModel : 'gemini-2.5-flash');
+  const model = targetModel || ((configuredModel && !configuredModel.includes('2.5-flash') && !configuredModel.includes('3.6') && !configuredModel.includes('3.5')) ? configuredModel : 'gemini-3.8-flash');
 
   console.log(`[GEMINI] Request started`);
   console.log(`[GEMINI] Target Model: ${model}`);
@@ -99,8 +99,12 @@ async function callDirectGeminiVision(fileInput, targetModel = null) {
 
   if (Buffer.isBuffer(fileInput)) {
     fileBuffer = fileInput;
-  } else if (fileInput && typeof fileInput === 'object' && Buffer.isBuffer(fileInput.buffer)) {
-    fileBuffer = fileInput.buffer;
+  } else if (fileInput && typeof fileInput === 'object') {
+    if (Buffer.isBuffer(fileInput.buffer)) {
+      fileBuffer = fileInput.buffer;
+    } else if (fileInput.path && fs.existsSync(fileInput.path)) {
+      fileBuffer = fs.readFileSync(fileInput.path);
+    }
     if (fileInput.mimetype) mimeType = fileInput.mimetype;
     if (fileInput.originalname) originalName = fileInput.originalname;
   } else if (typeof fileInput === 'string') {
@@ -292,8 +296,8 @@ async function analyzeComplaintPhoto(fileInput) {
   } catch (err) {
     if (err.statusCode === 404 || err.errorCode === 'AI_MODEL_NOT_FOUND') {
       try {
-        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-1.5-flash...');
-        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-1.5-flash');
+        console.log('[NAGARSETU Backend AI] Primary model 404, attempting fallback model gemini-2.5-flash-lite...');
+        const fallbackResult = await callDirectGeminiVision(fileInput, 'gemini-2.5-flash-lite');
         return fallbackResult;
       } catch (fbErr) {
         err = fbErr;

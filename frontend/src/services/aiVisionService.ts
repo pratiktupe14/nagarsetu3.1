@@ -419,7 +419,9 @@ async function callExpressBackendAiAnalyze(file: File): Promise<any> {
   const baseUrl = getApiUrl();
   const endpoint = baseUrl ? `${baseUrl}/api/ai/analyze` : '/api/ai/analyze';
 
-  let token = localStorage.getItem('token') || 
+  let token = localStorage.getItem('nagarsetu_token') ||
+              sessionStorage.getItem('nagarsetu_token') ||
+              localStorage.getItem('token') || 
               localStorage.getItem('access_token') || 
               localStorage.getItem('authToken') ||
               localStorage.getItem('nagarsetu_auth_token');
@@ -575,10 +577,28 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
 
   // If real successful Gemini response obtained:
   if (rawRes && rawRes.category && rawRes.success !== false && !rawRes.error) {
-    const rawCategory = rawRes.category as CivicCategory;
-    const category: CivicCategory = (CIVIC_CATEGORIES as readonly string[]).includes(rawCategory)
-      ? rawCategory
-      : 'Other Civic Issue';
+    const rawCategory = String(rawRes.category || '').trim();
+    let category: CivicCategory = 'Other Civic Issue';
+    if ((CIVIC_CATEGORIES as readonly string[]).includes(rawCategory)) {
+      category = rawCategory as CivicCategory;
+    } else {
+      const lower = rawCategory.toLowerCase();
+      if (lower.includes('road') || lower.includes('pothole') || lower.includes('asphalt')) {
+        category = 'Road Damage / Pothole';
+      } else if (lower.includes('water') || lower.includes('leak') || lower.includes('pipe')) {
+        category = 'Water Leakage / Pipeline';
+      } else if (lower.includes('garbage') || lower.includes('waste') || lower.includes('trash') || lower.includes('sanitation')) {
+        category = 'Garbage / Waste';
+      } else if (lower.includes('drain') || lower.includes('sewag') || lower.includes('gutter')) {
+        category = 'Drainage / Sewage';
+      } else if (lower.includes('street') || lower.includes('light') || lower.includes('electr')) {
+        category = 'Streetlight / Electrical';
+      } else if (lower.includes('traffic') || lower.includes('signal')) {
+        category = 'Traffic Infrastructure';
+      } else if (lower.includes('infrastruct') || lower.includes('footpath') || lower.includes('damage') || lower.includes('public')) {
+        category = 'Public Infrastructure Damage';
+      }
+    }
 
     const meta = VALID_TAXONOMY_MAP[category] || VALID_TAXONOMY_MAP['Other Civic Issue'];
     const confidence = typeof rawRes.confidence === 'number' ? rawRes.confidence : 0.94;
@@ -594,7 +614,7 @@ export async function detectCivicIssue(inputFile: File, bypassCache: boolean = f
       confidence: Math.round(confidence * 100) / 100,
       confidence_level: confidenceLevel,
       priority: (rawRes.priority as PriorityLevel) || meta.defaultPriority,
-      department: normalizeDepartment(rawRes.recommended_department || meta.department, category),
+      department: normalizeDepartment(rawRes.department || rawRes.recommended_department || meta.department, category),
       title: rawRes.title || meta.defaultTitle,
       description: rawRes.description || `Civic issue detected visually by Gemini Vision.`,
       is_available: true,

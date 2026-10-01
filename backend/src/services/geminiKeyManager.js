@@ -19,17 +19,21 @@ function getAvailableKeys() {
   const keys = [];
   for (let i = 1; i <= 5; i++) {
     const k = process.env[`GEMINI_API_KEY_${i}`];
-    if (k && k.trim()) {
+    if (k && k.trim() && k !== 'your_gemini_api_key_here' && !k.includes('placeholder')) {
       keys.push(k.trim());
     }
   }
 
-  // Fallback to legacy single or comma-separated GEMINI_API_KEY if slot keys not set
-  if (keys.length === 0 && process.env.GEMINI_API_KEY) {
+  // Fallback / merge legacy single or comma-separated GEMINI_API_KEY
+  if (process.env.GEMINI_API_KEY) {
     const raw = process.env.GEMINI_API_KEY.trim();
     if (raw.includes(',')) {
-      raw.split(',').map(s => s.trim()).filter(Boolean).forEach(k => keys.push(k));
-    } else if (raw) {
+      raw.split(',').map(s => s.trim()).filter(Boolean).forEach(k => {
+        if (k && k !== 'your_gemini_api_key_here' && !k.includes('placeholder') && !keys.includes(k)) {
+          keys.push(k);
+        }
+      });
+    } else if (raw && raw !== 'your_gemini_api_key_here' && !raw.includes('placeholder') && !keys.includes(raw)) {
       keys.push(raw);
     }
   }

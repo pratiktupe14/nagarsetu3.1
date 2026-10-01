@@ -69,8 +69,27 @@ router.post('/analyze', (req, res, next) => {
 
     console.log(`[${reqTime}] [NAGARSETU AI] Image received: originalname="${req.file.originalname}", size=${req.file.size || req.file.buffer?.length} bytes, mimetype="${req.file.mimetype}"`);
 
-    // Pass req.file (contains in-memory buffer or disk path) directly
-    const aiAnalysis = await analyzeComplaintPhoto(req.file);
+    const fs = require('fs');
+    let buffer = req.file.buffer;
+    if (!buffer && req.file.path && fs.existsSync(req.file.path)) {
+      buffer = fs.readFileSync(req.file.path);
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_IMAGE',
+        message: 'Uploaded photo file is empty or unreadable.'
+      });
+    }
+
+    // Pass buffer + mimetype directly to aiService
+    const aiAnalysis = await analyzeComplaintPhoto({
+      buffer,
+      mimetype: req.file.mimetype || 'image/jpeg',
+      originalname: req.file.originalname || 'photo.jpg',
+      size: buffer.length
+    });
 
     if (aiAnalysis.success === false) {
       const statusCode = aiAnalysis.statusCode || 500;

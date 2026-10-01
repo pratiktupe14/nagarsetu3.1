@@ -828,7 +828,7 @@ router.post('/assign', authenticateToken, requireRole(['department_head', 'admin
  * POST /api/department/verify
  * Department Head verifies & approves completion -> status = 'Resolved'
  */
-router.post('/verify', authenticateToken, requireRole(['department_head', 'admin', 'city_admin']), async (req, res) => {
+router.post('/verify', authenticateToken, requireRole(['department_head', 'admin', 'city_admin', 'overseer']), async (req, res) => {
   try {
     const { complaint_id, verified_by, verified_by_name, status } = req.body;
     const targetStatus = status || 'Resolved';
@@ -837,19 +837,76 @@ router.post('/verify', authenticateToken, requireRole(['department_head', 'admin
       return res.status(400).json({ error: 'Complaint ID is required' });
     }
 
-    await query(
-      `UPDATE complaints 
-       SET status = $1, 
-           verified_by = $2, 
-           verified_by_name = $3, 
-           verified_at = CURRENT_TIMESTAMP, 
-           updated_at = CURRENT_TIMESTAMP 
-       WHERE CAST(id AS TEXT) = $4 OR complaint_number = $4`,
-      [targetStatus, verified_by || req.user.id, verified_by_name || req.user.name || 'Department Head', complaint_id]
+    const userRole = normalizeRole(req.user?.role);
+    const isAdmin = ['admin', 'city_admin'].includes(userRole);
+    const isDeptHead = userRole === 'department_head';
+
+    // 1. Fetch target complaint
+    const compRes = await query(
+      `SELECT id, complaint_number, status, department_id 
+       FROM complaints 
+       WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      [complaint_id]
     );
 
+    if (!compRes.rows || compRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found' });
+    }
+
+    const complaint = compRes.rows[0];
+
+    // 2. Department Head Isolation & Status Validation
+    if (isDeptHead) {
+      const { canonicalDept } = await resolveUserDepartment(req);
+      const userDept = canonicalDept || getCanonicalDepartment(req.user.department_id || req.user.department_code || req.user.department_name);
+      const complaintDept = getCanonicalDepartment(complaint.department_id);
+
+      if (!userDept || !complaintDept || userDept.code !== complaintDept.code) {
+        return res.status(403).json({ error: 'Forbidden: You cannot verify complaints outside your department.' });
+      }
+
+      // Reviewable state check (Resolution Submitted, Pending Review, etc.)
+      const reviewableStates = [
+        'resolution submitted',
+        'pending review',
+        'under review',
+        'pending verification',
+        'in progress',
+        'staff assigned'
+      ];
+      const curStatus = String(complaint.status || '').toLowerCase().trim();
+      if (!reviewableStates.includes(curStatus) && curStatus !== targetStatus.toLowerCase()) {
+        return res.status(400).json({
+          error: `Complaint status "${complaint.status}" cannot be verified. Must be in a reviewable state (Resolution Submitted, Pending Review).`
+        });
+      }
+    } else if (!isAdmin && userRole !== 'overseer') {
+      return res.status(403).json({ error: 'Forbidden: Access denied for user role' });
+    }
+
+    // 3. Update complaint to targetStatus (Resolved)
+    try {
+      await query(
+        `UPDATE complaints 
+         SET status = $1, 
+             verified_by = $2, 
+             verified_at = CURRENT_TIMESTAMP, 
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE CAST(id AS TEXT) = $3 OR complaint_number = $3`,
+        [targetStatus, req.user.id || verified_by || 1, complaint_id]
+      );
+    } catch (colErr) {
+      await query(
+        `UPDATE complaints 
+         SET status = $1, 
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE CAST(id AS TEXT) = $2 OR complaint_number = $2`,
+        [targetStatus, complaint_id]
+      );
+    }
+
     const verifyRes = await query(
-      `SELECT id, complaint_number, status, verified_by_name, updated_at FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
+      `SELECT id, complaint_number, status, updated_at FROM complaints WHERE CAST(id AS TEXT) = $1 OR complaint_number = $1`,
       [complaint_id]
     );
 
